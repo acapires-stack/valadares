@@ -743,7 +743,14 @@
             padding: 22px 28px 16px;
             border-radius: 2px;
             min-width: 540px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
+        /* Scrollbar discreta dentro dos modais */
+        .chest-box::-webkit-scrollbar { width: 8px; }
+        .chest-box::-webkit-scrollbar-track { background: transparent; }
+        .chest-box::-webkit-scrollbar-thumb { background: #4a3a1a; border-radius: 4px; }
+        .chest-box::-webkit-scrollbar-thumb:hover { background: #6a5020; }
         .chest-title {
             color: #e8cc7a; font-family: 'Cinzel', Georgia, serif; font-size: 18px;
             letter-spacing: 8px; text-align: center; margin-bottom: 18px;
