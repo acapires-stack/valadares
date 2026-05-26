@@ -6690,6 +6690,30 @@ function showLoadingOverlay(show){
     if (el) el.style.display = show ? 'flex' : 'none';
 }
 
+// ─── Auto-update: detecta nova versão do cliente e recarrega ──────────────
+// Checa a cada 60s o ETag/Last-Modified do HTML. Se mudou, salva e recarrega.
+// Roda só após 30s de jogo (evita reload em loop se algo der ruim no primeiro check).
+let _lastHtmlVersion = null;
+let _autoUpdateStarted = Date.now();
+async function checkClientUpdate(){
+    if (Date.now() - _autoUpdateStarted < 30000) return;  // grace period
+    try {
+        const res = await fetch(window.location.pathname || '/', { method:'HEAD', cache:'no-store' });
+        const sig = res.headers.get('etag') || res.headers.get('last-modified') || res.headers.get('content-length') || '';
+        if (!sig) return;
+        if (_lastHtmlVersion === null){ _lastHtmlVersion = sig; return; }
+        if (sig !== _lastHtmlVersion){
+            console.log('[autoupdate] nova versão detectada, recarregando em 1s…');
+            if (typeof saveState === 'function') saveState();
+            // Pequeno delay pra save persistir no localStorage
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (e) { /* sem conexão / ignora */ }
+}
+setInterval(checkClientUpdate, 60 * 1000);
+// primeiro check em 35s pra pegar baseline
+setTimeout(checkClientUpdate, 35 * 1000);
+
 // ─── Save / Load (localStorage) ──────────────────────────────────────────────
 function saveKey(){ return 'valadares:save:' + player.name; }
 function saveState(){
