@@ -4230,6 +4230,20 @@ function handleMP(msg){
         appendChat(msg.name, msg.text, msg.id === myWsId);
     } else if (msg.t === 'mobs'){
         applyMobsSnapshot(msg.list);
+    } else if (msg.t === 'mobBatch'){
+        // Bundle de updates+floats (usado por tickBossHeal pra reduzir tráfego)
+        if (Array.isArray(msg.updates)){
+            for (const u of msg.updates){
+                const m = monsters.find(x => x.id === u.id);
+                if (m){ m.hp = u.hp; m.maxHp = u.maxHp; }
+            }
+        }
+        if (Array.isArray(msg.floats)){
+            for (const f of msg.floats){
+                const m = monsters.find(x => x.id === f.mobId);
+                if (m) addFloat(m.x, m.y, f.text, f.color || '#ff8060', !!f.crit);
+            }
+        }
     } else if (msg.t === 'mobUpdate'){
         const m = monsters.find(x => x.id === msg.id);
         if (m){ m.hp = msg.hp; m.maxHp = msg.maxHp; }

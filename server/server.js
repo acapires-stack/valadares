@@ -556,7 +556,10 @@ setInterval(broadcastMobs, SNAPSHOT_MS);
 setInterval(tickRespawns, 1000);
 
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
+// Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
 function tickBossHeal(){
+    const updates = [];
+    const floats  = [];
     for (const m of monsters.values()){
         if (!m.unique || m.hp <= 0) continue;
         const lvl = m.level || 1;
@@ -565,13 +568,13 @@ function tickBossHeal(){
         const pct = Math.min(0.05, 0.02 + (lvl - 3) * 0.005);
         const heal = Math.max(1, Math.round(m.maxHp * pct));
         m.hp = Math.min(m.maxHp, m.hp + heal);
-        // notifica clientes pra HP atualizar imediato (snapshot pega no próximo tick)
-        for (const p of players.values()){
-            if (p.ws.readyState === 1){
-                p.ws.send(JSON.stringify({ t:'mobUpdate', id:m.id, hp:m.hp, maxHp:m.maxHp }));
-                p.ws.send(JSON.stringify({ t:'mobFloat', mobId:m.id, text:`+${heal}`, color:'#74d176' }));
-            }
-        }
+        updates.push({ id:m.id, hp:m.hp, maxHp:m.maxHp });
+        floats.push({ mobId:m.id, text:`+${heal}`, color:'#74d176' });
+    }
+    if (!updates.length) return;
+    const payload = JSON.stringify({ t:'mobBatch', updates, floats });
+    for (const p of players.values()){
+        if (p.ws.readyState === 1) p.ws.send(payload);
     }
 }
 setInterval(tickBossHeal, 5000);
