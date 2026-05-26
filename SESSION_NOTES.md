@@ -1,5 +1,88 @@
 # Notas de Sessão
 
+## 📅 Sessão 26/05/2026 (cont.) — Polish massivo + features sociais
+
+> **37 tasks completas numa única sessão.** Foco em bugs, segurança,
+> retenção e gameplay. Tudo em produção (Vercel + Railway).
+
+### 🔒 Bugs críticos corrigidos
+- **Auto-update matava player** — durante 1s entre detect new version e reload, mobHit continuava chegando. Fix: `_isUpdating` flag gateia damage/poison + fecha WS + overlay claro
+- **XSS via nomes de player** — log()/innerHTML sem escape. Fix: `escapeHtml()` em 12+ pontos (joins, MOTD, chat, target widget, PvP logs)
+- **EventListener/Interval leak no logout** — saveState rodava N× após N logins. Fix: refs `_saveStateIntervalId` + clear
+- **Save sobrescrevia com vazio pós-logout** — sanity check `isEmptyDefaultSave` + backup A/B + auto-recover
+- **Mob entrava no tile do player** (race condition) — `bumpMobAwayFrom` no handler pos
+- **Mobs faziam fila atrás do player** — server portou `pickSurroundSlot` (intel ≥2 cercam, intel 3 flanqueiam)
+- **Atirar pela parede** — `hasLineOfSight` (Bresenham) em arco/lança/magia/Exori
+- **Chat ficava preso no input** após Enter — agora dá blur automático + clearAllKeys
+- **Bounds checks no server** — pos handler clampa x/y, hasLineOfSight com cap de iterações
+- **Chat sem rate-limit** — throttle 1 msg/500ms no server
+
+### ⚔ Gameplay novo
+- **Anti-kite**: mobs intel≥2 e bosses sprintam (×0.6 speed) quando perseguindo a >1 tile
+- **Boss heal Lv3+**: regen 2%/5s + 0.5% por nível acima de 3 (cap 5%)
+- **Sistema de Forja**: 3 items iguais + ouro tentam upgrade +N. Cap +5. Falha 40%→95%. Stats por nível: base/def, atkSpd, moveSpd, hpRegen, veneno/sangra/fogo (DoT em mobs)
+- **DoT engine em mobs**: server processa, cliente renderiza ícones ☠/🩸/🔥
+- **Bênção da Fênix**: item anti-morte (15k no mercador, packs 5×/10× com desconto). Cancela morte por mob ou PvP, mantém skills/gold
+- **Pacotes no shop**: poções vida/mana × 10/25 com desconto
+
+### 🎨 UX/UI
+- **Sons** procedurais (Web Audio): hit, dano, kill, magia, pickup, level-up, morte
+- **Tutorial** no primeiro login
+- **Settings** (tecla O): volume, "restaurar backup", "ver tutorial"
+- **Painel ADMIN** (Settings, só alcione): restore manual de skills/gold/HP/MP + snapshot pré-morte automático
+- **Inventário/baú categorizados** — Armas/Equipamento/Cosméticos/Bênçãos/Consumíveis/Munição/Materiais
+- **Shop com qty buttons** (vender 1/10/tudo)
+- **HP/MP visíveis** em outros players (broadcast via playerSync)
+- **Mini-PZ NPC** reduzido pra raio 1 + quebra ao atacar (anti-cheese)
+
+### 🌟 Features sociais (a sessão das 6)
+- **#1 Ranking** (tecla L): top 10 em mobs/PvP/bosses/gold. Server agrega + persiste
+- **#2 Eventos semanais**: boss **O Arauto** spawna sáb 20h-22h BRT em (50,65). Drops: gold + Bênção + cosméticos
+- **#3 Cosméticos**: 5 items só visuais (capas/auras/nome dourado). Drop do Arauto. Propaga via pstats
+- **#4 Amigos** (tecla N): lista local + whisper privado via `/msg nome texto`
+- **#5 Trade direto**: `/trade nome` no chat (≤3 tiles). Modal 2 colunas + confirm atomic. Re-validação no server
+- **#6 Guilds**: `/guild create NOME`, `invite`, `join`, `leave`, `info`, `list`. Chat exclusivo `/g msg`
+
+### 🔧 Refactor / qualidade
+- `applyAttackMults()` helper compartilhado (pvpMults + Coração + buff)
+- `categorizeItems()` helper compartilhado entre inv e baú
+- `mobBatch` no server bundle de update+float (12× menos tráfego)
+- 3 magias adicionadas: **Exori** (AoE), **Provocação** (taunt), **Fúria** (buff +25% dmg/spd)
+
+### 💰 Decisão comercial documentada
+- **Monetização futura: só vender gold** (PIX via MercadoPago/Asaas). Itens (Bênção, forja, magias) continuam compra in-game
+- **Modelo**: pay-to-skip-grind, não pay-to-win-direto
+- Webhook gateway → server credita gold automático
+- Painel admin já existe pra credit manual
+- Volume mínimo viável: ~100 players ativos × R$15/mês
+
+### 🎮 Atalhos novos
+| Tecla | Função |
+|---|---|
+| L | Ranking |
+| N | Amigos |
+| O | Opções (já tinha) |
+
+### 📍 Estado para retomar próxima sessão
+- Tudo em produção. Auto-update do cliente puxa em até 60s
+- 37 tasks completas — ROADMAP atualizado abaixo
+- Sem bugs conhecidos pendentes
+- Próximos focos sugeridos: testar com 5-10 amigos pra validar gameplay; depois open beta pra 50-100; só aí pensar em monetização
+
+### 🗺 Roadmap pós-sessão
+- ✅ Tudo do roadmap original
+- ✅ Bateria social (#1–#6 que o user pediu)
+- 🟡 Ideias futuras se necessário:
+  - Tag visual da guild no nome do boneco
+  - Modal de membros da guild
+  - Ranking de guilds
+  - Trade via UI (drag-drop ou click do nome na lista online)
+  - Mais cosméticos (efeitos especiais ao atacar, trail, etc)
+  - Eventos extras (raid mensal, mini-events diários)
+  - Sons ambient + música
+
+---
+
 ## 📅 Sessão 26/05/2026 — Deploy + endgame loop + raid boss
 
 ### 🚀 Deploy completo
