@@ -197,6 +197,13 @@ function mobAt(x, y){
     for (const m of monsters.values()) if (m.x === x && m.y === y && m.hp > 0) return m;
     return null;
 }
+function playerAt(x, y){
+    for (const p of players.values()){
+        if (p.disconnected) continue;
+        if (p.x === x && p.y === y) return p;
+    }
+    return null;
+}
 function spawnMob(type, x, y){
     const def = MTYPE[type];
     if (!def) return null;
@@ -401,6 +408,7 @@ function tickAI(){
             if (!isWalkable(nx, ny)) continue;
             if (inSafe(nx, ny)) continue;
             if (mobAt(nx, ny)) continue;
+            if (playerAt(nx, ny)) continue;   // não entra no tile de player
             m.x = nx; m.y = ny;
             m.dir = dy > 0 ? 'down' : dy < 0 ? 'up' : dx > 0 ? 'right' : 'left';
             break;
