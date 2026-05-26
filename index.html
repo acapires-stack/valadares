@@ -3401,10 +3401,15 @@ function renderChest(){
     };
     const invEl = document.getElementById('chestInvList');
     const chEl  = document.getElementById('chestChestList');
-    const invItems = Object.entries(player.inv).filter(([k,q]) => q > 0);
-    const chItems  = Object.entries(bag).filter(([k,q]) => k !== '_GOLD' && q > 0);
-    invEl.innerHTML = invItems.length ? invItems.map(([k,q]) => fmt(k,q,'inv')).join('') : '<div class="chest-empty">vazio</div>';
-    chEl.innerHTML  = chItems.length  ? chItems.map(([k,q]) => fmt(k,q,'chest')).join('') : '<div class="chest-empty">vazio</div>';
+    const renderGroups = (entries, side) => {
+        const groups = categorizeItems(entries);
+        if (!groups.length) return '<div class="chest-empty">vazio</div>';
+        return groups
+            .map(c => `<div class="inv-cat-head"><span>${c.label}</span><span class="inv-cat-count">${c.items.length}</span></div>${c.items.map(([k,q]) => fmt(k,q,side)).join('')}`)
+            .join('');
+    };
+    invEl.innerHTML = renderGroups(Object.entries(player.inv), 'inv');
+    chEl.innerHTML  = renderGroups(Object.entries(bag).filter(([k]) => k !== '_GOLD'), 'chest');
     document.getElementById('chestPlayerGold').textContent = player.gold + ' g';
     // Total de ouro entre todos os baús (mostra só no general)
     const totalGold = Object.values(player.chests).reduce((s,c) => s + (c._GOLD||0), 0);
@@ -5726,6 +5731,30 @@ function drawAmmoIcon(P, c, dark, light){
 }
 
 let invSignature = null;
+// Categorização compartilhada entre inventário e baús
+const ITEM_CATEGORIES = [
+    { label: 'Armas',        kinds: ['weapon'] },
+    { label: 'Equipamento',  kinds: ['offhand','armor','head','feet','neck'] },
+    { label: 'Consumíveis',  kinds: ['food','potion'] },
+    { label: 'Munição',      kinds: ['ammo'] },
+    { label: 'Materiais',    kinds: ['mat'] },
+];
+const ITEM_CATEGORY_KNOWN_KINDS = new Set(ITEM_CATEGORIES.flatMap(c => c.kinds));
+function categorizeItems(entries){
+    const usable = entries.filter(([k,q]) => q > 0 && ITEMS[k]);
+    const groups = ITEM_CATEGORIES.map(cat => ({
+        label: cat.label,
+        items: usable
+            .filter(([k]) => cat.kinds.includes(ITEMS[k].kind))
+            .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR')),
+    }));
+    const orphans = usable
+        .filter(([k]) => !ITEM_CATEGORY_KNOWN_KINDS.has(ITEMS[k].kind))
+        .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
+    if (orphans.length) groups.push({ label: 'Outros', items: orphans });
+    return groups.filter(g => g.items.length);
+}
+
 function renderInventoryIfChanged(){
     const sig = JSON.stringify([player.equipped, player.inv]);
     if (sig === invSignature) return;
@@ -5770,30 +5799,10 @@ function renderInventoryIfChanged(){
     eqEl.innerHTML = `<div class="paper-doll">${slotHtml}</div>${ammoLine}`;
 
     const invEl = document.getElementById('inventory');
-    const items = Object.entries(player.inv).filter(([k,q]) => q > 0 && ITEMS[k]);
-    if (!items.length){
+    const groups = categorizeItems(Object.entries(player.inv));
+    if (!groups.length){
         invEl.innerHTML = '<span style="color:#666">vazio</span>';
     } else {
-        // Categorias em ordem fixa; vazias ficam ocultas
-        const CATEGORIES = [
-            { label: 'Armas',        kinds: ['weapon'] },
-            { label: 'Equipamento',  kinds: ['offhand','armor','head','feet','neck'] },
-            { label: 'Consumíveis',  kinds: ['food','potion'] },
-            { label: 'Munição',      kinds: ['ammo'] },
-            { label: 'Materiais',    kinds: ['mat'] },
-        ];
-        const knownKinds = new Set(CATEGORIES.flatMap(c => c.kinds));
-        const itemsByCat = CATEGORIES.map(cat => ({
-            label: cat.label,
-            items: items
-                .filter(([k]) => cat.kinds.includes(ITEMS[k].kind))
-                .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR')),
-        }));
-        const orphans = items
-            .filter(([k]) => !knownKinds.has(ITEMS[k].kind))
-            .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
-        if (orphans.length) itemsByCat.push({ label: 'Outros', items: orphans });
-
         const renderItem = ([k,q]) => {
             const def = ITEMS[k];
             const equippable = ['weapon','offhand','armor','head','feet','neck'].includes(def.kind);
@@ -5805,8 +5814,7 @@ function renderInventoryIfChanged(){
                 <span style="color:#e0c060;margin-left:6px">${q}</span>
             </div>`;
         };
-        invEl.innerHTML = itemsByCat
-            .filter(c => c.items.length)
+        invEl.innerHTML = groups
             .map(c => `<div class="inv-cat-head"><span>${c.label}</span><span class="inv-cat-count">${c.items.length}</span></div>${c.items.map(renderItem).join('')}`)
             .join('');
     }
