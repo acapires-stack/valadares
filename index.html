@@ -2226,6 +2226,8 @@ const MTYPE = {
     CACADOR:    { name:'Caçador de Recompensa', hp:350, dmg:18, speed:320, xp:0, color:'#ff8c20', size:1.2, dodge:0.12, crit:0.22, intel:3 },
     // ★★ MEGA RAID BOSS — Senhor de Valadares (spawna quando 3 bosses Lv10)
     SENHOR_VALADARES: { name:'O Senhor de Valadares ★★', hp:8000, dmg:50, speed:280, xp:5000, color:'#ffd040', size:1.9, dodge:0.05, crit:0.30, unique:true, intel:3 },
+    // Boss de evento semanal (sábado 20h-22h BRT) — só spawna pelo servidor
+    ARAUTO: { name:'O Arauto', hp:3000, dmg:30, speed:320, xp:1500, color:'#a880ff', size:1.5, dodge:0.10, crit:0.20, unique:true, intel:3 },
 };
 
 
@@ -2420,6 +2422,14 @@ const DROPS = {
         ['ESPADA_ETERNA',   0.20, 1, 1],
         ['ARMADURA_TRONO',  0.50, 1, 1],
         ['ESPADA_HL',       0.40, 1, 1],
+    ],
+    // Boss de evento semanal — drop forte mas não único
+    ARAUTO: [
+        ['GOLD',         1.00, 500, 1500],
+        ['BENCAO_FENIX', 1.00, 1, 2],
+        ['POTION',       1.00, 5, 10],
+        ['POTION_MP',    1.00, 5, 10],
+        ['CORACAO_HL',   0.25, 1, 1],
     ],
 };
 

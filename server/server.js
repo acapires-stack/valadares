@@ -40,6 +40,8 @@ const MTYPE = {
     CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999, intel:3 },
     // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
     SENHOR_VALADARES: { hp:8000, dmg:50, speed:280, xp:5000, aggro:12, unique:true, mega:true, intel:3 },
+    // Boss de evento semanal (sábado 20h-22h BRT)
+    ARAUTO: { hp:3000, dmg:30, speed:320, xp:1500, aggro:8, unique:true, intel:3 },
 };
 
 const SPAWN_RINGS = [
@@ -711,6 +713,44 @@ function tickMobDots(){
     }
 }
 setInterval(tickMobDots, 1000);
+
+// ─── Evento semanal: O Arauto (sábado 20h-22h BRT) ─────────────────────────
+const EVENT_BOSS_TYPE = 'ARAUTO';
+const EVENT_BOSS_POS = { x: 50, y: 65 };
+let eventBossId = null;
+function isEventWindow(){
+    // BRT = UTC-3. Server roda UTC.
+    const brt = new Date(Date.now() - 3*60*60*1000);
+    const day = brt.getUTCDay();    // 0=dom 6=sáb
+    const hour = brt.getUTCHours();
+    return day === 6 && hour >= 20 && hour < 22;
+}
+function tickEvent(){
+    if (isEventWindow()){
+        const stillAlive = eventBossId && monsters.has(eventBossId) && monsters.get(eventBossId).hp > 0;
+        if (!stillAlive){
+            const m = spawnMob(EVENT_BOSS_TYPE, EVENT_BOSS_POS.x, EVENT_BOSS_POS.y);
+            if (m){
+                eventBossId = m.id;
+                broadcastMsg('event', `⚔ O Arauto apareceu! (${EVENT_BOSS_POS.x},${EVENT_BOSS_POS.y}) — Mata em 2h ou ele some.`);
+                console.log('[event] Arauto spawnado');
+            }
+        }
+    } else {
+        if (eventBossId && monsters.has(eventBossId)){
+            const m = monsters.get(eventBossId);
+            if (m && m.hp > 0){
+                monsters.delete(eventBossId);
+                broadcast(null, { t:'mobDead', mobId: eventBossId, byName:'evento encerrou', level: 1 });
+                broadcastMsg('warn', '⏳ O Arauto desapareceu (evento encerrou).');
+                console.log('[event] Arauto despawnado');
+            }
+            eventBossId = null;
+        }
+    }
+}
+setInterval(tickEvent, 60_000);
+setTimeout(tickEvent, 5_000);   // primeiro check 5s após boot
 
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
 // Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
