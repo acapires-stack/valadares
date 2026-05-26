@@ -1048,6 +1048,10 @@
         }
         .shop-row .shop-btn:hover { background: #3a2810; color: #ffcc40; border-color: #8a6020; }
         .shop-row .shop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .shop-row .shop-sell-btns { display: flex; gap: 3px; }
+        .shop-row .shop-btn-sm {
+            padding: 2px 7px; font-size: 10px; min-width: 28px; text-align: center;
+        }
 
         /* CRAFT */
         .craft-list {
@@ -3430,13 +3434,20 @@ function renderShop(){
     } else {
         sellEl.innerHTML = items.map(([k,q]) => {
             const def = ITEMS[k];
+            const unit = sellPriceFor(k);
+            const allPrice = unit * q;
+            const tenPrice = unit * Math.min(10, q);
             return `<div class="shop-row">
                 <div class="shop-info">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
                     <span class="shop-name">${def.name}</span>
                 </div>
-                <span class="shop-qty">${q}×</span>
-                <button class="shop-btn" data-sell="${k}">vender</button>
+                <span class="shop-qty">${q}× · ${unit}g</span>
+                <div class="shop-sell-btns">
+                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="1" title="vender 1 = ${unit}g">1</button>
+                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="10" ${q<2?'disabled':''} title="vender ${Math.min(10,q)} = ${tenPrice}g">10</button>
+                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="all" title="vender ${q} = ${allPrice}g">tudo</button>
+                </div>
             </div>`;
         }).join('');
     }
@@ -4701,24 +4712,33 @@ function buyFromShop(itemKey){
     log(`<span class="log-up">+1 ${ITEMS[itemKey].name} (-${offer.price}g)</span>`);
     renderShop();
 }
-function sellToShop(itemKey){
+// Preço unitário de venda (helper compartilhado com o render do shop)
+function sellPriceFor(itemKey){
+    const def = ITEMS[itemKey];
+    if (!def) return 1;
+    const buyOffer = SHOP_BUY.find(o => o.item === itemKey);
+    if (buyOffer) return Math.max(1, Math.floor(buyOffer.price * 0.30));
+    if (def.base)  return 3 + Math.floor(def.base * 1.5);   // arma
+    if (def.def)   return 3 + Math.floor(def.def * 1.5);    // armadura/escudo
+    if (def.heal)  return Math.max(1, Math.floor(def.heal * 0.5));
+    if (def.kind === 'mat') return 4;
+    return 1;
+}
+function sellToShop(itemKey, qtyStr){
     const have = player.inv[itemKey] || 0;
     if (have <= 0) return;
     const def = ITEMS[itemKey];
-    // Preço de venda: 30% do preço de compra se está no shop, ou heurística simples
-    const buyOffer = SHOP_BUY.find(o => o.item === itemKey);
-    let price = 1;
-    if (buyOffer) price = Math.max(1, Math.floor(buyOffer.price * 0.30));
-    else if (def.base)  price = 3 + Math.floor(def.base * 1.5);   // arma
-    else if (def.def)   price = 3 + Math.floor(def.def * 1.5);    // armadura/escudo
-    else if (def.heal)  price = Math.max(1, Math.floor(def.heal * 0.5));
-    else if (def.kind === 'mat') price = 4;
-    else price = 1;
-    player.inv[itemKey] = have - 1;
+    let qty = 1;
+    if (qtyStr === 'all') qty = have;
+    else if (qtyStr) qty = Math.max(1, Math.min(have, parseInt(qtyStr, 10) || 1));
+    const unit = sellPriceFor(itemKey);
+    const total = unit * qty;
+    player.inv[itemKey] = have - qty;
     if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
-    player.gold += price;
+    player.gold += total;
     invSignature = null;
-    log(`<span class="log-sys">Vendeu 1 ${def.name} (+${price}g)</span>`);
+    log(`<span class="log-sys">Vendeu ${qty}× ${def.name} (+${total}g)</span>`);
+    sndPickup();   // som curto de transação
     renderShop();
 }
 
@@ -5763,7 +5783,7 @@ document.addEventListener('click', e => {
     const buyBtn = e.target.closest('[data-buy]');
     if (buyBtn){ buyFromShop(buyBtn.dataset.buy); return; }
     const sellBtn = e.target.closest('[data-sell]');
-    if (sellBtn){ sellToShop(sellBtn.dataset.sell); return; }
+    if (sellBtn){ sellToShop(sellBtn.dataset.sell, sellBtn.dataset.qty); return; }
     // Quests aceitar/entregar
     const acc = e.target.closest('[data-accept]');
     if (acc){ acceptQuest(acc.dataset.accept); renderQuests(); return; }
