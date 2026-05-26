@@ -124,9 +124,14 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 - Anúncios globais via servidor MP
 
 ### Status effects
-- Engine poison/stun/bleed com tick
-- **Aranha** aplica **veneno** (15%, −2hp/3s × 4 ticks)
+- Engine poison/stun/bleed com tick, centralizada em `rollAttackerStatus(mobType)`
+- **Aranha** → veneno 15% / −2hp/3s × 4 ticks
+- **Escorpião** → veneno forte 30% / −3hp/3s × 5 ticks
+- **Lagarto** → sangra 20% / −1hp/2s × 6 ticks
+- **Troll** → stun 10% / 1.5s
+- **Minotauro** → stun forte 25% / 2.0s
 - **Stun** bloqueia move + attack do player; ícones flutuam acima do boneco (☠ ⚡ 🩸)
+- Funciona em modo offline (damagePlayer) e online (handler mobHit)
 - Limpa ao morrer
 
 ### NPCs + Quests
@@ -181,7 +186,7 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 | 1 | **Mais magias** | AoE (Exori), Provocação (tank), Buff temporário |
 | 2 | **Skill cap / limitações** | Definir teto (100? 200?) e curva final |
 | 3 | **2H ataca mais devagar** | Equilibra 1H+escudo vs 2H (proposta antiga) |
-| 4 | **Crafts lendários com Coração** | Espada do Highlander (3 Corações) etc |
+| 4 | ✅ **Crafts lendários com Coração** | Espada do Highlander ★ (3 corações, base 20/def 8), Armadura do Trono ★ (2 corações, def 14), Coroa do Vendedor ★ (1 coração, def 7). Custo 8-12k g + materiais raros |
 
 ### Médio prazo (sistemas)
 | # | Item | Notas |
