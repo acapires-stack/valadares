@@ -223,6 +223,23 @@ function playerAt(x, y){
     }
     return null;
 }
+// Empurra mob 1 tile pro lado se ele acabou ficando em cima de player (race condition
+// entre tickAI do server e movimento client-authoritative).
+function bumpMobAwayFrom(x, y){
+    const m = mobAt(x, y);
+    if (!m) return;
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+    for (const [dx, dy] of dirs){
+        const nx = m.x + dx, ny = m.y + dy;
+        if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
+        if (!isWalkable(nx, ny)) continue;
+        if (inSafe(nx, ny)) continue;
+        if (mobAt(nx, ny)) continue;
+        if (playerAt(nx, ny)) continue;
+        m.x = nx; m.y = ny;
+        return;
+    }
+}
 function spawnMob(type, x, y){
     const def = MTYPE[type];
     if (!def) return null;
@@ -656,6 +673,8 @@ wss.on('connection', (ws) => {
             p.x = msg.x; p.y = msg.y; p.dir = msg.dir;
             if (typeof msg.hp === 'number') p.hp = msg.hp;
             if (typeof msg.maxHp === 'number') p.maxHp = msg.maxHp;
+            // Se um mob acabou no mesmo tile (race com tickAI), empurra
+            bumpMobAwayFrom(p.x, p.y);
             broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp });
             return;
         }
