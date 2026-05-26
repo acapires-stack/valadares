@@ -158,10 +158,18 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 - **Offline** (sem WS): cliente continua simulando local
 - **Chat real**: tab CHAT alterna com COMBATE, Enter envia, broadcast a todos
 - **Body stays**: corpo fica 3 min após logout, atacável por outros (drop 10% gold + 1 item)
-- **Persistência server-side**: `state.json` salvo a cada 60s + ao SIGINT (mobs, bosses, níveis)
+- **Persistência server-side**: `state.json` salvo a cada 30s + ao SIGINT (mobs, bosses, níveis)
+- **Railway Volume montado** em `/data/state.json` — sobrevive a deploys (config feita 26/05)
 - **Reset diário 00:00**: bosses voltam ao Lv1
 - **WS URL configurável**: ?ws=... na query, localStorage, ou auto-detect por hostname
 - **Ghost duplicado fix**: reconectar com mesmo nome remove ghost antigo automaticamente
+- **Mensagens do servidor (4 levels)**: info (azul) / warn (amarelo) / event (dourado) / admin (vermelho pulsante)
+- **MOTD**: enviado no state inicial
+- **Comandos admin (alcione hardcode)**: /say /event /warn /info /motd /setboss /respawnboss
+- **Reconexão automática infinita** com backoff (2-10s) + overlay "RECONECTANDO" visível
+- **Anti-farm offline**: WS cai → bloqueia ataques+movimento até reconectar
+- **Auto-update**: cliente fetcha HEAD a cada 60s, se ETag mudou → saveState+reload
+- **NPCs viram mini-PZ** (raio 2): mob não ataca player adjacente a NPC
 
 ### UI/UX
 - Login com nome + senha (hash local) + auto-login por sessão + **link "servidor"** pra customizar WS URL
@@ -184,9 +192,14 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 | # | Item | Notas |
 |---|---|---|
 | 1 | **Mais magias** | AoE (Exori), Provocação (tank), Buff temporário |
-| 2 | **Skill cap / limitações** | Definir teto (100? 200?) e curva final |
+| 2 | **Skill cap / limitações** | Decisão: deixar **infinito** (sem cap), conforme decidido |
 | 3 | **2H ataca mais devagar** | Equilibra 1H+escudo vs 2H (proposta antiga) |
 | 4 | ✅ **Crafts lendários com Coração** | Espada do Highlander ★ (3 corações, base 20/def 8), Armadura do Trono ★ (2 corações, def 14), Coroa do Vendedor ★ (1 coração, def 7). Custo 8-12k g + materiais raros |
+| — | ✅ **Defesa percentual** | reduction = def/(def+30) — diminishing returns, sem mais "tomar 1 sempre" |
+| — | ✅ **Quests diárias** | 3 randomizadas por dia, tracker auto, recompensa 2-3× normal, reset 00:00 |
+| — | ✅ **Quest chains narrativas** | 5 chains com NPCs no mundo (Eremita/Ferreiro/Caçadora/Mineiro/Vendedor de Almas oculto) |
+| — | ✅ **Decisão moral** | Vendedor de Almas: Coroa lendária OU +5% XP permanente |
+| — | ✅ **Mega Raid: Senhor de Valadares ★★** | Trigger 3 bosses Lv10, spawna (50,30), 30min vida, dropa Coroa de Valadares (def 20) + Espada Eterna (base 30/def 12), reset bossLevel ao morrer, cooldown 24h |
 
 ### Médio prazo (sistemas)
 | # | Item | Notas |
