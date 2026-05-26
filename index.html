@@ -729,7 +729,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1343,6 +1343,40 @@
         <div id="statsBody" style="margin-top:14px"></div>
         <div class="chest-hint"><kbd>I</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeStats()">×</button>
+    </div>
+</div>
+
+<div id="tradeModal" style="display:none">
+    <div class="chest-box" style="min-width:680px;max-width:760px">
+        <div class="chest-title">🤝 NEGOCIAÇÃO</div>
+        <div id="tradeStatus" style="text-align:center;color:#998040;font-size:11px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:10px">
+            <div style="flex:1;background:#050405;border:1px solid #2a200a;padding:8px;border-radius:1px">
+                <div class="chest-head">SUA OFERTA — <span id="tradeMyName">você</span></div>
+                <div id="tradeMyOffer" style="min-height:120px;font-size:11px"></div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:6px;border-top:1px solid #1a1408">
+                    <span style="color:#c8a050;font-size:11px">Gold:</span>
+                    <input id="tradeMyGoldInput" type="number" min="0" value="0"
+                           style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#ffcc40;padding:3px 6px;font-family:Consolas,monospace">
+                    <button class="chest-qty-btn" onclick="updateTradeGold()">aplicar</button>
+                </div>
+                <div style="color:#666;font-size:9px;margin-top:6px;text-align:center">Clique em item do inv abaixo p/ adicionar</div>
+                <div id="tradeMyInv" style="margin-top:8px;max-height:200px;overflow-y:auto;font-size:11px"></div>
+            </div>
+            <div style="flex:1;background:#050405;border:1px solid #2a200a;padding:8px;border-radius:1px">
+                <div class="chest-head">OFERTA DE <span id="tradeOtherName">?</span></div>
+                <div id="tradeOtherOffer" style="min-height:120px;font-size:11px"></div>
+                <div style="margin-top:8px;padding-top:6px;border-top:1px solid #1a1408;color:#ffcc40;font-size:11px">
+                    Gold: <span id="tradeOtherGold">0</span>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="chest-btn chest-btn-primary" id="tradeConfirmBtn" onclick="confirmTradeOffer()">CONFIRMAR</button>
+            <button class="chest-btn" onclick="cancelTradeOffer()">cancelar</button>
+        </div>
+        <div class="chest-hint">os 2 lados precisam confirmar &nbsp;|&nbsp; <kbd>ESC</kbd> cancela</div>
+        <button class="chest-close" onclick="cancelTradeOffer()">×</button>
     </div>
 </div>
 
@@ -3704,7 +3738,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','tradeModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -4518,6 +4552,68 @@ function handleMP(msg){
         // Whisper recebido — alguém te mandou /msg
         appendChat('🔒 ' + msg.fromName, msg.text, false);
         if (typeof sndPickup === 'function') sndPickup();
+    } else if (msg.t === 'tradeOffer'){
+        // Outro player quer iniciar trade — aceitar?
+        if (_trade) return;
+        if (confirm(`${msg.fromName} quer fazer trade com você. Aceitar?`)){
+            ws.send(JSON.stringify({ t:'tradeAccept', fromId: msg.fromId }));
+        } else {
+            ws.send(JSON.stringify({ t:'tradeReject', fromId: msg.fromId }));
+        }
+    } else if (msg.t === 'tradeStart'){
+        _trade = {
+            id: msg.tradeId, otherName: msg.otherName,
+            myOffer: { items:{}, gold:0 },
+            otherOffer: { items:{}, gold:0 },
+            confirmedMe: false, confirmedOther: false,
+        };
+        openTradeModal(msg.otherName);
+    } else if (msg.t === 'tradeUpdate'){
+        if (!_trade || _trade.id !== msg.tradeId) return;
+        if (msg.side === 'other'){
+            _trade.otherOffer = msg.offer;
+            _trade.confirmedOther = false;   // outro mudou oferta → desconfirma os dois
+            _trade.confirmedMe = false;
+            document.getElementById('tradeConfirmBtn').textContent = 'CONFIRMAR';
+            document.getElementById('tradeConfirmBtn').style.background = '';
+        }
+        renderTradeUI();
+    } else if (msg.t === 'tradeConfirm'){
+        if (!_trade || _trade.id !== msg.tradeId) return;
+        if (msg.side === 'other') _trade.confirmedOther = true;
+        renderTradeUI();
+    } else if (msg.t === 'tradeDone'){
+        // Server transferiu items. Aplica no inv local.
+        if (msg.received){
+            for (const [k, q] of Object.entries(msg.received.items || {})){
+                if (ITEMS[k]){
+                    // Resolve upgrade items dinâmicos
+                    const tier = getUpgradeTier(k);
+                    if (tier.plus > 0) ensureUpgradeItem(tier.base, tier.plus);
+                }
+                player.inv[k] = (player.inv[k] || 0) + q;
+            }
+            if (msg.received.gold) player.gold += msg.received.gold;
+        }
+        if (msg.given){
+            for (const [k, q] of Object.entries(msg.given.items || {})){
+                player.inv[k] = Math.max(0, (player.inv[k] || 0) - q);
+                if (player.inv[k] <= 0) delete player.inv[k];
+            }
+            if (msg.given.gold) player.gold = Math.max(0, player.gold - msg.given.gold);
+        }
+        invSignature = null;
+        log('<span class="log-up">🤝 Trade concluído!</span>');
+        if (typeof sndLevelUp === 'function') sndLevelUp();
+        _trade = null;
+        document.getElementById('tradeModal').style.display = 'none';
+        saveState();
+    } else if (msg.t === 'tradeCancelled'){
+        if (_trade){
+            log(`<span class="log-sys">Trade cancelado: ${msg.reason || ''}</span>`);
+            _trade = null;
+            document.getElementById('tradeModal').style.display = 'none';
+        }
     } else if (msg.t === 'mobs'){
         applyMobsSnapshot(msg.list);
     } else if (msg.t === 'mobBatch'){
@@ -5504,6 +5600,12 @@ function sendChat(text){
         const toName = m[1], body = m[2];
         ws.send(JSON.stringify({ t:'whisper', toName, text: body }));
         appendChat(`para ${toName}`, body, true);
+        return;
+    }
+    // /trade nome → inicia negociação
+    const t = text.match(/^\/trade\s+(\S+)$/i);
+    if (t){
+        startTradeFlow(t[1]);
         return;
     }
     ws.send(JSON.stringify({ t:'chat', text }));
@@ -6628,7 +6730,7 @@ document.addEventListener('keydown', e => {
         if (m && m.style.display !== 'none') closeFriends(); else openFriends();
     }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); closeFriends(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); closeFriends(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -7809,6 +7911,122 @@ function openSettings(){
         adminSec.style.display = 'none';
     }
 }
+// ─── TRADE direto player↔player ───────────────────────────────────────────
+let _trade = null;   // { id, otherName, myOffer:{items:{},gold:0}, otherOffer:{}, confirmedMe, confirmedOther }
+function startTradeFlow(targetName){
+    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Trade só disponível online.</span>'); return; }
+    if (_trade){ log('<span class="log-sys">Já tem trade em andamento.</span>'); return; }
+    ws.send(JSON.stringify({ t:'tradeRequest', toName: targetName }));
+    log(`<span class="log-sys">Convite de trade enviado para ${escapeHtml(targetName)}.</span>`);
+}
+function openTradeModal(otherName){
+    closeAllModals();
+    document.getElementById('tradeModal').style.display = 'flex';
+    document.getElementById('tradeMyName').textContent = player.name;
+    document.getElementById('tradeOtherName').textContent = otherName;
+    document.getElementById('tradeStatus').textContent = `Negociando com ${otherName}`;
+    document.getElementById('tradeConfirmBtn').textContent = 'CONFIRMAR';
+    document.getElementById('tradeConfirmBtn').style.background = '';
+    renderTradeUI();
+}
+function renderTradeUI(){
+    if (!_trade) return;
+    const myEl = document.getElementById('tradeMyOffer');
+    const otherEl = document.getElementById('tradeOtherOffer');
+    const myItems = Object.entries(_trade.myOffer.items || {});
+    const otherItems = Object.entries(_trade.otherOffer.items || {});
+    myEl.innerHTML = myItems.length
+        ? myItems.map(([k,q]) => {
+            const def = ITEMS[k]; if (!def) return '';
+            return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid #1a1408;cursor:pointer" onclick="removeFromMyOffer('${k}')" title="click p/ remover 1">
+                <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 16)});width:16px;height:16px"></span>
+                <span style="flex:1;color:#c8a050">${escapeHtml(def.name)}</span>
+                <span style="color:#e0c060">${q}×</span>
+            </div>`;
+          }).join('')
+        : '<div style="color:#555;text-align:center;padding:14px;font-style:italic">vazio</div>';
+    otherEl.innerHTML = otherItems.length
+        ? otherItems.map(([k,q]) => {
+            const def = ITEMS[k] || { name: k, color: '#aaa' };
+            return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid #1a1408">
+                <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 16)});width:16px;height:16px"></span>
+                <span style="flex:1;color:#c8a050">${escapeHtml(def.name)}</span>
+                <span style="color:#e0c060">${q}×</span>
+            </div>`;
+          }).join('')
+        : '<div style="color:#555;text-align:center;padding:14px;font-style:italic">vazio</div>';
+    document.getElementById('tradeOtherGold').textContent = (_trade.otherOffer.gold || 0) + ' g';
+    document.getElementById('tradeMyGoldInput').value = _trade.myOffer.gold || 0;
+    // Inventário disponível pra adicionar
+    const invEl = document.getElementById('tradeMyInv');
+    const invItems = Object.entries(player.inv).filter(([k,q]) => q > 0 && ITEMS[k]);
+    if (!invItems.length){
+        invEl.innerHTML = '<div style="color:#555;text-align:center;font-style:italic;padding:8px">inventário vazio</div>';
+    } else {
+        invEl.innerHTML = invItems.map(([k,q]) => {
+            const def = ITEMS[k];
+            const offered = _trade.myOffer.items[k] || 0;
+            const avail = q - offered;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:${avail>0?'pointer':'not-allowed'};opacity:${avail>0?1:0.4}" onclick="${avail>0?`addToMyOffer('${k}')`:''}" title="${avail>0?'click p/ ofertar 1':'já tudo ofertado'}">
+                <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 14)});width:14px;height:14px"></span>
+                <span style="flex:1;color:#aaa">${escapeHtml(def.name)}</span>
+                <span style="color:#888;font-size:10px">${avail}/${q}</span>
+            </div>`;
+        }).join('');
+    }
+    // Status confirm
+    const status = `Você: ${_trade.confirmedMe?'<span style="color:#74d176">✓ confirmou</span>':'aguardando'} · ${escapeHtml(_trade.otherName)}: ${_trade.confirmedOther?'<span style="color:#74d176">✓ confirmou</span>':'aguardando'}`;
+    document.getElementById('tradeStatus').innerHTML = status;
+}
+function addToMyOffer(itemKey){
+    if (!_trade || _trade.confirmedMe) return;
+    const have = player.inv[itemKey] || 0;
+    const offered = _trade.myOffer.items[itemKey] || 0;
+    if (offered >= have) return;
+    _trade.myOffer.items[itemKey] = offered + 1;
+    sendTradeUpdate();
+    renderTradeUI();
+}
+function removeFromMyOffer(itemKey){
+    if (!_trade || _trade.confirmedMe) return;
+    const offered = _trade.myOffer.items[itemKey] || 0;
+    if (offered <= 1) delete _trade.myOffer.items[itemKey];
+    else _trade.myOffer.items[itemKey] = offered - 1;
+    sendTradeUpdate();
+    renderTradeUI();
+}
+function updateTradeGold(){
+    if (!_trade || _trade.confirmedMe) return;
+    const v = Math.max(0, Math.min(player.gold, parseInt(document.getElementById('tradeMyGoldInput').value, 10) || 0));
+    _trade.myOffer.gold = v;
+    sendTradeUpdate();
+    renderTradeUI();
+}
+function sendTradeUpdate(){
+    if (!_trade || !ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ t:'tradeUpdate', tradeId: _trade.id, offer: _trade.myOffer }));
+}
+function confirmTradeOffer(){
+    if (!_trade || _trade.confirmedMe) return;
+    _trade.confirmedMe = true;
+    document.getElementById('tradeConfirmBtn').textContent = '✓ AGUARDANDO OUTRO';
+    document.getElementById('tradeConfirmBtn').style.background = '#3a4d10';
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'tradeConfirm', tradeId: _trade.id }));
+    renderTradeUI();
+}
+function cancelTradeOffer(){
+    if (_trade){
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'tradeCancel', tradeId: _trade.id }));
+    }
+    _trade = null;
+    document.getElementById('tradeModal').style.display = 'none';
+}
+window.addToMyOffer = addToMyOffer;
+window.removeFromMyOffer = removeFromMyOffer;
+window.updateTradeGold = updateTradeGold;
+window.confirmTradeOffer = confirmTradeOffer;
+window.cancelTradeOffer = cancelTradeOffer;
+
 // ─── AMIGOS (localStorage por player) ──────────────────────────────────────
 function friendsKey(){ return 'valadares:friends:' + player.name; }
 function loadFriends(){

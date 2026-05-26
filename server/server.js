@@ -552,6 +552,30 @@ function broadcastMobs(){
     }
 }
 
+// ─── Trade ativo entre 2 players ───────────────────────────────────────────
+const trades = new Map();   // tradeId → { aId, bId, aOffer, bOffer, aConfirm, bConfirm, createdAt }
+function cancelTrade(trade, reason){
+    if (!trade) return;
+    const a = players.get(trade.aId);
+    const b = players.get(trade.bId);
+    if (a && a.ws.readyState === 1) a.ws.send(JSON.stringify({ t:'tradeCancelled', reason }));
+    if (b && b.ws.readyState === 1) b.ws.send(JSON.stringify({ t:'tradeCancelled', reason }));
+    trades.delete(trade.id);
+    if (a) a.tradeId = null;
+    if (b) b.tradeId = null;
+}
+// Limpa trades parados ou desconectados a cada 30s
+setInterval(() => {
+    const now = Date.now();
+    for (const trade of Array.from(trades.values())){
+        if (now - trade.createdAt > 5*60*1000){ cancelTrade(trade, 'timeout 5min'); continue; }
+        const a = players.get(trade.aId);
+        const b = players.get(trade.bId);
+        if (!a || !b || a.disconnected || b.disconnected){ cancelTrade(trade, 'desconexão'); continue; }
+        if (chebyshev(a.x, a.y, b.x, b.y) > 5){ cancelTrade(trade, 'longe demais'); continue; }
+    }
+}, 30000);
+
 // ─── Ranking público (acumula por nome do player) ──────────────────────────
 const rankings = new Map();   // name → { mobKills, pkKills, bossKills, gold }
 function ensureRanking(name){
@@ -1118,6 +1142,137 @@ wss.on('connection', (ws) => {
 
         if (msg.t === 'kill') {
             // legado (mob local). Ignora.
+            return;
+        }
+
+        // ─── TRADE ─────────────────────────────────────────────────────
+        if (msg.t === 'tradeRequest') {
+            const toName = String(msg.toName || '').trim().substring(0, 14);
+            if (!toName || toName.toLowerCase() === p.name.toLowerCase()){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Trade inválido.' });
+                return;
+            }
+            let target = null;
+            for (const pp of players.values()){
+                if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
+            }
+            if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`${toName} não está online.` }); return; }
+            if (chebyshev(p.x, p.y, target.x, target.y) > 3){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se mais (max 3 tiles).' });
+                return;
+            }
+            if (p.tradeId || target.tradeId){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Um dos dois já está em trade.' });
+                return;
+            }
+            // Manda oferta pro target. Responde com tradeAccept/tradeReject.
+            if (target.ws.readyState === 1){
+                target.ws.send(JSON.stringify({ t:'tradeOffer', fromId: id, fromName: p.name }));
+            }
+            return;
+        }
+        if (msg.t === 'tradeAccept') {
+            const initiator = players.get(msg.fromId);
+            if (!initiator || initiator.disconnected) return;
+            if (initiator.tradeId || p.tradeId) return;
+            if (chebyshev(p.x, p.y, initiator.x, initiator.y) > 3) return;
+            const tradeId = 'tr_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+            const trade = {
+                id: tradeId,
+                aId: initiator.id, bId: id,
+                aOffer: { items:{}, gold:0 }, bOffer: { items:{}, gold:0 },
+                aConfirm: false, bConfirm: false,
+                createdAt: Date.now(),
+            };
+            trades.set(tradeId, trade);
+            initiator.tradeId = tradeId;
+            p.tradeId = tradeId;
+            initiator.ws.send(JSON.stringify({ t:'tradeStart', tradeId, otherName: p.name }));
+            sendTo(id, { t:'tradeStart', tradeId, otherName: initiator.name });
+            return;
+        }
+        if (msg.t === 'tradeReject') {
+            const initiator = players.get(msg.fromId);
+            if (initiator && initiator.ws.readyState === 1){
+                initiator.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:`${p.name} recusou o trade.` }));
+            }
+            return;
+        }
+        if (msg.t === 'tradeUpdate') {
+            const trade = trades.get(msg.tradeId);
+            if (!trade) return;
+            const isA = trade.aId === id;
+            const isB = trade.bId === id;
+            if (!isA && !isB) return;
+            // Valida que o player TEM os items que está ofertando
+            const offer = msg.offer || { items:{}, gold:0 };
+            const cleanItems = {};
+            for (const [k, q] of Object.entries(offer.items || {})){
+                const qty = Math.max(0, Math.min(q | 0, p.inv[k] || 0));
+                if (qty > 0) cleanItems[k] = qty;
+            }
+            const goldClean = Math.max(0, Math.min(offer.gold | 0, p.gold || 0));
+            const cleanOffer = { items: cleanItems, gold: goldClean };
+            if (isA){ trade.aOffer = cleanOffer; trade.aConfirm = false; trade.bConfirm = false; }
+            else    { trade.bOffer = cleanOffer; trade.aConfirm = false; trade.bConfirm = false; }
+            // Broadcast pro outro lado
+            const other = players.get(isA ? trade.bId : trade.aId);
+            if (other && other.ws.readyState === 1){
+                other.ws.send(JSON.stringify({ t:'tradeUpdate', tradeId: trade.id, side:'other', offer: cleanOffer }));
+            }
+            return;
+        }
+        if (msg.t === 'tradeConfirm') {
+            const trade = trades.get(msg.tradeId);
+            if (!trade) return;
+            const isA = trade.aId === id;
+            if (isA) trade.aConfirm = true; else if (trade.bId === id) trade.bConfirm = true; else return;
+            const other = players.get(isA ? trade.bId : trade.aId);
+            if (other && other.ws.readyState === 1){
+                other.ws.send(JSON.stringify({ t:'tradeConfirm', tradeId: trade.id, side:'other' }));
+            }
+            if (trade.aConfirm && trade.bConfirm){
+                // Executa o trade atomicamente
+                const a = players.get(trade.aId);
+                const b = players.get(trade.bId);
+                if (!a || !b){
+                    cancelTrade(trade, 'desconexão');
+                    return;
+                }
+                // Re-valida posses
+                for (const [k, q] of Object.entries(trade.aOffer.items)) if ((a.inv[k]||0) < q){ cancelTrade(trade, 'oferta inválida'); return; }
+                for (const [k, q] of Object.entries(trade.bOffer.items)) if ((b.inv[k]||0) < q){ cancelTrade(trade, 'oferta inválida'); return; }
+                if ((a.gold||0) < trade.aOffer.gold || (b.gold||0) < trade.bOffer.gold){
+                    cancelTrade(trade, 'oferta inválida'); return;
+                }
+                // Transfere A→B
+                for (const [k, q] of Object.entries(trade.aOffer.items)){
+                    a.inv[k] = (a.inv[k] || 0) - q; if (a.inv[k] <= 0) delete a.inv[k];
+                    b.inv[k] = (b.inv[k] || 0) + q;
+                }
+                a.gold = (a.gold||0) - trade.aOffer.gold;
+                b.gold = (b.gold||0) + trade.aOffer.gold;
+                // Transfere B→A
+                for (const [k, q] of Object.entries(trade.bOffer.items)){
+                    b.inv[k] = (b.inv[k] || 0) - q; if (b.inv[k] <= 0) delete b.inv[k];
+                    a.inv[k] = (a.inv[k] || 0) + q;
+                }
+                b.gold = (b.gold||0) - trade.bOffer.gold;
+                a.gold = (a.gold||0) + trade.bOffer.gold;
+                // Notifica cada lado
+                sendTo(trade.aId, { t:'tradeDone', given: trade.aOffer, received: trade.bOffer });
+                sendTo(trade.bId, { t:'tradeDone', given: trade.bOffer, received: trade.aOffer });
+                // Limpa
+                trades.delete(trade.id);
+                if (a) a.tradeId = null;
+                if (b) b.tradeId = null;
+            }
+            return;
+        }
+        if (msg.t === 'tradeCancel') {
+            const trade = trades.get(msg.tradeId);
+            if (!trade) return;
+            cancelTrade(trade, 'cancelado');
             return;
         }
 
