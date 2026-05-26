@@ -3178,6 +3178,12 @@ function activeWeapon(){
     const k = player.equipped.weapon;
     if (!k) return PUNHO;
     const def = ITEMS[k];
+    // Fallback: save corrompido ou item removido da edição → desequipa silenciosamente
+    if (!def){
+        player.equipped.weapon = null;
+        console.warn('[activeWeapon] item desconhecido:', k, '- desequipado');
+        return PUNHO;
+    }
     return { skill: def.skill, base: def.base };
 }
 
@@ -4093,10 +4099,13 @@ function resolveWsUrl(){
 window.setWsUrl = (url) => { localStorage.setItem('valadares:ws', url); log(`<span class="log-sys">WS server: ${url} — reconecte</span>`); };
 
 function connectMP(){
+    // Se já existe um socket abrindo/aberto, não cria outro (evita race em
+    // scheduleReconnect duplo ou chamadas concorrentes)
+    if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
     const wsUrl = resolveWsUrl();
     try {
         ws = new WebSocket(wsUrl);
-        log(`<span class="log-sys">Conectando em ${wsUrl}…</span>`);
+        log(`<span class="log-sys">Conectando em ${escapeHtml(wsUrl)}…</span>`);
     } catch (e){
         log('<span class="log-sys">Servidor offline. Jogando sem multiplayer.</span>');
         document.getElementById('connStatus').textContent = '— OFFLINE —';
