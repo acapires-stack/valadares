@@ -69,6 +69,14 @@ const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
 const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 
+// Admins (pra comandos /say, /event etc). Configurar via env ADMIN_NAMES="nome1,nome2"
+const ADMIN_NAMES = (process.env.ADMIN_NAMES || 'alcione').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+function isAdmin(name){ return ADMIN_NAMES.includes(String(name || '').toLowerCase()); }
+
+// MOTD via env (mensagem do dia, aparece pra todos ao conectar)
+const SERVER_MOTD = process.env.SERVER_MOTD || '';
+let SERVER_MOTD_RUNTIME = SERVER_MOTD;  // pode ser editado via /motd (até reiniciar)
+
 // ─── Estado ─────────────────────────────────────────────────────────────────
 let nextId = 1;
 let nextMobId = 1;
@@ -154,6 +162,14 @@ function broadcast(except, msg){
         if (p.id === except) continue;
         if (p.ws.readyState === 1) p.ws.send(data);
     }
+}
+
+// Mensagens do servidor pra todos — levels: 'info' | 'warn' | 'event' | 'admin'
+function broadcastMsg(level, text, fromName){
+    const out = { t:'serverMsg', level, text: String(text).substring(0, 280) };
+    if (fromName) out.from = fromName;
+    broadcast(null, out);
+    console.log(`[msg ${level}]${fromName?' '+fromName+':':''} ${text}`);
 }
 function sendTo(id, msg){
     const p = players.get(id);
@@ -253,7 +269,7 @@ function tickRespawns(){
                 bossDeath.delete(b.type);
                 const baseName = b.type === 'ORC_LIDER' ? 'O Orc Líder' : b.type === 'DRAKE_LIDER' ? 'O Drake Ancião' : 'O Golem Rei';
                 const lvlTag = mob && mob.level > 1 ? ` ★ Lv${mob.level}` : '';
-                broadcast(null, { t:'announce', text:`⚔ ${baseName}${lvlTag} reapareceu!` });
+                broadcastMsg('event', `⚔ ${baseName}${lvlTag} reapareceu!`);
             }
         }
     }
@@ -468,7 +484,7 @@ function tickDailyReset(){
         if (m.unique) monsters.delete(m.id);
     }
     for (const b of BOSSES) spawnMob(b.type, b.x, b.y);
-    broadcast(null, { t:'announce', text:'🌅 Novo dia em Valadares! Bosses voltaram ao Lv1.' });
+    broadcastMsg('event', '🌅 Novo dia em Valadares! Bosses voltaram ao Lv1.');
     console.log('[reset] daily reset — bosses Lv1');
 }
 setInterval(tickDailyReset, 60 * 1000);  // checa a cada minuto
@@ -514,9 +530,17 @@ wss.on('connection', (ws) => {
                     break;
                 }
             }
-            console.log(`    ${id} = ${p.name}`);
-            ws.send(JSON.stringify({ t:'state', you: id, players: snapshotPlayers(), mobs: snapshotMobs() }));
+            console.log(`    ${id} = ${p.name}${isAdmin(p.name) ? ' [admin]' : ''}`);
+            ws.send(JSON.stringify({
+                t:'state', you: id,
+                players: snapshotPlayers(),
+                mobs: snapshotMobs(),
+                motd: SERVER_MOTD_RUNTIME,
+                isAdmin: isAdmin(p.name),
+            }));
             broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp } });
+            // Anuncia entrada (só pros outros)
+            broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
         }
 
@@ -566,7 +590,7 @@ wss.on('connection', (ws) => {
                     sendTo(id, { t:'pkKill', victimId: msg.targetId, victimName: tgt.name,
                                  victimHadSelos:false, goldGain: goldDrop, dropHighlander:false,
                                  droppedItem, ghost:true, dropX: tgt.x, dropY: tgt.y });
-                    broadcast(null, { t:'announce', text:`💀 ${p.name} acabou com o corpo de ${tgt.name}!` });
+                    broadcastMsg('warn', `💀 ${p.name} acabou com o corpo de ${tgt.name}!`);
                     players.delete(msg.targetId);
                     broadcast(null, { t:'leave', id: msg.targetId });
                 }
@@ -631,12 +655,12 @@ wss.on('connection', (ws) => {
                     dropHighlander: !!msg.dropHighlander,
                 }));
             }
-            broadcast(null, { t:'announce', text:`⚔ ${killer?killer.name:'?'} matou ${p.name}` + (msg.dropHighlander?' (Highlander caiu!)':'') });
+            broadcastMsg('warn', `⚔ ${killer?killer.name:'?'} matou ${p.name}` + (msg.dropHighlander?' (Highlander caiu!)':''));
             return;
         }
 
         if (msg.t === 'announce') {
-            broadcast(null, { t:'announce', text: String(msg.text).substring(0, 200) });
+            broadcastMsg('info', String(msg.text).substring(0, 200));
             return;
         }
 
@@ -648,6 +672,39 @@ wss.on('connection', (ws) => {
         if (msg.t === 'chat') {
             const text = String(msg.text || '').trim().substring(0, 240);
             if (!text) return;
+            // Comandos admin (só se nome do player tá em ADMIN_NAMES)
+            if (text.startsWith('/') && isAdmin(p.name)){
+                const [cmd, ...rest] = text.split(' ');
+                const arg = rest.join(' ').trim();
+                if (cmd === '/say' && arg){
+                    broadcastMsg('admin', arg, p.name);
+                    return;
+                }
+                if (cmd === '/event' && arg){
+                    broadcastMsg('event', arg);
+                    return;
+                }
+                if (cmd === '/warn' && arg){
+                    broadcastMsg('warn', arg);
+                    return;
+                }
+                if (cmd === '/info' && arg){
+                    broadcastMsg('info', arg);
+                    return;
+                }
+                if (cmd === '/help'){
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say MSG · /event MSG · /warn MSG · /info MSG · /motd MSG (sessão)' });
+                    return;
+                }
+                if (cmd === '/motd'){
+                    // não persiste em env, mas atualiza pra sessão atual
+                    SERVER_MOTD_RUNTIME = arg;
+                    sendTo(id, { t:'serverMsg', level:'info', text:`MOTD atualizado (até reiniciar): "${arg}"` });
+                    return;
+                }
+                sendTo(id, { t:'serverMsg', level:'warn', text:`Comando desconhecido: ${cmd}. /help pra ver lista` });
+                return;
+            }
             broadcast(null, { t:'chat', id, name:p.name, text });
             return;
         }

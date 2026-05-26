@@ -589,6 +589,67 @@
         }
         #login .opt { color: #888; font-size: 10px; margin: 18px 0 6px; letter-spacing: 2px; }
 
+        /* Server toasts (mensagens do servidor) */
+        #toastContainer {
+            position: fixed;
+            top: 40px; left: 50%;
+            transform: translateX(-50%);
+            display: flex; flex-direction: column;
+            gap: 6px;
+            z-index: 400;
+            pointer-events: none;
+            max-width: 560px;
+            width: 90%;
+        }
+        .toast {
+            padding: 9px 16px;
+            border-radius: 3px;
+            font-size: 12px;
+            text-align: center;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+            opacity: 0;
+            transform: translateY(-12px);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .toast.toast-visible { opacity: 1; transform: translateY(0); }
+        .toast-info  {
+            background: rgba(106,168,232,0.18);
+            border: 1px solid rgba(111,168,232,0.6);
+            color: #cfe5fa;
+        }
+        .toast-warn  {
+            background: rgba(255,170,32,0.20);
+            border: 1px solid rgba(255,170,32,0.7);
+            color: #ffe080;
+        }
+        .toast-event {
+            background: rgba(255,204,64,0.22);
+            border: 1px solid rgba(255,204,64,0.8);
+            color: #fff0b0;
+            font-family: 'Cinzel', Georgia, serif;
+            text-shadow: 0 0 14px rgba(255,204,64,0.5);
+        }
+        .toast-admin {
+            background: rgba(204,48,48,0.25);
+            border: 2px solid rgba(255,80,80,0.9);
+            color: #fff;
+            font-size: 13px;
+            text-shadow: 0 0 12px rgba(255,80,80,0.7);
+            animation: adminPulse 1.4s infinite;
+        }
+        @keyframes adminPulse {
+            0%,100% { box-shadow: 0 4px 18px rgba(0,0,0,0.5), 0 0 20px rgba(255,80,80,0.4); }
+            50%     { box-shadow: 0 4px 18px rgba(0,0,0,0.5), 0 0 35px rgba(255,80,80,0.7); }
+        }
+        .toast-from {
+            color: #ffd060;
+            font-weight: 700;
+            margin-right: 4px;
+        }
+
         /* Overlay de reconexão */
         #reconnectOverlay {
             position: fixed; inset: 0;
@@ -936,6 +997,9 @@
 
 <div id="title">⚔ &nbsp;VALADARES&nbsp; ⚔</div>
 <div id="connStatus" class="offline">— OFFLINE —</div>
+
+<!-- Toasts do servidor (info/warn/event/admin) — empilham no topo central -->
+<div id="toastContainer"></div>
 
 <!-- Overlay de reconexão (aparece quando WS cai estando em modo MP) -->
 <div id="reconnectOverlay">
@@ -3538,6 +3602,8 @@ function handleMP(msg){
     if (msg.t === 'state'){
         // estado completo: jogadores e monstros do servidor
         myWsId = msg.you;
+        player.isAdmin = !!msg.isAdmin;
+        if (msg.motd) showServerToast('event', '📜 ' + msg.motd, null, 7000);
         for (const id in remotePlayers) delete remotePlayers[id];
         msg.players.forEach(p => {
             if (p.id !== msg.you){
@@ -3592,7 +3658,14 @@ function handleMP(msg){
         // Você matou alguém em PvP
         pkKilledSomeone(msg);
     } else if (msg.t === 'announce'){
+        // Compat retroativa: trata como evento
+        showServerToast('event', msg.text);
         log(`<span class="log-up">${msg.text}</span>`);
+    } else if (msg.t === 'serverMsg'){
+        showServerToast(msg.level || 'info', msg.text, msg.from);
+        const logClass = {info:'log-sys', warn:'log-die', event:'log-up', admin:'log-up'}[msg.level] || 'log-sys';
+        const prefix = msg.from ? `<b style="color:#ffaa20">[${msg.from}]</b> ` : '';
+        log(`<span class="${logClass}">${prefix}${msg.text}</span>`);
     } else if (msg.t === 'chat'){
         appendChat(msg.name, msg.text, msg.id === myWsId);
     } else if (msg.t === 'mobs'){
@@ -3928,6 +4001,26 @@ function tickStatusEffects(){
     // Stun: auto-expira em isStunned()
     isStunned();
 }
+
+// ─── Server Toasts (mensagens do servidor) ──────────────────────────────────
+function showServerToast(level, text, fromName, durationMs){
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'toast toast-' + (level || 'info');
+    const safe = String(text).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    const prefix = fromName ? `<b class="toast-from">[${fromName}]</b> ` : '';
+    div.innerHTML = `${prefix}${safe}`;
+    container.appendChild(div);
+    // anim slide-in via class adicionada após pintar
+    requestAnimationFrame(() => div.classList.add('toast-visible'));
+    const dur = durationMs || (level === 'admin' ? 6500 : level === 'event' ? 5500 : 4500);
+    setTimeout(() => {
+        div.classList.remove('toast-visible');
+        setTimeout(() => div.remove(), 400);
+    }, dur);
+}
+window.showServerToast = showServerToast;
 
 // ─── Chat (UI) ───────────────────────────────────────────────────────────────
 let myWsId = null;
