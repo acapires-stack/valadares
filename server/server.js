@@ -84,8 +84,11 @@ const NPC_POSITIONS = [
     { x:66, y:90 },  // mineiro
     { x:75, y:20 },  // vendedor (hidden, mas dá proteção mesmo assim)
 ];
-const NPC_PROTECT_RADIUS = 2;
+const NPC_PROTECT_RADIUS = 1;   // 3×3 ao redor do NPC (suficiente pra ler modal)
+const NPC_PROTECT_COMBAT_GRACE_MS = 2000;   // ao atacar, perde proteção por 2s
 function playerNearNpc(p){
+    // Mini-PZ é cancelada se o player atacou recentemente (anti-cheese)
+    if (p.lastAttackAt && Date.now() - p.lastAttackAt < NPC_PROTECT_COMBAT_GRACE_MS) return false;
     for (const n of NPC_POSITIONS){
         if (Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)) <= NPC_PROTECT_RADIUS) return true;
     }
@@ -930,6 +933,7 @@ wss.on('connection', (ws) => {
             if (!m || m.hp <= 0) { sendTo(id, { t:'mobMissing', mobId: msg.monsterId }); return; }
             const range = msg.range || 1;
             if (chebyshev(p.x, p.y, m.x, m.y) > range) return;
+            p.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
             // LOS — só valida pra ranged (range > 1); melee adjacente passa sem check
             if (range > 1 && !hasLineOfSight(p.x, p.y, m.x, m.y)) return;
             // teto de dano: 3x o dmg base do mob (margem confortável pros crits)

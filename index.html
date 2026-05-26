@@ -1435,7 +1435,7 @@
             <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')">🔥 FORJA</button>
         </div>
         <div id="craftList" class="craft-list"></div>
-        <div id="forjaPanel" style="display:none"></div>
+        <div id="forjaPanel" class="craft-list" style="display:none"></div>
         <div class="chest-hint" id="craftHint">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeCraft()">×</button>
     </div>
@@ -1556,11 +1556,16 @@ function npcOnTile(x, y){
     }
     return null;
 }
-// Mini-PZ: player a 2 sqm de qualquer NPC é considerado em zona protegida
+// Mini-PZ: player a 1 sqm de NPC é considerado em zona protegida (3×3 ao redor).
+// Quebra por 2s se o player atacar recentemente — fim do exploit de lurar mob
+// perto do NPC pra atirar de graça.
+const NPC_MINI_PZ_RADIUS = 1;
+const NPC_MINI_PZ_COMBAT_GRACE_MS = 2000;
 function playerNearNpcMiniPZ(){
+    if (player.lastAttackAt && Date.now() - player.lastAttackAt < NPC_MINI_PZ_COMBAT_GRACE_MS) return false;
     for (const n of NPCS){
         if (!npcVisible(n)) continue;
-        if (Math.max(Math.abs(player.x - n.pos.x), Math.abs(player.y - n.pos.y)) <= 2) return true;
+        if (Math.max(Math.abs(player.x - n.pos.x), Math.abs(player.y - n.pos.y)) <= NPC_MINI_PZ_RADIUS) return true;
     }
     return false;
 }
@@ -3954,6 +3959,7 @@ function throwSpear(){
     if (inSafeZone(player.x, player.y)){
         log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
     }
+    player.lastAttackAt = Date.now();
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
     if (!wItem || !wItem.throwable){
@@ -4031,6 +4037,7 @@ function doAttack(m){
         }
         return;
     }
+    player.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
     const isRanged = wItem && wItem.ranged;
@@ -6592,6 +6599,8 @@ function castSpell(spellKey){
     if (sp.damage && inSafeZone(player.x, player.y)){
         log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
     }
+    // Magias ofensivas/AoE/taunt quebram mini-PZ do NPC
+    if (sp.damage || sp.aoeRange || sp.tauntRange) player.lastAttackAt = Date.now();
     if ((spellCooldowns[spellKey] || 0) > 0){
         log(`<span class="log-sys">${sp.name} em cooldown.</span>`); return;
     }
