@@ -729,7 +729,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal {
+        #settingsModal, #tutorialModal, #rankingModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1346,6 +1346,21 @@
     </div>
 </div>
 
+<div id="rankingModal" style="display:none">
+    <div class="chest-box" style="min-width:520px;max-width:580px">
+        <div class="chest-title">🏆 RANKING</div>
+        <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px">
+            <button class="train-tab active" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
+            <button class="train-tab" data-rank-tab="pvp" onclick="switchRankingTab('pvp')">PvP</button>
+            <button class="train-tab" data-rank-tab="bosses" onclick="switchRankingTab('bosses')">BOSSES</button>
+            <button class="train-tab" data-rank-tab="gold" onclick="switchRankingTab('gold')">GOLD</button>
+        </div>
+        <div id="rankingBody" style="min-height:300px"></div>
+        <div class="chest-hint"><kbd>L</kbd> ou <kbd>ESC</kbd> fechar</div>
+        <button class="chest-close" onclick="closeRanking()">×</button>
+    </div>
+</div>
+
 <div id="settingsModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:580px">
         <div class="chest-title">⚙ OPÇÕES</div>
@@ -1471,7 +1486,7 @@
 </div>
 
 <div id="controls">
-    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
+    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
 </div>
 
 <script>
@@ -3610,7 +3625,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -4374,6 +4389,9 @@ function handleMP(msg){
         }
     } else if (msg.t === 'pvp'){
         if (remotePlayers[msg.id]) remotePlayers[msg.id].pvp = msg.pvp;
+    } else if (msg.t === 'ranking'){
+        _rankingCache = msg;
+        if (document.getElementById('rankingModal')?.style.display === 'flex') renderRankingBody();
     } else if (msg.t === 'pstats'){
         // HP/MP de outro player (broadcast a cada playerSync de 5s)
         const rp = remotePlayers[msg.id];
@@ -6508,8 +6526,12 @@ document.addEventListener('keydown', e => {
         const m = document.getElementById('settingsModal');
         if (m && m.style.display !== 'none') closeSettings(); else openSettings();
     }
+    if (e.key==='l' || e.key==='L'){
+        const m = document.getElementById('rankingModal');
+        if (m && m.style.display !== 'none') closeRanking(); else openRanking();
+    }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -7651,7 +7673,7 @@ const KEY_HELP = [
     ['WASD','mover'], ['SPACE','engajar/falar'], ['TAB','trocar alvo'],
     ['R','magia'], ['F','arremessar lança'], ['E','comer'],
     ['B','baú'], ['C','craft'], ['M','altar'], ['T','treino'],
-    ['Q','quests'], ['I','stats'], ['O','opções'], ['P','PvP'],
+    ['Q','quests'], ['I','stats'], ['L','ranking'], ['O','opções'], ['P','PvP'],
     ['ESC','fechar/cancelar'],
 ];
 function openSettings(){
@@ -7690,6 +7712,59 @@ function openSettings(){
         adminSec.style.display = 'none';
     }
 }
+// ─── RANKING público ────────────────────────────────────────────────────────
+let _rankingCache = null;
+let _rankingTab = 'mobs';
+function openRanking(){
+    closeAllModals();
+    document.getElementById('rankingModal').style.display = 'flex';
+    renderRankingBody();
+    // Pede dados frescos do server
+    if (ws && ws.readyState === 1){
+        ws.send(JSON.stringify({ t:'getRanking', limit: 10 }));
+    } else {
+        document.getElementById('rankingBody').innerHTML =
+            '<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ranking só disponível online.</div>';
+    }
+}
+function closeRanking(){
+    document.getElementById('rankingModal').style.display = 'none';
+}
+function switchRankingTab(which){
+    _rankingTab = which;
+    document.querySelectorAll('[data-rank-tab]').forEach(t => {
+        t.classList.toggle('active', t.dataset.rankTab === which);
+    });
+    renderRankingBody();
+}
+function renderRankingBody(){
+    const el = document.getElementById('rankingBody');
+    if (!el) return;
+    if (!_rankingCache){
+        el.innerHTML = '<div style="color:#666;text-align:center;padding:40px">carregando…</div>';
+        return;
+    }
+    const list = _rankingCache[_rankingTab] || [];
+    const labels = { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro' };
+    if (!list.length){
+        el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ninguém com ${labels[_rankingTab]} ainda.</div>`;
+        return;
+    }
+    const colorMedal = i => i === 0 ? '#ffd040' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#5a4818';
+    el.innerHTML = `
+        <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">TOP ${list.length} — ${labels[_rankingTab].toUpperCase()}</div>
+        ${list.map((e, i) => `
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #1a1408;${e.name === player.name ? 'background:#1a1a08' : ''}">
+                <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
+                <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ' <span style="color:#888;font-size:10px">(você)</span>' : ''}</span>
+                <span style="color:#ffcc40;font-family:Consolas,monospace">${e.value}</span>
+            </div>
+        `).join('')}`;
+}
+window.openRanking = openRanking;
+window.closeRanking = closeRanking;
+window.switchRankingTab = switchRankingTab;
+
 function tryRestoreBackup(){
     if (!confirm('Restaurar do backup? O save atual será sobrescrito.')) return;
     if (typeof restoreFromBackup === 'function') restoreFromBackup();

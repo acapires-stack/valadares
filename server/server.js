@@ -549,6 +549,22 @@ function broadcastMobs(){
     }
 }
 
+// ─── Ranking público (acumula por nome do player) ──────────────────────────
+const rankings = new Map();   // name → { mobKills, pkKills, bossKills, gold }
+function ensureRanking(name){
+    if (!name) return null;
+    let r = rankings.get(name);
+    if (!r){ r = { mobKills:0, pkKills:0, bossKills:0, gold:0 }; rankings.set(name, r); }
+    return r;
+}
+function topRanking(field, limit){
+    return Array.from(rankings.entries())
+        .map(([name, r]) => ({ name, value: r[field] || 0 }))
+        .filter(e => e.value > 0)
+        .sort((a,b) => b.value - a.value)
+        .slice(0, limit);
+}
+
 // ─── Persistência (state.json) ─────────────────────────────────────────────
 function saveStateToDisk(){
     const snap = {
@@ -559,6 +575,7 @@ function saveStateToDisk(){
         bossLevel: Array.from(bossLevel.entries()),
         bossDeath: Array.from(bossDeath.entries()),
         megaBoss: { spawnedAt: megaBoss.spawnedAt, lastResolvedAt: megaBoss.lastResolvedAt },
+        rankings: Array.from(rankings.entries()),
         monsters: Array.from(monsters.values()).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
@@ -583,6 +600,9 @@ function loadStateFromDisk(){
         if (d.megaBoss){
             megaBoss.spawnedAt = d.megaBoss.spawnedAt || 0;
             megaBoss.lastResolvedAt = d.megaBoss.lastResolvedAt || 0;
+        }
+        if (Array.isArray(d.rankings)){
+            for (const [name, r] of d.rankings) rankings.set(name, r);
         }
         monsters.clear();
         if (Array.isArray(d.monsters)){
@@ -638,6 +658,13 @@ function handleMobDeath(m, killerId){
         killer.ws.send(JSON.stringify({ t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level }));
     }
     broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
+    if (killer){
+        const r = ensureRanking(killer.name);
+        if (r){
+            r.mobKills = (r.mobKills || 0) + 1;
+            if (m.unique) r.bossKills = (r.bossKills || 0) + 1;
+        }
+    }
 }
 
 // Ticka DoTs em mobs (veneno/sangra/fogo). Roda a cada 1s, processa dots
@@ -914,7 +941,11 @@ wss.on('connection', (ws) => {
 
         // Cliente envia snapshot de gold/inv/stats pra body stays + visibility
         if (msg.t === 'playerSync') {
-            if (typeof msg.gold === 'number') p.gold = msg.gold;
+            if (typeof msg.gold === 'number'){
+                p.gold = msg.gold;
+                const r = ensureRanking(p.name);
+                if (r) r.gold = msg.gold;
+            }
             if (msg.inv && typeof msg.inv === 'object') p.inv = msg.inv;
             let statsChanged = false;
             if (typeof msg.hp === 'number' && isFinite(msg.hp)) { p.hp = msg.hp; statsChanged = true; }
@@ -992,6 +1023,12 @@ wss.on('connection', (ws) => {
                 // notifica killer com xp + spawn de loot fica com o killer (cliente)
                 sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level });
                 broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level });
+                // Ranking: incrementa mobKills (e bossKills se for unique)
+                const r = ensureRanking(p.name);
+                if (r){
+                    r.mobKills = (r.mobKills || 0) + 1;
+                    if (m.unique) r.bossKills = (r.bossKills || 0) + 1;
+                }
             }
             return;
         }
@@ -1008,6 +1045,23 @@ wss.on('connection', (ws) => {
                 }));
             }
             broadcastMsg('warn', `⚔ ${killer?killer.name:'?'} matou ${p.name}` + (msg.dropHighlander?' (Highlander caiu!)':''));
+            // Ranking: incrementa pkKills do killer
+            if (killer){
+                const r = ensureRanking(killer.name);
+                if (r) r.pkKills = (r.pkKills || 0) + 1;
+            }
+            return;
+        }
+
+        if (msg.t === 'getRanking') {
+            const limit = Math.min(20, Math.max(1, msg.limit | 0 || 10));
+            sendTo(id, {
+                t: 'ranking',
+                mobs:   topRanking('mobKills',  limit),
+                pvp:    topRanking('pkKills',   limit),
+                bosses: topRanking('bossKills', limit),
+                gold:   topRanking('gold',      limit),
+            });
             return;
         }
 
