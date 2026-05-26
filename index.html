@@ -1344,6 +1344,10 @@
         <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
         <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
 
+        <div class="chest-head" style="margin-top:14px">SAVE</div>
+        <div id="backupInfo" style="color:#998040;font-size:10px;letter-spacing:0.5px;padding:4px 6px;margin-bottom:4px"></div>
+        <button class="chest-btn" onclick="tryRestoreBackup()">↺ Restaurar do backup</button>
+
         <div class="chest-head" style="margin-top:14px">TECLAS</div>
         <div class="key-grid" id="keyGrid"></div>
 
@@ -6904,12 +6908,31 @@ function openSettings(){
     document.getElementById('setVolEffects').value = settings.volEffects;
     document.getElementById('setVolMasterVal').textContent  = settings.volMaster;
     document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
+    // Info do backup
+    const info = document.getElementById('backupInfo');
+    if (info && player.name){
+        const bkp = (typeof readSaveRaw === 'function') ? readSaveRaw('valadares:save:bkp:' + player.name) : null;
+        if (bkp && bkp.savedAt){
+            const ageMin = Math.floor((Date.now() - bkp.savedAt) / 60000);
+            const ageTxt = ageMin < 1 ? 'agora há pouco' : ageMin < 60 ? `${ageMin}min atrás` : `${Math.floor(ageMin/60)}h atrás`;
+            info.textContent = `Backup: ${ageTxt} · ${bkp.gold||0} g · skills L${Math.max(...Object.values(bkp.skills||{}).map(s=>s.val||10))}`;
+        } else if (bkp){
+            info.textContent = 'Backup: disponível (sem data)';
+        } else {
+            info.textContent = 'Sem backup ainda.';
+        }
+    }
     // Lista de teclas
     const grid = document.getElementById('keyGrid');
     grid.innerHTML = KEY_HELP.map(([k, desc]) =>
         `<div class="key-row"><kbd>${k}</kbd><span>${desc}</span></div>`
     ).join('');
 }
+function tryRestoreBackup(){
+    if (!confirm('Restaurar do backup? O save atual será sobrescrito.')) return;
+    if (typeof restoreFromBackup === 'function') restoreFromBackup();
+}
+window.tryRestoreBackup = tryRestoreBackup;
 function closeSettings(){
     document.getElementById('settingsModal').style.display = 'none';
     saveSettings();
@@ -7004,6 +7027,7 @@ function deleteAccount(){
     if (acc.pw !== hashPw(pwd)){ err.textContent = 'Senha incorreta — confirme p/ excluir.'; return; }
     localStorage.removeItem(accountKey(name));
     localStorage.removeItem('valadares:save:' + name);
+    localStorage.removeItem('valadares:save:bkp:' + name);
     err.style.color = '#5fbf65'; err.textContent = 'Conta excluída.';
     setTimeout(() => { err.style.color = '#d04040'; loginStatus(); }, 1500);
 }
@@ -7198,6 +7222,27 @@ setTimeout(checkClientUpdate, 35 * 1000);
 
 // ─── Save / Load (localStorage) ──────────────────────────────────────────────
 function saveKey(){ return 'valadares:save:' + player.name; }
+function backupKey(){ return 'valadares:save:bkp:' + player.name; }
+// Detecta um save "vazio-default" — todas skills 10, sem inv/gold/equip.
+// Usado como sanity check pra recusar sobrescrita que zeraria progresso (bug pós-logout).
+function isEmptyDefaultSave(d){
+    if (!d || typeof d !== 'object') return false;
+    const skillsTen = d.skills
+        ? Object.values(d.skills).every(s => (s && s.val === 10) || !s)
+        : true;
+    const noInv    = !d.inv || Object.keys(d.inv).length === 0;
+    const noGold   = !d.gold;
+    const noEquip  = !d.equipped || Object.values(d.equipped).every(v => !v);
+    const noChests = !d.chests || Object.values(d.chests).every(c => !c || Object.keys(c).length === 0);
+    return skillsTen && noInv && noGold && noEquip && noChests;
+}
+function readSaveRaw(key){
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch { return null; }
+}
 function saveState(){
     if (!started) return;   // pós-logout o player foi resetado pra defaults; bloqueia overwrite
     if (!player.name) return;
@@ -7218,16 +7263,36 @@ function saveState(){
         flags: player.flags,
         questFlags: player.questFlags,
         permaBuffs: player.permaBuffs,
+        savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
     };
+    // Sanity: se save atual tem progresso e o novo é empty-default, recusa
+    // (segunda camada de defesa contra bugs tipo "reset acidental pós-logout")
+    const prev = readSaveRaw(saveKey());
+    if (prev && !isEmptyDefaultSave(prev) && isEmptyDefaultSave(data)){
+        console.warn('[save] recusada sobrescrita com empty-default — save intacto');
+        return;
+    }
+    // Backup do anterior antes de sobrescrever
+    if (prev && !isEmptyDefaultSave(prev)){
+        try { localStorage.setItem(backupKey(), JSON.stringify(prev)); } catch {}
+    }
     try { localStorage.setItem(saveKey(), JSON.stringify(data)); } catch {}
 }
 function loadState(){
     try {
-        const raw = localStorage.getItem(saveKey());
-        if (!raw) return false;
-        const d = JSON.parse(raw);
+        let d = readSaveRaw(saveKey());
+        // Se save principal estiver corrompido/vazio mas backup tem progresso, restaura
+        if ((!d || isEmptyDefaultSave(d))){
+            const bkp = readSaveRaw(backupKey());
+            if (bkp && !isEmptyDefaultSave(bkp)){
+                d = bkp;
+                try { localStorage.setItem(saveKey(), JSON.stringify(bkp)); } catch {}
+                setTimeout(() => log('<span class="log-up">✦ Save restaurado do backup automático.</span>'), 100);
+            }
+        }
+        if (!d) return false;
         if (d.skills)   Object.assign(player.skills, d.skills);
         if (d.equipped) Object.assign(player.equipped, d.equipped);
         if (d.weapon !== undefined) player.weapon = d.weapon;
@@ -7295,9 +7360,32 @@ function loadState(){
 function wipeSave(){
     if (!player.name) return;
     localStorage.removeItem(saveKey());
+    localStorage.removeItem(backupKey());
     log('<span class="log-sys">Save deletado.</span>');
 }
 window.wipeSave = wipeSave;
+
+// Restaura manualmente a partir do backup (via botão no settings)
+function restoreFromBackup(){
+    if (!player.name) return false;
+    const bkp = readSaveRaw(backupKey());
+    if (!bkp){
+        log('<span class="log-sys">Sem backup disponível.</span>');
+        return false;
+    }
+    if (isEmptyDefaultSave(bkp)){
+        log('<span class="log-sys">Backup também está vazio.</span>');
+        return false;
+    }
+    // Move backup → main; recarrega
+    try {
+        localStorage.setItem(saveKey(), JSON.stringify(bkp));
+        log('<span class="log-up">✦ Backup restaurado. Recarregando…</span>');
+        setTimeout(() => window.location.reload(), 800);
+        return true;
+    } catch { return false; }
+}
+window.restoreFromBackup = restoreFromBackup;
 
 function loop(ts){
     if (!started) return;   // logout pausa o loop
