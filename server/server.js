@@ -853,6 +853,20 @@ wss.on('connection', (ws) => {
         if (msg.t === 'chat') {
             const text = String(msg.text || '').trim().substring(0, 240);
             if (!text) return;
+            // Rate-limit: 1 msg / 500ms por player (admin não conta — comandos)
+            const now = Date.now();
+            if (!isAdmin(p.name)){
+                p.lastChatAt = p.lastChatAt || 0;
+                if (now - p.lastChatAt < 500){
+                    // Avisa só na primeira recusa dentro de uma janela de 2s pra não floodar de volta
+                    if (now - (p.lastChatRateWarn || 0) > 2000){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:'Devagar com o chat.' });
+                        p.lastChatRateWarn = now;
+                    }
+                    return;
+                }
+                p.lastChatAt = now;
+            }
             // Comandos admin (só se nome do player tá em ADMIN_NAMES)
             if (text.startsWith('/') && isAdmin(p.name)){
                 const [cmd, ...rest] = text.split(' ');
