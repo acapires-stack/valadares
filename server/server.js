@@ -5,10 +5,11 @@ const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8080;
+const PORT = parseInt(process.env.PORT, 10) || 8080;
 const wss = new WebSocketServer({ port: PORT });
 
-const STATE_FILE = path.join(__dirname, 'state.json');
+// Em produção (Railway), Volume montado em /data; localmente fica ao lado do server.js
+const STATE_FILE = process.env.STATE_FILE_PATH || path.join(__dirname, 'state.json');
 const STATE_SAVE_INTERVAL_MS = 60 * 1000;
 
 // ─── Constants do mundo ─────────────────────────────────────────────────────
