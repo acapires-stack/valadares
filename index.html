@@ -4437,12 +4437,21 @@ function connectMP(){
         _wsAuthed = false;   // reseta a cada reconexão
         document.getElementById('connStatus').textContent = '● ONLINE';
         document.getElementById('connStatus').className = 'online';
-        log('<span class="log-sys">Conectado ao servidor!</span>');
         mpWasConnected = true;
         mpDisconnected = false;
         _reconnectAttempt = 0;
         if (_reconnectTimer){ clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+        if (_overlayDelayTimer){ clearTimeout(_overlayDelayTimer); _overlayDelayTimer = null; }
         showReconnectOverlay(false);
+        // Heartbeat app-level: alguns proxies (Cloudflare/Railway) fecham WS após
+        // ~60s sem dados na direção cliente→server. Mandamos {t:'ping'} a cada 25s
+        // garantidamente, mesmo que o player esteja parado.
+        if (_heartbeatTimer) clearInterval(_heartbeatTimer);
+        _heartbeatTimer = setInterval(() => {
+            if (ws && ws.readyState === 1){
+                try { ws.send(JSON.stringify({ t:'ping' })); } catch {}
+            }
+        }, 25000);
         if (player.target && player.targetType === 'monster'){
             player.target = null;
         }
@@ -4465,11 +4474,20 @@ function connectMP(){
     ws.onclose = () => {
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
-        log('<span class="log-sys">Desconectado.</span>');
+        if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
         // Se já estava com mobs do server, marca como queda pra bloquear farm offline
         if (mpWasConnected && serverAuthMobs){
             mpDisconnected = true;
-            showReconnectOverlay(true);
+            // Só mostra o overlay se a desconexão durar >3s — reconexões rápidas
+            // (idle timeout de proxy, blip de rede) não devem incomodar o player
+            if (_overlayDelayTimer) clearTimeout(_overlayDelayTimer);
+            _overlayDelayTimer = setTimeout(() => {
+                if (mpDisconnected){
+                    showReconnectOverlay(true);
+                    log('<span class="log-sys">Desconectado.</span>');
+                }
+                _overlayDelayTimer = null;
+            }, 3000);
             scheduleReconnect();
         }
     };
@@ -4811,6 +4829,8 @@ let mpWasConnected = false;  // já teve conexão MP bem-sucedida nesta sessão
 let mpDisconnected = false;  // perdeu conexão temporariamente (bloqueia ataques pra evitar farm offline)
 let _reconnectTimer = null;
 let _reconnectAttempt = 0;
+let _overlayDelayTimer = null;  // atraso de 3s antes de mostrar overlay "RECONECTANDO"
+let _heartbeatTimer = null;     // ping app-level cliente→server pra evitar idle timeout de proxy
 
 function scheduleReconnect(){
     if (_reconnectTimer) return;
@@ -8473,6 +8493,8 @@ function logout(){
     // limpa intervals da sessão (evita saveState rodando pós-logout)
     if (_saveStateIntervalId){ clearInterval(_saveStateIntervalId); _saveStateIntervalId = null; }
     if (_playerSyncIntervalId){ clearInterval(_playerSyncIntervalId); _playerSyncIntervalId = null; }
+    if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+    if (_overlayDelayTimer){ clearTimeout(_overlayDelayTimer); _overlayDelayTimer = null; }
     // limpa o mundo
     monsters.length = 0;
     groundItems.length = 0;

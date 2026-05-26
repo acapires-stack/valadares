@@ -1077,6 +1077,13 @@ wss.on('connection', (ws) => {
         let msg;
         try { msg = JSON.parse(raw); } catch { return; }
 
+        // Heartbeat app-level — cliente manda a cada ~25s pra evitar idle timeout
+        // de proxies (Cloudflare/Railway costumam fechar WS após 60s sem dados C→S).
+        if (msg.t === 'ping') {
+            try { ws.send(JSON.stringify({ t:'pong' })); } catch {}
+            return;
+        }
+
         // ─── AUTH (precede join) ──────────────────────────────────────────
         // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
         // Cria conta se não existir, devolve save server-side se houver.
