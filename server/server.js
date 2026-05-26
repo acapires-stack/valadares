@@ -552,6 +552,106 @@ function broadcastMobs(){
     }
 }
 
+// ─── Guilds ────────────────────────────────────────────────────────────────
+// Persiste em state.json. Estrutura: { name, leader, members:[names], createdAt }
+const guilds = new Map();   // name → guild
+const guildInvites = new Map();  // toName → { guildName, fromName, expiresAt }
+function findGuildOfPlayer(name){
+    for (const g of guilds.values()) if (g.members.includes(name)) return g;
+    return null;
+}
+function handleGuildCommand(p, text, sendToFn, broadcastFn){
+    const parts = text.split(/\s+/);
+    const sub = (parts[1] || '').toLowerCase();
+    const arg = parts.slice(2).join(' ').trim();
+    const myGuild = findGuildOfPlayer(p.name);
+    if (sub === 'create'){
+        if (myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você já está numa guild.' }); return; }
+        const name = arg.substring(0, 16);
+        if (!/^[A-Za-z0-9_-]{3,16}$/.test(name)){
+            sendToFn({ t:'serverMsg', level:'warn', text:'Nome inválido. 3-16 chars, letras/números/_/-.' });
+            return;
+        }
+        if (guilds.has(name)){ sendToFn({ t:'serverMsg', level:'warn', text:'Já existe guild com esse nome.' }); return; }
+        guilds.set(name, { name, leader: p.name, members: [p.name], createdAt: Date.now() });
+        sendToFn({ t:'serverMsg', level:'event', text:`✦ Guild "${name}" criada! Você é o líder.` });
+        broadcastFn(null, { t:'guildUpdate', name, members:[p.name], leader: p.name });
+        return;
+    }
+    if (sub === 'invite'){
+        if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
+        if (myGuild.leader !== p.name){ sendToFn({ t:'serverMsg', level:'warn', text:'Só o líder convida.' }); return; }
+        if (!arg){ sendToFn({ t:'serverMsg', level:'warn', text:'Uso: /guild invite NOME' }); return; }
+        guildInvites.set(arg, { guildName: myGuild.name, fromName: p.name, expiresAt: Date.now() + 60_000 });
+        // Avisa o alvo se online
+        for (const pp of players.values()){
+            if (!pp.disconnected && pp.name.toLowerCase() === arg.toLowerCase() && pp.ws.readyState === 1){
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'event', text:`👥 ${p.name} convidou você pra guild "${myGuild.name}". Use /guild join` }));
+                break;
+            }
+        }
+        sendToFn({ t:'serverMsg', level:'info', text:`Convite enviado pra ${arg} (60s).` });
+        return;
+    }
+    if (sub === 'join'){
+        if (myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você já está numa guild.' }); return; }
+        const inv = guildInvites.get(p.name);
+        if (!inv || inv.expiresAt < Date.now()){
+            sendToFn({ t:'serverMsg', level:'warn', text:'Sem convites pendentes.' });
+            return;
+        }
+        const g = guilds.get(inv.guildName);
+        if (!g){ sendToFn({ t:'serverMsg', level:'warn', text:'Guild não existe mais.' }); guildInvites.delete(p.name); return; }
+        g.members.push(p.name);
+        guildInvites.delete(p.name);
+        sendToFn({ t:'serverMsg', level:'event', text:`✦ Você entrou na guild "${g.name}"!` });
+        // Notifica membros online
+        for (const pp of players.values()){
+            if (pp.ws.readyState === 1 && g.members.includes(pp.name) && pp.name !== p.name){
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} entrou na guild.` }));
+            }
+        }
+        broadcastFn(null, { t:'guildUpdate', name: g.name, members: g.members, leader: g.leader });
+        return;
+    }
+    if (sub === 'leave'){
+        if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
+        myGuild.members = myGuild.members.filter(n => n !== p.name);
+        // Se era líder e ainda tem membros: passa pra próximo
+        if (myGuild.leader === p.name){
+            if (myGuild.members.length === 0){
+                guilds.delete(myGuild.name);
+                broadcastFn(null, { t:'guildUpdate', name: myGuild.name, deleted: true });
+            } else {
+                myGuild.leader = myGuild.members[0];
+            }
+        }
+        sendToFn({ t:'serverMsg', level:'info', text:`Você saiu da guild "${myGuild.name}".` });
+        // Avisa restantes online
+        for (const pp of players.values()){
+            if (pp.ws.readyState === 1 && myGuild.members.includes(pp.name)){
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} saiu da guild.` }));
+            }
+        }
+        if (guilds.has(myGuild.name)){
+            broadcastFn(null, { t:'guildUpdate', name: myGuild.name, members: myGuild.members, leader: myGuild.leader });
+        }
+        return;
+    }
+    if (sub === 'info' || sub === ''){
+        if (!myGuild){ sendToFn({ t:'serverMsg', level:'info', text:'Sem guild. Use /guild create NOME ou /guild join (após convite).' }); return; }
+        sendToFn({ t:'serverMsg', level:'info', text:`📜 ${myGuild.name} — líder: ${myGuild.leader} — membros (${myGuild.members.length}): ${myGuild.members.join(', ')}` });
+        return;
+    }
+    if (sub === 'list'){
+        if (!guilds.size){ sendToFn({ t:'serverMsg', level:'info', text:'Nenhuma guild ainda.' }); return; }
+        const lines = Array.from(guilds.values()).map(g => `${g.name} (${g.members.length})`);
+        sendToFn({ t:'serverMsg', level:'info', text:'Guilds: ' + lines.join(', ') });
+        return;
+    }
+    sendToFn({ t:'serverMsg', level:'warn', text:'Subcomandos: create NOME, invite NOME, join, leave, info, list' });
+}
+
 // ─── Trade ativo entre 2 players ───────────────────────────────────────────
 const trades = new Map();   // tradeId → { aId, bId, aOffer, bOffer, aConfirm, bConfirm, createdAt }
 function cancelTrade(trade, reason){
@@ -603,6 +703,7 @@ function saveStateToDisk(){
         bossDeath: Array.from(bossDeath.entries()),
         megaBoss: { spawnedAt: megaBoss.spawnedAt, lastResolvedAt: megaBoss.lastResolvedAt },
         rankings: Array.from(rankings.entries()),
+        guilds: Array.from(guilds.values()),
         monsters: Array.from(monsters.values()).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
@@ -630,6 +731,9 @@ function loadStateFromDisk(){
         }
         if (Array.isArray(d.rankings)){
             for (const [name, r] of d.rankings) rankings.set(name, r);
+        }
+        if (Array.isArray(d.guilds)){
+            for (const g of d.guilds) if (g && g.name) guilds.set(g.name, g);
         }
         monsters.clear();
         if (Array.isArray(d.monsters)){
@@ -1325,6 +1429,24 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 p.lastChatAt = now;
+            }
+            // /guild ... — sistema de guild
+            if (text.startsWith('/guild')){
+                handleGuildCommand(p, text, (m) => sendTo(id, m), broadcast);
+                return;
+            }
+            // /g msg — chat exclusivo da guild
+            if (text.startsWith('/g ')){
+                const body = text.substring(3).trim();
+                if (!body) return;
+                const myGuild = findGuildOfPlayer(p.name);
+                if (!myGuild){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
+                for (const pp of players.values()){
+                    if (pp.ws.readyState !== 1) continue;
+                    if (!myGuild.members.includes(pp.name)) continue;
+                    pp.ws.send(JSON.stringify({ t:'guildChat', fromName: p.name, guild: myGuild.name, text: body }));
+                }
+                return;
             }
             // Comandos admin (só se nome do player tá em ADMIN_NAMES)
             if (text.startsWith('/') && isAdmin(p.name)){

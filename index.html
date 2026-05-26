@@ -4614,6 +4614,11 @@ function handleMP(msg){
             _trade = null;
             document.getElementById('tradeModal').style.display = 'none';
         }
+    } else if (msg.t === 'guildChat'){
+        // Chat exclusivo de guild — cor própria
+        appendChat(`⚔[${msg.guild}] ${msg.fromName}`, msg.text, false);
+    } else if (msg.t === 'guildUpdate'){
+        // Pode-se renderizar guild info aqui no futuro; por ora ignora silencioso
     } else if (msg.t === 'mobs'){
         applyMobsSnapshot(msg.list);
     } else if (msg.t === 'mobBatch'){
