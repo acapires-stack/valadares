@@ -6182,16 +6182,352 @@ function drawItemSprite(ctx, def, key, S){
     const u = S / 24;  // unidade base (sprites pensados em 24x24)
     const P = (x,y,w,h,col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x*u), Math.round(y*u), Math.max(1, Math.round(w*u)), Math.max(1, Math.round(h*u))); };
 
+    // Aura épica nos cantos — usado em itens lendários/míticos
+    const drawEpicAura = (auraColor) => {
+        // 4 raios diagonais nas pontas pra dar sensação de "brilho lendário"
+        P(0, 2, 1, 1, auraColor); P(1, 1, 1, 1, auraColor); P(2, 0, 1, 1, auraColor);
+        P(23, 2, 1, 1, auraColor); P(22, 1, 1, 1, auraColor); P(21, 0, 1, 1, auraColor);
+        P(0, 21, 1, 1, auraColor); P(1, 22, 1, 1, auraColor); P(2, 23, 1, 1, auraColor);
+        P(23, 21, 1, 1, auraColor); P(22, 22, 1, 1, auraColor); P(21, 23, 1, 1, auraColor);
+        // pontinhos extras (sparkle)
+        P(11, 0, 2, 1, auraColor); P(11, 23, 2, 1, auraColor);
+        P(0, 11, 1, 2, auraColor); P(23, 11, 1, 2, auraColor);
+    };
+
     // Items específicos com sprite único
     if (key === 'CORACAO_HL'){
-        // coração vermelho
+        // coração vermelho com aura dourada
         const r = c;
         P(7,7,4,4,r); P(13,7,4,4,r);
         P(6,9,12,4,r);
         P(7,13,10,2,r);
         P(9,15,6,2,r);
         P(11,17,2,1,r);
-        P(8,8,1,1, _shade(c,60));  // brilho
+        // brilhos
+        P(8,8,1,1, '#ffffff');
+        P(9,9,1,1, _shade(c,80));
+        P(14,8,1,1, _shade(c,60));
+        drawEpicAura('#ffcc40');
+        return;
+    }
+    if (key === 'ESPADA_HL'){
+        // Espada do Highlander — lâmina dourada com coração vermelho na guarda
+        const blade = '#ffe070';
+        const bladeL = '#ffffff';
+        const bladeD = '#aa8020';
+        // lâmina larga diagonal (estilo claymore)
+        for (let i=0; i<16; i++){
+            P(3+i, 18-i, 3, 2, blade);
+            P(3+i, 18-i, 1, 1, bladeL);
+            P(5+i, 19-i, 1, 1, bladeD);
+        }
+        // ponta brilhante
+        P(19, 2, 2, 2, '#ffffff');
+        P(18, 3, 1, 1, bladeL);
+        // guarda dupla
+        P(2, 17, 6, 1, '#cc8810'); P(2, 19, 1, 4, '#cc8810');
+        P(3, 16, 4, 1, '#ffcc40');
+        // coração na guarda
+        P(4, 18, 1, 1, '#ff3030');
+        P(5, 18, 1, 1, '#ff3030');
+        // cabo embrulhado
+        P(2, 20, 3, 3, '#4a2a10');
+        P(3, 20, 1, 3, '#6a3818');
+        drawEpicAura('#ffcc40');
+        return;
+    }
+    if (key === 'ESPADA_ETERNA'){
+        // ★★ Espada Eterna — lâmina branco-azulada com runas
+        const blade = '#e8f0ff';
+        const bladeL = '#ffffff';
+        const bladeD = '#7080a0';
+        const rune = '#40a0ff';
+        // lâmina enorme em diagonal
+        for (let i=0; i<18; i++){
+            P(2+i, 19-i, 3, 2, blade);
+            P(2+i, 19-i, 1, 1, bladeL);
+            P(4+i, 20-i, 1, 1, bladeD);
+        }
+        // runas espalhadas
+        P(8, 13, 1, 1, rune);
+        P(12, 9, 1, 1, rune);
+        P(15, 6, 1, 1, rune);
+        // ponta brilhante (estrela)
+        P(20, 1, 2, 2, '#ffffff');
+        P(19, 2, 1, 1, rune);
+        P(21, 0, 1, 1, '#ffffff');
+        // guarda em cruz
+        P(0, 18, 6, 1, '#d8dcec'); P(0, 19, 1, 5, '#d8dcec');
+        P(1, 17, 4, 1, '#a8b0c0');
+        // gema azul na guarda
+        P(2, 19, 2, 2, rune);
+        P(2, 19, 1, 1, '#ffffff');
+        // cabo
+        P(0, 21, 4, 3, '#3a4060');
+        P(1, 21, 1, 3, '#6080a0');
+        drawEpicAura('#80c8ff');
+        return;
+    }
+    if (key === 'ESPADA_DRACO'){
+        // Espada Dracônica — lâmina escamada verde/preta
+        const blade = c;
+        const bladeL = _shade(c, 60);
+        const bladeD = _shade(c, -60);
+        for (let i=0; i<17; i++){
+            P(3+i, 18-i, 3, 2, blade);
+            P(3+i, 18-i, 1, 1, bladeL);
+            P(5+i, 19-i, 1, 1, bladeD);
+            // padrão escamado
+            if (i % 3 === 0) P(4+i, 18-i, 1, 1, bladeD);
+        }
+        // ponta
+        P(19, 2, 2, 2, bladeL);
+        // garra de drake como guarda
+        P(2, 17, 5, 1, '#3a3020'); P(2, 18, 1, 5, '#3a3020');
+        P(2, 17, 1, 1, bladeD);
+        P(6, 17, 1, 1, bladeD);
+        // cabo
+        P(1, 20, 4, 3, '#4a2818');
+        return;
+    }
+    if (key === 'MARTELO_GOLEM'){
+        // Martelo gigante de pedra com runas brilhantes
+        const stone = c;
+        const stoneL = _shade(c, 50);
+        const stoneD = _shade(c, -40);
+        // cabo diagonal
+        for (let i=0; i<13; i++){
+            P(5+i, 18-i, 2, 2, '#5a4828');
+        }
+        // cabeça quadrada gigante
+        P(12, 2, 10, 9, stone);
+        P(12, 2, 10, 1, stoneL);
+        P(12, 10, 10, 1, stoneD);
+        P(21, 2, 1, 9, stoneD);
+        // detalhes de pedras craqueladas
+        P(14, 4, 1, 1, stoneD);
+        P(17, 6, 1, 1, stoneD);
+        P(19, 4, 1, 1, stoneL);
+        P(15, 8, 1, 1, stoneD);
+        // gema central brilhante
+        P(16, 5, 3, 3, '#ff8030');
+        P(17, 6, 1, 1, '#ffe080');
+        return;
+    }
+    if (key === 'MACHADO_MINO'){
+        // Machado do Minotauro — labrys (lâmina dupla) com chifres de touro
+        const wood = '#5a2a18';
+        const woodL = '#8a5028';
+        const blade = '#c8c8d0';
+        const bladeL = '#ffffff';
+        const bladeD = '#6a6a78';
+        const horn = '#2a1810';
+        // Cabo vertical no centro
+        P(11, 8, 2, 14, wood);
+        P(11, 8, 1, 14, woodL);
+        // Cabeça superior — pomo arredondado
+        P(10, 6, 4, 3, wood);
+        P(10, 6, 4, 1, woodL);
+        // Chifres saindo do pomo (curvados pra cima e fora)
+        P(8, 4, 2, 2, horn);  P(7, 3, 1, 2, horn);  P(6, 2, 1, 1, horn);
+        P(14, 4, 2, 2, horn); P(16, 3, 1, 2, horn); P(17, 2, 1, 1, horn);
+        // Lâmina dupla horizontal — gigante (labrys)
+        // metade esquerda
+        P(2, 10, 9, 6, blade);
+        P(2, 10, 9, 1, bladeL);
+        P(2, 15, 9, 1, bladeD);
+        P(1, 11, 1, 4, blade); P(1, 11, 1, 1, bladeL);
+        P(0, 12, 1, 2, blade);
+        // metade direita
+        P(13, 10, 9, 6, blade);
+        P(13, 10, 9, 1, bladeL);
+        P(13, 15, 9, 1, bladeD);
+        P(22, 11, 1, 4, blade); P(22, 14, 1, 1, bladeD);
+        P(23, 12, 1, 2, blade);
+        // gumes cromados (ponta afiada)
+        P(0, 12, 1, 1, '#ffffff');
+        P(0, 13, 1, 1, '#ffffff');
+        P(23, 12, 1, 1, '#ffffff');
+        P(23, 13, 1, 1, '#ffffff');
+        // detalhe central (anel que une lâmina ao cabo)
+        P(10, 11, 4, 4, '#aa8030');
+        P(10, 11, 4, 1, '#ffcc40');
+        P(11, 12, 2, 2, '#3a2010');
+        // Base do cabo
+        P(10, 21, 4, 2, '#3a2010');
+        return;
+    }
+    if (key === 'COROA_VENDEDOR'){
+        // Coroa do Vendedor de Almas — coroa demoníaca com chifres
+        const base = c;
+        const baseL = _shade(c, 40);
+        const baseD = _shade(c, -50);
+        // aro inferior
+        P(4, 14, 16, 4, base);
+        P(4, 14, 16, 1, baseL);
+        P(4, 17, 16, 1, baseD);
+        // 5 pontas
+        P(5, 9, 2, 5, base); P(5, 9, 1, 5, baseL);
+        P(9, 6, 2, 8, base); P(9, 6, 1, 8, baseL);
+        P(11, 4, 2, 10, base); P(11, 4, 1, 10, baseL);
+        P(15, 6, 2, 8, base); P(15, 6, 1, 8, baseL);
+        P(17, 9, 2, 5, base); P(17, 9, 1, 5, baseL);
+        // chifres pretos saindo
+        P(2, 8, 1, 4, '#1a0a04');
+        P(1, 7, 1, 1, '#1a0a04');
+        P(21, 8, 1, 4, '#1a0a04');
+        P(22, 7, 1, 1, '#1a0a04');
+        // gemas roxas/vermelhas
+        P(7, 15, 2, 2, '#8030c0');
+        P(11, 15, 2, 2, '#ff3030');
+        P(15, 15, 2, 2, '#8030c0');
+        P(11, 16, 1, 1, '#ffffff');
+        drawEpicAura('#ff6040');
+        return;
+    }
+    if (key === 'COROA_VALADARES'){
+        // ★★ Coroa de Valadares — coroa real dourada com 5 grandes gemas
+        const gold = c;
+        const goldL = '#fff0a0';
+        const goldD = '#aa7818';
+        // aro robusto
+        P(3, 14, 18, 5, gold);
+        P(3, 14, 18, 1, goldL);
+        P(3, 18, 18, 1, goldD);
+        P(3, 14, 1, 5, goldL);
+        P(20, 14, 1, 5, goldD);
+        // 5 pontas mais grossas
+        P(4, 10, 3, 4, gold); P(4, 10, 1, 4, goldL);
+        P(8, 6, 3, 8, gold); P(8, 6, 1, 8, goldL);
+        P(10, 3, 4, 11, gold); P(10, 3, 1, 11, goldL); P(13, 4, 1, 10, goldD);
+        P(15, 6, 3, 8, gold); P(15, 6, 1, 8, goldL);
+        P(17, 10, 3, 4, gold); P(17, 10, 1, 4, goldL);
+        // gemas em cada ponta
+        P(4, 9, 3, 2, '#40b0ff');  // azul
+        P(5, 9, 1, 1, '#ffffff');
+        P(8, 5, 3, 2, '#ff4040');  // vermelha
+        P(9, 5, 1, 1, '#ffffff');
+        P(11, 2, 2, 2, '#80ff80');  // central verde gigante
+        P(11, 2, 1, 1, '#ffffff');
+        P(15, 5, 3, 2, '#ff4040');  // vermelha
+        P(16, 5, 1, 1, '#ffffff');
+        P(17, 9, 3, 2, '#40b0ff');  // azul
+        P(18, 9, 1, 1, '#ffffff');
+        // gemas no aro
+        P(7, 16, 1, 1, '#ff60ff');
+        P(11, 16, 2, 1, '#ff60ff');
+        P(15, 16, 1, 1, '#ff60ff');
+        drawEpicAura('#ffe060');
+        return;
+    }
+    if (key === 'ARMADURA_TRONO'){
+        // Armadura do Trono — peitoral ornamentado com gema central
+        const armor = c;
+        const armorL = _shade(c, 50);
+        const armorD = _shade(c, -40);
+        // peitoral mais elaborado
+        P(7, 4, 10, 3, armor);  // ombros
+        P(5, 6, 14, 12, armor); // tronco
+        P(6, 18, 12, 3, armor); // base
+        // ombreiras com pontas
+        P(4, 5, 3, 4, armor);
+        P(17, 5, 3, 4, armor);
+        P(3, 4, 1, 3, armorD);
+        P(20, 4, 1, 3, armorD);
+        // brilhos
+        P(7, 4, 10, 1, armorL);
+        P(5, 6, 1, 12, armorL);
+        P(18, 6, 1, 12, armorD);
+        // ornamento central — cruz dourada
+        P(11, 8, 2, 8, '#ffcc40');
+        P(9, 11, 6, 2, '#ffcc40');
+        // gema vermelha no centro
+        P(11, 11, 2, 2, '#ff3030');
+        P(11, 11, 1, 1, '#ffffff');
+        // detalhes ornamentais
+        P(7, 9, 1, 1, '#ffcc40');
+        P(16, 9, 1, 1, '#ffcc40');
+        P(7, 15, 1, 1, '#ffcc40');
+        P(16, 15, 1, 1, '#ffcc40');
+        drawEpicAura('#ffcc40');
+        return;
+    }
+    if (key === 'ARMADURA_ESCAMA'){
+        // Armadura de Escamas — padrão escamado verde
+        const scale = c;
+        const scaleL = _shade(c, 50);
+        const scaleD = _shade(c, -40);
+        P(7, 4, 10, 3, scale);
+        P(5, 7, 14, 10, scale);
+        P(6, 17, 12, 3, scale);
+        P(7, 4, 10, 1, scaleL);
+        P(5, 7, 1, 10, scaleL);
+        P(18, 7, 1, 10, scaleD);
+        // padrão escamado (linhas alternadas)
+        for (let y = 8; y < 17; y += 2){
+            for (let x = 6; x < 18; x += 2){
+                const off = ((y - 8) / 2) % 2;
+                P(x + off, y, 1, 1, scaleL);
+                P(x + off + 1, y, 1, 1, scaleD);
+            }
+        }
+        return;
+    }
+    if (key === 'ESCUDO_PEDRA'){
+        // Escudo de pedra com runas e rachaduras
+        const stone = c;
+        const stoneL = _shade(c, 40);
+        const stoneD = _shade(c, -40);
+        P(5, 3, 14, 2, stone);
+        P(4, 5, 16, 4, stone);
+        P(4, 9, 16, 4, stone);
+        P(5, 13, 14, 2, stone);
+        P(6, 15, 12, 2, stone);
+        P(7, 17, 10, 2, stone);
+        P(9, 19, 6, 1, stone);
+        P(11, 20, 2, 1, stone);
+        // brilho
+        P(5, 3, 14, 1, stoneL);
+        P(4, 5, 1, 8, stoneL);
+        // boss central — runa
+        P(10, 8, 4, 5, stoneD);
+        P(11, 9, 2, 1, '#ff8030');
+        P(11, 11, 2, 1, '#ff8030');
+        P(10, 10, 4, 1, '#ff8030');
+        // rachaduras
+        P(7, 7, 1, 1, stoneD);
+        P(15, 6, 1, 1, stoneD);
+        P(16, 12, 1, 1, stoneD);
+        return;
+    }
+    if (key === 'ELMO_DRACO'){
+        // Elmo Dracônico com chifres curvados e visor brilhante
+        const helm = c;
+        const helmL = _shade(c, 40);
+        const helmD = _shade(c, -40);
+        // cúpula
+        P(7, 4, 10, 2, helm);
+        P(5, 6, 14, 3, helm);
+        P(4, 9, 16, 5, helm);
+        P(4, 14, 16, 2, helmD);
+        // visor com gema dracônica
+        P(7, 11, 10, 2, '#0a0805');
+        P(10, 11, 1, 2, '#ff4030');
+        P(13, 11, 1, 2, '#ff4030');
+        // brilho
+        P(5, 6, 14, 1, helmL);
+        P(4, 9, 1, 4, helmL);
+        // chifres dracônicos longos e curvados
+        P(2, 3, 1, 5, helmD);
+        P(1, 4, 1, 3, helmD);
+        P(0, 6, 1, 2, helmD);
+        P(21, 3, 1, 5, helmD);
+        P(22, 4, 1, 3, helmD);
+        P(23, 6, 1, 2, helmD);
+        // espinhos no topo
+        P(8, 2, 1, 2, helmD);
+        P(11, 1, 2, 3, helmD);
+        P(15, 2, 1, 2, helmD);
         return;
     }
     if (key === 'GOLD'){
@@ -6931,7 +7267,7 @@ const SPELLS = {
     FIREBALL: {
         name: 'Bola de Fogo',
         manaCost: 20, cooldown: 1500,
-        range: 8, damage: 8,
+        range: 8, damage: 12,
         color: '#ff8030', glow: '#ffcc40',
         switchCost: 200,
         desc: 'Lança bola de fogo no alvo. Range 8 tiles.',
@@ -6939,7 +7275,7 @@ const SPELLS = {
     HEAL: {
         name: 'Cura',
         manaCost: 25, cooldown: 1800,
-        heal: 20,
+        heal: 30,
         color: '#3acc60', glow: '#aaffaa',
         switchCost: 300,
         desc: 'Recupera HP. Pode ser usada na PZ.',
@@ -6947,7 +7283,7 @@ const SPELLS = {
     RAIO: {
         name: 'Raio Místico',
         manaCost: 15, cooldown: 1100,
-        range: 10, damage: 5,
+        range: 10, damage: 8,
         color: '#7090ff', glow: '#ccddff',
         projType: 'beam',
         switchCost: 250,
@@ -6956,7 +7292,7 @@ const SPELLS = {
     EXORI: {
         name: 'Exori',
         manaCost: 40, cooldown: 4000,
-        aoeRange: 3, damage: 7,
+        aoeRange: 3, damage: 11,
         color: '#ff6020', glow: '#ffaa30',
         switchCost: 400,
         desc: 'Explosão em área — acerta todos mobs em 3 tiles ao redor. Sem alvo necessário.',
