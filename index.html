@@ -3219,6 +3219,8 @@ const player = {
     flags: {},
     // Buffs permanentes (de decisões morais, achievements, etc)
     permaBuffs: {},   // ex: { xpBonus: 0.05 }
+    // Lista de amigos (cap 50). Persiste no save server-side.
+    friends: [],
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8092,13 +8094,18 @@ window.updateTradeGold = updateTradeGold;
 window.confirmTradeOffer = confirmTradeOffer;
 window.cancelTradeOffer = cancelTradeOffer;
 
-// ─── AMIGOS (localStorage por player) ──────────────────────────────────────
+// ─── AMIGOS (server-side via save; legacy: migração 1× do localStorage) ────
 function friendsKey(){ return 'valadares:friends:' + player.name; }
 function loadFriends(){
-    try { return JSON.parse(localStorage.getItem(friendsKey()) || '[]'); } catch { return []; }
+    if (Array.isArray(player.friends)) return player.friends.slice();
+    return [];
 }
 function saveFriends(list){
-    try { localStorage.setItem(friendsKey(), JSON.stringify(list.slice(0, 50))); } catch {}
+    player.friends = Array.isArray(list) ? list.slice(0, 50) : [];
+    // Snapshot pro localStorage continua existindo como cache (compat com saves antigos
+    // que ainda não passaram pelo applySaveData novo)
+    try { localStorage.setItem(friendsKey(), JSON.stringify(player.friends)); } catch {}
+    saveState();   // server-side via saveUpload (throttle 5s no server)
 }
 function addFriend(name){
     name = String(name || '').trim().substring(0, 14);
@@ -8483,6 +8490,7 @@ function logout(){
         pzLockUntil: 0, lastKilledBy: null, vengeance: {},
         hurtTimer: 0, shieldDefense: 0,
         poison: null, stun: null, bleed: null, buff: null,
+        friends: [],
     });
     for (const k of Object.keys(player.skills)){
         player.skills[k] = { val:10, xp:0, xpNext:50 };
@@ -8682,6 +8690,7 @@ function saveState(){
         flags: player.flags,
         questFlags: player.questFlags,
         permaBuffs: player.permaBuffs,
+        friends: Array.isArray(player.friends) ? player.friends.slice(0, 50) : [],
         savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
@@ -8794,6 +8803,14 @@ function applySaveData(d){
         if (d.flags)       player.flags = d.flags;
         if (d.questFlags)  player.questFlags = d.questFlags;
         if (d.permaBuffs)  player.permaBuffs = d.permaBuffs;
+        if (Array.isArray(d.friends)) player.friends = d.friends.slice(0, 50);
+        else {
+            // Migração 1×: save antigo sem `friends` mas localStorage tem
+            try {
+                const legacy = JSON.parse(localStorage.getItem('valadares:friends:' + player.name) || '[]');
+                if (Array.isArray(legacy) && legacy.length) player.friends = legacy.slice(0, 50);
+            } catch {}
+        }
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
