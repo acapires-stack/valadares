@@ -714,9 +714,10 @@
             font-style: italic;
         }
 
-        /* MODAIS (baú, craft, altar, treino, stats, shop, quests) */
+        /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
-        #shopModal, #questsModal, #statsModal, #chainDialogModal {
+        #shopModal, #questsModal, #statsModal, #chainDialogModal,
+        #settingsModal, #tutorialModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -784,6 +785,59 @@
         .chest-btn-primary:hover {
             background: linear-gradient(180deg, #aa7d30 0%, #6a4a18 100%);
             color: #fff;
+        }
+        /* Settings + Tutorial */
+        .settings-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 4px; border-bottom: 1px solid #1a1408;
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-label {
+            color: #c8a050; font-size: 11px; letter-spacing: 1.5px;
+            font-weight: 600; min-width: 130px;
+        }
+        .settings-val { color: #ffcc40; font-size: 11px; min-width: 36px; text-align: right; }
+        .settings-slider {
+            flex: 1; height: 6px; -webkit-appearance: none; appearance: none;
+            background: #1a1408; border: 1px solid #3a2d10; border-radius: 3px;
+            outline: none;
+        }
+        .settings-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: linear-gradient(180deg, #d8b048 0%, #8a6520 100%);
+            border: 1px solid #6a5020; cursor: pointer;
+        }
+        .settings-slider::-moz-range-thumb {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: linear-gradient(180deg, #d8b048 0%, #8a6520 100%);
+            border: 1px solid #6a5020; cursor: pointer;
+        }
+        .key-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 4px 16px; margin-top: 6px;
+        }
+        .key-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 3px 6px; font-size: 11px;
+        }
+        .key-row kbd {
+            background: #2a1f10; border: 1px solid #5a4218; color: #e0c060;
+            padding: 1px 6px; font-family: 'Consolas', monospace; font-size: 10px;
+            border-radius: 2px; min-width: 22px; text-align: center;
+            box-shadow: inset 0 -1px 0 rgba(0,0,0,0.4);
+        }
+        .key-row span { color: #aa9050; font-size: 10px; letter-spacing: 0.5px; }
+        .tutorial-section {
+            background: #050405; border: 1px solid #2a200a;
+            padding: 10px 12px; margin-bottom: 10px; border-radius: 1px;
+        }
+        .tutorial-section h4 {
+            color: #ffcc40; font-size: 11px; letter-spacing: 2px;
+            font-weight: 600; margin: 0 0 6px 0; text-transform: uppercase;
+        }
+        .tutorial-section p {
+            color: #998040; font-size: 11px; line-height: 1.55; margin: 4px 0;
         }
         .train-tab {
             background: #0a0805; border: 1px solid #2a200a;
@@ -1266,6 +1320,82 @@
     </div>
 </div>
 
+<div id="settingsModal" style="display:none">
+    <div class="chest-box" style="min-width:520px;max-width:580px">
+        <div class="chest-title">⚙ OPÇÕES</div>
+
+        <div class="chest-head">ÁUDIO</div>
+        <div class="settings-row">
+            <div class="settings-label">Volume geral</div>
+            <input id="setVolMaster" type="range" min="0" max="100" value="70" class="settings-slider">
+            <div class="settings-val" id="setVolMasterVal">70</div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Efeitos</div>
+            <input id="setVolEffects" type="range" min="0" max="100" value="80" class="settings-slider">
+            <div class="settings-val" id="setVolEffectsVal">80</div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Música</div>
+            <input id="setVolMusic" type="range" min="0" max="100" value="0" class="settings-slider" disabled>
+            <div class="settings-val" id="setVolMusicVal">—</div>
+        </div>
+
+        <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
+        <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
+
+        <div class="chest-head" style="margin-top:14px">TECLAS</div>
+        <div class="key-grid" id="keyGrid"></div>
+
+        <div class="chest-hint" style="margin-top:12px"><kbd>O</kbd> ou <kbd>ESC</kbd> fechar</div>
+        <button class="chest-close" onclick="closeSettings()">×</button>
+    </div>
+</div>
+
+<div id="tutorialModal" style="display:none">
+    <div class="chest-box" style="min-width:560px;max-width:640px">
+        <div class="chest-title">📜 BEM-VINDO A VALADARES</div>
+
+        <div class="tutorial-section">
+            <h4>🗺 O Mundo</h4>
+            <p>Você começa numa <b style="color:#c8a050">Zona Segura (PZ)</b> ao redor do spawn — sem combate. Saia pelos quatro lados pra encontrar mobs. Cada anel é mais difícil. Há <b style="color:#c8a050">5 cavernas</b>, biomas de <b style="color:#a8c8e8">neve</b> e <b style="color:#e8c878">deserto</b> com mobs exclusivos.</p>
+        </div>
+
+        <div class="tutorial-section">
+            <h4>⚔ Combate</h4>
+            <p><kbd>WASD</kbd> move (diagonais ok), <kbd>ESPAÇO</kbd> ataca/engaja, <kbd>TAB</kbd> troca de alvo, <kbd>R</kbd> lança magia, <kbd>F</kbd> arremessa lança. Equipe armas/armaduras clicando no inventário.</p>
+        </div>
+
+        <div class="tutorial-section">
+            <h4>🏠 Base Operacional (PZ)</h4>
+            <p><kbd>B</kbd> abre baú (4 independentes), <kbd>C</kbd> bancada de craft, <kbd>M</kbd> altar de magias, <kbd>T</kbd> boneco de treino, <kbd>Q</kbd> quests (fale com a Atendente). Mercador adjacente compra/vende.</p>
+        </div>
+
+        <div class="tutorial-section">
+            <h4>📈 Progressão</h4>
+            <p>Sem nível de personagem — tudo deriva de <b style="color:#c8a050">skills</b>. Cada arma treina sua skill (Espada/Machado/Clava/Distância/Punho). HP, MP, defesa e velocidade saem das skills. Treine no boneco da PZ ou matando mobs.</p>
+        </div>
+
+        <div class="tutorial-section">
+            <h4>☠ PvP (cuidado!)</h4>
+            <p><kbd>P</kbd> liga PvP (custa 5000g). Cada kill = <b style="color:#ff6060">selo de sangue</b>. 5 selos + kill final = vira <b style="color:#ffcc40">Highlander</b>. Aí 3 Caçadores vêm te perseguir pelo mapa inteiro.</p>
+        </div>
+
+        <div class="tutorial-section">
+            <h4>💡 Dicas</h4>
+            <p>Auto-save constante. Mini-mapa no canto descobre andando. <kbd>I</kbd> abre estatísticas, <kbd>O</kbd> abre opções/volume. Logout só fora de combate PvP.</p>
+        </div>
+
+        <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center">
+            <label style="color:#998040;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="tutDontShow" checked style="cursor:pointer"> Não mostrar de novo
+            </label>
+        </div>
+        <button class="chest-btn chest-btn-primary" onclick="closeTutorial()" style="margin-top:8px">ENTENDI ✦</button>
+        <button class="chest-close" onclick="closeTutorial()">×</button>
+    </div>
+</div>
+
 <div id="craftModal" style="display:none">
     <div class="chest-box" style="min-width:620px">
         <div class="chest-title">⚒ BANCADA</div>
@@ -1301,7 +1431,7 @@
 </div>
 
 <div id="controls">
-    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>P</kbd> PvP
+    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
 </div>
 
 <script>
@@ -2827,6 +2957,7 @@ function damagePlayer(amount, source, attacker){
     const actual  = Math.max(1, Math.round(raw * (1 - reduction)));
     const blocked = raw - actual;
     player.hp = Math.max(0, player.hp - actual);
+    sndDmg();
     addFloat(player.x, player.y, `-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
     player.hurtTimer = crit ? 450 : 300;
     const dt = blocked > 0 ? ` (${blocked} bloq · ${Math.round(reduction*100)}%)` : '';
@@ -2868,6 +2999,7 @@ function gainSkillXp(name, amount){
         sk.val++;
         sk.xpNext = Math.floor(sk.xpNext * 1.15);
         log(`<span class="log-up">★ ${name} subiu para ${sk.val}!</span>`);
+        sndLevelUp();
         recomputeStats();
     }
 }
@@ -2875,6 +3007,7 @@ function gainSkillXp(name, amount){
 function playerDie(){
     if (player.stats) player.stats.mobDeaths = (player.stats.mobDeaths || 0) + 1;
     clearStatusEffects();
+    sndDeath();
     log(`<span class="log-die">━━ Você morreu ━━</span>`);
     // Perda leve: 15% dos pontos de skill ACIMA de 10 (mínimo de -1 se subiu algo).
     // Mantém XP da skill (não perde o que tava cozinhando).
@@ -2909,6 +3042,7 @@ function killMonster(m){
     if (idx>=0) monsters.splice(idx,1);
     statsRecordMobKill(m.type, m.unique);
     notifyMobKilledForQuests(m.type);
+    sndKill();
     log(`<span class="log-kill">Você matou ${m.name}</span>`);
     // drops
     const before = groundItems.length;
@@ -3228,7 +3362,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -3736,6 +3870,7 @@ function doAttack(m){
         const critR = Math.random() < playerCritChance();
         if (critR) dmgR *= 2;
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
+        if (critR) sndCrit(); else sndHit();
         log(`<span class="log-dmg">${critR?'★ ':''}${wItem.name}: -${dmgR} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
         projectiles.push({
             x: player.renderX, y: player.renderY,
@@ -3775,6 +3910,7 @@ function doAttack(m){
     if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
     dmg = Math.floor(dmg * mult);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
+    if (crit) sndCrit(); else sndHit();
     log(`<span class="log-dmg">${crit?'★ ':''}${w.skill}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
     gainSkillXp(w.skill, 1);
     if (player.equipped.offhand && ITEMS[player.equipped.offhand].kind === 'offhand'){
@@ -3993,6 +4129,7 @@ function handleMP(msg){
         const actual = Math.max(1, Math.round(amount * (1 - reduction)));
         player.hp = Math.max(0, player.hp - actual);
         player.hurtTimer = 300;
+        sndDmg();
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         const def = MTYPE[msg.mobType];
         log(`<span class="log-dmg">⚠ ${def?def.name:msg.mobType}: ${actual} dano</span>`);
@@ -4050,6 +4187,7 @@ function applyMobsSnapshot(list){
 function mobKilledByServer(m){
     statsRecordMobKill(m.type, MTYPE[m.type] && MTYPE[m.type].unique);
     notifyMobKilledForQuests(m.type);
+    sndKill();
     if (typeof rollDrops === 'function') rollDrops(m.type, m.x, m.y);
     // XP no skill da arma equipada (simula killMonster sem mexer no monsters[])
     const wKey = player.equipped.weapon;
@@ -5703,6 +5841,7 @@ document.addEventListener('keydown', e => {
     // Se está digitando num input/textarea (login, chat, etc), não dispara atalhos
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    ensureAudio();   // resume AudioContext na primeira tecla (gesture requirement)
     keys[e.key] = true;
     if (e.key===' ' && !attackPressed){ attackPressed = true; engage(); }
     if (e.key==='e' || e.key==='E') eatBestFood();
@@ -5724,8 +5863,12 @@ document.addEventListener('keydown', e => {
     if (e.key==='f' || e.key==='F') throwSpear();
     if (e.key==='t' || e.key==='T') openTraining();
     if (e.key==='p' || e.key==='P') togglePvP();
+    if (e.key==='o' || e.key==='O'){
+        const m = document.getElementById('settingsModal');
+        if (m && m.style.display !== 'none') closeSettings(); else openSettings();
+    }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -5890,6 +6033,7 @@ function castSpell(spellKey){
         }
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
+        sndSpell();
         player.hp += healed;
         addFloat(player.x, player.y, `+${healed}`, sp.glow, true);
         log(`<span class="log-xp">${sp.name}: +${healed} HP</span>`);
@@ -5910,6 +6054,7 @@ function castSpell(spellKey){
     }
     player.mp -= sp.manaCost;
     spellCooldowns[spellKey] = sp.cooldown;
+    sndSpell();
     let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
     dmg = Math.max(1, dmg);
     const crit = Math.random() < playerCritChance();
@@ -6411,6 +6556,7 @@ function handleMovement(dt){
 
 // ─── Itens: pickup automático no raio 1 ──────────────────────────────────────
 function pickupAt(x, y){
+    let pickedAny = false;
     for (let i = groundItems.length-1; i >= 0; i--){
         const it = groundItems[i];
         if (Math.abs(it.x - x) > 1 || Math.abs(it.y - y) > 1) continue;
@@ -6423,7 +6569,9 @@ function pickupAt(x, y){
             log(`<span class="log-xp">Pegou ${it.qty}× ${def.name}</span>`);
         }
         groundItems.splice(i, 1);
+        pickedAny = true;
     }
+    if (pickedAny) sndPickup();
 }
 
 function eatBestFood(){
@@ -6512,6 +6660,306 @@ function loginStatus(){
 }
 
 const SESSION_KEY = 'valadares:session';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTINGS (#19) — volumes + flags persistidas em localStorage
+// ═══════════════════════════════════════════════════════════════════════════
+const SETTINGS_KEY = 'valadares:settings';
+const settings = {
+    volMaster: 70,   // 0-100
+    volEffects: 80,  // 0-100
+};
+function loadSettings(){
+    try {
+        const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+        if (s){
+            if (typeof s.volMaster === 'number')  settings.volMaster  = s.volMaster;
+            if (typeof s.volEffects === 'number') settings.volEffects = s.volEffects;
+        }
+    } catch {}
+}
+function saveSettings(){
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
+loadSettings();
+function effectiveVolume(){
+    return (settings.volMaster / 100) * (settings.volEffects / 100);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SOUND ENGINE (#17) — Web Audio sintetizado, sem arquivos externos
+// AudioContext só inicializa na primeira interação do usuário (regra browser)
+// ═══════════════════════════════════════════════════════════════════════════
+let audioCtx = null;
+let masterGain = null;
+let reverbNode = null;
+let reverbGain = null;
+function initAudio(){
+    if (audioCtx) return audioCtx;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return null;
+        audioCtx = new Ctor();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = effectiveVolume();
+        masterGain.connect(audioCtx.destination);
+        // Reverb leve via convolver com IR sintético
+        reverbNode = audioCtx.createConvolver();
+        reverbNode.buffer = makeImpulseResponse(1.4, 2.2);
+        reverbGain = audioCtx.createGain();
+        reverbGain.gain.value = 0.18;
+        reverbNode.connect(reverbGain).connect(masterGain);
+    } catch (e){ audioCtx = null; }
+    return audioCtx;
+}
+// Resume no primeiro clique/tecla (browsers suspendem até gesto)
+function ensureAudio(){
+    if (!audioCtx) initAudio();
+    if (audioCtx && audioCtx.state === 'suspended'){
+        try { audioCtx.resume(); } catch {}
+    }
+}
+function makeImpulseResponse(duration, decay){
+    const rate = audioCtx.sampleRate;
+    const length = Math.floor(rate * duration);
+    const buf = audioCtx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++){
+        const data = buf.getChannelData(ch);
+        for (let i = 0; i < length; i++){
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/length, decay);
+        }
+    }
+    return buf;
+}
+function refreshAudioVolume(){
+    if (masterGain) masterGain.gain.value = effectiveVolume();
+}
+// Helper para tocar um som via callback que recebe (ctx, masterGain, reverbGain, now)
+function playSfx(builder){
+    if (!audioCtx) initAudio();
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended'){ try { audioCtx.resume(); } catch {} }
+    if (effectiveVolume() <= 0.0001) return;
+    try { builder(audioCtx, masterGain, reverbGain, audioCtx.currentTime); } catch (e){}
+}
+
+// SOM: ataque/swing (corte rápido com filtro)
+function sndHit(){
+    playSfx((c, mg, rg, t) => {
+        const noise = c.createBufferSource();
+        const buf = c.createBuffer(1, 0.18 * c.sampleRate, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2 - 1) * (1 - i/d.length);
+        noise.buffer = buf;
+        const bp = c.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.8;
+        bp.frequency.exponentialRampToValueAtTime(600, t + 0.18);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.18, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        noise.connect(bp).connect(g).connect(mg);
+        g.connect(rg);
+        noise.start(t); noise.stop(t + 0.2);
+    });
+}
+// SOM: dano sofrido (thud grave + transiente)
+function sndDmg(){
+    playSfx((c, mg, rg, t) => {
+        const osc = c.createOscillator();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(140, t);
+        osc.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.34, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        osc.connect(g).connect(mg);
+        g.connect(rg);
+        osc.start(t); osc.stop(t + 0.3);
+        // transiente noise
+        const noise = c.createBufferSource();
+        const buf = c.createBuffer(1, 0.05 * c.sampleRate, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2 - 1);
+        noise.buffer = buf;
+        const lp = c.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 800;
+        const ng = c.createGain();
+        ng.gain.setValueAtTime(0.22, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        noise.connect(lp).connect(ng).connect(mg);
+        noise.start(t); noise.stop(t + 0.07);
+    });
+}
+// SOM: kill (pitch descendente com cauda)
+function sndKill(){
+    playSfx((c, mg, rg, t) => {
+        const osc = c.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(420, t);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.4);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.22, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+        osc.connect(g).connect(mg);
+        g.connect(rg);
+        osc.start(t); osc.stop(t + 0.5);
+    });
+}
+// SOM: magia (chime cintilante)
+function sndSpell(){
+    playSfx((c, mg, rg, t) => {
+        // Acorde com 3 frequências
+        const freqs = [660, 880, 1320];
+        freqs.forEach((f, i) => {
+            const osc = c.createOscillator();
+            osc.type = 'sine'; osc.frequency.value = f;
+            const g = c.createGain();
+            g.gain.setValueAtTime(0, t + i*0.05);
+            g.gain.linearRampToValueAtTime(0.13, t + i*0.05 + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, t + i*0.05 + 0.55);
+            osc.connect(g).connect(mg);
+            g.connect(rg);
+            osc.start(t + i*0.05); osc.stop(t + i*0.05 + 0.6);
+        });
+    });
+}
+// SOM: pickup (sino curto)
+function sndPickup(){
+    playSfx((c, mg, rg, t) => {
+        const osc = c.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(900, t);
+        osc.frequency.exponentialRampToValueAtTime(1320, t + 0.12);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.16, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.connect(g).connect(mg);
+        osc.start(t); osc.stop(t + 0.2);
+    });
+}
+// SOM: level up (arpejo ascendente)
+function sndLevelUp(){
+    playSfx((c, mg, rg, t) => {
+        const notes = [523, 659, 784, 1047]; // C E G C
+        notes.forEach((f, i) => {
+            const osc = c.createOscillator();
+            osc.type = 'triangle'; osc.frequency.value = f;
+            const g = c.createGain();
+            g.gain.setValueAtTime(0, t + i*0.08);
+            g.gain.linearRampToValueAtTime(0.18, t + i*0.08 + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, t + i*0.08 + 0.35);
+            osc.connect(g).connect(mg);
+            g.connect(rg);
+            osc.start(t + i*0.08); osc.stop(t + i*0.08 + 0.4);
+        });
+    });
+}
+// SOM: morte do player (grave descendente longo)
+function sndDeath(){
+    playSfx((c, mg, rg, t) => {
+        const osc = c.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 1.2);
+        const lp = c.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 600;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.28, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+        osc.connect(lp).connect(g).connect(mg);
+        g.connect(rg);
+        osc.start(t); osc.stop(t + 1.4);
+    });
+}
+// SOM: crítico (mais alto que hit normal)
+function sndCrit(){
+    playSfx((c, mg, rg, t) => {
+        const osc = c.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1200, t);
+        osc.frequency.exponentialRampToValueAtTime(600, t + 0.15);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.18, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.connect(g).connect(mg);
+        g.connect(rg);
+        osc.start(t); osc.stop(t + 0.2);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTINGS MODAL handlers
+// ═══════════════════════════════════════════════════════════════════════════
+const KEY_HELP = [
+    ['WASD','mover'], ['SPACE','engajar/falar'], ['TAB','trocar alvo'],
+    ['R','magia'], ['F','arremessar lança'], ['E','comer'],
+    ['B','baú'], ['C','craft'], ['M','altar'], ['T','treino'],
+    ['Q','quests'], ['I','stats'], ['O','opções'], ['P','PvP'],
+    ['ESC','fechar/cancelar'],
+];
+function openSettings(){
+    closeAllModals();
+    document.getElementById('settingsModal').style.display = 'flex';
+    // Sincroniza sliders com state atual
+    document.getElementById('setVolMaster').value  = settings.volMaster;
+    document.getElementById('setVolEffects').value = settings.volEffects;
+    document.getElementById('setVolMasterVal').textContent  = settings.volMaster;
+    document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
+    // Lista de teclas
+    const grid = document.getElementById('keyGrid');
+    grid.innerHTML = KEY_HELP.map(([k, desc]) =>
+        `<div class="key-row"><kbd>${k}</kbd><span>${desc}</span></div>`
+    ).join('');
+}
+function closeSettings(){
+    document.getElementById('settingsModal').style.display = 'none';
+    saveSettings();
+}
+window.openSettings = openSettings;
+window.closeSettings = closeSettings;
+// Bind sliders
+window.addEventListener('DOMContentLoaded', () => {
+    const m = document.getElementById('setVolMaster');
+    const e = document.getElementById('setVolEffects');
+    if (m) m.addEventListener('input', () => {
+        settings.volMaster = +m.value;
+        document.getElementById('setVolMasterVal').textContent = settings.volMaster;
+        refreshAudioVolume();
+    });
+    if (e) e.addEventListener('input', () => {
+        settings.volEffects = +e.value;
+        document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
+        refreshAudioVolume();
+        sndPickup();  // preview do volume
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TUTORIAL (#18) — modal único no primeiro login (por usuário)
+// ═══════════════════════════════════════════════════════════════════════════
+function tutorialKey(name){ return 'valadares:tutSeen:' + (name || ''); }
+function openTutorial(force){
+    if (!force){
+        try {
+            if (localStorage.getItem(tutorialKey(player.name)) === '1') return;
+        } catch {}
+    }
+    closeAllModals();
+    document.getElementById('tutorialModal').style.display = 'flex';
+    const cb = document.getElementById('tutDontShow');
+    if (cb) cb.checked = true;
+}
+function closeTutorial(){
+    const cb = document.getElementById('tutDontShow');
+    const dontShow = cb ? cb.checked : true;
+    if (dontShow){
+        try { localStorage.setItem(tutorialKey(player.name), '1'); } catch {}
+    } else {
+        try { localStorage.removeItem(tutorialKey(player.name)); } catch {}
+    }
+    document.getElementById('tutorialModal').style.display = 'none';
+}
+window.openTutorial = openTutorial;
+window.closeTutorial = closeTutorial;
 
 function tryLogin(multiplayer){
     const name = document.getElementById('charInput').value.trim();
@@ -6709,6 +7157,8 @@ function startGame(multiplayer, name){
     if (restored) log('<span class="log-sys">Progresso restaurado.</span>');
     log('Use WASD para mover, ESPAÇO para atacar.');
     started = true;
+    // Tutorial só na primeira vez por usuário (flag em localStorage)
+    setTimeout(() => openTutorial(false), 500);
     setInterval(saveState, 5000);
     setInterval(() => {
         if (ws && ws.readyState === 1){

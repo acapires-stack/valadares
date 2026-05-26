@@ -228,9 +228,9 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 ### Polish
 | # | Item | Notas |
 |---|---|---|
-| 17 | Sons / música | Hit, dano, kill, magia, ambient |
-| 18 | Tutorial in-game | Primeira vez explicando teclas |
-| 19 | Settings panel | Volume, atalhos customizáveis |
+| 17 | ✅ **Sons** | Web Audio sintetizado (osciladores + filtros + reverb leve). Hooks: hit, crit, dano, kill, magia, pickup, level-up, morte. Sem arquivos externos, respeita volume do settings |
+| 18 | ✅ **Tutorial in-game** | Modal único no primeiro login com 6 seções (Mundo/Combate/Base/Progressão/PvP/Dicas). Flag `tutSeen:<user>` no localStorage. Reabre pelo settings |
+| 19 | ✅ **Settings panel** | Tecla **O**. Sliders volume geral + efeitos (música reservada). Botão "ver tutorial de novo". Lista de teclas read-only. Persiste em `valadares:settings` |
 
 ---
 
