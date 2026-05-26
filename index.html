@@ -1377,6 +1377,11 @@
         <div class="chest-head" style="margin-top:14px">TECLAS</div>
         <div class="key-grid" id="keyGrid"></div>
 
+        <div id="adminSection" style="display:none">
+            <div class="chest-head" style="margin-top:14px;color:#cc4040">ADMIN</div>
+            <div id="adminBody"></div>
+        </div>
+
         <div class="chest-hint" style="margin-top:12px"><kbd>O</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeSettings()">×</button>
     </div>
@@ -3163,7 +3168,45 @@ function gainSkillXp(name, amount){
     }
 }
 
+// Snapshot pré-morte (só admin — recovery rápido em caso de morte teste)
+let _preDeathSnapshot = null;
+function captureAdminSnapshot(){
+    return {
+        savedAt: Date.now(),
+        skills: JSON.parse(JSON.stringify(player.skills)),
+        gold: player.gold,
+        hp: player.hp, maxHp: player.maxHp,
+        mp: player.mp,  maxMp: player.maxMp,
+        inv: { ...player.inv },
+        equipped: { ...player.equipped },
+    };
+}
+function restoreAdminSnapshot(snap){
+    if (!snap) return false;
+    for (const [name, sk] of Object.entries(snap.skills || {})){
+        if (player.skills[name]){
+            player.skills[name].val = sk.val;
+            player.skills[name].xp = sk.xp;
+            player.skills[name].xpNext = sk.xpNext;
+        }
+    }
+    if (typeof snap.gold === 'number') player.gold = snap.gold;
+    if (typeof snap.maxHp === 'number') player.maxHp = snap.maxHp;
+    if (typeof snap.maxMp === 'number') player.maxMp = snap.maxMp;
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    if (snap.inv) player.inv = { ...snap.inv };
+    if (snap.equipped) player.equipped = { ...snap.equipped };
+    recomputeStats();
+    buildSkillList();
+    invSignature = null;
+    saveState();
+    return true;
+}
+
 function playerDie(){
+    // Admin: captura snapshot ANTES de processar a perda
+    if (player.isAdmin) _preDeathSnapshot = captureAdminSnapshot();
     if (player.stats) player.stats.mobDeaths = (player.stats.mobDeaths || 0) + 1;
     clearStatusEffects();
     sndDeath();
@@ -7589,12 +7632,98 @@ function openSettings(){
     grid.innerHTML = KEY_HELP.map(([k, desc]) =>
         `<div class="key-row"><kbd>${k}</kbd><span>${desc}</span></div>`
     ).join('');
+    // Painel admin (só se player.isAdmin)
+    const adminSec = document.getElementById('adminSection');
+    if (player.isAdmin){
+        adminSec.style.display = '';
+        renderAdminPanel();
+    } else {
+        adminSec.style.display = 'none';
+    }
 }
 function tryRestoreBackup(){
     if (!confirm('Restaurar do backup? O save atual será sobrescrito.')) return;
     if (typeof restoreFromBackup === 'function') restoreFromBackup();
 }
 window.tryRestoreBackup = tryRestoreBackup;
+
+// ─── ADMIN: painel de restore manual (skills, gold, HP/MP, snapshot pré-morte)
+function renderAdminPanel(){
+    const el = document.getElementById('adminBody');
+    if (!el) return;
+    const skills = Object.entries(player.skills).map(([name, sk]) => `
+        <div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11px">
+            <span style="flex:1;color:#c8a050">${name}</span>
+            <input type="number" min="10" max="200" value="${sk.val}" id="admSk_${name}"
+                   style="width:60px;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;text-align:center">
+            <button class="chest-qty-btn" onclick="adminApplySkill('${name}')">aplicar</button>
+        </div>
+    `).join('');
+    const snapAge = _preDeathSnapshot
+        ? `há ${Math.max(0, Math.floor((Date.now() - _preDeathSnapshot.savedAt) / 1000))}s`
+        : 'nenhum';
+    el.innerHTML = `
+        <div style="background:#1a0808;border:1px solid #3a1818;padding:8px;margin-bottom:8px;font-size:10px;color:#cc8060">
+            ⚠ Painel restrito ao admin. Mudanças persistem no save.
+        </div>
+        <div style="color:#998040;font-size:10px;margin-bottom:4px;letter-spacing:0.5px">SKILLS</div>
+        ${skills}
+        <div style="color:#998040;font-size:10px;margin:10px 0 4px 0;letter-spacing:0.5px">RECURSOS</div>
+        <div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11px">
+            <span style="flex:1;color:#c8a050">Ouro</span>
+            <input type="number" min="0" value="${player.gold}" id="admGold"
+                   style="width:90px;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;text-align:right">
+            <button class="chest-qty-btn" onclick="adminApplyGold()">aplicar</button>
+        </div>
+        <button class="chest-btn" style="margin-top:6px" onclick="adminFullHeal()">⚕ HP + MP cheios</button>
+        <div style="color:#998040;font-size:10px;margin:10px 0 4px 0;letter-spacing:0.5px">SNAPSHOT PRÉ-MORTE</div>
+        <div style="color:#666;font-size:10px;padding:2px 6px">Capturado automaticamente antes de processar cada morte: ${snapAge}</div>
+        <button class="chest-btn" ${_preDeathSnapshot ? '' : 'disabled'} onclick="adminRestoreSnapshot()">↺ Restaurar último snapshot</button>
+    `;
+}
+function adminApplySkill(name){
+    if (!player.isAdmin) return;
+    const input = document.getElementById('admSk_' + name);
+    const val = Math.max(10, Math.min(200, parseInt(input.value, 10) || 10));
+    const sk = player.skills[name]; if (!sk) return;
+    sk.val = val;
+    sk.xp = 0;
+    sk.xpNext = Math.floor(50 * Math.pow(1.15, val - 10));
+    recomputeStats();
+    buildSkillList();
+    saveState();
+    log(`<span class="log-up">[admin] ${name} = ${val}</span>`);
+    renderAdminPanel();
+}
+function adminApplyGold(){
+    if (!player.isAdmin) return;
+    const v = Math.max(0, parseInt(document.getElementById('admGold').value, 10) || 0);
+    player.gold = v;
+    saveState();
+    log(`<span class="log-up">[admin] gold = ${v}</span>`);
+    const gEl = document.getElementById('goldVal');
+    if (gEl) gEl.textContent = player.gold + ' g';
+}
+function adminFullHeal(){
+    if (!player.isAdmin) return;
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    saveState();
+    log('<span class="log-up">[admin] HP/MP cheios</span>');
+}
+function adminRestoreSnapshot(){
+    if (!player.isAdmin) return;
+    if (!_preDeathSnapshot){ log('<span class="log-sys">Sem snapshot disponível.</span>'); return; }
+    if (!confirm('Restaurar estado pré-morte?')) return;
+    if (restoreAdminSnapshot(_preDeathSnapshot)){
+        log('<span class="log-up">[admin] estado pré-morte restaurado</span>');
+        renderAdminPanel();
+    }
+}
+window.adminApplySkill = adminApplySkill;
+window.adminApplyGold = adminApplyGold;
+window.adminFullHeal = adminFullHeal;
+window.adminRestoreSnapshot = adminRestoreSnapshot;
 function closeSettings(){
     document.getElementById('settingsModal').style.display = 'none';
     saveSettings();
