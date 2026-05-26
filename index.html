@@ -1450,6 +1450,26 @@ const TS = 48, VP_W = 15, VP_H = 11, M_W = 100, M_H = 100;
 const T  = { GRASS:0, DIRT:1, TREE:2, WATER:3, STONE:4, CAVE:5, CAVE_WALL:6, SNOW:7, SAND:8 };
 const TILE_NAMES = ['grama','terra','árvore','água','pedra','caverna','rocha','neve','areia'];
 const walkable = t => t===T.GRASS||t===T.DIRT||t===T.STONE||t===T.CAVE||t===T.SNOW||t===T.SAND;
+// Tile bloqueia projétil/visão? (TREE e CAVE_WALL bloqueiam; WATER passa transparente)
+const blocksLineOfSight = t => t===T.TREE || t===T.CAVE_WALL;
+// Bresenham — true se o caminho de (x1,y1) até (x2,y2) está livre de obstáculos.
+// Endpoints não contam (tile do atacante e do alvo são ignorados).
+function hasLineOfSight(x1, y1, x2, y2){
+    if (x1 === x2 && y1 === y2) return true;
+    let dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+    const sx = x1 < x2 ? 1 : -1;
+    const sy = y1 < y2 ? 1 : -1;
+    let err = dx - dy;
+    let x = x1, y = y1;
+    while (true){
+        const e2 = 2*err;
+        if (e2 > -dy){ err -= dy; x += sx; }
+        if (e2 <  dx){ err += dx; y += sy; }
+        if (x === x2 && y === y2) return true;
+        if (y < 0 || y >= M_H || x < 0 || x >= M_W) return false;
+        if (blocksLineOfSight(map[y][x])) return false;
+    }
+}
 
 // 4 baús no DP — cada um é storage independente (player escolhe qual usar)
 const CHESTS = [
@@ -3816,6 +3836,10 @@ function throwSpear(){
         log(`<span class="log-sys">Muito longe pra arremessar (${dist}/${wItem.throwable}).</span>`);
         return;
     }
+    if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
+        log(`<span class="log-sys">Sem linha de visão — a lança bateria na parede.</span>`);
+        return;
+    }
     // Esquiva
     if (Math.random() < m.dodge){
         log(`<span class="log-sys">${m.name} desviou da lança.</span>`);
@@ -3890,6 +3914,13 @@ function doAttack(m){
             }
             return;
         }
+        if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
+            if (!doAttack._losWarn || Date.now() - doAttack._losWarn > 1500){
+                log(`<span class="log-sys">Sem linha de visão — algo bloqueia a flecha.</span>`);
+                doAttack._losWarn = Date.now();
+            }
+            return;
+        }
         const arrowKey = findArrow();
         if (!arrowKey){
             if (!doAttack._ammoWarn || Date.now() - doAttack._ammoWarn > 2500){
@@ -3940,6 +3971,17 @@ function doAttack(m){
     }
 
     // MELEE (lógica antiga)
+    // Lança 1H com meleeRange > 1: exige linha de visão (sem atravessar parede)
+    if (wItem && wItem.meleeRange > 1){
+        const distM = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
+        if (distM > 1 && !hasLineOfSight(player.x, player.y, m.x, m.y)){
+            if (!doAttack._losWarn || Date.now() - doAttack._losWarn > 1500){
+                log(`<span class="log-sys">Sem linha de visão — a lança não passa.</span>`);
+                doAttack._losWarn = Date.now();
+            }
+            return;
+        }
+    }
     // Monstro esquivou?
     if (Math.random() < m.dodge){
         log(`<span class="log-sys">${m.name} esquivou.</span>`);
@@ -6124,6 +6166,7 @@ function castSpell(spellKey){
             if (m.hp <= 0) continue;
             const d = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
             if (d > sp.aoeRange || d === 0) continue;
+            if (!hasLineOfSight(player.x, player.y, m.x, m.y)) continue;   // explosão não passa parede
             let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
             dmg = Math.max(1, Math.floor(dmg * buffMult().dmg));
             if (serverAuthMobs && ws && ws.readyState === 1){
@@ -6210,6 +6253,9 @@ function castSpell(spellKey){
     const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
     if (dist > sp.range){
         log(`<span class="log-sys">Alvo muito longe (${dist}/${sp.range}).</span>`); return;
+    }
+    if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
+        log(`<span class="log-sys">Sem linha de visão — a magia bateria na parede.</span>`); return;
     }
     player.mp -= sp.manaCost;
     spellCooldowns[spellKey] = sp.cooldown;

@@ -186,6 +186,24 @@ function tileAt(x, y){
     return map[y][x];
 }
 function isWalkable(x, y){ return walkable(tileAt(x, y)); }
+const blocksLineOfSight = t => t===T.TREE || t===T.CAVE_WALL;
+// Bresenham — true se caminho (x1,y1) → (x2,y2) está livre de obstáculos.
+// Endpoints ignorados.
+function hasLineOfSight(x1, y1, x2, y2){
+    if (x1 === x2 && y1 === y2) return true;
+    let dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+    const sx = x1 < x2 ? 1 : -1;
+    const sy = y1 < y2 ? 1 : -1;
+    let err = dx - dy;
+    let x = x1, y = y1;
+    while (true){
+        const e2 = 2*err;
+        if (e2 > -dy){ err -= dy; x += sx; }
+        if (e2 <  dx){ err += dx; y += sy; }
+        if (x === x2 && y === y2) return true;
+        if (blocksLineOfSight(tileAt(x, y))) return false;
+    }
+}
 function broadcast(except, msg){
     const data = JSON.stringify(msg);
     for (const p of players.values()){
@@ -767,6 +785,8 @@ wss.on('connection', (ws) => {
             if (!m || m.hp <= 0) { sendTo(id, { t:'mobMissing', mobId: msg.monsterId }); return; }
             const range = msg.range || 1;
             if (chebyshev(p.x, p.y, m.x, m.y) > range) return;
+            // LOS — só valida pra ranged (range > 1); melee adjacente passa sem check
+            if (range > 1 && !hasLineOfSight(p.x, p.y, m.x, m.y)) return;
             // teto de dano: 3x o dmg base do mob (margem confortável pros crits)
             const cap = (MTYPE[m.type]?.hp || 50) + 50;  // teto generoso
             const dmg = Math.max(1, Math.min(msg.amount | 0, cap));
