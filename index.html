@@ -7349,6 +7349,9 @@ function logout(){
     }
     saveState();
     try { localStorage.removeItem(SESSION_KEY); } catch {}
+    // limpa intervals da sessão (evita saveState rodando pós-logout)
+    if (_saveStateIntervalId){ clearInterval(_saveStateIntervalId); _saveStateIntervalId = null; }
+    if (_playerSyncIntervalId){ clearInterval(_playerSyncIntervalId); _playerSyncIntervalId = null; }
     // limpa o mundo
     monsters.length = 0;
     groundItems.length = 0;
@@ -7434,6 +7437,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Salva ao fechar/recarregar pra não perder progresso do último segundo
 window.addEventListener('beforeunload', () => { if (started) saveState(); });
 
+// Refs de timers/intervals da sessão pra limpar no logout (evita acumular múltiplos
+// saveState/playerSync quando o jogador faz login várias vezes na mesma aba)
+let _saveStateIntervalId = null;
+let _playerSyncIntervalId = null;
 function startGame(multiplayer, name){
     player.name = (name || 'Aventureiro').substring(0,14);
     document.getElementById('login').style.display = 'none';
@@ -7464,8 +7471,11 @@ function startGame(multiplayer, name){
     started = true;
     // Tutorial só na primeira vez por usuário (flag em localStorage)
     setTimeout(() => openTutorial(false), 500);
-    setInterval(saveState, 5000);
-    setInterval(() => {
+    // Limpa intervals antigos antes de criar novos (re-login na mesma aba)
+    if (_saveStateIntervalId) clearInterval(_saveStateIntervalId);
+    if (_playerSyncIntervalId) clearInterval(_playerSyncIntervalId);
+    _saveStateIntervalId = setInterval(saveState, 5000);
+    _playerSyncIntervalId = setInterval(() => {
         if (ws && ws.readyState === 1){
             ws.send(JSON.stringify({ t:'playerSync', gold: player.gold, inv: player.inv }));
         }
