@@ -10,7 +10,7 @@ const wss = new WebSocketServer({ port: PORT });
 
 // Em produção (Railway), Volume montado em /data; localmente fica ao lado do server.js
 const STATE_FILE = process.env.STATE_FILE_PATH || path.join(__dirname, 'state.json');
-const STATE_SAVE_INTERVAL_MS = 60 * 1000;
+const STATE_SAVE_INTERVAL_MS = 30 * 1000;  // 30s — menos janela de perda
 
 // ─── Constants do mundo ─────────────────────────────────────────────────────
 const M_W = 100, M_H = 100;
@@ -632,8 +632,12 @@ wss.on('connection', (ws) => {
                 if (m.unique){
                     bossDeath.set(m.type, Date.now());
                     // próxima encarnação fica +1 nível (cap)
-                    const next = Math.min(BOSS_LEVEL_CAP, (bossLevel.get(m.type) || 1) + 1);
+                    const cur = bossLevel.get(m.type) || 1;
+                    const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
                     bossLevel.set(m.type, next);
+                    console.log(`[boss] ${m.type} morto (Lv${cur}) por ${p.name} → próximo Lv${next}`);
+                    // Salva imediatamente após escalar boss (não espera o tick)
+                    saveStateToDisk();
                 }
                 monsters.delete(m.id);
                 // notifica killer com xp + spawn de loot fica com o killer (cliente)
@@ -692,7 +696,39 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say MSG · /event MSG · /warn MSG · /info MSG · /motd MSG (sessão)' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE' });
+                    return;
+                }
+                if (cmd === '/setboss'){
+                    const parts = arg.split(/\s+/);
+                    const bossType = parts[0]?.toUpperCase();
+                    const newLv = Math.max(1, Math.min(BOSS_LEVEL_CAP, parseInt(parts[1], 10) || 1));
+                    const validBoss = BOSSES.find(b => b.type === bossType);
+                    if (!validBoss){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:'Boss inválido. Use: ORC_LIDER | DRAKE_LIDER | GOLEM_REI' });
+                        return;
+                    }
+                    bossLevel.set(bossType, newLv);
+                    // Se boss tá vivo, mata pra ressuscitar no novo nível
+                    for (const m of Array.from(monsters.values())) if (m.type === bossType) monsters.delete(m.id);
+                    bossDeath.delete(bossType);
+                    spawnMob(bossType, validBoss.x, validBoss.y);
+                    saveStateToDisk();
+                    broadcastMsg('event', `⚔ ${bossType} ressuscitado em Lv${newLv} (admin)`);
+                    return;
+                }
+                if (cmd === '/respawnboss'){
+                    const bossType = arg.toUpperCase();
+                    const validBoss = BOSSES.find(b => b.type === bossType);
+                    if (!validBoss){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:'Use: /respawnboss ORC_LIDER | DRAKE_LIDER | GOLEM_REI' });
+                        return;
+                    }
+                    for (const m of Array.from(monsters.values())) if (m.type === bossType) monsters.delete(m.id);
+                    bossDeath.delete(bossType);
+                    spawnMob(bossType, validBoss.x, validBoss.y);
+                    saveStateToDisk();
+                    sendTo(id, { t:'serverMsg', level:'info', text:`${bossType} respawnado no Lv${bossLevel.get(bossType) || 1}` });
                     return;
                 }
                 if (cmd === '/motd'){
