@@ -1990,16 +1990,90 @@ function drawWeaponSprite(px, py, weapon){
         // cabo comum para 2H
         ctx.fillStyle = '#5a3818';
         ctx.fillRect(wx, py+2, 3, 38);
+        // ── ÉPICOS 2H ────────────────────────────────────────────────────
+        if (weapon === 'ESPADA_HL'){
+            // Espada do Highlander — lâmina dourada longa com coração na guarda
+            ctx.fillStyle = '#ffe070'; ctx.fillRect(wx, py+2, 5, 30);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py, 3, 4);
+            ctx.fillStyle = '#aa8020'; ctx.fillRect(wx+4, py+4, 1, 28);
+            // guarda dourada cruzada
+            ctx.fillStyle = '#cc8810'; ctx.fillRect(wx-4, py+30, 12, 3);
+            ctx.fillStyle = '#ffcc40'; ctx.fillRect(wx-3, py+29, 10, 1);
+            // coração na guarda
+            ctx.fillStyle = '#ff3030'; ctx.fillRect(wx+1, py+30, 3, 2);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py+30, 1, 1);
+            // cabo
+            ctx.fillStyle = '#4a2a10'; ctx.fillRect(wx, py+33, 4, 7);
+            return;
+        }
+        if (weapon === 'ESPADA_ETERNA'){
+            // ★★ Espada Eterna — lâmina branco-azulada com runas
+            ctx.fillStyle = '#e8f0ff'; ctx.fillRect(wx, py+2, 5, 30);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py, 3, 4);
+            ctx.fillStyle = '#7080a0'; ctx.fillRect(wx+4, py+4, 1, 28);
+            // runas brilhantes na lâmina
+            ctx.fillStyle = '#40a0ff';
+            ctx.fillRect(wx+1, py+8, 1, 1);
+            ctx.fillRect(wx+2, py+15, 1, 1);
+            ctx.fillRect(wx+1, py+22, 1, 1);
+            // guarda em cruz prateada
+            ctx.fillStyle = '#d8dcec'; ctx.fillRect(wx-4, py+30, 12, 3);
+            ctx.fillStyle = '#a8b0c0'; ctx.fillRect(wx-3, py+33, 10, 1);
+            // gema azul central da guarda
+            ctx.fillStyle = '#40a0ff'; ctx.fillRect(wx+1, py+30, 3, 3);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py+30, 1, 1);
+            // cabo escuro
+            ctx.fillStyle = '#3a4060'; ctx.fillRect(wx, py+34, 4, 6);
+            return;
+        }
+        if (weapon === 'ESPADA_DRACO'){
+            // Espada Dracônica — lâmina escamada
+            ctx.fillStyle = def.color; ctx.fillRect(wx, py+2, 5, 30);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py, 3, 4);
+            // padrão escamado
+            const dark = '#2a4818';
+            for (let i=4; i<30; i+=4){
+                ctx.fillStyle = dark; ctx.fillRect(wx+1, py+i, 3, 1);
+            }
+            // guarda em forma de garras
+            ctx.fillStyle = '#3a3020'; ctx.fillRect(wx-3, py+30, 10, 2);
+            ctx.fillRect(wx-3, py+30, 1, 4);
+            ctx.fillRect(wx+6, py+30, 1, 4);
+            return;
+        }
+        if (weapon === 'MARTELO_GOLEM'){
+            // Martelo do Golem — cabeça pétrea com gema laranja
+            ctx.fillStyle = '#5a4828'; ctx.fillRect(wx, py+8, 3, 32);  // cabo madeira
+            // cabeça quadrada grande
+            ctx.fillStyle = def.color || '#7a6850';
+            ctx.fillRect(wx-6, py+2, 14, 12);
+            ctx.fillStyle = '#a89070'; ctx.fillRect(wx-6, py+2, 14, 2);
+            ctx.fillStyle = '#3a2818'; ctx.fillRect(wx-6, py+12, 14, 2);
+            // gema laranja central
+            ctx.fillStyle = '#ff8030'; ctx.fillRect(wx-1, py+6, 4, 4);
+            ctx.fillStyle = '#ffe080'; ctx.fillRect(wx, py+7, 1, 1);
+            return;
+        }
         if (weapon === 'MACHADO' || weapon === 'MACHADO_MINO'){
             ctx.fillStyle = weapon === 'MACHADO_MINO' ? '#5a2a18' : '#8a6020';
             ctx.fillRect(wx-5, py+6, 13, 9);
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
             ctx.fillRect(wx-4, py+7, 2, 6);
             if (weapon === 'MACHADO_MINO'){
-                ctx.fillStyle = '#bea878';
-                ctx.fillRect(wx+6, py+4, 3, 2);   // chifre
+                // Labrys completa — segunda lâmina embaixo + chifres
+                ctx.fillStyle = '#c8c8d0'; ctx.fillRect(wx-5, py+15, 13, 6);
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(wx-5, py+15, 13, 1);
+                ctx.fillStyle = '#6a6a78'; ctx.fillRect(wx-5, py+20, 13, 1);
+                // chifres no topo da arma
+                ctx.fillStyle = '#2a1810';
+                ctx.fillRect(wx-1, py+2, 1, 4);
+                ctx.fillRect(wx+3, py+2, 1, 4);
+                ctx.fillRect(wx-2, py, 1, 2);
+                ctx.fillRect(wx+4, py, 1, 2);
             }
-        } else if (weapon === 'ESPADA_LONGA'){
+            return;
+        }
+        if (weapon === 'ESPADA_LONGA'){
             ctx.fillStyle = '#aaaacc'; ctx.fillRect(wx, py+2, 4, 32);
             ctx.fillStyle = '#ddddee'; ctx.fillRect(wx-2, py+8, 8, 4);
             ctx.fillStyle = '#7755cc'; ctx.fillRect(wx, py+36, 4, 4);
@@ -2066,6 +2140,27 @@ function drawShieldSprite(px, py, shield){
     const def = ITEMS[shield]; if (!def) return;
     const sx = px + 4, sy = py + 16;
     ctx.fillStyle = def.color;
+    if (shield === 'ESCUDO_PEDRA'){
+        // Escudo de pedra com runa laranja
+        ctx.fillStyle = def.color;
+        ctx.beginPath();
+        ctx.moveTo(sx-1, sy);
+        ctx.lineTo(sx+9, sy);
+        ctx.lineTo(sx+9, sy+13);
+        ctx.lineTo(sx+4, sy+19);
+        ctx.lineTo(sx-1, sy+13);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+        // runa laranja central
+        ctx.fillStyle = '#ff8030';
+        ctx.fillRect(sx+3, sy+6, 3, 1);
+        ctx.fillRect(sx+4, sy+5, 1, 5);
+        // rachaduras
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fillRect(sx+1, sy+4, 1, 1);
+        ctx.fillRect(sx+7, sy+11, 1, 1);
+        return;
+    }
     if (shield === 'ESCUDO_FERRO'){
         ctx.beginPath(); ctx.ellipse(sx+4, sy+8, 8, 10, 0, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = '#6a7080';
@@ -2161,6 +2256,38 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
         ctx.fillStyle = '#aa6680'; ctx.fillRect(px+22, py+22, 4, 4);   // crânio central
     } else if (eq.armor === 'COURO'){
         ctx.fillStyle = '#5a3818'; ctx.fillRect(px+22, py+22, 4, 10);   // fivela couro
+    } else if (eq.armor === 'ARMADURA_TRONO'){
+        // ★ Armadura do Trono — cruz dourada + gema vermelha + ombreiras com pontas
+        ctx.fillStyle = '#ffcc40';
+        ctx.fillRect(px+22, py+18, 4, 16);   // barra vertical da cruz
+        ctx.fillRect(px+16, py+24, 16, 4);   // barra horizontal
+        // gema vermelha central
+        ctx.fillStyle = '#ff3030'; ctx.fillRect(px+22, py+24, 4, 4);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(px+22, py+24, 2, 2);
+        // detalhes dourados nos cantos
+        ctx.fillStyle = '#ffcc40';
+        ctx.fillRect(px+15, py+19, 2, 2);
+        ctx.fillRect(px+31, py+19, 2, 2);
+        ctx.fillRect(px+15, py+31, 2, 2);
+        ctx.fillRect(px+31, py+31, 2, 2);
+        // ombreiras com ponta
+        ctx.fillStyle = '#aa8020';
+        ctx.fillRect(px+7, py+13, 4, 4);
+        ctx.fillRect(px+37, py+13, 4, 4);
+    } else if (eq.armor === 'ARMADURA_ESCAMA'){
+        // Armadura de Escamas — padrão escamado em V
+        const scaleD = '#1a4818';
+        const scaleL = '#a8e090';
+        for (let row = 0; row < 4; row++){
+            for (let col = 0; col < 6; col++){
+                const x = px + 13 + col * 4 + (row % 2) * 2;
+                const y = py + 18 + row * 4;
+                ctx.fillStyle = scaleL;
+                ctx.fillRect(x, y, 3, 1);
+                ctx.fillStyle = scaleD;
+                ctx.fillRect(x, y+3, 3, 1);
+            }
+        }
     }
     // cabeça
     ctx.fillStyle='#e8c090'; ctx.fillRect(px+14, py+4, 20, 16);
@@ -2179,6 +2306,64 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
             ctx.beginPath();
             ctx.moveTo(px+35, py+2); ctx.lineTo(px+40, py-3); ctx.lineTo(px+33, py+2);
             ctx.closePath(); ctx.fill();
+        } else if (eq.head === 'ELMO_DRACO'){
+            // Elmo Dracônico — chifres curvados pra fora + olhos vermelhos no visor
+            ctx.fillStyle = '#2a1808';
+            // chifres longos pra fora
+            ctx.beginPath();
+            ctx.moveTo(px+12, py+1); ctx.lineTo(px+5, py-4); ctx.lineTo(px+2, py-2); ctx.lineTo(px+14, py+3);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(px+36, py+1); ctx.lineTo(px+43, py-4); ctx.lineTo(px+46, py-2); ctx.lineTo(px+34, py+3);
+            ctx.closePath(); ctx.fill();
+            // olhos vermelhos brilhando no visor
+            ctx.fillStyle = '#ff4030';
+            ctx.fillRect(px+18, py+6, 3, 2);
+            ctx.fillRect(px+27, py+6, 3, 2);
+        } else if (eq.head === 'COROA_VENDEDOR'){
+            // ★ Coroa do Vendedor — 5 pontas com gemas + chifres pretos
+            const c = ITEMS[eq.head].color;
+            // 5 pontas escalonadas
+            ctx.fillStyle = c;
+            ctx.fillRect(px+12, py-1, 3, 6);
+            ctx.fillRect(px+18, py-4, 3, 9);
+            ctx.fillRect(px+22, py-7, 4, 12);   // ponta central maior
+            ctx.fillRect(px+27, py-4, 3, 9);
+            ctx.fillRect(px+33, py-1, 3, 6);
+            // gemas nas pontas
+            ctx.fillStyle = '#8030c0'; ctx.fillRect(px+13, py, 1, 1);
+            ctx.fillStyle = '#ff3030'; ctx.fillRect(px+23, py-5, 2, 2);
+            ctx.fillStyle = '#8030c0'; ctx.fillRect(px+34, py, 1, 1);
+            // chifres pretos
+            ctx.fillStyle = '#1a0a04';
+            ctx.fillRect(px+8, py+1, 2, 4);
+            ctx.fillRect(px+38, py+1, 2, 4);
+        } else if (eq.head === 'COROA_VALADARES'){
+            // ★★ Coroa de Valadares — coroa dourada robusta + gemas multicoloridas
+            ctx.fillStyle = '#ffe060';
+            ctx.fillRect(px+11, py+2, 26, 4);    // aro
+            ctx.fillStyle = '#fff0a0';
+            ctx.fillRect(px+11, py+2, 26, 1);    // brilho
+            ctx.fillStyle = '#aa7818';
+            ctx.fillRect(px+11, py+5, 26, 1);    // borda inferior
+            // 5 pontas robustas
+            ctx.fillStyle = '#ffe060';
+            ctx.fillRect(px+11, py-2, 4, 4);
+            ctx.fillRect(px+17, py-5, 4, 7);
+            ctx.fillRect(px+22, py-8, 4, 10);    // central gigante
+            ctx.fillRect(px+27, py-5, 4, 7);
+            ctx.fillRect(px+33, py-2, 4, 4);
+            // gemas em cada ponta
+            ctx.fillStyle = '#40b0ff'; ctx.fillRect(px+12, py-1, 2, 2);   // azul
+            ctx.fillStyle = '#ff4040'; ctx.fillRect(px+18, py-3, 2, 2);   // vermelha
+            ctx.fillStyle = '#80ff80'; ctx.fillRect(px+23, py-6, 2, 3);   // verde central
+            ctx.fillStyle = '#ff4040'; ctx.fillRect(px+28, py-3, 2, 2);
+            ctx.fillStyle = '#40b0ff'; ctx.fillRect(px+34, py-1, 2, 2);
+            // gemas roxas no aro
+            ctx.fillStyle = '#ff60ff';
+            ctx.fillRect(px+15, py+3, 1, 1);
+            ctx.fillRect(px+23, py+3, 2, 1);
+            ctx.fillRect(px+31, py+3, 1, 1);
         }
     }
     // olhos / direção
@@ -4370,18 +4555,31 @@ function armorHpRegenBonus(){
     return bonus;
 }
 function tickRegen(dt){
+    // Anti-exploit: aba em background não regenera (evita afk regen com tab oculta).
+    // Também devolve foco ao loop quando aba volta sem dar "salto" de regen.
+    if (typeof document !== 'undefined' && document.hidden){
+        player.hpRegenTimer = 0;
+        player.mpRegenTimer = 0;
+        return;
+    }
     player.hpRegenTimer += dt;
     player.mpRegenTimer += dt;
     const m = pvpMults();
-    const hpInterval = 4000 / m.regenHp;
-    const mpInterval = 2000 / m.regenMp;
+    // PZ central = regen muito mais rápida (4× HP, 3× MP) — players novos
+    // ou voltando de morte recuperam rápido na zona segura
+    const inPz = inSafeZone(player.x, player.y);
+    const pzHp = inPz ? 4 : 1;
+    const pzMp = inPz ? 3 : 1;
+    const hpInterval = 4000 / (m.regenHp * pzHp);
+    const mpInterval = 2000 / (m.regenMp * pzMp);
     if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
-        const heal = 1 + armorHpRegenBonus();
+        const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0);
         player.hp = Math.min(player.maxHp, player.hp + heal);
         player.hpRegenTimer = 0;
     }
     if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
-        player.mp = Math.min(player.maxMp, player.mp+1);
+        const mpGain = inPz ? 2 : 1;
+        player.mp = Math.min(player.maxMp, player.mp + mpGain);
         player.mpRegenTimer = 0;
     }
 }
