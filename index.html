@@ -478,6 +478,18 @@
         }
         .inv-item.equippable { background: #0a0a12; cursor: pointer; }
         .inv-item.equippable:hover { border-color: #8a6020; background: #1a1410; transform: translateX(2px); }
+        .inv-cat-head {
+            color: #8a7438; font-size: 9px; letter-spacing: 2.5px;
+            text-transform: uppercase; font-weight: 600;
+            padding: 7px 4px 3px 4px; margin-top: 4px;
+            border-bottom: 1px solid #2a1f10;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .inv-cat-head:first-child { margin-top: 0; }
+        .inv-cat-count {
+            color: #5a4818; font-size: 9px; font-weight: 400;
+            background: #0a0805; padding: 1px 6px; border-radius: 2px;
+        }
         .inv-icon {
             display: inline-block;
             width: 18px; height: 18px;
@@ -5758,19 +5770,46 @@ function renderInventoryIfChanged(){
     eqEl.innerHTML = `<div class="paper-doll">${slotHtml}</div>${ammoLine}`;
 
     const invEl = document.getElementById('inventory');
-    const items = Object.entries(player.inv).filter(([k,q]) => q > 0);
-    if (!items.length){ invEl.innerHTML = '<span style="color:#666">vazio</span>'; }
-    else invEl.innerHTML = items.map(([k,q]) => {
-        const def = ITEMS[k];
-        const equippable = ['weapon','offhand','armor','head','feet','neck'].includes(def.kind);
-        const extra = itemStatsCompact(def);
-        return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${equippable?'click p/ equipar':''}">
-            <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
-            <span style="flex:1;margin-left:4px;color:#bbb">${def.name}</span>
-            ${extra}
-            <span style="color:#e0c060;margin-left:6px">${q}</span>
-        </div>`;
-    }).join('');
+    const items = Object.entries(player.inv).filter(([k,q]) => q > 0 && ITEMS[k]);
+    if (!items.length){
+        invEl.innerHTML = '<span style="color:#666">vazio</span>';
+    } else {
+        // Categorias em ordem fixa; vazias ficam ocultas
+        const CATEGORIES = [
+            { label: 'Armas',        kinds: ['weapon'] },
+            { label: 'Equipamento',  kinds: ['offhand','armor','head','feet','neck'] },
+            { label: 'Consumíveis',  kinds: ['food','potion'] },
+            { label: 'Munição',      kinds: ['ammo'] },
+            { label: 'Materiais',    kinds: ['mat'] },
+        ];
+        const knownKinds = new Set(CATEGORIES.flatMap(c => c.kinds));
+        const itemsByCat = CATEGORIES.map(cat => ({
+            label: cat.label,
+            items: items
+                .filter(([k]) => cat.kinds.includes(ITEMS[k].kind))
+                .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR')),
+        }));
+        const orphans = items
+            .filter(([k]) => !knownKinds.has(ITEMS[k].kind))
+            .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
+        if (orphans.length) itemsByCat.push({ label: 'Outros', items: orphans });
+
+        const renderItem = ([k,q]) => {
+            const def = ITEMS[k];
+            const equippable = ['weapon','offhand','armor','head','feet','neck'].includes(def.kind);
+            const extra = itemStatsCompact(def);
+            return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${equippable?'click p/ equipar':''}">
+                <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
+                <span style="flex:1;margin-left:4px;color:#bbb">${def.name}</span>
+                ${extra}
+                <span style="color:#e0c060;margin-left:6px">${q}</span>
+            </div>`;
+        };
+        invEl.innerHTML = itemsByCat
+            .filter(c => c.items.length)
+            .map(c => `<div class="inv-cat-head"><span>${c.label}</span><span class="inv-cat-count">${c.items.length}</span></div>${c.items.map(renderItem).join('')}`)
+            .join('');
+    }
 
     syncInvHeight();
 }
