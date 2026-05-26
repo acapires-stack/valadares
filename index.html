@@ -3328,11 +3328,14 @@ function tickRegen(dt){
 let ws = null;
 const remotePlayers = {}; // id -> {x,y,dir,name,hp,maxHp}
 
+// Servidor WebSocket em produção (Railway)
+const PRODUCTION_WS_URL = 'wss://valadares-production.up.railway.app';
+
 // Determina a URL do server WS. Ordem de prioridade:
 //  1. ?ws=wss://...  na query string
 //  2. localStorage 'valadares:ws'
-//  3. localhost: ws://localhost:8080
-//  4. produção: mesmo host com prefixo ws-/valadares-ws subdomínio
+//  3. localhost → ws://localhost:8080
+//  4. resto → PRODUCTION_WS_URL (Railway)
 function resolveWsUrl(){
     try {
         const qp = new URLSearchParams(window.location.search).get('ws');
@@ -3344,16 +3347,8 @@ function resolveWsUrl(){
     if (!host || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')){
         return 'ws://localhost:8080';
     }
-    // Produção: tenta wss://valadares-ws.{dominio} ou wss://ws.{dominio}
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // se subdominio for "valadares.empresa.com.br" → "valadares-ws.empresa.com.br"
-    const parts = host.split('.');
-    if (parts.length >= 3 && parts[0] !== 'www'){
-        parts[0] = parts[0] + '-ws';
-        return proto + '//' + parts.join('.');
-    }
-    // fallback: ws.{host}
-    return proto + '//ws.' + host;
+    // Produção: usa Railway
+    return PRODUCTION_WS_URL;
 }
 window.setWsUrl = (url) => { localStorage.setItem('valadares:ws', url); log(`<span class="log-sys">WS server: ${url} — reconecte</span>`); };
 
