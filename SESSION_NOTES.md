@@ -1,5 +1,49 @@
 # Notas de Sessão
 
+## 📅 Sessão 26/05/2026 (noite) — Save server-side
+
+> **Bug grave corrigido:** save vivia 100% no localStorage. Trocar de PC,
+> de browser, ou limpar dados zerava o personagem. Caso real: alcione perdeu
+> o boneco após reiniciar PC (na real era outro browser — o save tava no Edge).
+> O amigo também perdeu trocando de PC. Migração pra save server-side.
+
+### 🗄 Server (`server.js`)
+- **`accounts.json` separado** no Railway Volume (path derivado de `STATE_FILE_PATH`)
+- **Hash dobrado**: sha256(`ACCOUNTS_SALT` + clientHash) — cliente já manda hashPw leve, server reidrata com sha256+salt
+- **Handler `auth`**: cria conta no primeiro login; valida senha; devolve `{save, savedAt, isNew}`
+- **Handler `saveUpload`**: throttle 5s por player + cap 200KB JSON
+- **`join` força nome da conta autenticada** (impede impersonate de qualquer um virar "alcione")
+- Compat retroativa: cliente velho (sem auth) ainda conecta como `legacy=true`, mas sem persistência server
+- SIGINT/SIGTERM faz `flushAccounts()` síncrono antes de sair
+
+### 🧩 Cliente (`index.html`)
+- Vars de sessão: `_wsAuthed`, `_authPwHash`, `_didInitialAuth`
+- `tryLogin`/`tryAutoLogin` carregam `_authPwHash` (= hashPw da senha digitada)
+- `connectMP.onopen` envia `auth` ANTES do `join`; só joina após `authOk`
+- Timeout 8s no auth → fallback legado (joina sem sync) se server não responder
+- `applyServerSave(d)` aplica save vindo do server e atualiza cache local
+- `saveState()` envia `saveUpload` extra quando `_wsAuthed=true`
+- **Reconexão durante jogo NÃO sobrescreve** com save server (preserva progresso offline) — em vez disso faz push do estado atual
+- `authFail bad_password` → kicka pra login + limpa cache local (`acc:NAME` + `session`) + reload em 1.5s
+- Refator: `loadState()` agora delega ao novo `applySaveData(d)` (mesma lógica, parametrizada)
+
+### 🧪 Testes locais validados
+- ✅ Login novo cria conta server-side, save sobe (gold/skills/inv via accounts.json)
+- ✅ Limpar localStorage → relogar → server restaura tudo
+- ✅ Senha errada → kick limpo + cache local invalidado
+- ✅ Auto-login pós-reload mantém sessão autenticada
+
+### 🚨 Migração automática
+- Quem ainda tem save localStorage (qualquer browser/PC): no primeiro login pós-deploy, server cria conta nova (`isNew:true`), cliente faz `saveState()` imediato → save sobe pro server
+- A partir daí, qualquer máquina nova / browser novo já restaura via auth
+
+### 📂 Arquivos do server
+- `state.json` — mobs, bosses, rankings, guilds (já existia)
+- `accounts.json` (novo) — `{v:1, accounts: [{name, pwHash, save, savedAt, createdAt}]}`
+- Path padrão: ao lado de `state.json` (Volume `/data/accounts.json` em prod)
+
+---
+
 ## 📅 Sessão 26/05/2026 (cont.) — Polish massivo + features sociais
 
 > **37 tasks completas numa única sessão.** Foco em bugs, segurança,

@@ -756,12 +756,79 @@ function loadStateFromDisk(){
     }
 }
 
+// ─── Contas + save server-side (accounts.json no Volume) ──────────────────
+// Auth: cliente manda `pwHash` (hash leve da senha). Server aplica sha256(salt+hash)
+// e armazena. Save do player vive aqui, sobrevive a troca de PC / limpeza de
+// browser. localStorage do cliente fica como cache/offline-fallback.
+const crypto = require('crypto');
+const ACCOUNTS_FILE = process.env.ACCOUNTS_FILE_PATH
+    || (process.env.STATE_FILE_PATH
+        ? path.join(path.dirname(process.env.STATE_FILE_PATH), 'accounts.json')
+        : path.join(__dirname, 'accounts.json'));
+const ACCOUNTS_SALT = process.env.ACCOUNTS_SALT || 'valadares-v1-salt';
+const SAVE_THROTTLE_MS = 5 * 1000;
+const SAVE_MAX_BYTES = 200 * 1024;   // 200KB por save é folgado pro JSON atual
+
+const accounts = new Map();   // nameLower -> { name, pwHash, save, savedAt, createdAt }
+
+function hashPwServer(clientHash){
+    return crypto.createHash('sha256').update(ACCOUNTS_SALT + ':' + String(clientHash || '')).digest('hex');
+}
+function validAccountName(n){
+    return typeof n === 'string' && n.length >= 1 && n.length <= 14 && /^[A-Za-z0-9_\- ]+$/.test(n);
+}
+function getAccount(name){ return accounts.get(String(name || '').toLowerCase()); }
+function createAccount(name, clientHash){
+    const a = { name, pwHash: hashPwServer(clientHash), save: null, savedAt: 0, createdAt: Date.now() };
+    accounts.set(name.toLowerCase(), a);
+    queueSaveAccounts();
+    return a;
+}
+function verifyAccount(name, clientHash){
+    const a = getAccount(name);
+    if (!a) return false;
+    return a.pwHash === hashPwServer(clientHash);
+}
+function setPlayerSave(name, data){
+    const a = getAccount(name);
+    if (!a) return false;
+    a.save = data;
+    a.savedAt = Date.now();
+    queueSaveAccounts();
+    return true;
+}
+let _accountsSaveTimer = null;
+function flushAccounts(){
+    try {
+        const out = { v:1, savedAt: Date.now(), accounts: Array.from(accounts.values()) };
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(out), 'utf8');
+    } catch(e){ console.error('[accounts] erro ao salvar:', e.message); }
+}
+function queueSaveAccounts(){
+    if (_accountsSaveTimer) return;
+    _accountsSaveTimer = setTimeout(() => { _accountsSaveTimer = null; flushAccounts(); }, 2000);
+}
+function loadAccountsFromDisk(){
+    if (!fs.existsSync(ACCOUNTS_FILE)) return;
+    try {
+        const d = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+        if (!d || d.v !== 1) return;
+        if (Array.isArray(d.accounts)){
+            for (const a of d.accounts){
+                if (a && a.name && a.pwHash) accounts.set(a.name.toLowerCase(), a);
+            }
+        }
+        console.log(`[accounts] ${accounts.size} contas carregadas de disco`);
+    } catch(e){ console.error('[accounts] erro ao carregar:', e.message); }
+}
+loadAccountsFromDisk();
+
 // Inicia mundo
 let lastResetDay = new Date().toDateString();
 if (!loadStateFromDisk()) spawnInitial();
 setInterval(saveStateToDisk, STATE_SAVE_INTERVAL_MS);
-process.on('SIGINT',  () => { saveStateToDisk(); console.log('[state] salvo ao sair (SIGINT)'); process.exit(0); });
-process.on('SIGTERM', () => { saveStateToDisk(); console.log('[state] salvo ao sair (SIGTERM)'); process.exit(0); });
+process.on('SIGINT',  () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGINT)'); process.exit(0); });
+process.on('SIGTERM', () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGTERM)'); process.exit(0); });
 setInterval(tickAI, TICK_AI_MS);
 setInterval(broadcastMobs, SNAPSHOT_MS);
 setInterval(tickRespawns, 1000);
@@ -1010,8 +1077,64 @@ wss.on('connection', (ws) => {
         let msg;
         try { msg = JSON.parse(raw); } catch { return; }
 
+        // ─── AUTH (precede join) ──────────────────────────────────────────
+        // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
+        // Cria conta se não existir, devolve save server-side se houver.
+        if (msg.t === 'auth') {
+            const name = String(msg.name || '').trim().substring(0, 14);
+            const pwHash = String(msg.pwHash || '');
+            if (!validAccountName(name)){
+                ws.send(JSON.stringify({ t:'authFail', reason:'bad_name' }));
+                return;
+            }
+            if (!pwHash){
+                ws.send(JSON.stringify({ t:'authFail', reason:'no_password' }));
+                return;
+            }
+            let acc = getAccount(name);
+            let isNew = false;
+            if (!acc){
+                acc = createAccount(name, pwHash);
+                isNew = true;
+                console.log(`[auth] nova conta: ${name}`);
+            } else if (!verifyAccount(name, pwHash)){
+                ws.send(JSON.stringify({ t:'authFail', reason:'bad_password' }));
+                return;
+            }
+            p.authed = true;
+            p.authedName = acc.name;
+            ws.send(JSON.stringify({ t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0 }));
+            return;
+        }
+
+        // ─── SAVE upload (snapshot do save do player) ─────────────────────
+        if (msg.t === 'saveUpload') {
+            if (!p.authed || !p.authedName) return;
+            const now = Date.now();
+            if (p.lastSaveAt && now - p.lastSaveAt < SAVE_THROTTLE_MS) return;
+            const data = msg.data;
+            if (!data || typeof data !== 'object') return;
+            try {
+                const sz = JSON.stringify(data).length;
+                if (sz > SAVE_MAX_BYTES){
+                    sendTo(id, { t:'serverMsg', level:'warn', text:`Save muito grande (${(sz/1024).toFixed(1)}KB) — não foi gravado.` });
+                    return;
+                }
+            } catch { return; }
+            p.lastSaveAt = now;
+            setPlayerSave(p.authedName, data);
+            return;
+        }
+
         if (msg.t === 'join') {
-            p.name  = String(msg.name || 'Anônimo').substring(0, 14);
+            // Se o cliente passou pelo auth, força o nome da conta (impede impersonate)
+            if (p.authed && p.authedName){
+                p.name = p.authedName;
+            } else {
+                // Cliente legado (sem auth) — aceita pelo nome cru por compat, mas não persiste save
+                p.name = String(msg.name || 'Anônimo').substring(0, 14);
+                p.legacy = true;
+            }
             p.x     = msg.x ?? 50;
             p.y     = msg.y ?? 50;
             p.pvp   = !!msg.pvp;

@@ -4381,6 +4381,9 @@ function tickRegen(dt){
 // MULTIPLAYER
 // ═══════════════════════════════════════════════════════════════════════════
 let ws = null;
+let _wsAuthed = false;        // true após authOk do server (save server-side liberado)
+let _authPwHash = null;       // hash da senha pra mandar no auth ao (re)conectar
+let _didInitialAuth = false;  // marca primeira auth da sessão (login). Reconexão = true
 const remotePlayers = {}; // id -> {x,y,dir,name,hp,maxHp}
 
 // Servidor WebSocket em produção (Railway)
@@ -4422,8 +4425,7 @@ function connectMP(){
         return;
     }
     ws.onopen = () => {
-        ws.send(JSON.stringify({t:'join', name:player.name, x:player.x, y:player.y, pvp:player.pvp,
-                                 hp:player.hp, maxHp:player.maxHp}));
+        _wsAuthed = false;   // reseta a cada reconexão
         document.getElementById('connStatus').textContent = '● ONLINE';
         document.getElementById('connStatus').className = 'online';
         log('<span class="log-sys">Conectado ao servidor!</span>');
@@ -4432,9 +4434,23 @@ function connectMP(){
         _reconnectAttempt = 0;
         if (_reconnectTimer){ clearTimeout(_reconnectTimer); _reconnectTimer = null; }
         showReconnectOverlay(false);
-        // Reconexão pós-queda: target inválido provavelmente; limpa pra refresh
         if (player.target && player.targetType === 'monster'){
             player.target = null;
+        }
+        // Se temos pwHash, autentica primeiro. O `join` é mandado quando authOk chegar.
+        if (_authPwHash){
+            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash })); } catch {}
+            // Fallback: se server não responder ao auth em 8s, joina como legado (sem sync)
+            const wsAtAuth = ws;
+            setTimeout(() => {
+                if (wsAtAuth === ws && wsAtAuth?.readyState === 1 && !_wsAuthed){
+                    log('<span class="log-sys">Server não respondeu auth — entrando sem sync de save.</span>');
+                    sendJoinNow();
+                }
+            }, 8000);
+        } else {
+            // Sem credenciais (legado / modo solo virado MP) — entra direto sem persistência server
+            sendJoinNow();
         }
     };
     ws.onclose = () => {
@@ -4461,7 +4477,51 @@ function connectMP(){
     };
 }
 
+// Envia o `join` (depois de auth, ou direto em modo legado)
+function sendJoinNow(){
+    if (!ws || ws.readyState !== 1) return;
+    try {
+        ws.send(JSON.stringify({t:'join', name:player.name, x:player.x, y:player.y, pvp:player.pvp,
+                                hp:player.hp, maxHp:player.maxHp}));
+    } catch {}
+}
+
 function handleMP(msg){
+    if (msg.t === 'authOk'){
+        _wsAuthed = true;
+        // Reconexão durante jogo: NÃO sobrescreve com save server (pode estar atrasado
+        // se o player jogou offline). Em vez disso, faz push do estado atual.
+        if (_didInitialAuth){
+            log('<span class="log-sys">Autenticado (reconexão) — sincronizando estado local.</span>');
+            try { saveState(); } catch {}
+        } else if (msg.save && typeof msg.save === 'object'){
+            applyServerSave(msg.save);
+            log('<span class="log-sys">✦ Personagem restaurado do servidor.</span>');
+        } else if (msg.isNew){
+            log('<span class="log-sys">Conta sincronizada com o servidor.</span>');
+            try { saveState(); } catch {}
+        }
+        _didInitialAuth = true;
+        sendJoinNow();
+        return;
+    }
+    if (msg.t === 'authFail'){
+        const reason = msg.reason || 'desconhecida';
+        log(`<span class="log-dmg">⚠ Autenticação rejeitada (${escapeHtml(reason)}). Voltando ao login…</span>`);
+        showServerToast('admin', '⚠ Senha incorreta no servidor.', null, 4000);
+        _wsAuthed = false;
+        _authPwHash = null;
+        try { ws.close(); } catch {}
+        // Limpa credenciais locais erradas (caso o cliente tenha cacheado senha que não bate)
+        if (reason === 'bad_password' && player.name){
+            try {
+                localStorage.removeItem('valadares:acc:' + player.name);
+                localStorage.removeItem(SESSION_KEY);
+            } catch {}
+        }
+        setTimeout(() => window.location.reload(), 1500);
+        return;
+    }
     if (msg.t === 'state'){
         // estado completo: jogadores e monstros do servidor
         myWsId = msg.you;
@@ -8321,6 +8381,8 @@ function tryLogin(multiplayer){
     try {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ name, pw: hashPw(pwd), mp: !!multiplayer }));
     } catch {}
+    // Guarda o pwHash pra mandar no `auth` do WS — server valida + devolve save server-side
+    _authPwHash = multiplayer ? hashPw(pwd) : null;
     startGame(multiplayer, name);
 }
 
@@ -8331,7 +8393,9 @@ function tryAutoLogin(){
         if (!s || !s.name) return false;
         const acc = getAccount(s.name);
         if (!acc || acc.pw !== s.pw) return false;
-        startGame(true, s.name);
+        // s.pw já é o hashPw — reusa direto pra auth do WS
+        _authPwHash = s.mp === false ? null : s.pw;
+        startGame(s.mp !== false, s.name);
         return true;
     } catch { return false; }
 }
@@ -8388,6 +8452,10 @@ function logout(){
     }
     saveState();
     try { localStorage.removeItem(SESSION_KEY); } catch {}
+    // limpa credenciais da sessão atual
+    _authPwHash = null;
+    _wsAuthed = false;
+    _didInitialAuth = false;
     // limpa intervals da sessão (evita saveState rodando pós-logout)
     if (_saveStateIntervalId){ clearInterval(_saveStateIntervalId); _saveStateIntervalId = null; }
     if (_playerSyncIntervalId){ clearInterval(_playerSyncIntervalId); _playerSyncIntervalId = null; }
@@ -8630,6 +8698,21 @@ function saveState(){
         try { localStorage.setItem(backupKey(), JSON.stringify(prev)); } catch {}
     }
     try { localStorage.setItem(saveKey(), JSON.stringify(data)); } catch {}
+    // Sync server-side — só se autenticado. Throttle vive no server (5s/conta).
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'saveUpload', data })); } catch {}
+    }
+}
+
+// Aplica save vindo do server (sobrescreve o estado atual + grava local como cache)
+function applyServerSave(d){
+    if (!d || typeof d !== 'object') return false;
+    const ok = applySaveData(d);
+    if (ok){
+        // Persiste local como cache (pra modo offline futuro)
+        try { localStorage.setItem(saveKey(), JSON.stringify(d)); } catch {}
+    }
+    return ok;
 }
 function loadState(){
     try {
@@ -8644,6 +8727,15 @@ function loadState(){
             }
         }
         if (!d) return false;
+        return applySaveData(d);
+    } catch { return false; }
+}
+
+// Aplica um save (de localStorage OU server-side) no player atual.
+// Retorna true se algo foi aplicado.
+function applySaveData(d){
+    try {
+        if (!d || typeof d !== 'object') return false;
         if (d.skills)   Object.assign(player.skills, d.skills);
         if (d.equipped) Object.assign(player.equipped, d.equipped);
         if (d.weapon !== undefined) player.weapon = d.weapon;
