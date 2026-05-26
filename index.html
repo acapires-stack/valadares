@@ -1123,6 +1123,10 @@ const FIXED_COSTS = {
     ARMADURA_ESCAMA: 5000,
     ESCUDO_PEDRA:    4500,
     ELMO_DRACO:      3000,
+    // ★ Crafts lendários (com Coração do Highlander)
+    ESPADA_HL:       12000,
+    ARMADURA_TRONO:  10000,
+    COROA_VENDEDOR:  8000,
 };
 function itemGoldCost(itemKey){
     if (FIXED_COSTS[itemKey] != null) return FIXED_COSTS[itemKey];
@@ -1172,6 +1176,10 @@ const RECIPES = [
     { out:'BORDAO',         in:{ CLAVA:1, PEDRA_GOLEM:2, OSSO:2 },                    name:'Bordão de pedra' },
     { out:'MARTELO_GOLEM',  in:{ MARTELO:1, PEDRA_GOLEM:6 },                          name:'Martelo do Golem 2H' },
     { out:'ESCUDO_PEDRA',   in:{ ESCUDO_FERRO:1, PEDRA_GOLEM:5 },                     name:'Escudo de pedra' },
+    // ★ Crafts lendários (requer Coração do Highlander — drop raro de bosses/HL morto)
+    { out:'ESPADA_HL',      in:{ ESPADA_DRACO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 }, name:'Espada do Highlander ★' },
+    { out:'ARMADURA_TRONO', in:{ ARMADURA_ESCAMA:1, CORACAO_HL:2, PEDRA_GOLEM:4, OSSO:8 }, name:'Armadura do Trono ★' },
+    { out:'COROA_VENDEDOR', in:{ ELMO_DRACO:1, CORACAO_HL:1, ESCAMA:3, CHIFRE:2 },     name:'Coroa do Vendedor de Almas ★' },
 ];
 
 // Cavernas — declaradas cedo porque genMap() esculpe o mapa com elas
@@ -1772,6 +1780,10 @@ const ITEMS = {
     // armas novas — 2H endgame
     ESPADA_DRACO:  { name:'Espada Dracônica', color:'#ff6040', kind:'weapon', hand:'2h', skill:'Espada',  base:14, def:5 },
     MARTELO_GOLEM: { name:'Martelo do Golem', color:'#6888a8', kind:'weapon', hand:'2h', skill:'Clava',   base:13, def:6 },
+    // ★ Lendárias (custo: Coração do Highlander)
+    ESPADA_HL:     { name:'Espada do Highlander ★', color:'#ffd040', kind:'weapon', hand:'2h', skill:'Espada', base:20, def:8 },
+    ARMADURA_TRONO:{ name:'Armadura do Trono ★',    color:'#ffcc40', kind:'armor',   def:14 },
+    COROA_VENDEDOR:{ name:'Coroa do Vendedor ★',    color:'#ff8040', kind:'head',    def:7 },
     // armaduras endgame
     ARMADURA_ESCAMA:{ name:'Armadura de Escamas', color:'#cc5040', kind:'armor',   def:9 },
     ESCUDO_PEDRA:  { name:'Escudo de Pedra',  color:'#7888a0', kind:'offhand', def:8 },
@@ -2494,10 +2506,20 @@ function damagePlayer(amount, source, attacker){
     // Skill Escudo só treina se realmente está usando um
     if (hasShield()) gainSkillXp('Escudo', 1);
     // Status effects do atacante
-    if (attacker && attacker.type === 'SPIDER' && Math.random() < 0.15){
-        applyPoison(2, 4, 3000, 'Aranha');
-    }
+    rollAttackerStatus(attacker ? attacker.type : null);
     if (player.hp === 0) playerDie();
+}
+
+// Centraliza as regras de status: cada mob tem chance/efeito ao bater
+function rollAttackerStatus(mobType){
+    if (!mobType) return;
+    switch (mobType){
+        case 'SPIDER':   if (Math.random() < 0.15) applyPoison(2, 4, 3000, 'Aranha');           break;
+        case 'SCORPION': if (Math.random() < 0.30) applyPoison(3, 5, 3000, 'Escorpião');        break;
+        case 'LIZARD':   if (Math.random() < 0.20) applyBleed(1, 6, 2000, 'Lagarto');           break;
+        case 'TROLL':    if (Math.random() < 0.10) applyStun(1500, 'Troll');                    break;
+        case 'MINOTAUR': if (Math.random() < 0.25) applyStun(2000, 'Minotauro');                break;
+    }
 }
 
 // Ganho de XP em skill genérico — sobe nível e recalcula stats
@@ -3479,6 +3501,7 @@ function handleMP(msg){
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         const def = MTYPE[msg.mobType];
         log(`<span class="log-dmg">⚠ ${def?def.name:msg.mobType}: ${actual} dano</span>`);
+        rollAttackerStatus(msg.mobType);
         if (player.hp === 0) playerDie();
     }
 }
