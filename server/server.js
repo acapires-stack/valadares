@@ -71,6 +71,25 @@ const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
 const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 
+// Posições dos NPCs (espelhadas do cliente). Mob não ataca player adjacente a NPC (mini-PZ raio 2).
+// Mantém aqui no server porque cliente é dono dos NPCs (não precisa sincronizar tudo).
+const NPC_POSITIONS = [
+    { x:52, y:49 },  // mercador
+    { x:52, y:51 },  // atendente
+    { x:22, y:22 },  // eremita
+    { x:78, y:22 },  // ferreiro
+    { x:76, y:78 },  // caçadora
+    { x:66, y:90 },  // mineiro
+    { x:75, y:20 },  // vendedor (hidden, mas dá proteção mesmo assim)
+];
+const NPC_PROTECT_RADIUS = 2;
+function playerNearNpc(p){
+    for (const n of NPC_POSITIONS){
+        if (Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)) <= NPC_PROTECT_RADIUS) return true;
+    }
+    return false;
+}
+
 // ★★ MEGA BOSS (Senhor de Valadares)
 const MEGA_BOSS_POS = { x: 50, y: 30 };
 const MEGA_BOSS_TYPE = 'SENHOR_VALADARES';
@@ -374,11 +393,12 @@ function tickAI(){
     const now = Date.now();
     for (const m of monsters.values()){
         if (m.hp <= 0) continue;
-        // procura player mais próximo em aggro range
+        // procura player mais próximo em aggro range (ignora PZ e mini-PZ de NPC)
         let target = null, td = Infinity;
         for (const p of players.values()){
             if ((p.hp ?? 100) <= 0) continue;
             if (inSafe(p.x, p.y)) continue;
+            if (playerNearNpc(p)) continue;   // mini-PZ ao redor de NPCs
             const d = chebyshev(m.x, m.y, p.x, p.y);
             if (d <= m.aggro && d < td){ target = p; td = d; }
         }

@@ -1371,6 +1371,14 @@ function npcOnTile(x, y){
     }
     return null;
 }
+// Mini-PZ: player a 2 sqm de qualquer NPC é considerado em zona protegida
+function playerNearNpcMiniPZ(){
+    for (const n of NPCS){
+        if (!npcVisible(n)) continue;
+        if (Math.max(Math.abs(player.x - n.pos.x), Math.abs(player.y - n.pos.y)) <= 2) return true;
+    }
+    return false;
+}
 // Compat: atShop/atQuestNpc agora derivam do array
 function atShop()      { const n = npcAt(player.x, player.y); return n?.action === 'shop'; }
 function atQuestNpc()  { const n = npcAt(player.x, player.y); return n?.action === 'quests'; }
@@ -2635,12 +2643,13 @@ function updateMonster(m, dt){
     const distChase = Math.abs(m.x-player.x)+Math.abs(m.y-player.y);
     const distHit   = melee(m, player);
 
-    // Aggro: range maior, esquece se player muito longe OU dentro da PZ
-    if (inSafeZone(player.x, player.y)) m.aggro = false;
+    // Aggro: range maior, esquece se player muito longe OU dentro da PZ ou perto de NPC
+    const safeNow = inSafeZone(player.x, player.y) || playerNearNpcMiniPZ();
+    if (safeNow) m.aggro = false;
     else if (distChase <= 10) m.aggro = true;
     else if (distChase > 22) m.aggro = false;
 
-    if (m.attackTimer<=0 && distHit<=1 && !inSafeZone(player.x, player.y)){
+    if (m.attackTimer<=0 && distHit<=1 && !safeNow){
         damagePlayer(m.dmg, m.name, m);
         m.attackTimer = 1200;
     }
