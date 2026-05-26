@@ -7438,7 +7438,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isChat) document.getElementById('chatInput')?.focus();
         });
     });
-    // Input do chat — Enter envia, Esc cancela foco
+    // Input do chat — Enter envia + devolve foco ao jogo (WASD volta a mover).
+    // Esc também devolve foco. Evita morrer porque ficou "preso" digitando.
     const chatIn = document.getElementById('chatInput');
     if (chatIn){
         chatIn.addEventListener('keydown', e => {
@@ -7447,8 +7448,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter'){
                 sendChat(chatIn.value);
                 chatIn.value = '';
+                chatIn.blur();   // libera o teclado de volta pro jogo
+                clearAllKeys();  // garante que nenhuma tecla ficou "presa" do digitar
             } else if (e.key === 'Escape'){
+                chatIn.value = '';
                 chatIn.blur();
+                clearAllKeys();
             }
         });
         // Bloqueia keyup também
