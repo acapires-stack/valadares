@@ -188,7 +188,7 @@ function tileAt(x, y){
 function isWalkable(x, y){ return walkable(tileAt(x, y)); }
 const blocksLineOfSight = t => t===T.TREE || t===T.CAVE_WALL;
 // Bresenham — true se caminho (x1,y1) → (x2,y2) está livre de obstáculos.
-// Endpoints ignorados.
+// Endpoints ignorados. Limite duro de iterações pra evitar loop em coords inválidas.
 function hasLineOfSight(x1, y1, x2, y2){
     if (x1 === x2 && y1 === y2) return true;
     let dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
@@ -196,13 +196,15 @@ function hasLineOfSight(x1, y1, x2, y2){
     const sy = y1 < y2 ? 1 : -1;
     let err = dx - dy;
     let x = x1, y = y1;
-    while (true){
+    const maxSteps = Math.max(M_W, M_H) + 4;   // cobre diagonal completa do mapa
+    for (let i = 0; i < maxSteps; i++){
         const e2 = 2*err;
         if (e2 > -dy){ err -= dy; x += sx; }
         if (e2 <  dx){ err += dx; y += sy; }
         if (x === x2 && y === y2) return true;
         if (blocksLineOfSight(tileAt(x, y))) return false;
     }
+    return false;  // não conseguiu chegar — coord fora do mapa, etc
 }
 function broadcast(except, msg){
     const data = JSON.stringify(msg);
@@ -711,9 +713,14 @@ wss.on('connection', (ws) => {
         }
 
         if (msg.t === 'pos') {
-            p.x = msg.x; p.y = msg.y; p.dir = msg.dir;
-            if (typeof msg.hp === 'number') p.hp = msg.hp;
-            if (typeof msg.maxHp === 'number') p.maxHp = msg.maxHp;
+            // Sanitiza/clampa coords antes de aceitar (cliente malicioso poderia
+            // enviar {x:99999, y:99999} e quebrar tickAI/inCave/tileAt)
+            const nx = Math.max(0, Math.min(M_W - 1, Math.floor(Number(msg.x)) || 0));
+            const ny = Math.max(0, Math.min(M_H - 1, Math.floor(Number(msg.y)) || 0));
+            p.x = nx; p.y = ny;
+            p.dir = (typeof msg.dir === 'string' && msg.dir.length < 8) ? msg.dir : p.dir;
+            if (typeof msg.hp === 'number' && isFinite(msg.hp)) p.hp = msg.hp;
+            if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) p.maxHp = msg.maxHp;
             // Se um mob acabou no mesmo tile (race com tickAI), empurra
             bumpMobAwayFrom(p.x, p.y);
             broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp });
