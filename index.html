@@ -7199,6 +7199,7 @@ setTimeout(checkClientUpdate, 35 * 1000);
 // ─── Save / Load (localStorage) ──────────────────────────────────────────────
 function saveKey(){ return 'valadares:save:' + player.name; }
 function saveState(){
+    if (!started) return;   // pós-logout o player foi resetado pra defaults; bloqueia overwrite
     if (!player.name) return;
     const data = {
         v: 2,
