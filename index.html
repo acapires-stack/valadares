@@ -700,7 +700,7 @@
 
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
-        #shopModal, #questsModal, #statsModal {
+        #shopModal, #questsModal, #statsModal, #chainDialogModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -924,6 +924,41 @@
             padding-bottom: 5px;
             margin-bottom: 8px;
             text-shadow: 0 0 10px rgba(255,200,60,0.3);
+        }
+        /* Diálogo de NPC (chain) */
+        .dialog-flavor {
+            color: #d4cba8;
+            font-style: italic;
+            font-size: 12.5px;
+            line-height: 1.5;
+            padding: 10px 14px;
+            background: rgba(20,15,10,0.7);
+            border-left: 3px solid #aacfff;
+            border-radius: 2px;
+            margin-bottom: 12px;
+        }
+        .dialog-meta {
+            color: #8a7438;
+            font-size: 9.5px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .dialog-progress {
+            color: #aacfff;
+            font-size: 11px;
+            font-family: 'Consolas', monospace;
+            padding: 6px 10px;
+            background: rgba(170,200,255,0.08);
+            border-radius: 2px;
+            margin-bottom: 6px;
+        }
+        .dialog-reward {
+            color: #74d176;
+            font-size: 11px;
+            font-family: 'Consolas', monospace;
+            margin-bottom: 12px;
         }
 
         /* SHOP */
@@ -1186,6 +1221,16 @@
     </div>
 </div>
 
+<!-- MODAL DIÁLOGO de chain (NPC do mundo) -->
+<div id="chainDialogModal" style="display:none">
+    <div class="chest-box" style="min-width:480px;max-width:620px">
+        <div class="chest-title" id="chainDialogTitle">NPC</div>
+        <div id="chainDialogBody" style="margin-top:14px"></div>
+        <div class="chest-hint"><kbd>ESC</kbd> fechar</div>
+        <button class="chest-close" onclick="closeChainDialog()">×</button>
+    </div>
+</div>
+
 <!-- MODAL ESTATÍSTICAS -->
 <div id="statsModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:620px">
@@ -1272,14 +1317,64 @@ const DUMMY_POS = { x: 49, y: 51 };
 function atDummy(){
     return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
 }
-// NPCs (PZ leste)
-const SHOP_POS  = { x: 52, y: 49 };
-const QUEST_POS = { x: 52, y: 51 };
-function atShop(){
-    return Math.max(Math.abs(player.x - SHOP_POS.x), Math.abs(player.y - SHOP_POS.y)) <= 1;
+// ─── NPCs (PZ + mundo) ─────────────────────────────────────────────────────
+const NPCS = [
+    // PZ leste — comércio e quests principais
+    { id:'mercador',  name:'Mercador',     pos:{x:52,y:49}, body:'#3a5a8a', hat:'#ffcc40', action:'shop',   hint:'mercador' },
+    { id:'atendente', name:'Atendente',    pos:{x:52,y:51}, body:'#5a3a8a', hat:'#aacfff', action:'quests', hint:'quests'  },
+    // Mundo — chains narrativas (cada um tem seu local temático)
+    { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', chain:'cripta' },
+    { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
+    { id:'cacadora',  name:'Caçadora de Drakes', pos:{x:76,y:78}, body:'#3a5a3a', hat:'#80aa40', action:'chain', chain:'drake' },
+    { id:'mineiro',   name:'Mineiro Perdido',  pos:{x:66,y:90}, body:'#5a3a18', hat:'#9a9a9a', action:'chain', chain:'mina'   },
+    // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
+    { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
+];
+
+function npcVisible(n){ return !n.hiddenUntil || (player.flags && player.flags[n.hiddenUntil]); }
+function npcAt(x, y){
+    for (const n of NPCS){
+        if (!npcVisible(n)) continue;
+        if (Math.max(Math.abs(x-n.pos.x), Math.abs(y-n.pos.y)) <= 1) return n;
+    }
+    return null;
 }
-function atQuestNpc(){
-    return Math.max(Math.abs(player.x - QUEST_POS.x), Math.abs(player.y - QUEST_POS.y)) <= 1;
+function npcOnTile(x, y){
+    for (const n of NPCS){
+        if (!npcVisible(n)) continue;
+        if (n.pos.x === x && n.pos.y === y) return n;
+    }
+    return null;
+}
+// Compat: atShop/atQuestNpc agora derivam do array
+function atShop()      { const n = npcAt(player.x, player.y); return n?.action === 'shop'; }
+function atQuestNpc()  { const n = npcAt(player.x, player.y); return n?.action === 'quests'; }
+
+// Marcador acima do NPC (✦ nova / ✓ pronta / ! aviso) e label do hint
+function npcInteractionHint(npc){
+    if (npc.action === 'shop')   return { label:'comprar/vender', marker:'$', markerColor:'#ffcc40' };
+    if (npc.action === 'quests') return { label:'quests',         marker:null };
+    if (npc.action === 'chain'){
+        const stages = (player.questFlags && player.questFlags[npc.chain]) || null;
+        const chain = QUEST_CHAINS[npc.chain];
+        if (!chain) return { label:'falar' };
+        const stage = currentChainStage(npc.chain);
+        if (!stage) return { label:'concluída', marker:'✓', markerColor:'#74d176' };
+        // pode entregar?
+        if (stageReadyToTurnIn(npc.chain, stage)) return { label:'entregar', marker:'✓', markerColor:'#ffd060' };
+        // só nova quest pra pegar?
+        if (!isStageStarted(npc.chain, stage)) return { label:'aceitar quest', marker:'✦', markerColor:'#aacfff' };
+        return { label:'em progresso', marker:null };
+    }
+    return { label:'falar' };
+}
+
+// Abre interação certa: shop, quests modal, ou diálogo de chain
+function interactNpc(npc){
+    if (!npc) return;
+    if (npc.action === 'shop')   { openShop(); return; }
+    if (npc.action === 'quests') { openQuests(); return; }
+    if (npc.action === 'chain')  { openChainDialog(npc); return; }
 }
 const TRAINING_TIME = 2000;   // ms por sessão
 function atCraft(){
@@ -2646,6 +2741,10 @@ const player = {
         active: {},      // id -> { progress }
         completed: [],   // ids
     },
+    // Flags globais de progressão (visit, talkTo, decisões, etc)
+    flags: {},
+    // Buffs permanentes (de decisões morais, achievements, etc)
+    permaBuffs: {},   // ex: { xpBonus: 0.05 }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2703,6 +2802,9 @@ function rollAttackerStatus(mobType){
 function gainSkillXp(name, amount){
     const sk = player.skills[name];
     if (!sk) return;
+    // Aplica permaBuff xpBonus (decisão moral do Vendedor de Almas)
+    const bonus = player.permaBuffs?.xpBonus || 0;
+    if (bonus > 0) amount = Math.round(amount * (1 + bonus));
     sk.xp += amount;
     while (sk.xp >= sk.xpNext){
         sk.xp -= sk.xpNext;
@@ -3069,7 +3171,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -3116,6 +3218,82 @@ function renderShop(){
             </div>`;
         }).join('');
     }
+}
+
+// ─── Diálogo de chain (NPC do mundo) ──────────────────────────────────────
+function openChainDialog(npc){
+    if (!npc || npc.action !== 'chain') return;
+    closeAllModals();
+    document.getElementById('chainDialogModal').style.display = 'flex';
+    renderChainDialog(npc);
+}
+function closeChainDialog(){ document.getElementById('chainDialogModal').style.display = 'none'; saveState(); }
+window.openChainDialog = openChainDialog; window.closeChainDialog = closeChainDialog;
+
+function renderChainDialog(npc){
+    const chain = QUEST_CHAINS[npc.chain]; if (!chain) return;
+    document.getElementById('chainDialogTitle').textContent = `🗣 ${npc.name}`;
+    const body = document.getElementById('chainDialogBody');
+    const stage = currentChainStage(npc.chain);
+    if (!stage){
+        // chain inteira completa
+        body.innerHTML = `
+            <div class="dialog-flavor">"${chain.name} já foi cumprida. Obrigado, herói."</div>
+            <div class="dialog-meta">✓ Linha de quests concluída</div>
+        `;
+        return;
+    }
+    // Stage de escolha (decisão moral)
+    if (stage.kind === 'choice'){
+        const choicesHtml = stage.choices.map((c, idx) => {
+            const rew = describeReward(c.reward);
+            return `<button class="quest-btn" style="display:block;width:100%;margin-top:8px;text-align:left;padding:10px" data-choice="${npc.chain}|${idx}">
+                <b>${c.label}</b><br>
+                <span style="font-size:9.5px;color:#74d176;font-family:'Consolas',monospace">→ ${rew}</span>
+            </button>`;
+        }).join('');
+        body.innerHTML = `
+            <div class="dialog-flavor">${stage.desc}</div>
+            <div class="dialog-meta">— DECISÃO —</div>
+            ${choicesHtml}
+        `;
+        return;
+    }
+    // Stage normal
+    const started = isStageStarted(npc.chain, stage);
+    const ready = stageReadyToTurnIn(npc.chain, stage);
+    let progDesc = '';
+    if (stage.kind === 'item')      progDesc = `${stageProgress(npc.chain, stage)}/${stage.count} ${ITEMS[stage.type]?.name || stage.type}`;
+    else if (stage.kind === 'multiItem'){
+        const parts = Object.entries(stage.items).map(([k,n]) => `${Math.min(player.inv[k]||0, n)}/${n} ${ITEMS[k]?.name || k}`);
+        progDesc = parts.join(', ');
+    } else if (stage.kind === 'mob'){
+        progDesc = `${stageProgress(npc.chain, stage)}/${stage.count} ${MTYPE[stage.type]?.name || stage.type} mortos`;
+    } else if (stage.kind === 'visit'){
+        progDesc = stageReadyToTurnIn(npc.chain, stage) ? '✓ Local visitado' : `Vá até (${stage.x}, ${stage.y})`;
+    }
+    let btn;
+    if (!started) btn = `<button class="quest-btn" data-stage-start="${npc.chain}">aceitar quest</button>`;
+    else if (ready) btn = `<button class="quest-btn" data-stage-complete="${npc.chain}">entregar / concluir</button>`;
+    else btn = `<button class="quest-btn" disabled style="opacity:0.5;cursor:not-allowed">em progresso</button>`;
+    body.innerHTML = `
+        <div class="dialog-flavor">${stage.desc}</div>
+        <div class="dialog-meta">📜 ${chain.name} · etapa ${chain.stages.findIndex(s=>s.id===stage.id)+1}/${chain.stages.length}</div>
+        <div class="dialog-progress">${progDesc}</div>
+        <div class="dialog-reward">${describeReward(stage.reward)}</div>
+        ${btn}
+    `;
+    body.dataset.currentChain = npc.chain;
+}
+function describeReward(reward){
+    if (!reward) return '';
+    const parts = [];
+    if (reward.gold) parts.push(`${reward.gold}g`);
+    if (reward.xp) for (const [s, v] of Object.entries(reward.xp)) parts.push(`${v}xp ${s}`);
+    if (reward.item) for (const [k, n] of Object.entries(reward.item)) parts.push(`${n}× ${ITEMS[k]?.name || k}`);
+    if (reward.permaBuff) for (const [k, v] of Object.entries(reward.permaBuff)) parts.push(`+${(v*100).toFixed(0)}% ${k} (permanente)`);
+    if (reward.flag) parts.push('algo mudará no mundo…');
+    return parts.length ? 'Recompensa: ' + parts.join(' + ') : '';
 }
 
 // ─── QUESTS modal (Atendente) ──────────────────────────────────────────────
@@ -3882,6 +4060,215 @@ const QUESTS = [
       goal:{ kind:'mob', type:'ORC_LIDER', count:1 }, reward:{ gold:500 } },
 ];
 
+// ─── QUEST CHAINS (cadeias narrativas com NPCs do mundo) ──────────────────
+// Cada chain tem etapas (stages) que liberam a próxima ao completar.
+// Stage kind: 'mob' | 'item' | 'visit' | 'talk' | 'choice'
+// Recompensa pode dar: gold, xp{}, item{key:qty}, flag (set player.flags[flag]=true),
+//   permaBuff{xpBonus:0.05} pra decisões morais
+const QUEST_CHAINS = {
+    cripta: {
+        npc:'eremita', name:'Os Mortos da Cripta',
+        stages: [
+            { id:'cr1', name:'Investigue a Cripta', desc:'O Eremita pede que vá visitar a Cripta dos Mortos (18, 18).',
+              kind:'visit', x:18, y:18, radius:3, reward:{ gold:80, xp:{Magia:50} } },
+            { id:'cr2', name:'Restos profanados', desc:'Traga 8 Ossos da cripta.',
+              kind:'item', type:'OSSO', count:8, reward:{ gold:200, xp:{Magia:80} } },
+            { id:'cr3', name:'Silenciar os mortos', desc:'Elimine 10 Esqueletos.',
+              kind:'mob', type:'SKELETON', count:10, reward:{ gold:400, xp:{Magia:150}, item:{OSSO:5} } },
+            { id:'cr4', name:'O Senhor da Cripta', desc:'Mate o Minotauro guardião do Antro.',
+              kind:'mob', type:'MINOTAUR', count:1, reward:{ gold:800, xp:{Magia:200}, item:{POTION_MP:5}, flag:'flag_vendedor_revealed' } },
+        ],
+    },
+    forja: {
+        npc:'ferreiro', name:'A Forja Esquecida',
+        stages: [
+            { id:'fj1', name:'Materiais raros', desc:'Traga 5 Pedras do Golem e 5 Chifres.',
+              kind:'multiItem', items:{ PEDRA_GOLEM:5, CHIFRE:5 }, reward:{ gold:300 } },
+            { id:'fj2', name:'O Fole', desc:'Traga 10 Sedas (pra alimentar o fole).',
+              kind:'item', type:'SILK', count:10, reward:{ gold:250 } },
+            { id:'fj3', name:'A Forja Final', desc:'Mate 5 Golems (testando o metal contra eles).',
+              kind:'mob', type:'GOLEM', count:5, reward:{ gold:600, item:{MACHADO_MINO:1}, xp:{Machado:200} } },
+        ],
+    },
+    drake: {
+        npc:'cacadora', name:'Caça aos Drakes',
+        stages: [
+            { id:'dr1', name:'Filhotes', desc:'Mate 5 Drakes (mais novos).',
+              kind:'mob', type:'DRAKE', count:5, reward:{ gold:400, xp:{Distância:150} } },
+            { id:'dr2', name:'Couro de Drake', desc:'Traga 8 Escamas de Drake.',
+              kind:'item', type:'ESCAMA', count:8, reward:{ gold:600, xp:{Distância:120} } },
+            { id:'dr3', name:'O Ancião', desc:'Acabe com o Drake Ancião 1 vez.',
+              kind:'mob', type:'DRAKE_LIDER', count:1,
+              reward:{ gold:1500, item:{ELMO_DRACO:1, CORACAO_HL:1}, xp:{Distância:300} } },
+        ],
+    },
+    mina: {
+        npc:'mineiro', name:'Resgate na Mina',
+        stages: [
+            { id:'mn1', name:'Suprimentos', desc:'Traga 3 Presuntos e 3 Poções de vida.',
+              kind:'multiItem', items:{ HAM:3, POTION:3 }, reward:{ gold:200, xp:{Punho:50} } },
+            { id:'mn2', name:'Limpeza', desc:'Mate 10 Morcegos perto do Abismo.',
+              kind:'mob', type:'BAT', count:10, reward:{ gold:300, xp:{Distância:100} } },
+            { id:'mn3', name:'O Golem Rei', desc:'Mate o Golem Rei pra abrir caminho.',
+              kind:'mob', type:'GOLEM_REI', count:1,
+              reward:{ gold:1500, item:{PEDRA_GOLEM:10}, xp:{Clava:250} } },
+        ],
+    },
+    vendedor: {
+        npc:'vendedor', name:'O Vendedor de Almas',
+        stages: [
+            { id:'vd1', name:'Bem-vindo, mortal',
+              desc:'O Vendedor cobra 2 Corações do Highlander pelo trato.',
+              kind:'item', type:'CORACAO_HL', count:2,
+              reward:{ gold:0 } },
+            { id:'vd2', name:'A Decisão',
+              desc:'O Vendedor revela: vai usar os Corações pra ressuscitar o Drake Ancião como Boss Lv11. Você decide o que fazer.',
+              kind:'choice',
+              choices: [
+                  { label:'Aceitar a Coroa do Vendedor (item lendário)',
+                    reward:{ item:{COROA_VENDEDOR:1}, gold:500 } },
+                  { label:'Matar o Vendedor (ele some, ganha +5% XP permanente)',
+                    reward:{ permaBuff:{xpBonus:0.05}, gold:2000, flag:'flag_vendedor_killed' } },
+              ],
+            },
+        ],
+    },
+};
+
+// Helpers de chain
+function currentChainStage(chainId){
+    const chain = QUEST_CHAINS[chainId]; if (!chain) return null;
+    const progress = player.questFlags?.[chainId] || {};
+    for (const stage of chain.stages){
+        if (!progress[stage.id]) return stage;   // primeira não-completa
+    }
+    return null;   // chain inteira completa
+}
+function isStageStarted(chainId, stage){
+    return !!(player.questFlags?.[chainId]?.[stage.id + '_started']);
+}
+function stageProgress(chainId, stage){
+    if (stage.kind === 'item')      return Math.min(player.inv[stage.type] || 0, stage.count);
+    if (stage.kind === 'multiItem'){
+        let p = 0, t = 0;
+        for (const [k, n] of Object.entries(stage.items)){
+            p += Math.min(player.inv[k] || 0, n);
+            t += n;
+        }
+        return { p, t };
+    }
+    if (stage.kind === 'mob'){
+        return Math.min(player.questFlags?.[chainId]?.[stage.id + '_kills'] || 0, stage.count);
+    }
+    if (stage.kind === 'visit'){
+        return player.questFlags?.[chainId]?.[stage.id + '_visited'] ? 1 : 0;
+    }
+    if (stage.kind === 'choice') return 0;
+    return 0;
+}
+function stageReadyToTurnIn(chainId, stage){
+    if (stage.kind === 'visit')  return stageProgress(chainId, stage) >= 1;
+    if (stage.kind === 'choice') return false;  // só termina quando escolhe
+    if (stage.kind === 'mob')    return stageProgress(chainId, stage) >= stage.count;
+    if (stage.kind === 'item')   return stageProgress(chainId, stage) >= stage.count;
+    if (stage.kind === 'multiItem'){
+        const { p, t } = stageProgress(chainId, stage);
+        return p >= t;
+    }
+    return false;
+}
+function startStage(chainId, stage){
+    player.questFlags = player.questFlags || {};
+    player.questFlags[chainId] = player.questFlags[chainId] || {};
+    player.questFlags[chainId][stage.id + '_started'] = true;
+    log(`<span class="log-up">📜 Aceitou: ${stage.name}</span>`);
+    if (typeof showServerToast === 'function') showServerToast('event', `✦ ${stage.name}`, null, 4000);
+    saveState();
+}
+function completeStage(chainId, stage){
+    // Consome items se for item/multiItem
+    if (stage.kind === 'item'){
+        const have = player.inv[stage.type] || 0;
+        const take = Math.min(have, stage.count);
+        player.inv[stage.type] = have - take;
+        if (player.inv[stage.type] <= 0) delete player.inv[stage.type];
+        invSignature = null;
+    } else if (stage.kind === 'multiItem'){
+        for (const [k, n] of Object.entries(stage.items)){
+            const have = player.inv[k] || 0;
+            const take = Math.min(have, n);
+            player.inv[k] = have - take;
+            if (player.inv[k] <= 0) delete player.inv[k];
+        }
+        invSignature = null;
+    }
+    applyReward(stage.reward, chainId);
+    player.questFlags[chainId][stage.id] = true;
+    log(`<span class="log-up">★ Etapa concluída: ${stage.name}</span>`);
+    if (typeof showServerToast === 'function') showServerToast('event', `★ ${stage.name}`, null, 4000);
+    saveState();
+}
+function applyReward(reward, chainId){
+    if (!reward) return;
+    if (reward.gold){
+        player.gold += reward.gold;
+        log(`<span class="log-up">+${reward.gold}g</span>`);
+    }
+    if (reward.xp) for (const [s, v] of Object.entries(reward.xp)){
+        if (player.skills[s]) gainSkillXp(s, v);
+    }
+    if (reward.item) for (const [k, n] of Object.entries(reward.item)){
+        if (!ITEMS[k]) continue;
+        player.inv[k] = (player.inv[k] || 0) + n;
+        log(`<span class="log-up">+${n}× ${ITEMS[k].name}</span>`);
+        invSignature = null;
+    }
+    if (reward.flag){
+        player.flags = player.flags || {};
+        player.flags[reward.flag] = true;
+        log(`<span class="log-sys">⚡ Algo mudou no mundo…</span>`);
+    }
+    if (reward.permaBuff) for (const [k, v] of Object.entries(reward.permaBuff)){
+        player.permaBuffs[k] = (player.permaBuffs[k] || 0) + v;
+        log(`<span class="log-up">💎 Buff permanente: ${k} +${(v*100).toFixed(0)}%</span>`);
+    }
+}
+// Hook: incrementa contagem de mob kill em todas as chains com stage 'mob' ativo
+function notifyMobKillForChains(type){
+    if (!player.questFlags) return;
+    for (const [chainId, chain] of Object.entries(QUEST_CHAINS)){
+        const stage = currentChainStage(chainId);
+        if (!stage || stage.kind !== 'mob' || stage.type !== type) continue;
+        if (!isStageStarted(chainId, stage)) continue;
+        player.questFlags[chainId] = player.questFlags[chainId] || {};
+        const key = stage.id + '_kills';
+        const cur = player.questFlags[chainId][key] || 0;
+        if (cur < stage.count){
+            player.questFlags[chainId][key] = cur + 1;
+            if (cur + 1 === stage.count){
+                log(`<span class="log-up">✓ Volte ao NPC: ${stage.name}</span>`);
+            }
+        }
+    }
+}
+// Hook: visit (chamado quando player anda)
+function notifyVisitForChains(x, y){
+    if (!player.questFlags) return;
+    for (const [chainId, chain] of Object.entries(QUEST_CHAINS)){
+        const stage = currentChainStage(chainId);
+        if (!stage || stage.kind !== 'visit') continue;
+        if (!isStageStarted(chainId, stage)) continue;
+        const d = Math.max(Math.abs(x - stage.x), Math.abs(y - stage.y));
+        if (d <= (stage.radius || 1)){
+            player.questFlags[chainId] = player.questFlags[chainId] || {};
+            if (!player.questFlags[chainId][stage.id + '_visited']){
+                player.questFlags[chainId][stage.id + '_visited'] = true;
+                log(`<span class="log-up">✓ Local visitado: ${stage.name}. Volte ao NPC.</span>`);
+            }
+        }
+    }
+}
+
 // Pool de quests DIÁRIAS — 3 randomizadas por dia, reset 00:00 local.
 // Recompensas mais gordas (2-3× normal) pra incentivar logar todo dia.
 const DAILY_POOL = [
@@ -4030,6 +4417,8 @@ function turnInQuest(id){
     return true;
 }
 function notifyMobKilledForQuests(type){
+    // Chains narrativas
+    notifyMobKillForChains(type);
     // Quests principais (aceitas)
     for (const id in player.quests.active){
         const q = questById(id);
@@ -4254,6 +4643,7 @@ function revealAround(cx, cy){
             if (Math.max(Math.abs(dx),Math.abs(dy)) > MM_REVEAL_RADIUS) continue;
             player.visited[y*M_W + x] = 1;
         }
+    if (typeof notifyVisitForChains === 'function') notifyVisitForChains(cx, cy);
 }
 function drawMinimap(){
     ensureVisited();
@@ -5149,6 +5539,40 @@ document.addEventListener('click', e => {
     if (ti){ turnInQuest(ti.dataset.turnin); return; }
     const cl = e.target.closest('[data-claim]');
     if (cl){ claimDaily(cl.dataset.claim); return; }
+    // Chain dialog buttons
+    const sStart = e.target.closest('[data-stage-start]');
+    if (sStart){
+        const chainId = sStart.dataset.stageStart;
+        const stage = currentChainStage(chainId);
+        if (stage){ startStage(chainId, stage); renderChainDialog(NPCS.find(n => n.chain === chainId)); }
+        return;
+    }
+    const sComp = e.target.closest('[data-stage-complete]');
+    if (sComp){
+        const chainId = sComp.dataset.stageComplete;
+        const stage = currentChainStage(chainId);
+        if (stage && stageReadyToTurnIn(chainId, stage)){
+            completeStage(chainId, stage);
+            renderChainDialog(NPCS.find(n => n.chain === chainId));
+        }
+        return;
+    }
+    const choice = e.target.closest('[data-choice]');
+    if (choice){
+        const [chainId, idxStr] = choice.dataset.choice.split('|');
+        const idx = parseInt(idxStr, 10);
+        const stage = currentChainStage(chainId);
+        if (stage && stage.kind === 'choice' && stage.choices[idx]){
+            applyReward(stage.choices[idx].reward, chainId);
+            player.questFlags[chainId] = player.questFlags[chainId] || {};
+            player.questFlags[chainId][stage.id] = true;
+            log(`<span class="log-up">★ Decisão: ${stage.choices[idx].label}</span>`);
+            if (typeof showServerToast === 'function') showServerToast('event', `★ ${stage.choices[idx].label}`, null, 5000);
+            saveState();
+            renderChainDialog(NPCS.find(n => n.chain === chainId));
+        }
+        return;
+    }
     const eq = e.target.closest('.equip-slot, .paper-slot');
     if (eq && !eq.classList.contains('empty') && !eq.classList.contains('blocked')){
         unequip(eq.dataset.slot); return;
@@ -5243,7 +5667,7 @@ document.addEventListener('keydown', e => {
     if (e.key==='t' || e.key==='T') openTraining();
     if (e.key==='p' || e.key==='P') togglePvP();
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -5323,8 +5747,8 @@ function clearTarget(){
 
 // ESPAÇO: prioriza NPC adjacente. Caso contrário, engaja combate.
 function engage(){
-    if (atShop()){ openShop(); return; }
-    if (atQuestNpc()){ openQuests(); return; }
+    const npc = npcAt(player.x, player.y);
+    if (npc){ interactNpc(npc); return; }
     targetNearest(false);   // troca de alvo se aparecer ameaça mais próxima
     const m = player.target ? monsters.find(x=>x.id===player.target) : null;
     if (m && melee(m, player) <= 1 && player.attackTimer <= 0){
@@ -5913,6 +6337,7 @@ function handleMovement(dt){
     if (nx<0||ny<0||nx>=M_W||ny>=M_H) return;
     if (!walkable(map[ny][nx])) return;
     if (monsterAt(nx,ny)) return;
+    if (npcOnTile(nx,ny)) return;  // não passa por cima de NPC
     // animação: guarda posição anterior antes de pular pro tile novo
     player.prevX = player.x; player.prevY = player.y;
     player.x = nx; player.y = ny;
@@ -6240,6 +6665,9 @@ function saveState(){
         pvp: player.pvp, selos: player.selos, highlander: player.highlander,
         stats: player.stats,
         quests: player.quests,
+        flags: player.flags,
+        questFlags: player.questFlags,
+        permaBuffs: player.permaBuffs,
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
     };
@@ -6303,7 +6731,11 @@ function loadState(){
         if (d.quests && typeof d.quests === 'object'){
             player.quests.active    = d.quests.active    || {};
             player.quests.completed = d.quests.completed || [];
+            if (d.quests.daily) player.quests.daily = d.quests.daily;
         }
+        if (d.flags)       player.flags = d.flags;
+        if (d.questFlags)  player.questFlags = d.questFlags;
+        if (d.permaBuffs)  player.permaBuffs = d.permaBuffs;
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
@@ -6571,14 +7003,13 @@ function loop(ts){
         }
     }
 
-    // NPCs (Mercador e Atendente)
-    for (const npc of [
-        { pos:SHOP_POS,  body:'#3a5a8a', hat:'#ffcc40', label:'Mercador',  hint:'[ESPAÇO] mercador',  near: atShop() },
-        { pos:QUEST_POS, body:'#5a3a8a', hat:'#aacfff', label:'Atendente', hint:'[ESPAÇO] quests',    near: atQuestNpc() },
-    ]){
+    // NPCs (todos do array NPCS, respeita hidden)
+    for (const npc of NPCS){
+        if (!npcVisible(npc)) continue;
         if (npc.pos.x < cam.x-1 || npc.pos.x >= cam.x+VP_W+1 || npc.pos.y < cam.y-1 || npc.pos.y >= cam.y+VP_H+1) continue;
         const nx = (npc.pos.x - cam.x) * TS;
         const ny = (npc.pos.y - cam.y) * TS;
+        const near = npcAt(player.x, player.y) === npc;
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.beginPath(); ctx.ellipse(nx+TS/2, ny+TS-4, 10, 4, 0, 0, Math.PI*2); ctx.fill();
@@ -6600,20 +7031,31 @@ function loop(ts){
         ctx.fillRect(nx+14, ny+5, 20, 5);
         ctx.fillStyle = 'rgba(0,0,0,0.25)';
         ctx.fillRect(nx+14, ny+8, 20, 2);
+        // marcador de quest disponível (✦ amarelo se tem chain ativa pronta ou nova)
+        const hint = npcInteractionHint(npc);
+        if (hint.marker){
+            ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+            ctx.fillStyle = hint.markerColor || '#ffd060';
+            const pulse = 0.6 + Math.sin(performance.now() * 0.005) * 0.4;
+            ctx.globalAlpha = pulse;
+            ctx.fillText(hint.marker, nx+TS/2, ny-6);
+            ctx.globalAlpha = 1;
+        }
         // nome (sempre visível)
+        const label = npc.name;
         ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(nx+TS/2-npc.label.length*2.6-2, ny-4, npc.label.length*5.2+4, 9);
+        ctx.fillRect(nx+TS/2-label.length*2.6-2, ny+TS+1, label.length*5.2+4, 9);
         ctx.fillStyle = '#e0c060';
-        ctx.fillText(npc.label, nx+TS/2, ny+3);
+        ctx.fillText(label, nx+TS/2, ny+TS+8);
         // brilho ao aproximar + hint
-        if (npc.near){
+        if (near){
             ctx.strokeStyle = 'rgba(220,180,80,0.6)';
             ctx.lineWidth = 2;
             ctx.strokeRect(nx+6, ny+4, 36, 44);
             ctx.fillStyle = '#ffd060';
             ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
-            ctx.fillText(npc.hint, nx+TS/2, ny+TS+12);
+            ctx.fillText(`[ESPAÇO] ${hint.label || 'falar'}`, nx+TS/2, ny+TS+20);
         }
     }
 
