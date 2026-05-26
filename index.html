@@ -915,6 +915,16 @@
             cursor: pointer; border-radius: 1px;
         }
         .quest-btn:hover { background: linear-gradient(180deg, #aa7d30 0%, #6a4a18 100%); }
+        .quest-section-title {
+            color: #ffd060;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            border-bottom: 1px solid #5a4818;
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(255,200,60,0.3);
+        }
 
         /* SHOP */
         .shop-row {
@@ -2660,12 +2670,15 @@ function damagePlayer(amount, source, attacker){
     const crit = attacker && Math.random() < (attacker.crit || 0);
     let raw = amount;
     if (crit) raw *= 2;
-    const blocked = Math.min(raw - 1, totalDefense());
-    const actual  = Math.max(1, raw - blocked);
+    // Defesa percentual (diminishing returns): def/(def+30). 30=50%, 60=67%, 90=75%
+    const def = totalDefense();
+    const reduction = def > 0 ? def / (def + 30) : 0;
+    const actual  = Math.max(1, Math.round(raw * (1 - reduction)));
+    const blocked = raw - actual;
     player.hp = Math.max(0, player.hp - actual);
     addFloat(player.x, player.y, `-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
     player.hurtTimer = crit ? 450 : 300;
-    const dt = blocked > 0 ? ` (${blocked} bloq)` : '';
+    const dt = blocked > 0 ? ` (${blocked} bloq · ${Math.round(reduction*100)}%)` : '';
     log(`<span class="log-dmg">⚠ ${crit?'★ ':''}${source}: ${actual}${dt}</span>`);
     // Skill Escudo só treina se realmente está usando um
     if (hasShield()) gainSkillXp('Escudo', 1);
@@ -3108,6 +3121,7 @@ function renderShop(){
 // ─── QUESTS modal (Atendente) ──────────────────────────────────────────────
 function openQuests(){
     closeAllModals();
+    ensureDailyQuests();
     document.getElementById('questsModal').style.display = 'flex';
     renderQuests();
 }
@@ -3117,6 +3131,34 @@ function renderQuests(){
     const el = document.getElementById('questsBody');
     if (!el) return;
     const near = atQuestNpc();
+    // Diárias primeiro
+    ensureDailyQuests();
+    const daily = player.quests.daily || { list: [] };
+    const dailyRows = (daily.list || []).map(q => {
+        const claimed = isDailyClaimed(q.id);
+        const ready = !claimed && dailyComplete(q.id);
+        let cls, badge, btn = '';
+        if (claimed){ cls = 'done'; badge = '✓ resgatada'; }
+        else if (ready){
+            cls = 'ready'; badge = '★ pronta!';
+            btn = `<button class="quest-btn" data-claim="${q.id}">resgatar</button>`;
+        } else { cls = 'active'; badge = 'em progresso'; }
+        const prog = dailyProgress(q.id);
+        const total = q.goal.count;
+        const goalName = q.goal.kind === 'item' ? (ITEMS[q.goal.type]?.name || q.goal.type) : (MTYPE[q.goal.type]?.name || q.goal.type);
+        const goalDesc = q.goal.kind === 'item' ? `coletar ${total}× ${goalName}` : `matar ${total}× ${goalName}`;
+        const rewardParts = [];
+        if (q.reward.gold) rewardParts.push(`${q.reward.gold}g`);
+        if (q.reward.xp) for (const [s, v] of Object.entries(q.reward.xp)) rewardParts.push(`${v}xp ${s}`);
+        return `<div class="quest-row ${cls}">
+            <div class="quest-title">${q.name} <span class="quest-badge">${badge}</span></div>
+            <div class="quest-desc">${q.desc}</div>
+            ${!claimed ? `<div class="quest-progress">→ ${goalDesc} &nbsp;|&nbsp; <b>${prog}/${total}</b></div>` : ''}
+            <div class="quest-reward">recompensa: ${rewardParts.join(' + ')}</div>
+            ${btn}
+        </div>`;
+    }).join('');
+
     const rows = QUESTS.map(q => {
         const done = questIsDone(q.id);
         const active = questIsActive(q.id);
@@ -3151,7 +3193,22 @@ function renderQuests(){
             ${btn}
         </div>`;
     }).join('');
-    el.innerHTML = rows;
+
+    // Hora restante até reset (00:00 local)
+    const now = new Date();
+    const nextReset = new Date(now);
+    nextReset.setHours(24, 0, 0, 0);
+    const msLeft = nextReset - now;
+    const hLeft = Math.floor(msLeft / 3600000);
+    const mLeft = Math.floor((msLeft % 3600000) / 60000);
+    const resetTxt = `reset em ${hLeft}h ${mLeft}m`;
+
+    el.innerHTML = `
+        <div class="quest-section-title">📅 DIÁRIAS <span style="float:right;color:#888;font-weight:400;font-size:9.5px;letter-spacing:1px">${resetTxt}</span></div>
+        ${dailyRows || '<div class="stats-empty">Sem diárias disponíveis</div>'}
+        <div class="quest-section-title" style="margin-top:14px">📜 PRINCIPAIS</div>
+        ${rows}
+    `;
 }
 
 // ─── STATS modal ───────────────────────────────────────────────────────────
@@ -3644,8 +3701,9 @@ function handleMP(msg){
         }
     } else if (msg.t === 'pvpHit'){
         const amount = msg.amount;
-        const blocked = Math.min(amount - 1, totalDefense());
-        const actual = Math.max(1, amount - blocked);
+        const defT = totalDefense();
+        const reduction = defT > 0 ? defT / (defT + 30) : 0;
+        const actual = Math.max(1, Math.round(amount * (1 - reduction)));
         player.hp = Math.max(0, player.hp - actual);
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         player.hurtTimer = 300;
@@ -3692,10 +3750,11 @@ function handleMP(msg){
         // mob que tentei atacar já morreu/sumiu
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
     } else if (msg.t === 'mobHit'){
-        // mob me bateu — aplica dano (com defesa)
+        // mob me bateu — aplica dano com defesa percentual
         const amount = msg.dmg | 0;
-        const blocked = Math.min(amount - 1, totalDefense());
-        const actual = Math.max(1, amount - blocked);
+        const defT = totalDefense();
+        const reduction = defT > 0 ? defT / (defT + 30) : 0;
+        const actual = Math.max(1, Math.round(amount * (1 - reduction)));
         player.hp = Math.max(0, player.hp - actual);
         player.hurtTimer = 300;
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
@@ -3822,6 +3881,112 @@ const QUESTS = [
     { id:'q_lider',    name:'O Líder',           desc:'Acabe com o Orc Líder.',
       goal:{ kind:'mob', type:'ORC_LIDER', count:1 }, reward:{ gold:500 } },
 ];
+
+// Pool de quests DIÁRIAS — 3 randomizadas por dia, reset 00:00 local.
+// Recompensas mais gordas (2-3× normal) pra incentivar logar todo dia.
+const DAILY_POOL = [
+    // Tier mob-fraco
+    { tpl:'mob', type:'RAT',      count:25, gold:200,  xp:{Punho:80} },
+    { tpl:'mob', type:'SNAKE',    count:15, gold:250,  xp:{Espada:80} },
+    { tpl:'mob', type:'SPIDER',   count:12, gold:300,  xp:{Distância:60} },
+    // Tier médio
+    { tpl:'mob', type:'WOLF',     count:10, gold:450,  xp:{Machado:100} },
+    { tpl:'mob', type:'ORC',      count:8,  gold:600,  xp:{Espada:80, Machado:80} },
+    { tpl:'mob', type:'SKELETON', count:10, gold:500,  xp:{Clava:100} },
+    { tpl:'mob', type:'BAT',      count:15, gold:400,  xp:{Distância:80} },
+    { tpl:'mob', type:'TROLL',    count:6,  gold:700,  xp:{Machado:120} },
+    { tpl:'mob', type:'LIZARD',   count:8,  gold:500,  xp:{Distância:90} },
+    { tpl:'mob', type:'SCORPION', count:6,  gold:600,  xp:{Distância:100} },
+    // Tier forte
+    { tpl:'mob', type:'DRAKE',    count:4,  gold:900,  xp:{Espada:120, Magia:60} },
+    { tpl:'mob', type:'GOLEM',    count:4,  gold:900,  xp:{Clava:120} },
+    { tpl:'mob', type:'MINOTAUR', count:3,  gold:1000, xp:{Machado:150} },
+    // Bosses (recompensa pesada)
+    { tpl:'mob', type:'ORC_LIDER',   count:1, gold:1200, xp:{Espada:150, Machado:150} },
+    { tpl:'mob', type:'DRAKE_LIDER', count:1, gold:1800, xp:{Espada:200, Magia:200} },
+    { tpl:'mob', type:'GOLEM_REI',   count:1, gold:1800, xp:{Clava:200} },
+    // Coletas
+    { tpl:'item', type:'SILK',         count:10, gold:300 },
+    { tpl:'item', type:'OSSO',         count:15, gold:400 },
+    { tpl:'item', type:'CHIFRE',       count:6,  gold:600 },
+    { tpl:'item', type:'GARRA',        count:8,  gold:500 },
+    { tpl:'item', type:'ESCAMA',       count:5,  gold:800 },
+    { tpl:'item', type:'PEDRA_GOLEM',  count:5,  gold:800 },
+    { tpl:'item', type:'ASA_MORCEGO',  count:10, gold:400 },
+];
+
+// Gera 3 quests pra "hoje" (data local YYYY-MM-DD)
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function rollDailyQuests(){
+    const pool = DAILY_POOL.slice();
+    // Fisher-Yates parcial — 3 random únicos
+    for (let i = pool.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i+1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, 3).map((p, idx) => {
+        const id = `d_${todayStr()}_${idx}`;
+        const def = MTYPE[p.type] || ITEMS[p.type] || {};
+        const tgtName = def.name || p.type;
+        const verb = p.tpl === 'mob' ? 'Mate' : 'Colete';
+        return {
+            id,
+            name: `Diária: ${p.tpl === 'mob' ? '⚔' : '📦'} ${p.count}× ${tgtName}`,
+            desc: `${verb} ${p.count} ${tgtName}${p.count > 1 ? 's' : ''} antes da meia-noite.`,
+            goal: { kind: p.tpl, type: p.type, count: p.count },
+            reward: { gold: p.gold, xp: p.xp || {} },
+            daily: true,
+        };
+    });
+}
+
+function ensureDailyQuests(){
+    if (!player.quests.daily) player.quests.daily = { date: null, list: [], progress: {} };
+    const today = todayStr();
+    if (player.quests.daily.date !== today){
+        player.quests.daily.date = today;
+        player.quests.daily.list = rollDailyQuests();
+        player.quests.daily.progress = {};
+        log('<span class="log-up">🌅 Quests diárias renovadas!</span>');
+        if (typeof showServerToast === 'function') showServerToast('event', '🌅 Novas quests diárias disponíveis!', null, 5000);
+    }
+}
+function questByIdAny(id){
+    return QUESTS.find(q => q.id === id) || (player.quests.daily?.list || []).find(q => q.id === id);
+}
+function dailyProgress(id){
+    const q = questByIdAny(id); if (!q) return 0;
+    if (q.goal.kind === 'item') return Math.min(player.inv[q.goal.type] || 0, q.goal.count);
+    return Math.min((player.quests.daily?.progress?.[id]) || 0, q.goal.count);
+}
+function dailyComplete(id){ return dailyProgress(id) >= questByIdAny(id).goal.count; }
+function isDailyClaimed(id){
+    return (player.quests.daily?.claimed || []).includes(id);
+}
+function claimDaily(id){
+    const q = questByIdAny(id);
+    if (!q || !q.daily || isDailyClaimed(id) || !dailyComplete(id)) return false;
+    if (q.goal.kind === 'item'){
+        const have = player.inv[q.goal.type] || 0;
+        const take = Math.min(have, q.goal.count);
+        player.inv[q.goal.type] = have - take;
+        if (player.inv[q.goal.type] <= 0) delete player.inv[q.goal.type];
+        invSignature = null;
+    }
+    if (q.reward.gold){
+        player.gold += q.reward.gold;
+        log(`<span class="log-up">+${q.reward.gold}g</span>`);
+    }
+    if (q.reward.xp) for (const [s, v] of Object.entries(q.reward.xp)){
+        if (player.skills[s]) gainSkillXp(s, v);
+    }
+    player.quests.daily.claimed = player.quests.daily.claimed || [];
+    player.quests.daily.claimed.push(id);
+    log(`<span class="log-up">★ Diária concluída: ${q.name}</span>`);
+    saveState();
+    renderQuests();
+    return true;
+}
 function questById(id){ return QUESTS.find(q => q.id === id); }
 function questProgress(id){
     const q = questById(id); if (!q) return 0;
@@ -3865,6 +4030,7 @@ function turnInQuest(id){
     return true;
 }
 function notifyMobKilledForQuests(type){
+    // Quests principais (aceitas)
     for (const id in player.quests.active){
         const q = questById(id);
         if (!q || q.goal.kind !== 'mob' || q.goal.type !== type) continue;
@@ -3874,6 +4040,18 @@ function notifyMobKilledForQuests(type){
             if (st.progress === q.goal.count){
                 log(`<span class="log-up">✓ Quest pronta pra entregar: ${q.name}</span>`);
             }
+        }
+    }
+    // Quests diárias (sem aceitar — tracking automático)
+    ensureDailyQuests();
+    const daily = player.quests.daily;
+    if (!daily || !daily.list) return;
+    for (const q of daily.list){
+        if (q.goal.kind !== 'mob' || q.goal.type !== type) continue;
+        if (isDailyClaimed(q.id)) continue;
+        daily.progress[q.id] = (daily.progress[q.id] || 0) + 1;
+        if (daily.progress[q.id] === q.goal.count){
+            log(`<span class="log-up">✓ Diária pronta: ${q.name}</span>`);
         }
     }
 }
@@ -4969,6 +5147,8 @@ document.addEventListener('click', e => {
     if (acc){ acceptQuest(acc.dataset.accept); renderQuests(); return; }
     const ti = e.target.closest('[data-turnin]');
     if (ti){ turnInQuest(ti.dataset.turnin); return; }
+    const cl = e.target.closest('[data-claim]');
+    if (cl){ claimDaily(cl.dataset.claim); return; }
     const eq = e.target.closest('.equip-slot, .paper-slot');
     if (eq && !eq.classList.contains('empty') && !eq.classList.contains('blocked')){
         unequip(eq.dataset.slot); return;
