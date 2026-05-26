@@ -2224,6 +2224,7 @@ const ITEMS = {
     HAM:      { name:'Presunto',       color:'#d07050', heal:75, kind:'food' },
     POTION:   { name:'Poção de vida',  color:'#ee3040', heal:60, kind:'potion' },
     POTION_MP:{ name:'Poção de mana',  color:'#4080ff', manaheal:50, kind:'potion' },
+    BENCAO_FENIX: { name:'Bênção da Fênix', color:'#ffaa30', kind:'blessing', desc:'Salva você da próxima morte. Consumida automaticamente.' },
     GOLD:     { name:'Ouro',           color:'#ffcc40', kind:'gold' },
     SILK:     { name:'Seda',           color:'#d0d0e0', kind:'mat' },
     // armas — hand: '1h' permite escudo, '2h' bloqueia. base=ataque, def=bloqueio da arma.
@@ -3205,6 +3206,25 @@ function restoreAdminSnapshot(snap){
 }
 
 function playerDie(){
+    // Bênção da Fênix: consome 1 e cancela a morte completamente
+    if ((player.inv.BENCAO_FENIX || 0) > 0){
+        player.inv.BENCAO_FENIX -= 1;
+        if (player.inv.BENCAO_FENIX <= 0) delete player.inv.BENCAO_FENIX;
+        invSignature = null;
+        clearStatusEffects();
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        player.x = spawn.x; player.y = spawn.y;
+        player.target = null; player.autoAttack = false;
+        snapRender(player);
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
+        log('<span class="log-up">✨ ━━ A Bênção da Fênix te salvou! ━━ ✨</span>');
+        if (typeof showServerToast === 'function') showServerToast('event', '✨ Bênção da Fênix consumida! Você renasceu.');
+        if (typeof sndLevelUp === 'function') sndLevelUp();
+        addFloat(player.x, player.y, '✨ RENASCIDO', '#ffcc40', true, -10);
+        saveState();
+        return;
+    }
     // Admin: captura snapshot ANTES de processar a perda
     if (player.isAdmin) _preDeathSnapshot = captureAdminSnapshot();
     if (player.stats) player.stats.mobDeaths = (player.stats.mobDeaths || 0) + 1;
@@ -4965,6 +4985,7 @@ const SHOP_BUY = [
     { item:'HAM',       price:30 },
     { item:'BOTAS',     price:120 },
     { item:'COURO',     price:180 },
+    { item:'BENCAO_FENIX', price:15000 },
 ];
 function buyFromShop(itemKey){
     const offer = SHOP_BUY.find(o => o.item === itemKey);
@@ -5444,6 +5465,23 @@ function drawMinimap(){
 }
 
 function pkDeathBy(killerId, killerName){
+    // Bênção da Fênix: consome 1 e cancela a morte PvP (sem gold drop, sem perda)
+    if ((player.inv.BENCAO_FENIX || 0) > 0){
+        player.inv.BENCAO_FENIX -= 1;
+        if (player.inv.BENCAO_FENIX <= 0) delete player.inv.BENCAO_FENIX;
+        invSignature = null;
+        clearStatusEffects();
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        player.x = spawn.x; player.y = spawn.y;
+        snapRender(player);
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
+        log(`<span class="log-up">✨ ━━ Bênção da Fênix te salvou de ${escapeHtml(killerName)}! ━━ ✨</span>`);
+        if (typeof showServerToast === 'function') showServerToast('event', '✨ Bênção da Fênix consumida! Você renasceu.');
+        if (typeof sndLevelUp === 'function') sndLevelUp();
+        saveState();
+        return;
+    }
     if (player.stats) player.stats.pkDeaths = (player.stats.pkDeaths || 0) + 1;
     // Vingança: se eu já tinha matado o killer recentemente, ele leva penalty dobrado?
     // Na real: a janela inversa - o killer atual ESTÁ vingando uma morte minha que ele teve?
@@ -6171,6 +6209,7 @@ let invSignature = null;
 const ITEM_CATEGORIES = [
     { label: 'Armas',        kinds: ['weapon'] },
     { label: 'Equipamento',  kinds: ['offhand','armor','head','feet','neck'] },
+    { label: 'Bênçãos',      kinds: ['blessing'] },
     { label: 'Consumíveis',  kinds: ['food','potion'] },
     { label: 'Munição',      kinds: ['ammo'] },
     { label: 'Materiais',    kinds: ['mat'] },
