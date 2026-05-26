@@ -650,6 +650,22 @@
             margin-right: 4px;
         }
 
+        /* Overlay de carregamento (loading) — reusa estilo do reconnect, cor neutra */
+        #loadingOverlay {
+            position: fixed; inset: 0;
+            background: rgba(20,15,10,0.85);
+            display: none;
+            align-items: center; justify-content: center;
+            z-index: 600;
+            backdrop-filter: blur(4px);
+        }
+        #loadingOverlay .reconnect-box {
+            border-color: #6a5020;
+            box-shadow: 0 0 80px rgba(180,130,40,0.4), 0 8px 30px rgba(0,0,0,0.8);
+        }
+        #loadingOverlay .reconnect-spinner { color: #ffd060; text-shadow: 0 0 20px rgba(255,200,60,0.5); }
+        #loadingOverlay .reconnect-title   { color: #ffd060; text-shadow: 0 0 14px rgba(255,200,60,0.5); }
+
         /* Overlay de reconexão */
         #reconnectOverlay {
             position: fixed; inset: 0;
@@ -1045,6 +1061,15 @@
 
 <!-- Toasts do servidor (info/warn/event/admin) — empilham no topo central -->
 <div id="toastContainer"></div>
+
+<!-- Overlay de loading (aparece entre login e primeiro snapshot MP) -->
+<div id="loadingOverlay">
+    <div class="reconnect-box">
+        <div class="reconnect-spinner">⚙</div>
+        <div class="reconnect-title">CARREGANDO MUNDO</div>
+        <div class="reconnect-desc">Aguardando snapshot do servidor…</div>
+    </div>
+</div>
 
 <!-- Overlay de reconexão (aparece quando WS cai estando em modo MP) -->
 <div id="reconnectOverlay">
@@ -3838,6 +3863,7 @@ function handleMP(msg){
         // estado completo: jogadores e monstros do servidor
         myWsId = msg.you;
         player.isAdmin = !!msg.isAdmin;
+        if (typeof showLoadingOverlay === 'function') showLoadingOverlay(false);
         if (msg.motd) showServerToast('event', '📜 ' + msg.motd, null, 7000);
         for (const id in remotePlayers) delete remotePlayers[id];
         msg.players.forEach(p => {
@@ -6632,11 +6658,24 @@ function startGame(multiplayer, name){
     buildSkillList();
     ensureVisited();
     revealAround(player.x, player.y);
-    spawnInitialMonsters();
+    if (multiplayer){
+        // Não spawna local — espera snapshot do server (sem flicker)
+        showLoadingOverlay(true);
+        connectMP();
+        // Fallback: se WS não responder em 6s, gera mundo local
+        setTimeout(() => {
+            if (!serverAuthMobs && monsters.length === 0){
+                log('<span class="log-sys">Servidor lento — gerando mundo local.</span>');
+                spawnInitialMonsters();
+                showLoadingOverlay(false);
+            }
+        }, 6000);
+    } else {
+        spawnInitialMonsters();
+    }
     log('<span class="log-sys">Bem-vindo a Valadares, '+player.name+'!</span>');
     if (restored) log('<span class="log-sys">Progresso restaurado.</span>');
     log('Use WASD para mover, ESPAÇO para atacar.');
-    if (multiplayer) connectMP();
     started = true;
     setInterval(saveState, 5000);
     setInterval(() => {
@@ -6645,6 +6684,10 @@ function startGame(multiplayer, name){
         }
     }, 5000);
     requestAnimationFrame(loop);
+}
+function showLoadingOverlay(show){
+    const el = document.getElementById('loadingOverlay');
+    if (el) el.style.display = show ? 'flex' : 'none';
 }
 
 // ─── Save / Load (localStorage) ──────────────────────────────────────────────
