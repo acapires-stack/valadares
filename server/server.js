@@ -237,6 +237,7 @@ function snapshotPlayers(){
         id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:!!p.pvp,
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
+        cosmetic: p.cosmetic || null,
         ghost: !!p.disconnected,
     }));
 }
@@ -992,8 +993,13 @@ wss.on('connection', (ws) => {
             if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) { p.maxHp = msg.maxHp; statsChanged = true; }
             if (typeof msg.mp === 'number' && isFinite(msg.mp)) { p.mp = msg.mp; statsChanged = true; }
             if (typeof msg.maxMp === 'number' && isFinite(msg.maxMp)) { p.maxMp = msg.maxMp; statsChanged = true; }
+            // Cosmético: propaga pros outros (string ou null, máx 32 chars)
+            if ('cosmetic' in msg){
+                const cos = (typeof msg.cosmetic === 'string' && msg.cosmetic.length < 32) ? msg.cosmetic : null;
+                if (cos !== p.cosmetic){ p.cosmetic = cos; statsChanged = true; }
+            }
             if (statsChanged){
-                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic });
             }
             return;
         }

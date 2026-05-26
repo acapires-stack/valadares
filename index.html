@@ -2038,6 +2038,18 @@ function drawShieldSprite(px, py, shield){
     }
 }
 
+// Enriquece o objeto equip com props visuais do cosmético equipado
+// (cape/aura/nameColor). Idempotente — se já tem, mantém.
+function withCosmetics(equipObj, cosmeticKey){
+    const c = cosmeticKey || (equipObj && equipObj.cosmetic);
+    if (!c || !ITEMS[c]) return equipObj;
+    const def = ITEMS[c];
+    const out = { ...equipObj };
+    if (def.cape && !out.cape)           out.cape = def.cape;
+    if (def.aura && !out.aura)           out.aura = def.aura;
+    if (def.nameColor && !out.nameColor) out.nameColor = def.nameColor;
+    return out;
+}
 function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
     // Equipamento default vazio
     const eq = equip || {};
@@ -2046,6 +2058,21 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
     // sombra
     ctx.fillStyle='rgba(0,0,0,0.3)';
     ctx.beginPath(); ctx.ellipse(px+TS/2,py+TS-5,11,5,0,0,Math.PI*2); ctx.fill();
+    // Capa (cosmético) — desenhada atrás do corpo
+    if (eq.cape){
+        ctx.fillStyle = eq.cape;
+        // trapézio descendente atrás do boneco
+        ctx.beginPath();
+        ctx.moveTo(px+12, py+14);
+        ctx.lineTo(px+36, py+14);
+        ctx.lineTo(px+40, py+42);
+        ctx.lineTo(px+8,  py+42);
+        ctx.closePath();
+        ctx.fill();
+        // sombra interna pra dar profundidade
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(px+12, py+14, 24, 4);
+    }
     // pernas + botas
     ctx.fillStyle = bootsColor;
     ctx.fillRect(px+13,py+34,10,12);
@@ -2114,12 +2141,26 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
         ctx.fillStyle = `rgba(220, 30, 30, ${0.65 * hurtPct})`;
         ctx.fillRect(px+9, py+2, 30, 44);
     }
+    // Aura (cosmético) — anel pulsante ao redor do boneco
+    if (eq.aura){
+        const t = Date.now() / 200;
+        const pulse = 0.5 + 0.5 * Math.sin(t);
+        ctx.save();
+        ctx.globalAlpha = 0.3 + pulse * 0.25;
+        ctx.strokeStyle = eq.aura;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px+TS/2, py+TS/2, 22 + pulse*3, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+    }
     // nome
     if (nameTag){
         ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
         ctx.fillRect(px+TS/2-nameTag.length*3-3, py-12, nameTag.length*6+6, 11);
-        ctx.fillStyle = '#e0c060';
+        // Cor do nome: override via equip.nameColor (cosmético)
+        ctx.fillStyle = (equip && equip.nameColor) || '#e0c060';
         ctx.fillText(nameTag, px+TS/2, py-3);
     }
     // mpPct presente = player local → mostra HP/MP sempre. Sem mpPct = mob/remote → HP só quando ferido.
@@ -2242,6 +2283,12 @@ const ITEMS = {
     POTION:   { name:'Poção de vida',  color:'#ee3040', heal:60, kind:'potion' },
     POTION_MP:{ name:'Poção de mana',  color:'#4080ff', manaheal:50, kind:'potion' },
     BENCAO_FENIX: { name:'Bênção da Fênix', color:'#ffaa30', kind:'blessing', desc:'Salva você da próxima morte. Consumida automaticamente.' },
+    // Cosméticos — equipáveis num slot único, só visual, sem stats
+    CAPA_REAL:    { name:'Capa Real',       color:'#ffd040', kind:'cosmetic', cape:'#ffd040', desc:'Capa dourada atrás do boneco.' },
+    CAPA_SOMBRA:  { name:'Capa das Sombras', color:'#202028', kind:'cosmetic', cape:'#1a1a22', desc:'Capa preta. Visual sombrio.' },
+    AURA_FOGO:    { name:'Aura de Fogo',    color:'#ff4020', kind:'cosmetic', aura:'#ff4020', desc:'Anel pulsante laranja ao redor.' },
+    AURA_GELO:    { name:'Aura de Gelo',    color:'#60c0ff', kind:'cosmetic', aura:'#60c0ff', desc:'Anel pulsante azul ao redor.' },
+    NOME_DOURADO: { name:'Nome Dourado',    color:'#ffd040', kind:'cosmetic', nameColor:'#ffd040', desc:'Nome do boneco em dourado.' },
     GOLD:     { name:'Ouro',           color:'#ffcc40', kind:'gold' },
     SILK:     { name:'Seda',           color:'#d0d0e0', kind:'mat' },
     // armas — hand: '1h' permite escudo, '2h' bloqueia. base=ataque, def=bloqueio da arma.
@@ -2430,6 +2477,12 @@ const DROPS = {
         ['POTION',       1.00, 5, 10],
         ['POTION_MP',    1.00, 5, 10],
         ['CORACAO_HL',   0.25, 1, 1],
+        // Cosméticos — chance moderada cada
+        ['CAPA_REAL',    0.20, 1, 1],
+        ['CAPA_SOMBRA',  0.20, 1, 1],
+        ['AURA_FOGO',    0.15, 1, 1],
+        ['AURA_GELO',    0.15, 1, 1],
+        ['NOME_DOURADO', 0.10, 1, 1],
     ],
 };
 
@@ -3433,7 +3486,7 @@ function totalDefense(){
 }
 
 // Mapeia kind do item para slot
-const SLOT_OF_KIND = { weapon:'weapon', offhand:'offhand', armor:'armor', head:'head', feet:'feet', neck:'neck' };
+const SLOT_OF_KIND = { weapon:'weapon', offhand:'offhand', armor:'armor', head:'head', feet:'feet', neck:'neck', cosmetic:'cosmetic' };
 
 function returnToInv(itemKey){
     if (!itemKey) return;
@@ -4410,6 +4463,7 @@ function handleMP(msg){
             if (typeof msg.maxHp === 'number') rp.maxHp = msg.maxHp;
             if (typeof msg.mp === 'number') rp.mp = msg.mp;
             if (typeof msg.maxMp === 'number') rp.maxMp = msg.maxMp;
+            if ('cosmetic' in msg) rp.cosmetic = msg.cosmetic;
         }
     } else if (msg.t === 'float'){
         // mostra float text na posição do player remoto
@@ -6247,6 +6301,7 @@ let invSignature = null;
 const ITEM_CATEGORIES = [
     { label: 'Armas',        kinds: ['weapon'] },
     { label: 'Equipamento',  kinds: ['offhand','armor','head','feet','neck'] },
+    { label: 'Cosméticos',   kinds: ['cosmetic'] },
     { label: 'Bênçãos',      kinds: ['blessing'] },
     { label: 'Consumíveis',  kinds: ['food','potion'] },
     { label: 'Munição',      kinds: ['ammo'] },
@@ -8014,7 +8069,7 @@ function logout(){
         hp: 100, maxHp: 100, mp: 100, maxMp: 100,
         target: null, autoAttack: false,
         weapon: null,
-        equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null },
+        equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null },
         inv: {}, chests: { b1:{}, b2:{}, b3:{}, b4:{} }, gold: 0,
         activeSpell: null,
         pvp: false, selos: 0, highlander: false,
@@ -8131,6 +8186,7 @@ function startGame(multiplayer, name){
                 t:'playerSync', gold: player.gold, inv: player.inv,
                 hp: player.hp, maxHp: player.maxHp,
                 mp: player.mp, maxMp: player.maxMp,
+                cosmetic: player.equipped.cosmetic || null,
             }));
         }
     }, 5000);
@@ -8715,7 +8771,8 @@ function loop(ts){
             const hpPct = (p.maxHp > 0) ? Math.max(0, Math.min(1, (p.hp ?? p.maxHp) / p.maxHp)) : 1;
             const mpPct = (p.maxMp > 0) ? Math.max(0, Math.min(1, (p.mp ?? 0) / p.maxMp)) : null;
             drawCharacter(px, py, p.dir||'down',
-                { weapon:'ESPADA', bodyColor: bodyCol }, p.name, hpPct, 0, mpPct);
+                withCosmetics({ weapon:'ESPADA', bodyColor: bodyCol }, p.cosmetic),
+                p.name, hpPct, 0, mpPct);
             // overlay cinza translúcido se for ghost (corpo desconectado)
             if (p.ghost){
                 ctx.fillStyle = 'rgba(120,120,140,0.45)';
@@ -8734,7 +8791,7 @@ function loop(ts){
     // player (renderX/Y interpolado, com todos equipamentos visíveis)
     const ppx = (player.renderX-cam.x)*TS, ppy = (player.renderY-cam.y)*TS;
     drawCharacter(ppx, ppy, player.dir,
-        { ...player.equipped, bodyColor: player.color },
+        withCosmetics({ ...player.equipped, bodyColor: player.color }),
         null, player.hp/player.maxHp, player.hurtTimer/450,
         player.maxMp > 0 ? player.mp/player.maxMp : null);
     // Status effects: ícones acima da barra de HP
