@@ -4705,6 +4705,9 @@ window.setLogFilter = setLogFilter;
 const keys = {};
 let attackPressed = false;
 document.addEventListener('keydown', e => {
+    // Se está digitando num input/textarea (login, chat, etc), não dispara atalhos
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     keys[e.key] = true;
     if (e.key===' ' && !attackPressed){ attackPressed = true; engage(); }
     if (e.key==='e' || e.key==='E') eatBestFood();
@@ -4731,6 +4734,8 @@ document.addEventListener('keydown', e => {
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     keys[e.key] = false;
     if (e.key===' ') attackPressed = false;
 });
