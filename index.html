@@ -729,7 +729,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1346,6 +1346,22 @@
     </div>
 </div>
 
+<div id="friendsModal" style="display:none">
+    <div class="chest-box" style="min-width:480px;max-width:540px">
+        <div class="chest-title">👥 AMIGOS</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+            <input type="text" id="friendNameInput" placeholder="nome do amigo" maxlength="14"
+                   style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:5px 8px;font-family:Consolas,monospace">
+            <button class="chest-btn" style="margin:0;width:auto;padding:5px 12px" onclick="addFriendFromInput()">adicionar</button>
+        </div>
+        <div id="friendsList" style="max-height:50vh;overflow-y:auto"></div>
+        <div class="chest-hint" style="margin-top:10px">
+            chat: <kbd>/msg nome</kbd> <span style="color:#888">texto</span> &nbsp;|&nbsp; <kbd>N</kbd> ou <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeFriends()">×</button>
+    </div>
+</div>
+
 <div id="rankingModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:580px">
         <div class="chest-title">🏆 RANKING</div>
@@ -1486,7 +1502,7 @@
 </div>
 
 <div id="controls">
-    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
+    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>N</kbd> amigos &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
 </div>
 
 <script>
@@ -3688,7 +3704,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -4498,6 +4514,10 @@ function handleMP(msg){
         log(`<span class="${logClass}">${prefix}${escapeHtml(msg.text)}</span>`);
     } else if (msg.t === 'chat'){
         appendChat(msg.name, msg.text, msg.id === myWsId);
+    } else if (msg.t === 'whisper'){
+        // Whisper recebido — alguém te mandou /msg
+        appendChat('🔒 ' + msg.fromName, msg.text, false);
+        if (typeof sndPickup === 'function') sndPickup();
     } else if (msg.t === 'mobs'){
         applyMobsSnapshot(msg.list);
     } else if (msg.t === 'mobBatch'){
@@ -5474,11 +5494,19 @@ function appendChatSystem(text){
 function sendChat(text){
     text = String(text || '').trim();
     if (!text) return;
-    if (typeof ws !== 'undefined' && ws && ws.readyState === 1){
-        ws.send(JSON.stringify({ t:'chat', text }));
-    } else {
+    if (typeof ws === 'undefined' || !ws || ws.readyState !== 1){
         appendChatSystem('Offline — mensagem não enviada');
+        return;
     }
+    // /msg nome texto → whisper privado
+    const m = text.match(/^\/(?:msg|w|whisper)\s+(\S+)\s+(.+)$/i);
+    if (m){
+        const toName = m[1], body = m[2];
+        ws.send(JSON.stringify({ t:'whisper', toName, text: body }));
+        appendChat(`para ${toName}`, body, true);
+        return;
+    }
+    ws.send(JSON.stringify({ t:'chat', text }));
 }
 
 // ─── Mini-mapa (overlay no canto do canvas) ──────────────────────────────────
@@ -6595,8 +6623,12 @@ document.addEventListener('keydown', e => {
         const m = document.getElementById('rankingModal');
         if (m && m.style.display !== 'none') closeRanking(); else openRanking();
     }
+    if (e.key==='n' || e.key==='N'){
+        const m = document.getElementById('friendsModal');
+        if (m && m.style.display !== 'none') closeFriends(); else openFriends();
+    }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); closeFriends(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -7738,7 +7770,7 @@ const KEY_HELP = [
     ['WASD','mover'], ['SPACE','engajar/falar'], ['TAB','trocar alvo'],
     ['R','magia'], ['F','arremessar lança'], ['E','comer'],
     ['B','baú'], ['C','craft'], ['M','altar'], ['T','treino'],
-    ['Q','quests'], ['I','stats'], ['L','ranking'], ['O','opções'], ['P','PvP'],
+    ['Q','quests'], ['I','stats'], ['L','ranking'], ['N','amigos'], ['O','opções'], ['P','PvP'],
     ['ESC','fechar/cancelar'],
 ];
 function openSettings(){
@@ -7777,6 +7809,90 @@ function openSettings(){
         adminSec.style.display = 'none';
     }
 }
+// ─── AMIGOS (localStorage por player) ──────────────────────────────────────
+function friendsKey(){ return 'valadares:friends:' + player.name; }
+function loadFriends(){
+    try { return JSON.parse(localStorage.getItem(friendsKey()) || '[]'); } catch { return []; }
+}
+function saveFriends(list){
+    try { localStorage.setItem(friendsKey(), JSON.stringify(list.slice(0, 50))); } catch {}
+}
+function addFriend(name){
+    name = String(name || '').trim().substring(0, 14);
+    if (!name) return false;
+    if (name === player.name){ log('<span class="log-sys">Não pode adicionar você mesmo.</span>'); return false; }
+    const list = loadFriends();
+    if (list.includes(name)){ log(`<span class="log-sys">${escapeHtml(name)} já é amigo.</span>`); return false; }
+    list.push(name);
+    saveFriends(list);
+    log(`<span class="log-up">👥 ${escapeHtml(name)} adicionado.</span>`);
+    return true;
+}
+function removeFriend(name){
+    const list = loadFriends().filter(n => n !== name);
+    saveFriends(list);
+    log(`<span class="log-sys">${escapeHtml(name)} removido.</span>`);
+}
+function addFriendFromInput(){
+    const inp = document.getElementById('friendNameInput');
+    if (addFriend(inp.value)){
+        inp.value = '';
+        renderFriendsList();
+    }
+}
+function openFriends(){
+    closeAllModals();
+    document.getElementById('friendsModal').style.display = 'flex';
+    renderFriendsList();
+    setTimeout(() => document.getElementById('friendNameInput')?.focus(), 50);
+}
+function closeFriends(){
+    document.getElementById('friendsModal').style.display = 'none';
+}
+function renderFriendsList(){
+    const el = document.getElementById('friendsList');
+    if (!el) return;
+    const friends = loadFriends();
+    if (!friends.length){
+        el.innerHTML = '<div style="color:#666;text-align:center;padding:24px;font-style:italic">Sem amigos ainda. Adicione pelo nome acima.</div>';
+        return;
+    }
+    // Online = está no remotePlayers
+    const onlineByName = {};
+    for (const id in remotePlayers){
+        const rp = remotePlayers[id];
+        if (rp.name) onlineByName[rp.name] = rp;
+    }
+    el.innerHTML = friends.map(name => {
+        const rp = onlineByName[name];
+        const isOnline = !!rp;
+        const dist = rp ? Math.max(Math.abs(rp.x - player.x), Math.abs(rp.y - player.y)) : null;
+        const distTxt = dist != null ? ` · ${dist}sqm` : '';
+        const status = isOnline ? '<span style="color:#74d176">● online</span>' : '<span style="color:#666">○ offline</span>';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #1a1408">
+            <span style="flex:1;color:#c8a050">${escapeHtml(name)} <span style="font-size:10px">${status}${distTxt}</span></span>
+            <button class="chest-qty-btn" ${isOnline?'':'disabled'} onclick="whisperTo('${escapeHtml(name).replace(/'/g, '&#39;')}')">msg</button>
+            <button class="chest-qty-btn" onclick="removeFriend('${escapeHtml(name).replace(/'/g, '&#39;')}'); renderFriendsList();">✕</button>
+        </div>`;
+    }).join('');
+}
+function whisperTo(name){
+    closeFriends();
+    // Foca o chat e pré-popula com /msg nome
+    const tab = document.querySelector('.chat-tab[data-tab="chat"]');
+    if (tab) tab.click();
+    const inp = document.getElementById('chatInput');
+    if (inp){
+        inp.value = '/msg ' + name + ' ';
+        inp.focus();
+    }
+}
+window.openFriends = openFriends;
+window.closeFriends = closeFriends;
+window.addFriendFromInput = addFriendFromInput;
+window.removeFriend = removeFriend;
+window.whisperTo = whisperTo;
+
 // ─── RANKING público ────────────────────────────────────────────────────────
 let _rankingCache = null;
 let _rankingTab = 'mobs';

@@ -1121,6 +1121,39 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // Whisper privado: /msg nome texto
+        if (msg.t === 'whisper') {
+            const toName = String(msg.toName || '').trim().substring(0, 14);
+            const text = String(msg.text || '').trim().substring(0, 240);
+            if (!toName || !text) return;
+            // Rate-limit (mesmo balde do chat normal)
+            const now = Date.now();
+            if (!isAdmin(p.name)){
+                p.lastChatAt = p.lastChatAt || 0;
+                if (now - p.lastChatAt < 500){
+                    if (now - (p.lastChatRateWarn || 0) > 2000){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:'Devagar com o chat.' });
+                        p.lastChatRateWarn = now;
+                    }
+                    return;
+                }
+                p.lastChatAt = now;
+            }
+            // Procura player pelo nome (case-insensitive)
+            let target = null;
+            for (const pp of players.values()){
+                if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
+            }
+            if (!target){
+                sendTo(id, { t:'serverMsg', level:'warn', text:`"${toName}" não está online.` });
+                return;
+            }
+            if (target.ws.readyState === 1){
+                target.ws.send(JSON.stringify({ t:'whisper', fromName: p.name, text }));
+            }
+            return;
+        }
+
         if (msg.t === 'chat') {
             const text = String(msg.text || '').trim().substring(0, 240);
             if (!text) return;
