@@ -18,26 +18,28 @@ const SAFE_RADIUS = 3, SAFE_CX = 50, SAFE_CY = 50;
 const T = { GRASS:0, DIRT:1, TREE:2, WATER:3, STONE:4, CAVE:5, CAVE_WALL:6, SNOW:7, SAND:8 };
 const walkable = t => t===T.GRASS||t===T.DIRT||t===T.STONE||t===T.CAVE||t===T.SNOW||t===T.SAND;
 
+// intel: 1=burro (vai direto, faz fila), 2=cerca (escolhe vaga adjacente livre),
+// 3=flanqueia (prefere atrás do player)
 const MTYPE = {
-    RAT:        { hp:18,  dmg:2,  speed:440, xp:8,   aggro:4 },
-    SNAKE:      { hp:35,  dmg:4,  speed:390, xp:18,  aggro:4 },
-    SPIDER:     { hp:50,  dmg:6,  speed:370, xp:30,  aggro:5 },
-    WOLF:       { hp:80,  dmg:8,  speed:320, xp:55,  aggro:6 },
-    ORC:        { hp:140, dmg:11, speed:370, xp:120, aggro:5 },
-    ORC_LIDER:  { hp:450, dmg:19, speed:340, xp:600, aggro:6, unique:true },
-    BAT:        { hp:25,  dmg:5,  speed:250, xp:22,  aggro:5 },
-    MINOTAUR:   { hp:220, dmg:16, speed:380, xp:240, aggro:6 },
-    SKELETON:   { hp:90,  dmg:11, speed:370, xp:80,  aggro:5 },
-    TROLL:      { hp:160, dmg:14, speed:420, xp:160, aggro:5 },
-    LIZARD:     { hp:55,  dmg:9,  speed:300, xp:45,  aggro:4 },
-    DRAKE:      { hp:130, dmg:15, speed:340, xp:150, aggro:6 },
-    DRAKE_LIDER:{ hp:700, dmg:25, speed:360, xp:800, aggro:7, unique:true },
-    GOLEM:      { hp:200, dmg:13, speed:460, xp:180, aggro:6 },
-    GOLEM_REI:  { hp:900, dmg:20, speed:490, xp:700, aggro:7, unique:true },
-    SCORPION:   { hp:75,  dmg:11, speed:320, xp:55,  aggro:4 },
-    CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999 },
+    RAT:        { hp:18,  dmg:2,  speed:440, xp:8,   aggro:4, intel:1 },
+    SNAKE:      { hp:35,  dmg:4,  speed:390, xp:18,  aggro:4, intel:1 },
+    SPIDER:     { hp:50,  dmg:6,  speed:370, xp:30,  aggro:5, intel:2 },
+    WOLF:       { hp:80,  dmg:8,  speed:320, xp:55,  aggro:6, intel:2 },
+    ORC:        { hp:140, dmg:11, speed:370, xp:120, aggro:5, intel:2 },
+    ORC_LIDER:  { hp:450, dmg:19, speed:340, xp:600, aggro:6, unique:true, intel:3 },
+    BAT:        { hp:25,  dmg:5,  speed:250, xp:22,  aggro:5, intel:1 },
+    MINOTAUR:   { hp:220, dmg:16, speed:380, xp:240, aggro:6, intel:3 },
+    SKELETON:   { hp:90,  dmg:11, speed:370, xp:80,  aggro:5, intel:2 },
+    TROLL:      { hp:160, dmg:14, speed:420, xp:160, aggro:5, intel:2 },
+    LIZARD:     { hp:55,  dmg:9,  speed:300, xp:45,  aggro:4, intel:1 },
+    DRAKE:      { hp:130, dmg:15, speed:340, xp:150, aggro:6, intel:2 },
+    DRAKE_LIDER:{ hp:700, dmg:25, speed:360, xp:800, aggro:7, unique:true, intel:3 },
+    GOLEM:      { hp:200, dmg:13, speed:460, xp:180, aggro:6, intel:2 },
+    GOLEM_REI:  { hp:900, dmg:20, speed:490, xp:700, aggro:7, unique:true, intel:3 },
+    SCORPION:   { hp:75,  dmg:11, speed:320, xp:55,  aggro:4, intel:2 },
+    CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999, intel:3 },
     // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
-    SENHOR_VALADARES: { hp:8000, dmg:50, speed:280, xp:5000, aggro:12, unique:true, mega:true },
+    SENHOR_VALADARES: { hp:8000, dmg:50, speed:280, xp:5000, aggro:12, unique:true, mega:true, intel:3 },
 };
 
 const SPAWN_RINGS = [
@@ -274,6 +276,7 @@ function spawnMob(type, x, y){
         hp, maxHp: hp, dmg, speed: def.speed, xp,
         aggro: def.aggro, unique: !!def.unique,
         level,
+        intel: def.intel || 1,
         lastMoveAt: 0, lastAttackAt: 0,
     };
     monsters.set(m.id, m);
@@ -426,6 +429,48 @@ function tickRespawns(){
 // ─── Tick AI ────────────────────────────────────────────────────────────────
 const TICK_AI_MS = 300;
 const ATTACK_CD_MS = 1100;
+// Pega vaga adjacente ao player que melhor espalhe os mobs (intel >=2 cerca,
+// intel 3 prefere flanco atrás do player). Retorna {x,y} ou null se nada livre.
+function pickSurroundSlot(m, target){
+    const intel = m.intel || 1;
+    const slots = [];
+    for (let dy = -1; dy <= 1; dy++){
+        for (let dx = -1; dx <= 1; dx++){
+            if (!dx && !dy) continue;
+            const x = target.x + dx, y = target.y + dy;
+            if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
+            if (!isWalkable(x, y)) continue;
+            if (inSafe(x, y)) continue;
+            const occ = mobAt(x, y);
+            if (occ && occ !== m) continue;
+            if (playerAt(x, y)) continue;
+            const d = Math.max(Math.abs(m.x - x), Math.abs(m.y - y));
+            let score = d;
+            // intel >=2: penaliza vagas perto de outros mobs (espalha)
+            if (intel >= 2){
+                let cluster = 0;
+                for (const om of monsters.values()){
+                    if (om === m || om.hp <= 0) continue;
+                    const od = Math.max(Math.abs(om.x - x), Math.abs(om.y - y));
+                    if (od <= 1) cluster++;
+                }
+                score += cluster * 0.8;
+            }
+            // intel 3: flanco — atrás do player (oposto à direção)
+            if (intel >= 3){
+                const back = {'up':[0,1],'down':[0,-1],'left':[1,0],'right':[-1,0]}[target.dir] || [0,0];
+                if (Math.sign(dx) === back[0] && Math.sign(dy) === back[1]) score -= 2.0;
+                else if (Math.sign(dx) === back[0] || Math.sign(dy) === back[1]) score -= 0.8;
+            }
+            // tiebreak determinístico por id (mob não fica oscilando)
+            const tiebreak = ((m.id * 31 + dx * 7 + dy * 11) % 100) / 1000;
+            slots.push({ x, y, score: score + tiebreak });
+        }
+    }
+    if (!slots.length) return null;
+    slots.sort((a,b) => a.score - b.score);
+    return slots[0];
+}
 function tickAI(){
     const now = Date.now();
     for (const m of monsters.values()){
@@ -455,8 +500,17 @@ function tickAI(){
         const effectiveSpeed = (td > 1) ? Math.floor(m.speed * 0.6) : m.speed;
         if (now - m.lastMoveAt < effectiveSpeed) continue;
         m.lastMoveAt = now;
-        const dx = Math.sign(target.x - m.x);
-        const dy = Math.sign(target.y - m.y);
+        // Intel >=2 escolhe vaga adjacente ao player (cerca + flanco); intel 1 vai direto
+        let tx, ty;
+        if ((m.intel || 1) >= 2){
+            const slot = pickSurroundSlot(m, target);
+            tx = slot ? slot.x : target.x;
+            ty = slot ? slot.y : target.y;
+        } else {
+            tx = target.x; ty = target.y;
+        }
+        const dx = Math.sign(tx - m.x);
+        const dy = Math.sign(ty - m.y);
         const candidates = [
             [m.x+dx, m.y+dy],
             [m.x+dx, m.y],
@@ -532,6 +586,7 @@ function loadStateFromDisk(){
                     id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir||'down',
                     hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
                     aggro:m.aggro, unique:!!m.unique, level:m.level||1,
+                    intel: m.intel || (MTYPE[m.type]?.intel || 1),  // backfill saves antigos
                     lastMoveAt: 0, lastAttackAt: 0,
                 });
             }
