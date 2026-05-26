@@ -3162,6 +3162,7 @@ function findArrow(){
 
 // Arremesso de lança — consome a equipada, auto-equipa outra do inv se houver.
 function throwSpear(){
+    if (blockedByDisconnect()) return;
     if (inSafeZone(player.x, player.y)){
         log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
     }
@@ -3190,11 +3191,16 @@ function throwSpear(){
         dmg = Math.max(1, dmg);
         const crit = Math.random() < playerCritChance();
         if (crit) dmg *= 2;
-        m.hp = Math.max(0, m.hp - dmg);
         addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#cce0a0', crit, crit ? -10 : 0);
         log(`<span class="log-dmg">${crit?'★ ':''}${wItem.name} arremessada: -${dmg} em ${m.name}</span>`);
         gainSkillXp('Distância', 1);
-        if (m.hp === 0) killMonster(m);
+        if (serverAuthMobs && ws && ws.readyState === 1){
+            // server aplica dano e broadcasta mobUpdate / mobDead
+            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit }));
+        } else {
+            m.hp = Math.max(0, m.hp - dmg);
+            if (m.hp === 0) killMonster(m);
+        }
     }
     // projétil rotacionado
     projectiles.push({
@@ -3225,6 +3231,7 @@ function throwSpear(){
 window.throwSpear = throwSpear;
 
 function doAttack(m){
+    if (blockedByDisconnect()) return;
     if (inSafeZone(player.x, player.y)){
         if (!doAttack._warned || Date.now() - doAttack._warned > 2000){
             log(`<span class="log-sys">Não pode atacar dentro da zona segura.</span>`);
@@ -3319,7 +3326,9 @@ function doAttack(m){
     }
     player.attackTimer = player.attackDelay;
     if (serverAuthMobs && ws && ws.readyState === 1){
-        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:1, crit }));
+        // Lança 1H tem meleeRange (até 3 sqm); demais armas melee usam 1
+        const attackRange = (wItem && wItem.meleeRange) || 1;
+        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:attackRange, crit }));
         player.target = m.id; m.aggro = true;
     } else {
         m.hp = Math.max(0, m.hp - dmg);
@@ -3386,15 +3395,30 @@ function connectMP(){
         return;
     }
     ws.onopen = () => {
-        ws.send(JSON.stringify({t:'join', name:player.name, x:player.x, y:player.y, pvp:player.pvp}));
+        ws.send(JSON.stringify({t:'join', name:player.name, x:player.x, y:player.y, pvp:player.pvp,
+                                 hp:player.hp, maxHp:player.maxHp}));
         document.getElementById('connStatus').textContent = '● ONLINE';
         document.getElementById('connStatus').className = 'online';
         log('<span class="log-sys">Conectado ao servidor!</span>');
+        mpWasConnected = true;
+        mpDisconnected = false;
+        // Reconexão pós-queda: target inválido provavelmente; limpa pra refresh
+        if (player.target && player.targetType === 'monster'){
+            player.target = null;
+        }
     };
     ws.onclose = () => {
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
         log('<span class="log-sys">Desconectado.</span>');
+        // Se já estava com mobs do server, marca como queda pra bloquear farm offline
+        if (mpWasConnected && serverAuthMobs){
+            mpDisconnected = true;
+            log('<span class="log-die">⚠ Sem conexão com o servidor — ataques bloqueados até voltar</span>');
+            addFloat(player.x, player.y, 'SEM CONEXÃO', '#ff5050', true, -10);
+            // Tenta reconectar automaticamente em 3s
+            setTimeout(() => { if (mpDisconnected) connectMP(); }, 3000);
+        }
     };
     ws.onerror = () => {
         log('<span class="log-sys">Erro ao conectar. Jogando sem multiplayer.</span>');
@@ -3567,6 +3591,20 @@ function mobKilledByServer(m){
 
 // ─── Multiplayer authoritative state ─────────────────────────────────────────
 let serverAuthMobs = false;  // true quando recebemos o primeiro snapshot de mobs
+let mpWasConnected = false;  // já teve conexão MP bem-sucedida nesta sessão
+let mpDisconnected = false;  // perdeu conexão temporariamente (bloqueia ataques pra evitar farm offline)
+
+// Anti-exploit: jogador estava em modo online (server-auth) e a conexão caiu?
+// Se sim, bloqueia ações que afetam mobs/inv até reconectar.
+function blockedByDisconnect(){
+    if (!mpDisconnected) return false;
+    if (!doAttack._discWarn || Date.now() - doAttack._discWarn > 2500){
+        log('<span class="log-sys">⚠ Sem conexão com o servidor. Ataques bloqueados até reconectar.</span>');
+        addFloat(player.x, player.y, 'SEM CONEXÃO', '#ff5050', true, -10);
+        doAttack._discWarn = Date.now();
+    }
+    return true;
+}
 
 // ─── Stats helpers ───────────────────────────────────────────────────────────
 function statsRecordMobKill(type, isBoss){
@@ -4895,6 +4933,8 @@ function tickSpellCooldowns(dt){
 
 function castSpell(spellKey){
     const sp = SPELLS[spellKey]; if (!sp) return;
+    // Bloqueia magias de ataque/cura offline pra evitar farm; cura local é permitida pq autocura mais útil
+    if (sp.damage && blockedByDisconnect()) return;
     // Cura é permitida na PZ; ataque não
     if (sp.damage && inSafeZone(player.x, player.y)){
         log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
