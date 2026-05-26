@@ -494,6 +494,48 @@
             padding: 5px 7px; font-size: 10px; color: #aaa;
             font-family: 'Consolas', monospace;
         }
+        .po-header {
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: #8a7438;
+            text-transform: uppercase;
+            padding-bottom: 4px;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #1a1408;
+        }
+        .po-row {
+            padding: 3px 4px;
+            margin-bottom: 3px;
+            border-left: 2px solid #2a200a;
+            background: #0a0805;
+            border-radius: 1px;
+        }
+        .po-row.me      { border-left-color: #ffd060; background: #1a1408; }
+        .po-row.ghost   { border-left-color: #555; opacity: 0.7; }
+        .po-line1       { display: flex; align-items: center; gap: 4px; font-size: 10.5px; }
+        .po-name        { color: #c8a050; flex: 1; font-weight: 600; }
+        .po-row.me .po-name { color: #ffd060; }
+        .po-row.ghost .po-name { color: #888; font-style: italic; }
+        .po-badge       { font-size: 11px; line-height: 1; }
+        .po-badge.hl    { color: #ffd060; text-shadow: 0 0 6px rgba(255,200,60,0.6); }
+        .po-badge.pvp   { color: #cc3030; }
+        .po-badge.ghost { opacity: 0.7; }
+        .po-dist {
+            font-size: 8.5px;
+            font-family: 'Consolas', monospace;
+            padding: 0 4px;
+            border-radius: 1px;
+            letter-spacing: 0.5px;
+        }
+        .po-dist.near   { background: rgba(116,209,118,0.15); color: #92e090; }
+        .po-dist.mid    { background: rgba(255,170,32,0.15);  color: #ffcc70; }
+        .po-dist.far    { background: rgba(100,100,100,0.15); color: #888; }
+        .po-hp-bar {
+            background: #050405; border: 1px solid #1a1408;
+            height: 4px; margin-top: 3px; border-radius: 1px;
+            overflow: hidden;
+        }
+        .po-hp-fill { height: 100%; transition: width 0.2s; }
 
         #controls {
             color: #6a5520; font-size: 10px; margin-top: 12px;
@@ -4081,13 +4123,68 @@ function pkKilledSomeone(msg){
     saveState();
 }
 
-function updatePlayersOnline(list){
+// Lista inicial dos players (chamada no msg 'state'); o render real é dinâmico
+function updatePlayersOnline(){ renderPlayersOnline(); }
+
+// Render rico: você no topo + remotes ordenados por distância, com HP bar e badges
+function renderPlayersOnline(){
     const el = document.getElementById('players-online');
-    el.innerHTML = list.map(p => {
-        const pvpMark = p.pvp ? ' <span style="color:#cc3030">☠</span>' : '';
-        const isMe = p.name === player.name ? ' (você)' : '';
-        return `<div>● ${p.name}${pvpMark}${isMe}</div>`;
-    }).join('') || 'Ninguém';
+    if (!el) return;
+    // Monta lista: você primeiro, depois remotos
+    const me = {
+        name: player.name, x: player.x, y: player.y,
+        hp: player.hp, maxHp: player.maxHp,
+        pvp: !!player.pvp, highlander: !!player.highlander, ghost: false, isMe: true,
+    };
+    const remotes = Object.values(remotePlayers).map(r => ({
+        name: r.name || '?', x: r.x, y: r.y,
+        hp: r.hp ?? 100, maxHp: r.maxHp ?? 100,
+        pvp: !!r.pvp, highlander: !!r.highlander, ghost: !!r.ghost, isMe: false,
+    }));
+    // ordena: ghosts no fim, depois por distância
+    remotes.sort((a,b) => {
+        if (a.ghost !== b.ghost) return a.ghost ? 1 : -1;
+        const da = Math.max(Math.abs(a.x-player.x), Math.abs(a.y-player.y));
+        const db = Math.max(Math.abs(b.x-player.x), Math.abs(b.y-player.y));
+        return da - db;
+    });
+    const all = [me, ...remotes];
+    const alive = all.filter(p => !p.ghost).length;
+    const ghosts = all.length - alive;
+    const headerTxt = ghosts > 0 ? `${alive} vivo${alive!==1?'s':''} · ${ghosts} 💤` : `${alive} online`;
+
+    el.innerHTML = `
+        <div class="po-header">${headerTxt}</div>
+        ${all.map(p => renderPlayerRow(p)).join('')}
+    `;
+}
+
+function renderPlayerRow(p){
+    const hpPct = p.maxHp > 0 ? Math.max(0, Math.min(1, p.hp / p.maxHp)) : 0;
+    const hpColor = hpPct > 0.5 ? '#4caf50' : hpPct > 0.25 ? '#ffaa00' : '#cc3030';
+    let badge = '';
+    if (p.ghost) badge = '<span class="po-badge ghost" title="Corpo desconectado">💤</span>';
+    else if (p.highlander) badge = '<span class="po-badge hl" title="Highlander">👑</span>';
+    else if (p.pvp) badge = '<span class="po-badge pvp" title="PvP ativo">☠</span>';
+    // Distância (só pra remotos, não pra você)
+    let distTag = '';
+    if (!p.isMe){
+        const d = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
+        let distCls = 'far';
+        if (d <= 7) distCls = 'near';
+        else if (d <= 18) distCls = 'mid';
+        distTag = `<span class="po-dist ${distCls}">${d}sqm</span>`;
+    }
+    const meClass = p.isMe ? ' me' : '';
+    const ghostClass = p.ghost ? ' ghost' : '';
+    const safeName = (p.name || '?').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    return `<div class="po-row${meClass}${ghostClass}">
+        <div class="po-line1">
+            <span class="po-name">${safeName}${p.isMe?' <span style="color:#888;font-weight:400">(você)</span>':''}</span>
+            ${badge}${distTag}
+        </div>
+        ${p.ghost ? '' : `<div class="po-hp-bar"><div class="po-hp-fill" style="width:${(hpPct*100).toFixed(0)}%;background:${hpColor}"></div></div>`}
+    </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4165,6 +4262,7 @@ function updateSidebar(){
     renderTargetWidget();
     renderPvpWidget();
     renderBossesWidget();
+    renderPlayersOnline();
     document.getElementById('goldVal').textContent = player.gold + ' g';
     // Inventário e equipamento só re-renderizam quando MUDAM (evita perder o click no rebuild)
     renderInventoryIfChanged();
