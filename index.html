@@ -2623,7 +2623,28 @@ let respawnTimer = 0;
 const RESPAWN_INTERVAL = 900;    // tenta repor a cada 0.9s
 const RESPAWN_PER_TICK = 3;      // até 3 monstros por tick
 
+// Boss heal Lv3+ — bosses regeneram lentamente quando upados
+let bossHealTimer = 0;
+const BOSS_HEAL_INTERVAL = 5000;   // 5s entre ticks
+function tickBossHeal(dt){
+    bossHealTimer += dt;
+    if (bossHealTimer < BOSS_HEAL_INTERVAL) return;
+    bossHealTimer = 0;
+    for (const m of monsters){
+        if (!m.unique || m.hp <= 0) continue;
+        const lvl = m.level || 1;
+        if (lvl < 3) continue;
+        if (m.hp >= m.maxHp) continue;
+        // 2% maxHp por tick + 0.5% por nível acima de 3 (cap 5%)
+        const pct = Math.min(0.05, 0.02 + (lvl - 3) * 0.005);
+        const heal = Math.max(1, Math.round(m.maxHp * pct));
+        m.hp = Math.min(m.maxHp, m.hp + heal);
+        addFloat(m.x, m.y, `+${heal}`, '#74d176', false, -8);
+    }
+}
+
 function tickRespawns(dt){
+    tickBossHeal(dt);
     if (serverAuthMobs) { tickHighlanderHunt(dt); return; }  // respawn fica no server
     if (bossDeathTime !== null && Date.now() - bossDeathTime >= BOSS_RESPAWN_MS){
         spawnBossAndLair(); bossDeathTime = null;
@@ -2839,6 +2860,11 @@ function updateMonster(m, dt){
         // Diagonal custa 1.4× tempo (mesma lógica do player)
         const wasDiag = moved && Math.abs(sx) === 1 && Math.abs(sy) === 1;
         m.moveTimer = m.speed * (moved ? (wasDiag ? 1.2 : 0.85) : 0.6);
+        // Anti-kite: mobs intel≥2 e bosses sprintam quando perseguindo a distância
+        // (counter pra spear/arco; ratos e cobras ficam dumb como antes)
+        if (distChase > 1 && (m.intel >= 2 || m.unique)){
+            m.moveTimer *= 0.6;
+        }
     } else if (!m.aggro){
         // Se está longe de casa (spawn), volta. Senão, vagueia leve.
         const dxh = m.wanderX - m.x, dyh = m.wanderY - m.y;

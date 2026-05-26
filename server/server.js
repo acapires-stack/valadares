@@ -431,7 +431,9 @@ function tickAI(){
             continue;
         }
         // mover 1 tile em direção (respeita speed)
-        if (now - m.lastMoveAt < m.speed) continue;
+        // Anti-kite: sprint quando perseguindo a >1 tile (counter pra spear/arco)
+        const effectiveSpeed = (td > 1) ? Math.floor(m.speed * 0.6) : m.speed;
+        if (now - m.lastMoveAt < effectiveSpeed) continue;
         m.lastMoveAt = now;
         const dx = Math.sign(target.x - m.x);
         const dy = Math.sign(target.y - m.y);
@@ -532,6 +534,27 @@ process.on('SIGTERM', () => { saveStateToDisk(); console.log('[state] salvo ao s
 setInterval(tickAI, TICK_AI_MS);
 setInterval(broadcastMobs, SNAPSHOT_MS);
 setInterval(tickRespawns, 1000);
+
+// Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
+function tickBossHeal(){
+    for (const m of monsters.values()){
+        if (!m.unique || m.hp <= 0) continue;
+        const lvl = m.level || 1;
+        if (lvl < 3) continue;
+        if (m.hp >= m.maxHp) continue;
+        const pct = Math.min(0.05, 0.02 + (lvl - 3) * 0.005);
+        const heal = Math.max(1, Math.round(m.maxHp * pct));
+        m.hp = Math.min(m.maxHp, m.hp + heal);
+        // notifica clientes pra HP atualizar imediato (snapshot pega no próximo tick)
+        for (const p of players.values()){
+            if (p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({ t:'mobUpdate', id:m.id, hp:m.hp, maxHp:m.maxHp }));
+                p.ws.send(JSON.stringify({ t:'mobFloat', mobId:m.id, text:`+${heal}`, color:'#74d176' }));
+            }
+        }
+    }
+}
+setInterval(tickBossHeal, 5000);
 
 // ─── Reset diário (00:00) ──────────────────────────────────────────────────
 function tickDailyReset(){
