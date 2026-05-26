@@ -2797,6 +2797,21 @@ function drawMonster(m, px, py){
         ctx.strokeStyle='#ff4040'; ctx.lineWidth=2;
         ctx.strokeRect(px+2, py+2, TS-4, TS-4);
     }
+    // Ícones de DoT ativo (veneno/sangra/fogo) — debaixo do nome
+    if (m.dots && m.dots.length){
+        const glyphMap = { poison:'☠', bleed:'🩸', burn:'🔥' };
+        const colorMap = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        const cy = py - (m.unique ? 22 : 14);
+        const stepX = 10;
+        const startX = px + TS/2 - ((m.dots.length-1) * stepX) / 2;
+        for (let i = 0; i < m.dots.length; i++){
+            const d = m.dots[i];
+            ctx.fillStyle = colorMap[d.type] || '#fff';
+            ctx.fillText(glyphMap[d.type] || '?', startX + i*stepX, cy);
+        }
+    }
 }
 
 // Escolhe a casa adjacente ao player mais perto deste monstro (cerca + fan-out)
@@ -2844,6 +2859,8 @@ function pickSurroundSlot(m){
 // IA dos monstros (skip quando server-autoritativo — mob só anima localmente)
 function updateMonster(m, dt){
     if (serverAuthMobs) return;
+    // DoT ticks (veneno/sangra/fogo). Pode matar o mob.
+    if (tickMobDots(m, Date.now())) return;
     m.moveTimer  = Math.max(0, m.moveTimer-dt);
     m.attackTimer = Math.max(0, m.attackTimer-dt);
     const distChase = Math.abs(m.x-player.x)+Math.abs(m.y-player.y);
@@ -2940,6 +2957,60 @@ function updateMonster(m, dt){
 
 function monsterAt(x,y){
     return monsters.find(m => m.hp>0 && m.x===x && m.y===y);
+}
+
+// ─── DoT em monstros (veneno/sangra/fogo proc de armas +N) ─────────────────
+const DOT_INTERVAL_MS = 3000;
+const DOT_COLOR = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
+const DOT_GLYPH = { poison:'☠', bleed:'🩸', burn:'🔥' };
+function applyMobDot(m, type, spec){
+    if (!m || !spec) return;
+    m.dots = m.dots || [];
+    const existing = m.dots.find(d => d.type === type);
+    const newTotal = spec.dmg * spec.ticks;
+    if (existing){
+        // Refresh: pega o maior dano restante (não acumula stacks do mesmo tipo)
+        const oldTotal = existing.dmg * existing.ticksLeft;
+        if (newTotal <= oldTotal) return;
+        existing.dmg = spec.dmg;
+        existing.ticksLeft = spec.ticks;
+        existing.nextTickAt = Date.now() + DOT_INTERVAL_MS;
+    } else {
+        m.dots.push({ type, dmg: spec.dmg, ticksLeft: spec.ticks, nextTickAt: Date.now() + DOT_INTERVAL_MS });
+    }
+}
+// Roda os ticks de DoT do mob. Retorna true se o mob morreu por DoT.
+function tickMobDots(m, now){
+    if (!m.dots || !m.dots.length) return false;
+    for (let i = m.dots.length - 1; i >= 0; i--){
+        const d = m.dots[i];
+        if (now < d.nextTickAt) continue;
+        const dmg = d.dmg;
+        m.hp = Math.max(0, m.hp - dmg);
+        addFloat(m.x, m.y, `-${dmg}`, DOT_COLOR[d.type] || '#aaa', false);
+        d.ticksLeft--;
+        if (d.ticksLeft <= 0) m.dots.splice(i, 1);
+        else d.nextTickAt = now + DOT_INTERVAL_MS;
+        if (m.hp === 0){
+            if (!serverAuthMobs) killMonster(m);
+            return true;
+        }
+    }
+    return false;
+}
+// Tenta aplicar os procs do weapon equipado contra mob (chama applyMobDot
+// pra cada status disponível com roll). Retorna lista de procs aplicados.
+function rollWeaponStatusOnMob(wItem, m){
+    if (!wItem || !m) return [];
+    const out = [];
+    for (const type of ['poison','bleed','burn']){
+        const spec = wItem[type];
+        if (spec && Math.random() < (spec.chance || 0)){
+            applyMobDot(m, type, spec);
+            out.push({ type, dmg: spec.dmg, ticks: spec.ticks });
+        }
+    }
+    return out;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3186,6 +3257,13 @@ function applyAttackMults(dmg){
     if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
     mult *= buffMult().dmg;
     return Math.floor(dmg * mult);
+}
+// Delay efetivo de ataque considerando atkSpd da arma equipada (upgrades +N)
+function effectiveAttackDelay(){
+    const wK = player.equipped.weapon;
+    const wI = wK ? ITEMS[wK] : null;
+    const atk = (wI && wI.atkSpd) || 0;
+    return Math.max(150, Math.floor(player.attackDelay * (1 - atk)));
 }
 function activeWeapon(){
     const k = player.equipped.weapon;
@@ -3836,6 +3914,14 @@ function playerMoveDelay(){
     // Buff temporário (Fúria)
     const b = buffMult();
     if (b.spd > 0) d = Math.floor(d * (1 - b.spd));
+    // moveSpd de armaduras upgraded (+N): soma % de todos os slots de equip
+    let armorSpd = 0;
+    for (const slot of ['armor','offhand','head','feet','neck']){
+        const k = player.equipped[slot];
+        const it = k ? ITEMS[k] : null;
+        if (it && it.moveSpd) armorSpd += it.moveSpd;
+    }
+    if (armorSpd > 0) d = Math.floor(d * (1 - Math.min(0.40, armorSpd)));
     return Math.max(80, d);
 }
 
@@ -3931,7 +4017,7 @@ function throwSpear(){
         buildSkillList();
     }
     invSignature = null;
-    player.attackTimer = player.attackDelay;
+    player.attackTimer = effectiveAttackDelay();
     saveState();
 }
 window.throwSpear = throwSpear;
@@ -3975,7 +4061,7 @@ function doAttack(m){
                 addFloat(player.x, player.y, 'SEM FLECHAS', '#ff5050', true);
                 doAttack._ammoWarn = Date.now();
             }
-            player.attackTimer = player.attackDelay;
+            player.attackTimer = effectiveAttackDelay();
             return;
         }
         const arrow = ITEMS[arrowKey];
@@ -3985,7 +4071,7 @@ function doAttack(m){
         if (Math.random() < m.dodge){
             log(`<span class="log-sys">${m.name} esquivou da flecha.</span>`);
             gainSkillXp('Distância', 1);
-            player.attackTimer = player.attackDelay;
+            player.attackTimer = effectiveAttackDelay();
             return;
         }
         const baseR = wItem.base + (arrow.ammoBonus || 0) + Math.floor(sk.val/3);
@@ -4005,9 +4091,11 @@ function doAttack(m){
             life: 0, duration: Math.max(100, dist * 28),
         });
         gainSkillXp('Distância', 1);
-        player.attackTimer = player.attackDelay;
+        player.attackTimer = effectiveAttackDelay();
+        // DoT procs (veneno/sangra/fogo do weapon +N)
+        const procsR = rollWeaponStatusOnMob(wItem, m);
         if (serverAuthMobs && ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR }));
+            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR }));
             player.target = m.id; m.aggro = true;
         } else {
             m.hp = Math.max(0, m.hp - dmgR);
@@ -4033,7 +4121,7 @@ function doAttack(m){
     if (Math.random() < m.dodge){
         log(`<span class="log-sys">${m.name} esquivou.</span>`);
         gainSkillXp(w.skill, 1);
-        player.attackTimer = player.attackDelay;
+        player.attackTimer = effectiveAttackDelay();
         return;
     }
     const base = w.base + Math.floor(sk.val/3);
@@ -4048,11 +4136,13 @@ function doAttack(m){
     if (player.equipped.offhand && ITEMS[player.equipped.offhand].kind === 'offhand'){
         gainSkillXp('Escudo', 1);
     }
-    player.attackTimer = player.attackDelay;
+    player.attackTimer = effectiveAttackDelay();
+    // DoT procs do weapon equipado (veneno/sangra/fogo)
+    const procs = rollWeaponStatusOnMob(wItem, m);
     if (serverAuthMobs && ws && ws.readyState === 1){
         // Lança 1H tem meleeRange (até 3 sqm); demais armas melee usam 1
         const attackRange = (wItem && wItem.meleeRange) || 1;
-        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:attackRange, crit }));
+        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:attackRange, crit, dots: procs }));
         player.target = m.id; m.aggro = true;
     } else {
         m.hp = Math.max(0, m.hp - dmg);
@@ -4061,6 +4151,16 @@ function doAttack(m){
     }
 }
 
+// Soma hpRegen das armaduras equipadas (+N)
+function armorHpRegenBonus(){
+    let bonus = 0;
+    for (const slot of ['armor','offhand','head','feet','neck']){
+        const k = player.equipped[slot];
+        const it = k ? ITEMS[k] : null;
+        if (it && it.hpRegen) bonus += it.hpRegen;
+    }
+    return bonus;
+}
 function tickRegen(dt){
     player.hpRegenTimer += dt;
     player.mpRegenTimer += dt;
@@ -4068,7 +4168,8 @@ function tickRegen(dt){
     const hpInterval = 4000 / m.regenHp;
     const mpInterval = 2000 / m.regenMp;
     if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
-        player.hp = Math.min(player.maxHp, player.hp+1);
+        const heal = 1 + armorHpRegenBonus();
+        player.hp = Math.min(player.maxHp, player.hp + heal);
         player.hpRegenTimer = 0;
     }
     if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
@@ -4338,6 +4439,8 @@ function applyMobsSnapshot(list){
             }
             m.hp = srv.hp; m.maxHp = srv.maxHp;
         }
+        // DoTs ativos vêm como [{type}] na snapshot — guarda só pra renderizar ícone
+        m.dots = Array.isArray(srv.dots) ? srv.dots : null;
     }
     for (let i = monsters.length - 1; i >= 0; i--){
         if (!seen.has(monsters[i].id)) monsters.splice(i, 1);
@@ -4831,9 +4934,26 @@ function buyFromShop(itemKey){
 // FORJA — upgrade de equips usando 3 items iguais + ouro (chance alta de falha)
 // ═══════════════════════════════════════════════════════════════════════════
 const UPGRADE_MAX        = 5;
-const UPGRADE_BONUS      = [0, 1, 2, 3, 5, 7];     // +N → bônus em base/def
 const UPGRADE_FAIL       = [0, 0.40, 0.60, 0.75, 0.88, 0.95];
 const UPGRADE_COST_MULT  = [0, 3, 8, 20, 50, 120]; // multiplicador do custo base
+// Stats acumulados por nível pra armas (kind:'weapon')
+const WEAPON_UPGRADES = [
+    null,
+    { base: 1 },
+    { base: 2, atkSpd: 0.05 },
+    { base: 3, atkSpd: 0.05, poison: { chance: 0.10, dmg: 2, ticks: 4 } },
+    { base: 5, atkSpd: 0.10, poison: { chance: 0.15, dmg: 2, ticks: 4 }, bleed: { chance: 0.10, dmg: 3, ticks: 3 } },
+    { base: 7, atkSpd: 0.15, poison: { chance: 0.20, dmg: 2, ticks: 4 }, bleed: { chance: 0.15, dmg: 3, ticks: 3 }, burn: { chance: 0.10, dmg: 4, ticks: 3 } },
+];
+// Stats pra armaduras/escudos/elmos/botas/colares
+const ARMOR_UPGRADES = [
+    null,
+    { def: 1 },
+    { def: 2, moveSpd: 0.03 },
+    { def: 3, moveSpd: 0.03, hpRegen: 1 },
+    { def: 5, moveSpd: 0.06, hpRegen: 2 },
+    { def: 7, moveSpd: 0.10, hpRegen: 3 },
+];
 function isUpgradableKind(kind){
     return ['weapon','offhand','armor','head','feet','neck'].includes(kind);
 }
@@ -4846,18 +4966,29 @@ function getUpgradeTier(itemKey){
 function makeUpgradeKey(baseKey, plus){
     return plus > 0 ? baseKey + '_PLUS_' + plus : baseKey;
 }
-// Cria a entrada em ITEMS se ainda não existe (idempotente). Stats escalam só
-// em base (armas) ou def (armaduras/escudos) — outras props preservam.
+// Cria a entrada em ITEMS se ainda não existe (idempotente). Aplica stats
+// por nível: armas (base, atkSpd, poison/bleed/burn) e armaduras (def,
+// moveSpd, hpRegen).
 function ensureUpgradeItem(baseKey, plus){
     const key = makeUpgradeKey(baseKey, plus);
     if (ITEMS[key]) return key;
-    if (plus <= 0) return baseKey;   // base sem upgrade
+    if (plus <= 0) return baseKey;
     const baseDef = ITEMS[baseKey];
     if (!baseDef) return null;
-    const bonus = UPGRADE_BONUS[plus] || 0;
     const newDef = { ...baseDef, name: baseDef.name + ' +' + plus };
-    if (typeof baseDef.base === 'number') newDef.base = baseDef.base + bonus;
-    if (typeof baseDef.def  === 'number') newDef.def  = baseDef.def  + bonus;
+    const isWeapon = baseDef.kind === 'weapon';
+    const isArmor  = ['armor','offhand','head','feet','neck'].includes(baseDef.kind);
+    const up = isWeapon ? WEAPON_UPGRADES[plus] : (isArmor ? ARMOR_UPGRADES[plus] : null);
+    if (up){
+        if (up.base !== undefined && typeof baseDef.base === 'number') newDef.base = baseDef.base + up.base;
+        if (up.def  !== undefined && typeof baseDef.def  === 'number') newDef.def  = baseDef.def  + up.def;
+        if (up.atkSpd)  newDef.atkSpd  = up.atkSpd;
+        if (up.moveSpd) newDef.moveSpd = up.moveSpd;
+        if (up.hpRegen) newDef.hpRegen = up.hpRegen;
+        if (up.poison)  newDef.poison  = up.poison;
+        if (up.bleed)   newDef.bleed   = up.bleed;
+        if (up.burn)    newDef.burn    = up.burn;
+    }
     ITEMS[key] = newDef;
     return key;
 }
@@ -4950,6 +5081,43 @@ function switchCraftTab(which){
 }
 window.switchCraftTab = switchCraftTab;
 
+// Descreve todos os bônus que o item GANHA ao subir do nível atual pro target.
+// Compara o def atual com o que seria o def do target (precisa simular o item).
+function describeUpgradeBonuses(itemKey, target){
+    const def = ITEMS[itemKey];
+    const tier = getUpgradeTier(itemKey);
+    const isWeapon = def.kind === 'weapon';
+    const up = isWeapon ? WEAPON_UPGRADES[target] : ARMOR_UPGRADES[target];
+    if (!up) return '';
+    const parts = [];
+    if (up.base !== undefined && typeof def.base === 'number'){
+        parts.push(`<b style="color:#ff8030">atk ${def.base} → ${def.base + up.base}</b>`);
+    }
+    if (up.def !== undefined && typeof def.def === 'number'){
+        parts.push(`<b style="color:#cce0a0">def ${def.def} → ${def.def + up.def}</b>`);
+    }
+    if (up.atkSpd){
+        const prev = def.atkSpd || 0;
+        parts.push(`<span style="color:#a0c8ff">atk spd +${Math.round(up.atkSpd*100)}%</span>${prev !== up.atkSpd ? '' : ''}`);
+    }
+    if (up.moveSpd){
+        parts.push(`<span style="color:#a0c8ff">spd +${Math.round(up.moveSpd*100)}%</span>`);
+    }
+    if (up.hpRegen){
+        parts.push(`<span style="color:#74d176">+${up.hpRegen} HP regen</span>`);
+    }
+    if (up.poison){
+        parts.push(`<span style="color:#74d176">☠ veneno ${Math.round(up.poison.chance*100)}%</span>`);
+    }
+    if (up.bleed){
+        parts.push(`<span style="color:#cc3030">🩸 sangra ${Math.round(up.bleed.chance*100)}%</span>`);
+    }
+    if (up.burn){
+        parts.push(`<span style="color:#ff8030">🔥 fogo ${Math.round(up.burn.chance*100)}%</span>`);
+    }
+    return parts.join(' &nbsp; ');
+}
+
 function renderForja(){
     const el = document.getElementById('forjaPanel');
     if (!el) return;
@@ -4970,20 +5138,15 @@ function renderForja(){
             const cost = forgeCostFor(tier.base, target);
             const fail = Math.round(UPGRADE_FAIL[target] * 100);
             const canPay = player.gold >= cost;
-            const bonus = UPGRADE_BONUS[target];
-            const statTxt = (typeof def.base === 'number')
-                ? `ataque ${def.base} → <b style="color:#74d176">${def.base + bonus}</b>`
-                : (typeof def.def === 'number')
-                ? `def ${def.def} → <b style="color:#74d176">${def.def + bonus}</b>`
-                : '';
+            const bonusLine = describeUpgradeBonuses(k, target);
             return `<div class="craft-row">
                 <div class="craft-out">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
                     <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(def.name)}</span>
                     <span style="margin-left:6px;color:#888;font-size:10px">${q}× disponíveis</span>
                 </div>
-                <div class="craft-in" style="color:#aaa;font-size:11px">
-                    ${statTxt}<br>
+                <div class="craft-in" style="color:#aaa;font-size:10.5px;line-height:1.5">
+                    ${bonusLine}<br>
                     <span style="color:#ffcc40">${cost}g</span> &nbsp;·&nbsp;
                     <span style="color:#ff8060">${fail}% falha</span>
                 </div>
@@ -6956,7 +7119,7 @@ function pvpAttackPlayer(targetId){
     }
     log(`<span class="log-dmg">${crit?'★ ':''}PvP: -${dmg} em ${escapeHtml(tgt.name)}</span>`);
     gainSkillXp(w.skill, 1);
-    player.attackTimer = player.attackDelay;
+    player.attackTimer = effectiveAttackDelay();
 }
 window.pvpAttackPlayer = pvpAttackPlayer;
 

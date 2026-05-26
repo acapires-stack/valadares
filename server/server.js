@@ -536,6 +536,7 @@ function snapshotMobs(){
     return Array.from(monsters.values()).map(m => ({
         id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir, hp:m.hp, maxHp:m.maxHp, unique:!!m.unique,
         level: m.level || 1,
+        dots: (m.dots && m.dots.length) ? m.dots.map(d => ({ type:d.type })) : undefined,
     }));
 }
 function broadcastMobs(){
@@ -610,6 +611,76 @@ process.on('SIGTERM', () => { saveStateToDisk(); console.log('[state] salvo ao s
 setInterval(tickAI, TICK_AI_MS);
 setInterval(broadcastMobs, SNAPSHOT_MS);
 setInterval(tickRespawns, 1000);
+
+// Resolve a morte de um mob (extração da lógica do attackMob handler) —
+// reutilizado pra mortes por DoT (veneno/sangra/fogo).
+function handleMobDeath(m, killerId){
+    if (m.unique){
+        if (m.type === MEGA_BOSS_TYPE){
+            const killer = players.get(killerId);
+            if (killer) handleMegaBossDeath(killer, m);
+        } else {
+            bossDeath.set(m.type, Date.now());
+            const cur = bossLevel.get(m.type) || 1;
+            const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
+            bossLevel.set(m.type, next);
+            console.log(`[boss] ${m.type} morto (Lv${cur}) por DoT/killer=${killerId} → próximo Lv${next}`);
+            saveStateToDisk();
+            checkMegaBossSpawn();
+        }
+    }
+    monsters.delete(m.id);
+    const killer = players.get(killerId);
+    if (killer && killer.ws.readyState === 1){
+        killer.ws.send(JSON.stringify({ t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level }));
+    }
+    broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
+}
+
+// Ticka DoTs em mobs (veneno/sangra/fogo). Roda a cada 1s, processa dots
+// expirados, aplica dano, broadcasta updates+floats.
+const DOT_TICK_INTERVAL_MS = 3000;
+function tickMobDots(){
+    const now = Date.now();
+    const updates = [];
+    const floats  = [];
+    const dotColor = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
+    for (const m of monsters.values()){
+        if (!m.dots || !m.dots.length || m.hp <= 0) continue;
+        let touched = false;
+        for (let i = m.dots.length - 1; i >= 0; i--){
+            const d = m.dots[i];
+            if (now < d.nextTickAt) continue;
+            const dmg = d.dmg;
+            m.hp = Math.max(0, m.hp - dmg);
+            floats.push({ mobId: m.id, text: `-${dmg}`, color: dotColor[d.type] || '#aaa' });
+            d.ticksLeft--;
+            if (d.ticksLeft <= 0) m.dots.splice(i, 1);
+            else d.nextTickAt = now + DOT_TICK_INTERVAL_MS;
+            touched = true;
+            if (m.hp === 0){
+                // Morte por DoT — quem aplicou o último dot ganha kill
+                const killerId = d.byId;
+                updates.push({ id: m.id, hp: 0, maxHp: m.maxHp });
+                if (floats.length){
+                    const payload = JSON.stringify({ t:'mobBatch', updates, floats });
+                    for (const p of players.values()){
+                        if (p.ws.readyState === 1) p.ws.send(payload);
+                    }
+                }
+                handleMobDeath(m, killerId);
+                break;
+            }
+        }
+        if (touched && m.hp > 0) updates.push({ id: m.id, hp: m.hp, maxHp: m.maxHp });
+    }
+    if (!updates.length && !floats.length) return;
+    const payload = JSON.stringify({ t:'mobBatch', updates, floats });
+    for (const p of players.values()){
+        if (p.ws.readyState === 1) p.ws.send(payload);
+    }
+}
+setInterval(tickMobDots, 1000);
 
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
 // Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
@@ -865,6 +936,28 @@ wss.on('connection', (ws) => {
             const cap = (MTYPE[m.type]?.hp || 50) + 50;  // teto generoso
             const dmg = Math.max(1, Math.min(msg.amount | 0, cap));
             m.hp = Math.max(0, m.hp - dmg);
+            // DoT procs (veneno/sangra/fogo de armas +N) — cliente enviou no msg.dots
+            if (Array.isArray(msg.dots) && msg.dots.length){
+                m.dots = m.dots || [];
+                for (const d of msg.dots){
+                    if (!d || !d.type || !['poison','bleed','burn'].includes(d.type)) continue;
+                    const safeDmg = Math.max(1, Math.min(20, d.dmg | 0));
+                    const safeTicks = Math.max(1, Math.min(8, d.ticks | 0));
+                    const existing = m.dots.find(x => x.type === d.type);
+                    if (existing){
+                        const oldTotal = existing.dmg * existing.ticksLeft;
+                        const newTotal = safeDmg * safeTicks;
+                        if (newTotal > oldTotal){
+                            existing.dmg = safeDmg;
+                            existing.ticksLeft = safeTicks;
+                            existing.nextTickAt = Date.now() + 3000;
+                            existing.byId = id;
+                        }
+                    } else {
+                        m.dots.push({ type: d.type, dmg: safeDmg, ticksLeft: safeTicks, nextTickAt: Date.now() + 3000, byId: id });
+                    }
+                }
+            }
             // broadcast update do mob
             const update = { t:'mobUpdate', id:m.id, hp:m.hp, maxHp:m.maxHp };
             for (const pp of players.values()){
