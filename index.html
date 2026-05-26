@@ -4192,9 +4192,20 @@ function handleMP(msg){
             remotePlayers[msg.id].x = msg.x;
             remotePlayers[msg.id].y = msg.y;
             remotePlayers[msg.id].dir = msg.dir;
+            if (typeof msg.hp === 'number') remotePlayers[msg.id].hp = msg.hp;
+            if (typeof msg.maxHp === 'number') remotePlayers[msg.id].maxHp = msg.maxHp;
         }
     } else if (msg.t === 'pvp'){
         if (remotePlayers[msg.id]) remotePlayers[msg.id].pvp = msg.pvp;
+    } else if (msg.t === 'pstats'){
+        // HP/MP de outro player (broadcast a cada playerSync de 5s)
+        const rp = remotePlayers[msg.id];
+        if (rp){
+            if (typeof msg.hp === 'number') rp.hp = msg.hp;
+            if (typeof msg.maxHp === 'number') rp.maxHp = msg.maxHp;
+            if (typeof msg.mp === 'number') rp.mp = msg.mp;
+            if (typeof msg.maxMp === 'number') rp.maxMp = msg.maxMp;
+        }
     } else if (msg.t === 'float'){
         // mostra float text na posição do player remoto
         const rp = remotePlayers[msg.id];
@@ -7506,7 +7517,11 @@ function startGame(multiplayer, name){
     _saveStateIntervalId = setInterval(saveState, 5000);
     _playerSyncIntervalId = setInterval(() => {
         if (ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'playerSync', gold: player.gold, inv: player.inv }));
+            ws.send(JSON.stringify({
+                t:'playerSync', gold: player.gold, inv: player.inv,
+                hp: player.hp, maxHp: player.maxHp,
+                mp: player.mp, maxMp: player.maxMp,
+            }));
         }
     }, 5000);
     requestAnimationFrame(loop);
@@ -8085,8 +8100,10 @@ function loop(ts){
         if (p.x>=cam.x-1&&p.x<cam.x+VP_W+1 && p.y>=cam.y-1&&p.y<cam.y+VP_H+1){
             const px = (p.x-cam.x)*TS, py = (p.y-cam.y)*TS;
             const bodyCol = p.ghost ? '#3a3a3a' : (p.pvp ? '#5a1a1a' : '#1a3a5a');
+            const hpPct = (p.maxHp > 0) ? Math.max(0, Math.min(1, (p.hp ?? p.maxHp) / p.maxHp)) : 1;
+            const mpPct = (p.maxMp > 0) ? Math.max(0, Math.min(1, (p.mp ?? 0) / p.maxMp)) : null;
             drawCharacter(px, py, p.dir||'down',
-                { weapon:'ESPADA', bodyColor: bodyCol }, p.name, 1, 0);
+                { weapon:'ESPADA', bodyColor: bodyCol }, p.name, hpPct, 0, mpPct);
             // overlay cinza translúcido se for ghost (corpo desconectado)
             if (p.ghost){
                 ctx.fillStyle = 'rgba(120,120,140,0.45)';

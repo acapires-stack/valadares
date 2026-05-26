@@ -231,6 +231,7 @@ function snapshotPlayers(){
     return Array.from(players.values()).map(p => ({
         id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:!!p.pvp,
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
+        mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
         ghost: !!p.disconnected,
     }));
 }
@@ -837,10 +838,18 @@ wss.on('connection', (ws) => {
             return;
         }
 
-        // Cliente envia snapshot de gold/inv pra body stays funcionar
+        // Cliente envia snapshot de gold/inv/stats pra body stays + visibility
         if (msg.t === 'playerSync') {
             if (typeof msg.gold === 'number') p.gold = msg.gold;
             if (msg.inv && typeof msg.inv === 'object') p.inv = msg.inv;
+            let statsChanged = false;
+            if (typeof msg.hp === 'number' && isFinite(msg.hp)) { p.hp = msg.hp; statsChanged = true; }
+            if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) { p.maxHp = msg.maxHp; statsChanged = true; }
+            if (typeof msg.mp === 'number' && isFinite(msg.mp)) { p.mp = msg.mp; statsChanged = true; }
+            if (typeof msg.maxMp === 'number' && isFinite(msg.maxMp)) { p.maxMp = msg.maxMp; statsChanged = true; }
+            if (statsChanged){
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
+            }
             return;
         }
 
