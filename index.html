@@ -2922,6 +2922,7 @@ const player = {
     poison: null,   // { dmgPerTick, ticksLeft, intervalMs, nextTickAt, source }
     stun:   null,   // { endAt }
     bleed:  null,   // mesmo shape de poison
+    buff:   null,   // { dmg, spd, expiresAt, color, name } — Fúria etc
     // Quests: ativas com progresso, completas (já entregues), prontas pra entregar
     quests: {
         active: {},      // id -> { progress }
@@ -3728,6 +3729,9 @@ function playerMoveDelay(){
     }
     // Coração equipado: +3% spd
     if (player.equipped.neck === 'CORACAO_HL') d = Math.floor(d * 0.97);
+    // Buff temporário (Fúria)
+    const b = buffMult();
+    if (b.spd > 0) d = Math.floor(d * (1 - b.spd));
     return Math.max(80, d);
 }
 
@@ -3873,6 +3877,7 @@ function doAttack(m){
         let dmgR = Math.max(1, baseR + Math.floor(Math.random()*5) - 2);
         const critR = Math.random() < playerCritChance();
         if (critR) dmgR *= 2;
+        dmgR = Math.floor(dmgR * buffMult().dmg);
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
         if (critR) sndCrit(); else sndHit();
         log(`<span class="log-dmg">${critR?'★ ':''}${wItem.name}: -${dmgR} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
@@ -3909,9 +3914,10 @@ function doAttack(m){
     let dmg = Math.max(1, base + Math.floor(Math.random()*5) - 2);
     const crit = Math.random() < playerCritChance();
     if (crit) dmg *= 2;
-    // Multiplicadores: selos PvP + Coração equipado
+    // Multiplicadores: selos PvP + Coração equipado + buff Fúria
     let mult = pvpMults().dmg;
     if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
+    mult *= buffMult().dmg;
     dmg = Math.floor(dmg * mult);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
     if (crit) sndCrit(); else sndHit();
@@ -4724,7 +4730,7 @@ function applyBleed(dmgPerTick, ticks, intervalMs, source){
     }
 }
 function clearStatusEffects(){
-    player.poison = null; player.stun = null; player.bleed = null;
+    player.poison = null; player.stun = null; player.bleed = null; player.buff = null;
 }
 function isStunned(){
     if (!player.stun) return false;
@@ -6001,6 +6007,30 @@ const SPELLS = {
         switchCost: 250,
         desc: 'Disparo mágico de longo alcance (10 tiles). Dano menor que Fireball mas barato e rápido.',
     },
+    EXORI: {
+        name: 'Exori',
+        manaCost: 40, cooldown: 4000,
+        aoeRange: 3, damage: 7,
+        color: '#ff6020', glow: '#ffaa30',
+        switchCost: 400,
+        desc: 'Explosão em área — acerta todos mobs em 3 tiles ao redor. Sem alvo necessário.',
+    },
+    PROVOCACAO: {
+        name: 'Provocação',
+        manaCost: 25, cooldown: 8000,
+        tauntRange: 5,
+        color: '#aa3030', glow: '#ff8080',
+        switchCost: 350,
+        desc: 'Força todos mobs em 5 tiles a focar em você. Sem dano — útil pra puxar agro em grupo.',
+    },
+    FURIA: {
+        name: 'Fúria',
+        manaCost: 35, cooldown: 30000,
+        buff: { dmg: 0.25, spd: 0.25, duration: 12000 },
+        color: '#cc4040', glow: '#ff6060',
+        switchCost: 450,
+        desc: 'Buff temporário: +25% dano e +25% velocidade por 12s. Cooldown 30s.',
+    },
 };
 const auraEffects = [];   // { entity, color, life, duration }
 const spellCooldowns = {};   // { FIREBALL: ms restante }
@@ -6010,6 +6040,16 @@ function tickSpellCooldowns(dt){
     for (const k in spellCooldowns){
         if (spellCooldowns[k] > 0) spellCooldowns[k] = Math.max(0, spellCooldowns[k] - dt);
     }
+    // Buff temporário (Fúria) — limpa quando expira
+    if (player.buff && Date.now() >= player.buff.expiresAt){
+        log(`<span class="log-sys">${player.buff.name} acabou.</span>`);
+        player.buff = null;
+    }
+}
+// Retorna multiplicadores do buff ativo (1 / 0 quando inativo)
+function buffMult(){
+    if (!player.buff) return { dmg: 1, spd: 0 };
+    return { dmg: 1 + player.buff.dmg, spd: player.buff.spd };
 }
 
 function castSpell(spellKey){
@@ -6027,6 +6067,75 @@ function castSpell(spellKey){
         log(`<span class="log-sys">Sem mana (${player.mp}/${sp.manaCost}).</span>`); return;
     }
     const sk = player.skills['Magia'];
+
+    // ─── AOE (Exori) ────────────────────────────────────────────
+    if (sp.aoeRange){
+        player.mp -= sp.manaCost;
+        spellCooldowns[spellKey] = sp.cooldown;
+        sndSpell();
+        let hits = 0;
+        for (const m of monsters){
+            if (m.hp <= 0) continue;
+            const d = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
+            if (d > sp.aoeRange || d === 0) continue;
+            let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
+            dmg = Math.max(1, Math.floor(dmg * buffMult().dmg));
+            if (serverAuthMobs && ws && ws.readyState === 1){
+                ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false }));
+                m.aggro = true;
+            } else {
+                m.hp = Math.max(0, m.hp - dmg);
+                if (m.hp === 0) killMonster(m);
+                else m.aggro = true;
+            }
+            addFloat(m.x, m.y, `-${dmg}`, sp.glow, true);
+            hits++;
+        }
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 600 });
+        log(`<span class="log-dmg">${sp.name}: ${hits} alvo(s) atingido(s)</span>`);
+        if (hits > 0) gainSkillXp('Magia', hits);
+        return;
+    }
+
+    // ─── TAUNT (Provocação) ─────────────────────────────────────
+    if (sp.tauntRange){
+        player.mp -= sp.manaCost;
+        spellCooldowns[spellKey] = sp.cooldown;
+        sndSpell();
+        let count = 0;
+        for (const m of monsters){
+            if (m.hp <= 0) continue;
+            const d = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
+            if (d > sp.tauntRange) continue;
+            m.aggro = true;
+            m.wanderX = player.x;
+            m.wanderY = player.y;
+            count++;
+        }
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800 });
+        log(`<span class="log-sys">${sp.name}: provocou ${count} mob(s)</span>`);
+        gainSkillXp('Magia', Math.max(1, count));
+        return;
+    }
+
+    // ─── BUFF (Fúria) ───────────────────────────────────────────
+    if (sp.buff){
+        player.mp -= sp.manaCost;
+        spellCooldowns[spellKey] = sp.cooldown;
+        sndSpell();
+        player.buff = {
+            dmg: sp.buff.dmg,
+            spd: sp.buff.spd,
+            expiresAt: Date.now() + sp.buff.duration,
+            color: sp.glow,
+            name: sp.name,
+        };
+        addFloat(player.x, player.y, `★ ${sp.name}`, sp.glow, true, -10);
+        log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(sp.buff.duration/1000)}s</span>`);
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
+        gainSkillXp('Magia', 2);
+        return;
+    }
 
     // ─── CURA (self) ────────────────────────────────────────────
     if (sp.heal){
@@ -6063,6 +6172,7 @@ function castSpell(spellKey){
     dmg = Math.max(1, dmg);
     const crit = Math.random() < playerCritChance();
     if (crit) dmg *= 2;
+    dmg = Math.floor(dmg * buffMult().dmg);
     m.hp = Math.max(0, m.hp - dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : sp.glow, true, crit ? -10 : 0);
     log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
@@ -6225,9 +6335,18 @@ function renderAltar(){
     el.innerHTML = studyHtml + Object.entries(SPELLS).map(([k, sp]) => {
         const active = k === player.activeSpell;
         const canBuy = player.gold >= sp.switchCost;
-        const statLine = sp.heal
-            ? `<span style="color:#74d176">+${sp.heal} HP base</span> · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`
-            : `<span style="color:#ff8030">${sp.damage} dano base</span> · range ${sp.range} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+        let statLine;
+        if (sp.heal){
+            statLine = `<span style="color:#74d176">+${sp.heal} HP base</span> · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+        } else if (sp.aoeRange){
+            statLine = `<span style="color:#ff8030">${sp.damage} dano base</span> · AoE raio ${sp.aoeRange} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+        } else if (sp.tauntRange){
+            statLine = `<span style="color:#ff8080">taunt</span> · raio ${sp.tauntRange} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+        } else if (sp.buff){
+            statLine = `<span style="color:#ff6060">+${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd</span> · ${(sp.buff.duration/1000).toFixed(0)}s · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(0)}s`;
+        } else {
+            statLine = `<span style="color:#ff8030">${sp.damage} dano base</span> · range ${sp.range} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+        }
         return `<div class="craft-row ${active?'craft-ok':''}">
             <div class="craft-out">
                 <span style="color:${sp.glow}">●</span>
@@ -6460,6 +6579,7 @@ function pvpAttackPlayer(targetId){
     if (crit) dmg *= 2;
     let mult = pvpMults().dmg;
     if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
+    mult *= buffMult().dmg;
     dmg = Math.floor(dmg * mult);
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
@@ -7092,6 +7212,7 @@ function logout(){
         pvp: false, selos: 0, highlander: false,
         pzLockUntil: 0, lastKilledBy: null, vengeance: {},
         hurtTimer: 0, shieldDefense: 0,
+        poison: null, stun: null, bleed: null, buff: null,
     });
     for (const k of Object.keys(player.skills)){
         player.skills[k] = { val:10, xp:0, xpNext:50 };
@@ -7783,6 +7904,7 @@ function loop(ts){
         if (player.poison) icons.push({ glyph:'☠', color:'#74d176' });
         if (player.stun)   icons.push({ glyph:'⚡', color:'#ffaa20' });
         if (player.bleed)  icons.push({ glyph:'🩸', color:'#cc3030' });
+        if (player.buff)   icons.push({ glyph:'★', color: player.buff.color || '#ff6060' });
         if (icons.length){
             ctx.font = 'bold 11px monospace';
             ctx.textAlign = 'center';
@@ -7795,6 +7917,18 @@ function loop(ts){
                 ctx.fillText(ic.glyph, x, ppy-12);
             });
         }
+    }
+    // Aura persistente do buff Fúria (pulsa enquanto ativo)
+    if (player.buff){
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+        ctx.save();
+        ctx.globalAlpha = 0.3 + pulse * 0.2;
+        ctx.strokeStyle = player.buff.color || '#ff6060';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ppx + TS/2, ppy + TS/2, 18 + pulse * 3, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
     }
     if (player.pvp || player.selos > 0){
         const intensity = Math.min(1, 0.4 + player.selos * 0.15);

@@ -191,9 +191,9 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 ### Curto prazo
 | # | Item | Notas |
 |---|---|---|
-| 1 | **Mais magias** | AoE (Exori), Provocação (tank), Buff temporário |
+| 1 | ✅ **Mais magias** | **Exori** (AoE raio 3, 40mp/cd 4s, dano base 7) · **Provocação** (taunt raio 5, 25mp/cd 8s, força aggro em grupo) · **Fúria** (buff +25% dmg/+25% spd por 12s, 35mp/cd 30s, com aura pulsante) |
 | 2 | **Skill cap / limitações** | Decisão: deixar **infinito** (sem cap), conforme decidido |
-| 3 | **2H ataca mais devagar** | Equilibra 1H+escudo vs 2H (proposta antiga) |
+| 3 | ~~2H ataca mais devagar~~ | ❌ **Descartado** — jogo está balanceado assim |
 | 4 | ✅ **Crafts lendários com Coração** | Espada do Highlander ★ (3 corações, base 20/def 8), Armadura do Trono ★ (2 corações, def 14), Coroa do Vendedor ★ (1 coração, def 7). Custo 8-12k g + materiais raros |
 | — | ✅ **Defesa percentual** | reduction = def/(def+30) — diminishing returns, sem mais "tomar 1 sempre" |
 | — | ✅ **Quests diárias** | 3 randomizadas por dia, tracker auto, recompensa 2-3× normal, reset 00:00 |
@@ -204,7 +204,7 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 ### Médio prazo (sistemas)
 | # | Item | Notas |
 |---|---|---|
-| 5 | **Classes** (Guerreiro/Tank/Arqueiro/Mago) | Quest desbloqueia. Cada classe ganha 1 magia única (Exori, Provocação, Disparo Rápido) |
+| 5 | ~~Classes (Guerreiro/Tank/Arqueiro/Mago)~~ | ❌ **Descartado** — magias do altar já dão variedade, sem precisar de classes fixas |
 | 6 | ✅ **NPCs / Quests** | Mercador (52,49) + Atendente (52,51) na PZ. 5 quests iniciais com tracker auto. Tecla Q abre quadro. Shop compra/vende items |
 | 7 | ✅ **Status effects** | Engine poison/stun/bleed com tick. Aranha aplica veneno (15%, -2hp/3s × 4). Stun bloqueia move+attack. Ícones flutuam acima do boneco |
 | 8 | ✅ **Body stays no logout** | Server mantém ghost 3 min após disconnect. Atacável (PvP), HP processado server-side. Ao morrer dropa 10% gold + 1 item random pro killer. Visual cinza + 💤 |
@@ -214,7 +214,7 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 |---|---|---|
 | 9 | ✅ **Monstros sincronizados** | Server autoritativo: spawna 146+ mobs no início, tickAI (300ms) move/ataca, snapshot 250ms broadcast pra todos. Cliente em modo online (`serverAuthMobs=true`) skipa simulação local. Offline: simulação local como antes |
 | 10 | ✅ **Combate MP validado** | Cliente envia `attackMob {monsterId, amount, range, crit}`. Server valida range (chebyshev) + dano ≤ teto. Aplica HP, broadcasta `mobUpdate`, on death envia `mobKill` (loot/xp local) + `mobDead` (remove pra todos) |
-| 11 | **Bônus de grupo** | +20% XP quando treinar perto de outro player |
+| 11 | ~~Bônus de grupo~~ | ❌ **Descartado** — jogo está emocionante assim |
 | 12 | ✅ **Chat real** | Tab CHAT alterna com COMBATE, input habilitado. Enter envia `chat {text}`. Server broadcasta a todos. Self-msg vem azul, others douradas, tab pulsa laranja quando inativa |
 
 ### Conteúdo (mundo)
