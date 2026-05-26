@@ -1151,6 +1151,16 @@
     </div>
 </div>
 
+<!-- Overlay de auto-update (aparece quando uma nova versão é detectada) -->
+<div id="updateOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;align-items:center;justify-content:center;">
+    <div class="reconnect-box">
+        <div class="reconnect-spinner">⚙</div>
+        <div class="reconnect-title">ATUALIZANDO</div>
+        <div class="reconnect-desc">Nova versão do jogo detectada…</div>
+        <div class="reconnect-hint">Salvando progresso e recarregando — combate pausado</div>
+    </div>
+</div>
+
 <div id="gameWrapper">
 
     <!-- SIDEBAR ESQUERDA -->
@@ -3010,6 +3020,7 @@ function addFloat(x,y,text,color,big,offsetY){
 }
 
 function damagePlayer(amount, source, attacker){
+    if (_isUpdating) return;   // janela de auto-update — combate pausado
     if (Math.random() < playerDodgeChance()){
         log(`<span class="log-sys">Você esquivou de ${source}.</span>`);
         gainSkillXp('Escudo', 1);
@@ -4228,6 +4239,7 @@ function handleMP(msg){
         // mob que tentei atacar já morreu/sumiu
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
     } else if (msg.t === 'mobHit'){
+        if (_isUpdating) return;   // janela de auto-update — ignora dano
         // mob me bateu — aplica dano com defesa percentual
         const amount = msg.dmg | 0;
         const defT = totalDefense();
@@ -4843,6 +4855,7 @@ function isStunned(){
     return true;
 }
 function tickStatusEffects(){
+    if (_isUpdating) return;   // janela de auto-update — pausa ticks de DoT
     const now = Date.now();
     // Poison
     if (player.poison){
@@ -7461,7 +7474,9 @@ function showLoadingOverlay(show){
 // Roda só após 30s de jogo (evita reload em loop se algo der ruim no primeiro check).
 let _lastHtmlVersion = null;
 let _autoUpdateStarted = Date.now();
+let _isUpdating = false;   // true durante a janela de reload (bloqueia damage)
 async function checkClientUpdate(){
+    if (_isUpdating) return;
     if (Date.now() - _autoUpdateStarted < 30000) return;  // grace period
     try {
         const res = await fetch(window.location.pathname || '/', { method:'HEAD', cache:'no-store' });
@@ -7469,10 +7484,19 @@ async function checkClientUpdate(){
         if (!sig) return;
         if (_lastHtmlVersion === null){ _lastHtmlVersion = sig; return; }
         if (sig !== _lastHtmlVersion){
-            console.log('[autoupdate] nova versão detectada, recarregando em 1s…');
+            console.log('[autoupdate] nova versão detectada, recarregando em 1.5s…');
+            _isUpdating = true;
+            // Overlay claro pro player — combate visualmente pausado
+            const el = document.getElementById('updateOverlay');
+            if (el) el.style.display = 'flex';
+            // Fecha WS imediato pra parar mobHit (servidor para de mandar dano)
+            if (ws){ try { ws.close(); } catch{} ws = null; }
+            // Cancela targets/auto-attack que poderiam roubar mais um tick
+            player.autoAttack = false;
+            player.target = null;
             if (typeof saveState === 'function') saveState();
-            // Pequeno delay pra save persistir no localStorage
-            setTimeout(() => window.location.reload(), 1000);
+            // Delay generoso pra save flushar + frame final do overlay aparecer
+            setTimeout(() => window.location.reload(), 1500);
         }
     } catch (e) { /* sem conexão / ignora */ }
 }
