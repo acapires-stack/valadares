@@ -3628,16 +3628,17 @@ window.openShop = openShop; window.closeShop = closeShop;
 function renderShop(){
     document.getElementById('shopGoldLabel').textContent = `${player.gold} g`;
     const buyEl = document.getElementById('shopBuyList');
-    buyEl.innerHTML = SHOP_BUY.map(o => {
+    buyEl.innerHTML = SHOP_BUY.map((o, i) => {
         const def = ITEMS[o.item];
         const canBuy = player.gold >= o.price;
+        const label = o.label || def.name;
         return `<div class="shop-row">
             <div class="shop-info">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(o.item, 18)})"></span>
-                <span class="shop-name">${def.name}</span>
+                <span class="shop-name">${escapeHtml(label)}</span>
             </div>
             <span class="shop-price">${o.price}g</span>
-            <button class="shop-btn" data-buy="${o.item}" ${canBuy?'':'disabled'}>comprar</button>
+            <button class="shop-btn" data-buy="${i}" ${canBuy?'':'disabled'}>comprar</button>
         </div>`;
     }).join('');
     const sellEl = document.getElementById('shopSellList');
@@ -4986,18 +4987,23 @@ const SHOP_BUY = [
     { item:'BOTAS',     price:120 },
     { item:'COURO',     price:180 },
     { item:'BENCAO_FENIX', price:15000 },
+    { item:'BENCAO_FENIX', price:65000,  qty:5,  label:'Bênção da Fênix × 5 (pacote -13%)' },
+    { item:'BENCAO_FENIX', price:120000, qty:10, label:'Bênção da Fênix × 10 (pacote -20%)' },
 ];
-function buyFromShop(itemKey){
-    const offer = SHOP_BUY.find(o => o.item === itemKey);
+// idx é o index em SHOP_BUY (suporta múltiplas ofertas pro mesmo item com qty/label)
+function buyFromShop(idx){
+    const i = parseInt(idx, 10);
+    const offer = SHOP_BUY[i];
     if (!offer) return;
     if (player.gold < offer.price){
         log(`<span class="log-sys">Sem ouro suficiente (${offer.price}g).</span>`);
         return;
     }
+    const qty = offer.qty || 1;
     player.gold -= offer.price;
-    player.inv[itemKey] = (player.inv[itemKey] || 0) + 1;
+    player.inv[offer.item] = (player.inv[offer.item] || 0) + qty;
     invSignature = null;
-    log(`<span class="log-up">+1 ${ITEMS[itemKey].name} (-${offer.price}g)</span>`);
+    log(`<span class="log-up">+${qty} ${ITEMS[offer.item].name} (-${offer.price}g)</span>`);
     renderShop();
 }
 // Preço unitário de venda (helper compartilhado com o render do shop)
