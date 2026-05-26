@@ -69,9 +69,8 @@ const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
 const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 
-// Admins (pra comandos /say, /event etc). Configurar via env ADMIN_NAMES="nome1,nome2"
-const ADMIN_NAMES = (process.env.ADMIN_NAMES || 'alcione').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-function isAdmin(name){ return ADMIN_NAMES.includes(String(name || '').toLowerCase()); }
+// Admin: travado em 'alcione' (não usa env, segurança extra)
+function isAdmin(name){ return String(name || '').toLowerCase() === 'alcione'; }
 
 // MOTD via env (mensagem do dia, aparece pra todos ao conectar)
 const SERVER_MOTD = process.env.SERVER_MOTD || '';
