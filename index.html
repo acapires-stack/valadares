@@ -3174,6 +3174,14 @@ function attack(){
 
 // Se nada equipado, luta com Punho (base 3, sobe skill Punho).
 const PUNHO = { skill:'Punho', base:2 };
+// Mult final em ataques melee/PvP: selos PvP + Coração equipado + buff Fúria.
+// Ataques ranged e magia usam só buffMult().dmg direto (decisão de design).
+function applyAttackMults(dmg){
+    let mult = pvpMults().dmg;
+    if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
+    mult *= buffMult().dmg;
+    return Math.floor(dmg * mult);
+}
 function activeWeapon(){
     const k = player.equipped.weapon;
     if (!k) return PUNHO;
@@ -4027,11 +4035,7 @@ function doAttack(m){
     let dmg = Math.max(1, base + Math.floor(Math.random()*5) - 2);
     const crit = Math.random() < playerCritChance();
     if (crit) dmg *= 2;
-    // Multiplicadores: selos PvP + Coração equipado + buff Fúria
-    let mult = pvpMults().dmg;
-    if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
-    mult *= buffMult().dmg;
-    dmg = Math.floor(dmg * mult);
+    dmg = applyAttackMults(dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
     if (crit) sndCrit(); else sndHit();
     log(`<span class="log-dmg">${crit?'★ ':''}${w.skill}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
@@ -6746,10 +6750,7 @@ function pvpAttackPlayer(targetId){
     let dmg = Math.max(1, base + Math.floor(Math.random()*5) - 2);
     const crit = Math.random() < playerCritChance();
     if (crit) dmg *= 2;
-    let mult = pvpMults().dmg;
-    if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
-    mult *= buffMult().dmg;
-    dmg = Math.floor(dmg * mult);
+    dmg = applyAttackMults(dmg);
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
     }
