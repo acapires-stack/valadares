@@ -1430,8 +1430,13 @@
     <div class="chest-box" style="min-width:620px">
         <div class="chest-title">⚒ BANCADA</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px;letter-spacing:1px;font-weight:600" id="craftGoldLabel">0 g</div>
+        <div style="display:flex;gap:4px;justify-content:center;margin-bottom:8px">
+            <button class="train-tab active" data-craft-tab="craft" onclick="switchCraftTab('craft')">RECEITAS</button>
+            <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')">🔥 FORJA</button>
+        </div>
         <div id="craftList" class="craft-list"></div>
-        <div class="chest-hint">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
+        <div id="forjaPanel" style="display:none"></div>
+        <div class="chest-hint" id="craftHint">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeCraft()">×</button>
     </div>
 </div>
@@ -4822,6 +4827,171 @@ function buyFromShop(itemKey){
     renderShop();
 }
 // Preço unitário de venda (helper compartilhado com o render do shop)
+// ═══════════════════════════════════════════════════════════════════════════
+// FORJA — upgrade de equips usando 3 items iguais + ouro (chance alta de falha)
+// ═══════════════════════════════════════════════════════════════════════════
+const UPGRADE_MAX        = 5;
+const UPGRADE_BONUS      = [0, 1, 2, 3, 5, 7];     // +N → bônus em base/def
+const UPGRADE_FAIL       = [0, 0.40, 0.60, 0.75, 0.88, 0.95];
+const UPGRADE_COST_MULT  = [0, 3, 8, 20, 50, 120]; // multiplicador do custo base
+function isUpgradableKind(kind){
+    return ['weapon','offhand','armor','head','feet','neck'].includes(kind);
+}
+// Decomp: ESPADA_PLUS_2 → { base:'ESPADA', plus:2 }; ESPADA → { base:'ESPADA', plus:0 }
+function getUpgradeTier(itemKey){
+    const m = itemKey && itemKey.match(/^(.+)_PLUS_(\d+)$/);
+    if (m) return { base: m[1], plus: parseInt(m[2], 10) };
+    return { base: itemKey, plus: 0 };
+}
+function makeUpgradeKey(baseKey, plus){
+    return plus > 0 ? baseKey + '_PLUS_' + plus : baseKey;
+}
+// Cria a entrada em ITEMS se ainda não existe (idempotente). Stats escalam só
+// em base (armas) ou def (armaduras/escudos) — outras props preservam.
+function ensureUpgradeItem(baseKey, plus){
+    const key = makeUpgradeKey(baseKey, plus);
+    if (ITEMS[key]) return key;
+    if (plus <= 0) return baseKey;   // base sem upgrade
+    const baseDef = ITEMS[baseKey];
+    if (!baseDef) return null;
+    const bonus = UPGRADE_BONUS[plus] || 0;
+    const newDef = { ...baseDef, name: baseDef.name + ' +' + plus };
+    if (typeof baseDef.base === 'number') newDef.base = baseDef.base + bonus;
+    if (typeof baseDef.def  === 'number') newDef.def  = baseDef.def  + bonus;
+    ITEMS[key] = newDef;
+    return key;
+}
+// Backfill: garante que todas as keys *_PLUS_N usadas em inv/chests/equipped
+// estejam em ITEMS após loadState (saves vêm com a key mas sem o def).
+function ensureAllUpgradeItemsFromState(){
+    const scan = (obj) => {
+        for (const k of Object.keys(obj || {})){
+            const t = getUpgradeTier(k);
+            if (t.plus > 0) ensureUpgradeItem(t.base, t.plus);
+        }
+    };
+    scan(player.inv);
+    for (const bagId of ['b1','b2','b3','b4']) scan(player.chests?.[bagId]);
+    if (player.equipped){
+        for (const slot of Object.keys(player.equipped)){
+            const v = player.equipped[slot];
+            if (v){
+                const t = getUpgradeTier(v);
+                if (t.plus > 0) ensureUpgradeItem(t.base, t.plus);
+            }
+        }
+    }
+}
+function forgeCostFor(baseKey, targetPlus){
+    const sell = sellPriceFor(baseKey);
+    const base = Math.max(20, sell * 2);
+    const mult = UPGRADE_COST_MULT[targetPlus] || 0;
+    return base * mult;
+}
+function attemptForge(itemKey){
+    const tier = getUpgradeTier(itemKey);
+    const targetPlus = tier.plus + 1;
+    if (targetPlus > UPGRADE_MAX){
+        log('<span class="log-sys">Já no nível máximo (+' + UPGRADE_MAX + ').</span>');
+        return;
+    }
+    const have = player.inv[itemKey] || 0;
+    if (have < 3){
+        log('<span class="log-sys">Precisa de 3× ' + ITEMS[itemKey].name + '.</span>');
+        return;
+    }
+    const cost = forgeCostFor(tier.base, targetPlus);
+    if (player.gold < cost){
+        log('<span class="log-sys">Sem ouro (' + cost + 'g).</span>');
+        return;
+    }
+    // Consome material e ouro ANTES do roll
+    player.inv[itemKey] -= 3;
+    if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
+    player.gold -= cost;
+    invSignature = null;
+    const failChance = UPGRADE_FAIL[targetPlus];
+    if (Math.random() < failChance){
+        // Os 3 explodem
+        log('<span class="log-die">💥 Forja falhou! 3× ' + ITEMS[itemKey].name + ' destruídos. -' + cost + 'g</span>');
+        if (typeof sndDeath === 'function') sndDeath();
+        addFloat(player.x, player.y, 'FALHA', '#ff3030', true, -10);
+        renderForja();
+        return;
+    }
+    // Sucesso — cria item upgrade
+    const newKey = ensureUpgradeItem(tier.base, targetPlus);
+    player.inv[newKey] = (player.inv[newKey] || 0) + 1;
+    log('<span class="log-up">✨ Forjou ' + ITEMS[newKey].name + '! (custo ' + cost + 'g)</span>');
+    if (typeof sndLevelUp === 'function') sndLevelUp();
+    addFloat(player.x, player.y, '★ +' + targetPlus, '#ffcc40', true, -10);
+    renderForja();
+}
+window.attemptForge = attemptForge;
+
+function switchCraftTab(which){
+    document.querySelectorAll('[data-craft-tab]').forEach(t => {
+        t.classList.toggle('active', t.dataset.craftTab === which);
+    });
+    const listEl = document.getElementById('craftList');
+    const forjaEl = document.getElementById('forjaPanel');
+    const hint = document.getElementById('craftHint');
+    if (which === 'craft'){
+        listEl.style.display = '';
+        forjaEl.style.display = 'none';
+        hint.innerHTML = 'click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar';
+        renderCraft();
+    } else {
+        listEl.style.display = 'none';
+        forjaEl.style.display = '';
+        hint.innerHTML = '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói os 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar';
+        renderForja();
+    }
+}
+window.switchCraftTab = switchCraftTab;
+
+function renderForja(){
+    const el = document.getElementById('forjaPanel');
+    if (!el) return;
+    document.getElementById('craftGoldLabel').textContent = player.gold + ' g';
+    const candidates = Object.entries(player.inv)
+        .filter(([k,q]) => q >= 3 && ITEMS[k] && isUpgradableKind(ITEMS[k].kind))
+        .filter(([k]) => getUpgradeTier(k).plus < UPGRADE_MAX)
+        .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
+    if (!candidates.length){
+        el.innerHTML = '<div class="chest-empty" style="padding:24px;text-align:center;font-style:italic;color:#666">Sem candidatos.<br><br>Precisa de <b>3× items equipáveis iguais</b> (arma, armadura, escudo, elmo, botas ou colar) com mesmo nível.</div>';
+        return;
+    }
+    el.innerHTML = '<div style="color:#998040;font-size:10px;padding:0 6px 10px 6px;letter-spacing:0.3px;text-align:center">3× consumidos por tentativa &nbsp;·&nbsp; <span style="color:#ff8060">falha destrói todos</span> &nbsp;·&nbsp; sucesso retorna 1× upgraded</div>' +
+        candidates.map(([k,q]) => {
+            const def = ITEMS[k];
+            const tier = getUpgradeTier(k);
+            const target = tier.plus + 1;
+            const cost = forgeCostFor(tier.base, target);
+            const fail = Math.round(UPGRADE_FAIL[target] * 100);
+            const canPay = player.gold >= cost;
+            const bonus = UPGRADE_BONUS[target];
+            const statTxt = (typeof def.base === 'number')
+                ? `ataque ${def.base} → <b style="color:#74d176">${def.base + bonus}</b>`
+                : (typeof def.def === 'number')
+                ? `def ${def.def} → <b style="color:#74d176">${def.def + bonus}</b>`
+                : '';
+            return `<div class="craft-row">
+                <div class="craft-out">
+                    <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
+                    <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(def.name)}</span>
+                    <span style="margin-left:6px;color:#888;font-size:10px">${q}× disponíveis</span>
+                </div>
+                <div class="craft-in" style="color:#aaa;font-size:11px">
+                    ${statTxt}<br>
+                    <span style="color:#ffcc40">${cost}g</span> &nbsp;·&nbsp;
+                    <span style="color:#ff8060">${fail}% falha</span>
+                </div>
+                <button class="craft-btn" ${canPay ? '' : 'disabled'} onclick="attemptForge('${k}')">forjar +${target}</button>
+            </div>`;
+        }).join('');
+}
+
 function sellPriceFor(itemKey){
     const def = ITEMS[itemKey];
     if (!def) return 1;
@@ -5135,10 +5305,15 @@ function pkKilledSomeone(msg){
         invSignature = null;
     }
     // Drop de item ao matar um ghost (corpo desconectado)
-    if (msg.ghost && msg.droppedItem && ITEMS[msg.droppedItem]){
-        player.inv[msg.droppedItem] = (player.inv[msg.droppedItem] || 0) + 1;
-        log(`<span class="log-up">💀 Saqueou: ${ITEMS[msg.droppedItem].name}</span>`);
-        invSignature = null;
+    if (msg.ghost && msg.droppedItem){
+        // Se for item upgrade que ainda não está em ITEMS (outro player forjou), recria
+        const tier = getUpgradeTier(msg.droppedItem);
+        if (tier.plus > 0 && !ITEMS[msg.droppedItem]) ensureUpgradeItem(tier.base, tier.plus);
+        if (ITEMS[msg.droppedItem]){
+            player.inv[msg.droppedItem] = (player.inv[msg.droppedItem] || 0) + 1;
+            log(`<span class="log-up">💀 Saqueou: ${escapeHtml(ITEMS[msg.droppedItem].name)}</span>`);
+            invSignature = null;
+        }
     }
     saveState();
 }
@@ -7700,6 +7875,8 @@ function loadState(){
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
+        // Recria entries de ITEMS pros items upgrade _PLUS_N que estavam no save
+        if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
         return true;
     } catch { return false; }
 }
