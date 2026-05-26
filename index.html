@@ -4165,14 +4165,14 @@ function handleMP(msg){
         }
     } else if (msg.t === 'join'){
         remotePlayers[msg.player.id] = msg.player;
-        log(`<span class="log-sys">${msg.player.name} entrou!</span>`);
+        log(`<span class="log-sys">${escapeHtml(msg.player.name)} entrou!</span>`);
     } else if (msg.t === 'leave'){
-        if (remotePlayers[msg.id]) log(`<span class="log-sys">${remotePlayers[msg.id].name} saiu.</span>`);
+        if (remotePlayers[msg.id]) log(`<span class="log-sys">${escapeHtml(remotePlayers[msg.id].name)} saiu.</span>`);
         delete remotePlayers[msg.id];
     } else if (msg.t === 'ghost'){
         if (remotePlayers[msg.id]){
             remotePlayers[msg.id].ghost = true;
-            log(`<span class="log-die">💤 ${remotePlayers[msg.id].name} deslogou (corpo fica 3 min)</span>`);
+            log(`<span class="log-die">💤 ${escapeHtml(remotePlayers[msg.id].name)} deslogou (corpo fica 3 min)</span>`);
         }
     } else if (msg.t === 'pos'){
         if (remotePlayers[msg.id]){
@@ -4196,7 +4196,7 @@ function handleMP(msg){
         player.hp = Math.max(0, player.hp - actual);
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         player.hurtTimer = 300;
-        log(`<span class="log-dmg">⚠ ${msg.fromName} (PvP): ${actual} dano</span>`);
+        log(`<span class="log-dmg">⚠ ${escapeHtml(msg.fromName)} (PvP): ${actual} dano</span>`);
         if (player.hp === 0){
             // PK death — reporta ao servidor pra dar selo/coração ao killer
             pkDeathBy(msg.from, msg.fromName);
@@ -4207,12 +4207,12 @@ function handleMP(msg){
     } else if (msg.t === 'announce'){
         // Compat retroativa: trata como evento
         showServerToast('event', msg.text);
-        log(`<span class="log-up">${msg.text}</span>`);
+        log(`<span class="log-up">${escapeHtml(msg.text)}</span>`);
     } else if (msg.t === 'serverMsg'){
         showServerToast(msg.level || 'info', msg.text, msg.from);
         const logClass = {info:'log-sys', warn:'log-die', event:'log-up', admin:'log-up'}[msg.level] || 'log-sys';
-        const prefix = msg.from ? `<b style="color:#ffaa20">[${msg.from}]</b> ` : '';
-        log(`<span class="${logClass}">${prefix}${msg.text}</span>`);
+        const prefix = msg.from ? `<b style="color:#ffaa20">[${escapeHtml(msg.from)}]</b> ` : '';
+        log(`<span class="${logClass}">${prefix}${escapeHtml(msg.text)}</span>`);
     } else if (msg.t === 'chat'){
         appendChat(msg.name, msg.text, msg.id === myWsId);
     } else if (msg.t === 'mobs'){
@@ -4899,9 +4899,8 @@ function showServerToast(level, text, fromName, durationMs){
     if (!container) return;
     const div = document.createElement('div');
     div.className = 'toast toast-' + (level || 'info');
-    const safe = String(text).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
-    const prefix = fromName ? `<b class="toast-from">[${fromName}]</b> ` : '';
-    div.innerHTML = `${prefix}${safe}`;
+    const prefix = fromName ? `<b class="toast-from">[${escapeHtml(fromName)}]</b> ` : '';
+    div.innerHTML = `${prefix}${escapeHtml(text)}`;
     container.appendChild(div);
     // anim slide-in via class adicionada após pintar
     requestAnimationFrame(() => div.classList.add('toast-visible'));
@@ -4920,9 +4919,7 @@ function appendChat(name, text, isSelf){
     if (!box) return;
     const div = document.createElement('div');
     div.className = 'chat-msg' + (isSelf ? ' self' : '');
-    const safeName = (name || '?').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
-    const safeText = String(text).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
-    div.innerHTML = `<span class="chat-name">${safeName}:</span><span class="chat-text">${safeText}</span>`;
+    div.innerHTML = `<span class="chat-name">${escapeHtml(name || '?')}:</span><span class="chat-text">${escapeHtml(text)}</span>`;
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
     // notifica visualmente se a tab CHAT estiver inativa
@@ -5041,7 +5038,7 @@ function pkDeathBy(killerId, killerName){
         // Eu (killer original) tô sendo morto em vingança → perde 60% skills
         applyPvpPenalty(true);
         delete player.vengeance[killerId];
-        log(`<span class="log-die">⚠ Vingado por ${killerName}! Perda dobrada de skills.</span>`);
+        log(`<span class="log-die">⚠ Vingado por ${escapeHtml(killerName)}! Perda dobrada de skills.</span>`);
     } else {
         applyPvpPenalty(false);
     }
@@ -5072,7 +5069,7 @@ function pkKilledSomeone(msg){
     // msg = { victimId, victimName, victimHadSelos, goldGain, dropHighlander }
     if (player.stats) player.stats.pkKills = (player.stats.pkKills || 0) + 1;
     player.gold += msg.goldGain;
-    log(`<span class="log-up">⚔ Você matou ${msg.victimName}! +${msg.goldGain}g</span>`);
+    log(`<span class="log-up">⚔ Você matou ${escapeHtml(msg.victimName)}! +${msg.goldGain}g</span>`);
     // Se eu havia sido morto por essa pessoa recentemente, é vingança → recupera skills
     const prevKill = player.lastKilledBy;
     if (prevKill && prevKill.id === msg.victimId && (Date.now() - prevKill.time) < PVP_VENGEANCE_MS){
@@ -5162,7 +5159,7 @@ function renderPlayerRow(p){
     }
     const meClass = p.isMe ? ' me' : '';
     const ghostClass = p.ghost ? ' ghost' : '';
-    const safeName = (p.name || '?').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    const safeName = escapeHtml(p.name || '?');
     return `<div class="po-row${meClass}${ghostClass}">
         <div class="po-line1">
             <span class="po-name">${safeName}${p.isMe?' <span style="color:#888;font-weight:400">(você)</span>':''}</span>
@@ -5291,7 +5288,7 @@ function renderTargetWidget(){
         meta.push(`<span style="color:${fl>0?'#cce0a0':'#cc5050'}">▶ ${fl} flechas</span>`);
     }
     el.innerHTML = `
-        <div class="target-name ${isPlayer?'player':''}">${isPlayer?'☠ ':''}${target.name}</div>
+        <div class="target-name ${isPlayer?'player':''}">${isPlayer?'☠ ':''}${escapeHtml(target.name)}</div>
         <div class="target-hp-bar">
             <div class="target-hp-fill" style="width:${pct}%;background:${color}"></div>
             <div class="target-hp-text">${Math.max(0,target.hp)}/${target.maxHp}</div>
@@ -5874,7 +5871,7 @@ canvas.addEventListener('click', e => {
             player.target = parseInt(id, 10);
             player.targetType = 'player';
             player.autoAttack = true;
-            log(`<span class="log-dmg">Alvo PvP: ${rp.name} ☠ [AUTO]</span>`);
+            log(`<span class="log-dmg">Alvo PvP: ${escapeHtml(rp.name)} ☠ [AUTO]</span>`);
             return;
         }
     }
@@ -5963,6 +5960,17 @@ function categorize(html){
     if (html.includes('log-xp'))   return 'loot';   // drops/pickup/comer
     if (html.includes('log-up'))   return 'up';
     return 'sys';
+}
+// Escape de HTML — usado pra interpolar strings vindas de outro player ou do server
+// em log()/innerHTML. Inclui aspas pra cobrir contexto de atributo.
+function escapeHtml(s){
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 function log(html, cat){
     const c = cat || categorize(html);
@@ -6736,7 +6744,7 @@ function pvpAttackPlayer(targetId){
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
     }
-    log(`<span class="log-dmg">${crit?'★ ':''}PvP: -${dmg} em ${tgt.name}</span>`);
+    log(`<span class="log-dmg">${crit?'★ ':''}PvP: -${dmg} em ${escapeHtml(tgt.name)}</span>`);
     gainSkillXp(w.skill, 1);
     player.attackTimer = player.attackDelay;
 }
