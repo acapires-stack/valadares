@@ -2006,6 +2006,8 @@ const MTYPE = {
     GOLEM_REI:  { name:'Golem Rei',    hp:900, dmg:20, speed:490, xp:700, color:'#4a5868', size:1.55, dodge:0.03, crit:0.15, unique:true, intel:3 },
     // caçadores do Highlander Hunt
     CACADOR:    { name:'Caçador de Recompensa', hp:350, dmg:18, speed:320, xp:0, color:'#ff8c20', size:1.2, dodge:0.12, crit:0.22, intel:3 },
+    // ★★ MEGA RAID BOSS — Senhor de Valadares (spawna quando 3 bosses Lv10)
+    SENHOR_VALADARES: { name:'O Senhor de Valadares ★★', hp:8000, dmg:50, speed:280, xp:5000, color:'#ffd040', size:1.9, dodge:0.05, crit:0.30, unique:true, intel:3 },
 };
 
 
@@ -2078,6 +2080,10 @@ const ITEMS = {
     ESPADA_HL:     { name:'Espada do Highlander ★', color:'#ffd040', kind:'weapon', hand:'2h', skill:'Espada', base:20, def:8 },
     ARMADURA_TRONO:{ name:'Armadura do Trono ★',    color:'#ffcc40', kind:'armor',   def:14 },
     COROA_VENDEDOR:{ name:'Coroa do Vendedor ★',    color:'#ff8040', kind:'head',    def:7 },
+    // ★★ MÍTICAS (drops do Senhor de Valadares)
+    ESPADA_ETERNA:  { name:'Espada Eterna ★★',    color:'#ffe060', kind:'weapon', hand:'2h', skill:'Espada', base:30, def:12 },
+    COROA_VALADARES:{ name:'Coroa de Valadares ★★', color:'#ffd700', kind:'head',  def:20 },
+    ESSENCIA:       { name:'Essência de Valadares', color:'#ffe5a0', kind:'mat' },
     // armaduras endgame
     ARMADURA_ESCAMA:{ name:'Armadura de Escamas', color:'#cc5040', kind:'armor',   def:9 },
     ESCUDO_PEDRA:  { name:'Escudo de Pedra',  color:'#7888a0', kind:'offhand', def:8 },
@@ -2183,6 +2189,18 @@ const DROPS = {
         ['SABRE',  0.30, 1, 1],
         ['BESTA',  0.25, 1, 1],
         ['ARMADURA', 0.40, 1, 1],
+    ],
+    // ★★ MEGA RAID — Senhor de Valadares
+    SENHOR_VALADARES: [
+        ['GOLD',            1.00, 5000, 10000],
+        ['ESSENCIA',        1.00, 5, 10],
+        ['CORACAO_HL',      1.00, 3, 5],
+        ['POTION',          1.00, 10, 20],
+        ['POTION_MP',       1.00, 10, 20],
+        ['COROA_VALADARES', 0.30, 1, 1],
+        ['ESPADA_ETERNA',   0.20, 1, 1],
+        ['ARMADURA_TRONO',  0.50, 1, 1],
+        ['ESPADA_HL',       0.40, 1, 1],
     ],
 };
 
@@ -2820,6 +2838,11 @@ function rollAttackerStatus(mobType){
         case 'LIZARD':   if (Math.random() < 0.20) applyBleed(1, 6, 2000, 'Lagarto');           break;
         case 'TROLL':    if (Math.random() < 0.10) applyStun(1500, 'Troll');                    break;
         case 'MINOTAUR': if (Math.random() < 0.25) applyStun(2000, 'Minotauro');                break;
+        // ★★ Senhor de Valadares: stun + bleed (efeitos devastadores)
+        case 'SENHOR_VALADARES':
+            if (Math.random() < 0.35) applyStun(2500, 'Senhor de Valadares');
+            if (Math.random() < 0.50) applyBleed(4, 5, 2000, 'Senhor de Valadares');
+            break;
     }
 }
 

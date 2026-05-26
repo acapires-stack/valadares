@@ -36,6 +36,8 @@ const MTYPE = {
     GOLEM_REI:  { hp:900, dmg:20, speed:490, xp:700, aggro:7, unique:true },
     SCORPION:   { hp:75,  dmg:11, speed:320, xp:55,  aggro:4 },
     CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999 },
+    // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
+    SENHOR_VALADARES: { hp:8000, dmg:50, speed:280, xp:5000, aggro:12, unique:true, mega:true },
 };
 
 const SPAWN_RINGS = [
@@ -68,6 +70,16 @@ const bossDeath = new Map(); // type -> deathAt
 const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
 const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
+
+// ★★ MEGA BOSS (Senhor de Valadares)
+const MEGA_BOSS_POS = { x: 50, y: 30 };
+const MEGA_BOSS_TYPE = 'SENHOR_VALADARES';
+const MEGA_BOSS_LIFETIME_MS = 30 * 60 * 1000;   // 30 min vivo
+const MEGA_BOSS_COOLDOWN_MS = 24 * 60 * 60 * 1000;  // 24h cooldown após morte/expira
+const megaBoss = {
+    spawnedAt: 0,         // 0 = não está vivo
+    lastResolvedAt: 0,    // última vez que morreu ou expirou
+};
 
 // Admin: travado em 'alcione' (não usa env, segurança extra)
 function isAdmin(name){ return String(name || '').toLowerCase() === 'alcione'; }
@@ -420,6 +432,7 @@ function saveStateToDisk(){
         nextMobId,
         bossLevel: Array.from(bossLevel.entries()),
         bossDeath: Array.from(bossDeath.entries()),
+        megaBoss: { spawnedAt: megaBoss.spawnedAt, lastResolvedAt: megaBoss.lastResolvedAt },
         monsters: Array.from(monsters.values()).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
@@ -441,6 +454,10 @@ function loadStateFromDisk(){
         if (typeof d.nextMobId === 'number') nextMobId = d.nextMobId;
         if (Array.isArray(d.bossLevel)) for (const [k,v] of d.bossLevel) bossLevel.set(k, v);
         if (Array.isArray(d.bossDeath)) for (const [k,v] of d.bossDeath) bossDeath.set(k, v);
+        if (d.megaBoss){
+            megaBoss.spawnedAt = d.megaBoss.spawnedAt || 0;
+            megaBoss.lastResolvedAt = d.megaBoss.lastResolvedAt || 0;
+        }
         monsters.clear();
         if (Array.isArray(d.monsters)){
             for (const m of d.monsters){
@@ -487,6 +504,70 @@ function tickDailyReset(){
     console.log('[reset] daily reset — bosses Lv1');
 }
 setInterval(tickDailyReset, 60 * 1000);  // checa a cada minuto
+
+// ─── ★★ MEGA BOSS — Senhor de Valadares ──────────────────────────────────
+function allBossesAtMaxLevel(){
+    for (const b of BOSSES){
+        if ((bossLevel.get(b.type) || 1) < BOSS_LEVEL_CAP) return false;
+    }
+    return true;
+}
+function megaBossIsAlive(){
+    if (!megaBoss.spawnedAt) return false;
+    for (const m of monsters.values()) if (m.type === MEGA_BOSS_TYPE) return true;
+    return false;
+}
+function checkMegaBossSpawn(){
+    if (megaBoss.spawnedAt) return;  // já tá vivo
+    if (!allBossesAtMaxLevel()) return;
+    if (Date.now() - megaBoss.lastResolvedAt < MEGA_BOSS_COOLDOWN_MS) return;
+    // Spawn!
+    const m = spawnMob(MEGA_BOSS_TYPE, MEGA_BOSS_POS.x, MEGA_BOSS_POS.y);
+    if (!m) return;
+    megaBoss.spawnedAt = Date.now();
+    saveStateToDisk();
+    broadcastMsg('event', `⚡ O Senhor de Valadares despertou em (${MEGA_BOSS_POS.x}, ${MEGA_BOSS_POS.y})! Você tem 30 minutos.`);
+    console.log(`[mega] Senhor de Valadares spawnado @ ${MEGA_BOSS_POS.x},${MEGA_BOSS_POS.y}`);
+}
+function handleMegaBossDeath(killer, mob){
+    const survivedMs = Date.now() - megaBoss.spawnedAt;
+    megaBoss.spawnedAt = 0;
+    megaBoss.lastResolvedAt = Date.now();
+    // Reset bossLevel de todos pra Lv1
+    bossLevel.clear();
+    bossDeath.clear();
+    for (const b of BOSSES){
+        // Remove versões antigas e spawna Lv1
+        for (const x of Array.from(monsters.values())) if (x.type === b.type) monsters.delete(x.id);
+        spawnMob(b.type, b.x, b.y);
+    }
+    saveStateToDisk();
+    broadcastMsg('event', `🏆 ${killer.name} derrotou O Senhor de Valadares em ${Math.floor(survivedMs/60000)}min! Bosses recomeçam no Lv1. Cooldown 24h.`);
+    console.log(`[mega] Senhor morto por ${killer.name} (sobreviveu ${(survivedMs/1000).toFixed(0)}s) → bossLevel resetado`);
+}
+function tickMegaBoss(){
+    if (!megaBoss.spawnedAt) return;
+    const alive = megaBossIsAlive();
+    const elapsed = Date.now() - megaBoss.spawnedAt;
+    if (!alive){
+        // morreu (já tratado por handleMegaBossDeath) — só limpa flag se ainda não foi
+        if (megaBoss.spawnedAt){
+            megaBoss.spawnedAt = 0;
+            megaBoss.lastResolvedAt = Date.now();
+        }
+        return;
+    }
+    if (elapsed >= MEGA_BOSS_LIFETIME_MS){
+        // Expirou — Senhor escapou
+        for (const m of Array.from(monsters.values())) if (m.type === MEGA_BOSS_TYPE) monsters.delete(m.id);
+        megaBoss.spawnedAt = 0;
+        megaBoss.lastResolvedAt = Date.now();
+        saveStateToDisk();
+        broadcastMsg('warn', `💨 O Senhor de Valadares escapou de volta ao Vazio. Cooldown 24h.`);
+        console.log('[mega] Senhor expirou (30min sem morrer)');
+    }
+}
+setInterval(tickMegaBoss, 5000);
 
 // ─── Ghosts (body stays) ───────────────────────────────────────────────────
 function tickGhosts(){
@@ -630,14 +711,21 @@ wss.on('connection', (ws) => {
             if (m.hp === 0){
                 // morte
                 if (m.unique){
-                    bossDeath.set(m.type, Date.now());
-                    // próxima encarnação fica +1 nível (cap)
-                    const cur = bossLevel.get(m.type) || 1;
-                    const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
-                    bossLevel.set(m.type, next);
-                    console.log(`[boss] ${m.type} morto (Lv${cur}) por ${p.name} → próximo Lv${next}`);
-                    // Salva imediatamente após escalar boss (não espera o tick)
-                    saveStateToDisk();
+                    if (m.type === MEGA_BOSS_TYPE){
+                        // ★★ Mega boss morreu — recompensa épica + reset bossLevel
+                        handleMegaBossDeath(p, m);
+                    } else {
+                        bossDeath.set(m.type, Date.now());
+                        // próxima encarnação fica +1 nível (cap)
+                        const cur = bossLevel.get(m.type) || 1;
+                        const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
+                        bossLevel.set(m.type, next);
+                        console.log(`[boss] ${m.type} morto (Lv${cur}) por ${p.name} → próximo Lv${next}`);
+                        // Salva imediatamente
+                        saveStateToDisk();
+                        // Verifica se desbloqueou o mega boss
+                        checkMegaBossSpawn();
+                    }
                 }
                 monsters.delete(m.id);
                 // notifica killer com xp + spawn de loot fica com o killer (cliente)
