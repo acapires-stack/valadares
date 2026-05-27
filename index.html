@@ -7710,7 +7710,8 @@ function targetScore(m){
 
 // Trava em um alvo do viewport e liga auto-ataque.
 // Quando PvP está ligado, players inimigos têm PRIORIDADE sobre monstros.
-function targetNearest(cycle){
+// silent: pula o log "Alvo: X [AUTO]" (usado pelo auto-engage passivo do loop).
+function targetNearest(cycle, silent){
     const cam = getCamera();
     let best = null, bestS = Infinity, bestType = 'monster', bestId = null;
     // Monstros
@@ -7738,11 +7739,13 @@ function targetNearest(cycle){
         player.target = bestId;
         player.targetType = bestType;
         player.autoAttack = true;
-        if (bestType === 'player')
-            log(`<span class="log-dmg">Alvo PvP: ${best.name} ☠ [AUTO]</span>`);
-        else
-            log(`<span class="log-sys">Alvo: ${best.name} [AUTO]</span>`);
-    } else {
+        if (!silent){
+            if (bestType === 'player')
+                log(`<span class="log-dmg">Alvo PvP: ${best.name} ☠ [AUTO]</span>`);
+            else
+                log(`<span class="log-sys">Alvo: ${best.name} [AUTO]</span>`);
+        }
+    } else if (!silent){
         log('<span class="log-sys">Nenhum alvo visível.</span>');
     }
 }
@@ -8524,6 +8527,14 @@ function checkPzLock(){
         player.x = SAFE_CX;
         snapRender(player);
     }
+    // Transição fora→dentro de PZ: cancela alvos automaticamente
+    const inSafe = inSafeZone(player.x, player.y);
+    if (inSafe && !player._lastInSafe && (player.target || player.autoAttack)){
+        player.target = null;
+        player.autoAttack = false;
+        log('<span class="log-sys">Entrou na PZ — alvo cancelado.</span>');
+    }
+    player._lastInSafe = inSafe;
 }
 
 // Concede +1 selo ao matador (chamado quando alguém é morto em PvP)
@@ -10162,6 +10173,13 @@ function loop(ts){
     // interpolação visual (depois das mudanças de pos)
     tickRender(player, dt);
     monsters.forEach(m => tickRender(m, dt));
+
+    // Auto-engage passivo: fora da PZ, com arma, sem alvo → procura inimigo no viewport
+    // e engaja sozinho (sem precisar SPACE). Silent: não loga "Alvo: X" toda hora.
+    if (!player.autoAttack && !player.target && player.equipped.weapon
+        && !inSafeZone(player.x, player.y)){
+        targetNearest(false, true);
+    }
 
     // auto-attack (inclui diagonais via Chebyshev)
     if (player.autoAttack){
