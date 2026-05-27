@@ -4659,9 +4659,14 @@ function doAttack(m){
         return;
     }
     player.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
-    // Partículas cosméticas no momento do ataque (visual local)
+    // Partículas cosméticas no momento do ataque (visual local + broadcast)
     const partCol = ITEMS[player.equipped.cosmetic]?.particles;
-    if (partCol) spawnAttackParticles(player.x, player.y, partCol);
+    if (partCol){
+        spawnAttackParticles(player.x, player.y, partCol);
+        if (ws && ws.readyState === 1){
+            try { ws.send(JSON.stringify({t:'attackVfx', color: partCol})); } catch{}
+        }
+    }
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
     const isRanged = wItem && wItem.ranged;
@@ -5069,6 +5074,12 @@ function handleMP(msg){
         const rp = remotePlayers[msg.id];
         if (rp){
             addFloat(rp.x, rp.y, msg.text, msg.color, msg.big);
+        }
+    } else if (msg.t === 'attackVfx'){
+        // partículas de cosmético de outro player atacando
+        const rp = remotePlayers[msg.id];
+        if (rp && typeof msg.color === 'string'){
+            spawnAttackParticles(rp.x, rp.y, msg.color);
         }
     } else if (msg.t === 'pvpHit'){
         const amount = msg.amount;

@@ -1504,6 +1504,13 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        if (msg.t === 'attackVfx') {
+            // Cosmético de partícula ao atacar — propaga pros outros renderizarem
+            const color = typeof msg.color === 'string' ? msg.color.slice(0, 12) : null;
+            if (color) broadcast(id, { t:'attackVfx', id, color });
+            return;
+        }
+
         // PvP entre players (vivo ou ghost)
         if (msg.t === 'pvpAttack') {
             const tgt = players.get(msg.targetId);
