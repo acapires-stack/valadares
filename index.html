@@ -3535,6 +3535,11 @@ const floatTexts = []; // damage numbers
 const trails = [];      // { x, y, color, life, maxLife }
 // Partículas (cosmético PART_*): centelhas saindo do boneco ao atacar
 const particles = [];   // { x, y, dx, dy, color, life, maxLife }
+// Partículas ambiente por bioma (neve caindo, areia voando, gotas, embers)
+const ambientParticles = []; // { kind, x, y, vx, vy, life, maxLife, color }
+const AMBIENT_CAP = 90;
+let ambientSpawnTimer = 0;
+const AMBIENT_SPAWN_INTERVAL = 70; // ms
 
 function spawnTrailAt(rx, ry, color){
     trails.push({ x: rx, y: ry, color, life: 800, maxLife: 800 });
@@ -8092,6 +8097,118 @@ function drawParticles(cam){
     }
 }
 
+// ===== Partículas ambiente por bioma =====
+function _makeAmbientParticle(kind, tx, ty){
+    if (kind === 'snow'){
+        return { kind, x: tx + Math.random(), y: ty - 0.5,
+                 vx: -0.08 + Math.random()*0.05, vy: 0.7 + Math.random()*0.35,
+                 life: 4200, maxLife: 4200, color: 'rgba(255,255,255,0.85)' };
+    }
+    if (kind === 'sand'){
+        return { kind, x: tx + Math.random(), y: ty + Math.random()*0.6 + 0.2,
+                 vx: 0.9 + Math.random()*0.5, vy: -0.05 + Math.random()*0.2,
+                 life: 2200, maxLife: 2200, color: 'rgba(230,200,130,0.65)' };
+    }
+    if (kind === 'spray'){
+        return { kind, x: tx + Math.random(), y: ty + Math.random()*0.4 + 0.1,
+                 vx: -0.4 + Math.random()*0.8, vy: -0.5 - Math.random()*0.4,
+                 life: 700, maxLife: 700, color: 'rgba(180,220,255,0.75)' };
+    }
+    if (kind === 'ember'){
+        return { kind, x: tx + 0.3 + Math.random()*0.4, y: ty + Math.random()*0.2,
+                 vx: -0.05 + Math.random()*0.1, vy: -0.35 - Math.random()*0.25,
+                 life: 1400, maxLife: 1400, color: 'rgba(255,180,60,0.95)' };
+    }
+    if (kind === 'pollen'){
+        return { kind, x: tx + Math.random(), y: ty + Math.random()*0.6,
+                 vx: -0.15 + Math.random()*0.3, vy: -0.05 + Math.random()*0.05,
+                 life: 5000, maxLife: 5000, color: 'rgba(220,255,160,0.5)' };
+    }
+    if (kind === 'cave_drip'){
+        return { kind, x: tx + 0.3 + Math.random()*0.4, y: ty + Math.random()*0.4,
+                 vx: 0, vy: 0.9 + Math.random()*0.4,
+                 life: 1500, maxLife: 1500, color: 'rgba(120,160,200,0.55)' };
+    }
+    return null;
+}
+function tickAmbientParticles(dt){
+    ambientSpawnTimer += dt;
+    if (ambientSpawnTimer >= AMBIENT_SPAWN_INTERVAL && ambientParticles.length < AMBIENT_CAP){
+        ambientSpawnTimer = 0;
+        const cam = getCamera();
+        // 6 amostras aleatórias na viewport
+        for (let i = 0; i < 6; i++){
+            const tx = Math.floor(cam.x) + Math.floor(Math.random() * (VP_W+1));
+            const ty = Math.floor(cam.y) + Math.floor(Math.random() * (VP_H+1));
+            if (tx < 0 || ty < 0 || tx >= M_W || ty >= M_H) continue;
+            const t = map[ty][tx];
+            let kind = null;
+            if      (t === T.SNOW)              kind = 'snow';
+            else if (t === T.SAND  && Math.random() < 0.6) kind = 'sand';
+            else if (t === T.WATER && Math.random() < 0.35) kind = 'spray';
+            else if (t === T.GRASS && Math.random() < 0.08) kind = 'pollen';
+            else if (t === T.CAVE  && Math.random() < 0.15) kind = 'cave_drip';
+            if (kind){
+                const p = _makeAmbientParticle(kind, tx, ty);
+                if (p) ambientParticles.push(p);
+            }
+        }
+        // embers fixos perto das tochas da PZ
+        for (const torch of TORCHES){
+            if (torch.x < cam.x-1 || torch.x > cam.x+VP_W+1) continue;
+            if (torch.y < cam.y-1 || torch.y > cam.y+VP_H+1) continue;
+            if (Math.random() < 0.5){
+                ambientParticles.push(_makeAmbientParticle('ember', torch.x, torch.y));
+            }
+        }
+    }
+    const dts = dt / 1000;
+    for (let i = ambientParticles.length - 1; i >= 0; i--){
+        const p = ambientParticles[i];
+        p.life -= dt;
+        if (p.life <= 0){ ambientParticles.splice(i, 1); continue; }
+        p.x += p.vx * dts;
+        p.y += p.vy * dts;
+        if (p.kind === 'snow'){
+            p.vx += Math.sin((p.maxLife - p.life) * 0.003) * 0.002;  // vento sutil
+        } else if (p.kind === 'ember'){
+            p.vy -= 0.15 * dts;
+            p.vx += (Math.random() - 0.5) * 0.04;
+        } else if (p.kind === 'spray'){
+            p.vy += 1.4 * dts;  // gravidade alta — gota cai
+        } else if (p.kind === 'pollen'){
+            p.vy += Math.sin((p.maxLife - p.life) * 0.004) * 0.003;
+        }
+    }
+}
+function drawAmbientParticles(cam){
+    for (const p of ambientParticles){
+        const sx = (p.x - cam.x) * TS;
+        const sy = (p.y - cam.y) * TS;
+        if (sx < -6 || sx > canvas.width + 6 || sy < -6 || sy > canvas.height + 6) continue;
+        const a = Math.max(0, Math.min(1, p.life / p.maxLife));
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.fillStyle = p.color;
+        if (p.kind === 'snow'){
+            ctx.fillRect(sx-1, sy-1, 2, 2);
+        } else if (p.kind === 'sand'){
+            ctx.fillRect(sx, sy, 4, 1);  // riscado fino voando
+        } else if (p.kind === 'spray'){
+            ctx.fillRect(sx, sy, 2, 2);
+        } else if (p.kind === 'ember'){
+            ctx.fillRect(sx-1, sy-1, 2, 2);
+            ctx.globalAlpha = a * 0.4;
+            ctx.fillRect(sx-2, sy-2, 4, 4);   // halo
+        } else if (p.kind === 'pollen'){
+            ctx.fillRect(sx, sy, 2, 2);
+        } else if (p.kind === 'cave_drip'){
+            ctx.fillRect(sx, sy, 1, 3);
+        }
+        ctx.restore();
+    }
+}
+
 function drawProjectiles(cam){
     for (const p of projectiles){
         const sx = (p.x - cam.x) * TS + TS/2;
@@ -9979,6 +10096,7 @@ function loop(ts){
     tickAuras(dt);
     tickTrails(dt);
     tickParticles(dt);
+    tickAmbientParticles(dt);
     updateAmbient();
     tickStatusEffects();
     tickTraining(dt);
@@ -10435,6 +10553,7 @@ function loop(ts){
     drawProjectiles(cam);
     drawAuras(cam);
     drawParticles(cam);
+    drawAmbientParticles(cam);
 
     // Ciclo dia/noite + iluminação dinâmica
     gameTime += dt;
