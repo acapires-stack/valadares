@@ -3692,6 +3692,25 @@ function addFloat(x,y,text,color,big,offsetY){
 }
 
 let _lastHitBy = null;   // último a bater no player (mob ou player) — usado pra spectator
+// ─── Death replay buffer ─────────────────────────────────────────────────
+// Rolling log dos últimos 5s antes da morte (hits recebidos, magias, status).
+// Snapshot ao morrer fica em player._lastDeathReplay e aparece no modal Stats.
+const DEATH_REPLAY_WINDOW_MS = 5000;
+let _deathReplayBuffer = [];
+function recordReplay(kind, text, color){
+    const now = Date.now();
+    _deathReplayBuffer.push({ t: now, hp: player.hp, mp: player.mp, kind, text, color: color || '#c8a050' });
+    // Trim: keep só os últimos DEATH_REPLAY_WINDOW_MS
+    const cutoff = now - DEATH_REPLAY_WINDOW_MS;
+    while (_deathReplayBuffer.length && _deathReplayBuffer[0].t < cutoff){
+        _deathReplayBuffer.shift();
+    }
+    if (_deathReplayBuffer.length > 80) _deathReplayBuffer.splice(0, _deathReplayBuffer.length - 80);
+}
+function snapshotDeathReplay(){
+    player._lastDeathReplay = _deathReplayBuffer.slice();
+    _deathReplayBuffer = [];
+}
 function damagePlayer(amount, source, attacker){
     if (_isUpdating) return;   // janela de auto-update — combate pausado
     // Marca último atacante pra spectator pós-morte
@@ -3717,6 +3736,7 @@ function damagePlayer(amount, source, attacker){
     sndDmg();
     addFloat(player.x, player.y, `-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
     player.hurtTimer = crit ? 450 : 300;
+    recordReplay('hit', `${crit?'★ ':''}${source}: -${actual}`, crit ? '#ff6020' : '#ff3030');
     const dt = blocked > 0 ? ` (${blocked} bloq · ${Math.round(reduction*100)}%)` : '';
     log(`<span class="log-dmg">⚠ ${crit?'★ ':''}${source}: ${actual}${dt}</span>`);
     // Skill Escudo só treina se realmente está usando um
@@ -3824,6 +3844,7 @@ function playerDie(){
     // Admin: captura snapshot ANTES de processar a perda
     if (player.isAdmin) _preDeathSnapshot = captureAdminSnapshot();
     if (player.stats) player.stats.mobDeaths = (player.stats.mobDeaths || 0) + 1;
+    snapshotDeathReplay();
     clearStatusEffects();
     sndDeath();
     log(`<span class="log-die">━━ Você morreu ━━</span>`);
@@ -4526,8 +4547,27 @@ function renderStats(){
     // Ratio PK
     const pkRatio = s.pkDeaths > 0 ? (s.pkKills / s.pkDeaths).toFixed(2) : (s.pkKills > 0 ? '∞' : '—');
 
+    // Replay da última morte (últimos 5s antes de morrer)
+    let replayHtml = '';
+    const rp = player._lastDeathReplay;
+    if (Array.isArray(rp) && rp.length){
+        const t0 = rp[0].t;
+        const tEnd = rp[rp.length - 1].t;
+        replayHtml = `<div class="stats-section-title">Última morte — últimos ${((tEnd - t0)/1000).toFixed(1)}s</div>
+            <div style="background:#0a0805;border:1px solid #3a2d10;padding:6px 8px;max-height:160px;overflow-y:auto;font-size:11px;font-family:Consolas,monospace">
+            ${rp.map(e => {
+                const dt = ((e.t - t0)/1000).toFixed(1);
+                return `<div style="display:flex;gap:8px;padding:1px 0">
+                    <span style="color:#888;width:38px">+${dt}s</span>
+                    <span style="color:#74d176;width:60px">HP ${e.hp}/${player.maxHp}</span>
+                    <span style="color:${e.color};flex:1">${escapeHtml(e.text)}</span>
+                </div>`;
+            }).join('')}
+            </div>`;
+    }
     el.innerHTML = cards +
         `<div class="stats-section-title">Mortes por mob</div>` + mobList +
+        replayHtml +
         `<div class="stats-summary">tempo de jogo: <b>${playtime}</b> &nbsp;·&nbsp; K/D PvP: <b>${pkRatio}</b></div>`;
 }
 
@@ -6799,6 +6839,7 @@ function pkDeathBy(killerId, killerName){
         return;
     }
     if (player.stats) player.stats.pkDeaths = (player.stats.pkDeaths || 0) + 1;
+    snapshotDeathReplay();
     // Vingança: se eu já tinha matado o killer recentemente, ele leva penalty dobrado?
     // Na real: a janela inversa - o killer atual ESTÁ vingando uma morte minha que ele teve?
     // Veja função pkKilledSomeone pra detectar o caso de vingança.
