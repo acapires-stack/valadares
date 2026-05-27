@@ -1285,9 +1285,17 @@ function megaBossIsAlive(){
     return false;
 }
 function checkMegaBossSpawn(){
-    if (megaBoss.spawnedAt) return;  // já tá vivo
-    if (!allBossesAtMaxLevel()) return;
-    if (Date.now() - megaBoss.lastResolvedAt < MEGA_BOSS_COOLDOWN_MS) return;
+    if (megaBoss.spawnedAt){ console.log('[mega] skip: já vivo'); return; }
+    if (!allBossesAtMaxLevel()){
+        const levels = BOSSES.map(b => `${b.type}=${bossLevel.get(b.type) || 1}`).join(' ');
+        console.log(`[mega] skip: bosses não estão maxados — ${levels}`);
+        return;
+    }
+    const cdLeft = MEGA_BOSS_COOLDOWN_MS - (Date.now() - megaBoss.lastResolvedAt);
+    if (cdLeft > 0){
+        console.log(`[mega] skip: cooldown ${Math.floor(cdLeft/60000)}min restantes`);
+        return;
+    }
     // Spawn!
     const m = spawnMob(MEGA_BOSS_TYPE, MEGA_BOSS_POS.x, MEGA_BOSS_POS.y);
     if (!m) return;
@@ -1910,7 +1918,7 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset' });
                     return;
                 }
                 if (cmd === '/setboss'){
@@ -1949,6 +1957,40 @@ wss.on('connection', (ws) => {
                     // não persiste em env, mas atualiza pra sessão atual
                     SERVER_MOTD_RUNTIME = arg;
                     sendTo(id, { t:'serverMsg', level:'info', text:`MOTD atualizado (até reiniciar): "${arg}"` });
+                    return;
+                }
+                if (cmd === '/megaboss'){
+                    const sub = (arg || '').toLowerCase();
+                    if (sub === 'status' || sub === ''){
+                        const levels = BOSSES.map(b => `${b.type}=Lv${bossLevel.get(b.type) || 1}`).join(' · ');
+                        const cdLeft = MEGA_BOSS_COOLDOWN_MS - (Date.now() - megaBoss.lastResolvedAt);
+                        const cdTxt = cdLeft > 0 ? `${Math.floor(cdLeft/60000)}min restantes` : 'pronto';
+                        const alive = megaBossIsAlive() ? 'SIM' : 'NÃO';
+                        sendTo(id, { t:'serverMsg', level:'info', text:`Mega: vivo=${alive} · maxed=${allBossesAtMaxLevel()} · cd=${cdTxt} · ${levels}` });
+                        return;
+                    }
+                    if (sub === 'spawn'){
+                        if (megaBoss.spawnedAt){
+                            sendTo(id, { t:'serverMsg', level:'warn', text:'Mega já vivo' });
+                            return;
+                        }
+                        const m = spawnMob(MEGA_BOSS_TYPE, MEGA_BOSS_POS.x, MEGA_BOSS_POS.y);
+                        if (!m){ sendTo(id, { t:'serverMsg', level:'warn', text:'Falha ao spawnar' }); return; }
+                        megaBoss.spawnedAt = Date.now();
+                        saveStateToDisk();
+                        broadcastMsg('event', `⚡ O Senhor de Valadares despertou em (${MEGA_BOSS_POS.x}, ${MEGA_BOSS_POS.y})! [admin]`);
+                        console.log(`[mega] forçado por admin ${p.name}`);
+                        return;
+                    }
+                    if (sub === 'reset'){
+                        megaBoss.spawnedAt = 0;
+                        megaBoss.lastResolvedAt = 0;
+                        for (const x of Array.from(monsters.values())) if (x.type === MEGA_BOSS_TYPE) monsters.delete(x.id);
+                        saveStateToDisk();
+                        sendTo(id, { t:'serverMsg', level:'info', text:'Mega resetado (cooldown zerado, instância removida).' });
+                        return;
+                    }
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Uso: /megaboss status | spawn | reset' });
                     return;
                 }
                 sendTo(id, { t:'serverMsg', level:'warn', text:`Comando desconhecido: ${cmd}. /help pra ver lista` });
