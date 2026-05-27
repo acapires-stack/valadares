@@ -3550,6 +3550,7 @@ const player = {
     stun:   null,   // { endAt }
     bleed:  null,   // mesmo shape de poison
     buff:   null,   // { dmg, spd, expiresAt, color, name } — Fúria etc
+    manaBuff: null, // { mpPerSec, life, maxLife } — pot de mana vira regen on-the-fly
     // Quests: ativas com progresso, completas (já entregues), prontas pra entregar
     quests: {
         active: {},      // id -> { progress }
@@ -4760,6 +4761,18 @@ function tickRegen(dt){
         const mpGain = inPz ? 2 : 1;
         player.mp = Math.min(player.maxMp, player.mp + mpGain);
         player.mpRegenTimer = 0;
+    }
+    // Pot de mana: buff que adiciona mp/seg até acabar a vida
+    if (player.manaBuff && player.manaBuff.life > 0){
+        player.manaBuff.life -= dt;
+        // acumula fração de mp ao longo dos frames pra não perder em dt < 1seg
+        player.manaBuff.acc = (player.manaBuff.acc || 0) + (player.manaBuff.mpPerSec * dt / 1000);
+        if (player.manaBuff.acc >= 1 && player.mp < player.maxMp){
+            const gain = Math.floor(player.manaBuff.acc);
+            player.mp = Math.min(player.maxMp, player.mp + gain);
+            player.manaBuff.acc -= gain;
+        }
+        if (player.manaBuff.life <= 0) player.manaBuff = null;
     }
 }
 
@@ -6014,7 +6027,7 @@ function applyBleed(dmgPerTick, ticks, intervalMs, source){
     }
 }
 function clearStatusEffects(){
-    player.poison = null; player.stun = null; player.bleed = null; player.buff = null;
+    player.poison = null; player.stun = null; player.bleed = null; player.buff = null; player.manaBuff = null;
 }
 function isStunned(){
     if (!player.stun) return false;
@@ -8750,19 +8763,26 @@ function eatBestFood(){
         }
     }
     if (needMp > 0){
-        const mana = Object.entries(player.inv)
-            .filter(([k,q]) => q > 0 && ITEMS[k].manaheal)
-            .map(([k,q]) => ({ k, q, mp: ITEMS[k].manaheal }));
-        if (mana.length){
-            mana.sort((a,b) => Math.abs(a.mp - needMp) - Math.abs(b.mp - needMp));
-            const pick = mana[0]; const def = ITEMS[pick.k];
-            const got = Math.min(def.manaheal, needMp);
-            player.mp += got;
-            player.inv[pick.k]--;
-            if (player.inv[pick.k] <= 0) delete player.inv[pick.k];
-            addFloat(player.x, player.y, `+${got} mp`, '#5599ff', false, offY);
-            log(`<span class="log-xp">Bebeu ${def.name} (+${got} MP)</span>`);
-            didSomething = true;
+        // Pot de mana vira regen on-the-fly (não cura instantânea):
+        // libera tick extra de mana enquanto o buff está ativo. Não pode beber outra
+        // enquanto a regen anterior não terminar — força planejamento de combate.
+        if (player.manaBuff && player.manaBuff.life > 0){
+            log('<span class="log-sys">Regen de mana ainda ativa — aguarde acabar.</span>');
+        } else {
+            const mana = Object.entries(player.inv)
+                .filter(([k,q]) => q > 0 && ITEMS[k].manaheal)
+                .map(([k,q]) => ({ k, q, mp: ITEMS[k].manaheal }));
+            if (mana.length){
+                const pick = mana[0]; const def = ITEMS[pick.k];
+                // Explosivo: 8 mp/seg por 10s = 80 mp total
+                const lifeMs = 10000, mpPerSec = 8;
+                player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs };
+                player.inv[pick.k]--;
+                if (player.inv[pick.k] <= 0) delete player.inv[pick.k];
+                addFloat(player.x, player.y, `+${mpPerSec}/s por ${lifeMs/1000}s`, '#5599ff', false, offY);
+                log(`<span class="log-xp">Bebeu ${def.name} — regen ${mpPerSec} mp/s por ${lifeMs/1000}s</span>`);
+                didSomething = true;
+            }
         }
     }
     if (!didSomething){
@@ -10527,6 +10547,7 @@ function loop(ts){
         if (player.stun)   icons.push({ glyph:'⚡', color:'#ffaa20' });
         if (player.bleed)  icons.push({ glyph:'🩸', color:'#cc3030' });
         if (player.buff)   icons.push({ glyph:'★', color: player.buff.color || '#ff6060' });
+        if (player.manaBuff) icons.push({ glyph:'⚗', color:'#5599ff' });
         if (icons.length){
             ctx.font = 'bold 11px monospace';
             ctx.textAlign = 'center';
