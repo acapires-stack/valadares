@@ -2016,6 +2016,41 @@ function drawSand(px,py,v){
         ctx.fillRect(px+6,py+34,8,2); ctx.fillRect(px+28,py+20,6,2);
     }
 }
+// Cores médias por bioma — usadas pro blending de borda.
+// Apenas estes tipos blendam entre si (cortes ficam definidos pra TREE/WATER/CAVE_WALL).
+const TILE_BLEND_COL = {};
+TILE_BLEND_COL[T.GRASS] = '#3d7d2a';
+TILE_BLEND_COL[T.SAND]  = '#d4b858';
+TILE_BLEND_COL[T.SNOW]  = '#dde8f4';
+TILE_BLEND_COL[T.DIRT]  = '#9a7230';
+TILE_BLEND_COL[T.STONE] = '#646464';
+function _blendEdges(t, tx, ty, px, py){
+    const myCol = TILE_BLEND_COL[t];
+    if (!myCol) return;
+    const D = 6;  // espessura da transição em pixels
+    const apply = (otherT, side) => {
+        const oc = TILE_BLEND_COL[otherT];
+        if (!oc || oc === myCol) return;
+        ctx.fillStyle = oc;
+        // 3 faixas com alpha decrescente do vizinho pro centro
+        const alphas = [0.55, 0.30, 0.13];
+        const step = D / alphas.length;
+        for (let i = 0; i < alphas.length; i++){
+            ctx.globalAlpha = alphas[i];
+            const off = i * step;
+            if (side === 'N')      ctx.fillRect(px,            py + off,        TS, step);
+            else if (side === 'S') ctx.fillRect(px,            py + TS-D + off, TS, step);
+            else if (side === 'W') ctx.fillRect(px + off,      py,              step, TS);
+            else                   ctx.fillRect(px + TS-D+off, py,              step, TS);
+        }
+        ctx.globalAlpha = 1;
+    };
+    // Para "S" e "E" usamos cores invertidas (o vizinho está depois do tile)
+    if (ty > 0)      apply(map[ty-1][tx], 'N');
+    if (ty < M_H-1)  apply(map[ty+1][tx], 'S');
+    if (tx > 0)      apply(map[ty][tx-1], 'W');
+    if (tx < M_W-1)  apply(map[ty][tx+1], 'E');
+}
 function drawTile(t,px,py,tx,ty){
     const v=vr(tx,ty);
     if(t===T.GRASS)drawGrass(px,py,v);
@@ -2027,6 +2062,7 @@ function drawTile(t,px,py,tx,ty){
     else if(t===T.CAVE_WALL)drawCaveWall(px,py,v);
     else if(t===T.SNOW)drawSnow(px,py,v);
     else if(t===T.SAND)drawSand(px,py,v);
+    _blendEdges(t, tx, ty, px, py);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
