@@ -548,6 +548,27 @@
             overflow: hidden;
         }
         .po-hp-fill { height: 100%; transition: width 0.2s; }
+        .po-actions {
+            display: flex; gap: 4px; margin-top: 4px;
+        }
+        .po-btn {
+            flex: 1;
+            background: #1a1408; border: 1px solid #4a3818;
+            color: #c8a050; font-size: 9px;
+            padding: 2px 4px; border-radius: 2px;
+            cursor: pointer; letter-spacing: 0.5px;
+            font-family: 'Consolas', monospace;
+            transition: background 0.1s, color 0.1s, border-color 0.1s;
+        }
+        .po-btn:hover {
+            background: #2a1d0c; color: #ffd060; border-color: #6a5020;
+        }
+        .po-btn.po-btn-dim {
+            color: #5a4828; border-color: #2a200a; cursor: help;
+        }
+        .po-btn.po-btn-dim:hover {
+            background: #1a1408; color: #6a5020;
+        }
 
         #controls {
             color: #6a5520; font-size: 10px; margin-top: 12px;
@@ -6138,14 +6159,42 @@ function renderPlayerRow(p){
     const meClass = p.isMe ? ' me' : '';
     const ghostClass = p.ghost ? ' ghost' : '';
     const safeName = escapeHtml(p.name || '?');
+    // Botões de ação pra player remoto vivo: trade (precisa estar ≤3 sqm) e whisper
+    let actions = '';
+    if (!p.isMe && !p.ghost){
+        const d = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
+        const canTrade = d <= 3;
+        const tradeTip = canTrade ? `Trocar com ${p.name}` : `Aproxime-se (≤3 sqm) — está a ${d}sqm`;
+        actions = `<div class="po-actions">
+            <button class="po-btn ${canTrade?'':'po-btn-dim'}" title="${tradeTip}"
+                onclick="startTradeFlow('${p.name.replace(/'/g, "\\'")}')">⇄ trade</button>
+            <button class="po-btn" title="Sussurrar pra ${p.name}"
+                onclick="quickWhisper('${p.name.replace(/'/g, "\\'")}')">✉ msg</button>
+        </div>`;
+    }
     return `<div class="po-row${meClass}${ghostClass}">
         <div class="po-line1">
             <span class="po-name">${safeName}${p.isMe?' <span style="color:#888;font-weight:400">(você)</span>':''}</span>
             ${badge}${distTag}
         </div>
         ${p.ghost ? '' : `<div class="po-hp-bar"><div class="po-hp-fill" style="width:${(hpPct*100).toFixed(0)}%;background:${hpColor}"></div></div>`}
+        ${actions}
     </div>`;
 }
+
+// Atalho do botão ✉: foca chat com /msg nome pré-digitado pro player completar
+function quickWhisper(name){
+    const chatIn = document.getElementById('chatInput');
+    if (!chatIn) return;
+    // Vai pra aba CHAT se não estiver
+    const chatTab = document.querySelector('.chat-tab[data-tab="chat"]');
+    if (chatTab && !chatTab.classList.contains('active')) chatTab.click();
+    chatIn.value = `/msg ${name} `;
+    chatIn.focus();
+    // posiciona cursor no fim
+    chatIn.setSelectionRange(chatIn.value.length, chatIn.value.length);
+}
+window.quickWhisper = quickWhisper;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SIDEBAR / UI
@@ -8582,9 +8631,11 @@ let _trade = null;   // { id, otherName, myOffer:{items:{},gold:0}, otherOffer:{
 function startTradeFlow(targetName){
     if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Trade só disponível online.</span>'); return; }
     if (_trade){ log('<span class="log-sys">Já tem trade em andamento.</span>'); return; }
+    if (targetName === player.name){ log('<span class="log-sys">Não dá pra trocar consigo mesmo.</span>'); return; }
     ws.send(JSON.stringify({ t:'tradeRequest', toName: targetName }));
     log(`<span class="log-sys">Convite de trade enviado para ${escapeHtml(targetName)}.</span>`);
 }
+window.startTradeFlow = startTradeFlow;
 function openTradeModal(otherName){
     closeAllModals();
     document.getElementById('tradeModal').style.display = 'flex';
