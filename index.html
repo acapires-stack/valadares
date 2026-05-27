@@ -6420,13 +6420,10 @@ function renderPlayersOnline(){
 }
 
 function renderPlayerRow(p){
-    const hpPct = p.maxHp > 0 ? Math.max(0, Math.min(1, p.hp / p.maxHp)) : 0;
-    const hpColor = hpPct > 0.5 ? '#4caf50' : hpPct > 0.25 ? '#ffaa00' : '#cc3030';
     let badge = '';
     if (p.ghost) badge = '<span class="po-badge ghost" title="Corpo desconectado">💤</span>';
     else if (p.highlander) badge = '<span class="po-badge hl" title="Highlander">👑</span>';
     else if (p.pvp) badge = '<span class="po-badge pvp" title="PvP ativo">☠</span>';
-    // Distância (só pra remotos, não pra você)
     let distTag = '';
     if (!p.isMe){
         const d = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
@@ -6438,32 +6435,11 @@ function renderPlayerRow(p){
     const meClass = p.isMe ? ' me' : '';
     const ghostClass = p.ghost ? ' ghost' : '';
     const safeName = escapeHtml(p.name || '?');
-    // Botões de ação pra player remoto vivo: trade (precisa estar ≤3 sqm) e whisper
-    let actions = '';
-    if (!p.isMe && !p.ghost){
-        const d = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
-        const meInSafe    = inSafeZone(player.x, player.y);
-        const otherInSafe = inSafeZone(p.x, p.y);
-        const canTrade = d <= 3 && meInSafe && otherInSafe;
-        let tradeTip;
-        if (!meInSafe) tradeTip = 'Trade só na Zona Segura — vá pra PZ central';
-        else if (!otherInSafe) tradeTip = `${p.name} precisa estar na PZ`;
-        else if (d > 3) tradeTip = `Aproxime-se (≤3 sqm) — está a ${d}sqm`;
-        else tradeTip = `Trocar com ${p.name}`;
-        actions = `<div class="po-actions">
-            <button class="po-btn ${canTrade?'':'po-btn-dim'}" title="${tradeTip}"
-                onclick="startTradeFlow('${p.name.replace(/'/g, "\\'")}')">⇄ trade</button>
-            <button class="po-btn" title="Sussurrar pra ${p.name}"
-                onclick="quickWhisper('${p.name.replace(/'/g, "\\'")}')">✉ msg</button>
-        </div>`;
-    }
-    return `<div class="po-row${meClass}${ghostClass}">
+    return `<div class="po-row${meClass}${ghostClass}" title="${p.isMe?'':'Right-click no boneco pra Trade/Whisper'}">
         <div class="po-line1">
             <span class="po-name">${safeName}${p.isMe?' <span style="color:#888;font-weight:400">(você)</span>':''}</span>
             ${badge}${distTag}
         </div>
-        ${p.ghost ? '' : `<div class="po-hp-bar"><div class="po-hp-fill" style="width:${(hpPct*100).toFixed(0)}%;background:${hpColor}"></div></div>`}
-        ${actions}
     </div>`;
 }
 
@@ -8043,7 +8019,20 @@ function castSpell(spellKey){
             addFloat(m.x, m.y, `-${dmg}`, sp.glow, true);
             hits++;
         }
-        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 600 });
+        // Visual AoE: anel grande mostrando o raio real (3 tiles)
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 600, maxR: sp.aoeRange * TS });
+        // Aura curta interna
+        auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 400 });
+        // Burst de 16 partículas voando radialmente
+        for (let i = 0; i < 16; i++){
+            const angle = (i / 16) * Math.PI * 2;
+            const speed = TS * (3 + Math.random() * 2);   // 3-5 tiles/seg
+            particles.push({
+                x: player.renderX + 0.5, y: player.renderY + 0.5,
+                dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+                color: sp.glow, life: 500, maxLife: 500,
+            });
+        }
         log(`<span class="log-dmg">${sp.name}: ${hits} alvo(s) atingido(s)</span>`);
         if (hits > 0) gainSkillXp('Magia', hits);
         return;
@@ -8064,7 +8053,9 @@ function castSpell(spellKey){
             m.wanderY = player.y;
             count++;
         }
-        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800 });
+        // Visual AoE: anel grande do raio de provocação
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.tauntRange * TS });
+        auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
         log(`<span class="log-sys">${sp.name}: provocou ${count} mob(s)</span>`);
         gainSkillXp('Magia', Math.max(1, count));
         return;
@@ -8152,7 +8143,8 @@ function tickAuras(dt){
 function drawAuras(cam){
     for (const a of auraEffects){
         const t = a.life / a.duration;       // 0..1
-        const r = 10 + 30 * t;
+        const maxR = a.maxR || 40;
+        const r = 10 + (maxR - 10) * t;
         const alpha = 0.8 * (1 - t);
         const e = a.entity;
         const wx = e ? e.renderX : a.x;
@@ -8162,11 +8154,20 @@ function drawAuras(cam){
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = a.color;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = a.maxR ? 4 : 3;
         ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.stroke();
         // segundo anel mais interno e brilhante
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(sx, sy, r*0.6, 0, Math.PI*2); ctx.stroke();
+        // Para AoE grande, preenchimento sutil tipo gradient explosion
+        if (a.maxR){
+            const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+            g.addColorStop(0, a.color + '40');
+            g.addColorStop(0.7, a.color + '20');
+            g.addColorStop(1, a.color + '00');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.fill();
+        }
         ctx.restore();
     }
 }
