@@ -5853,7 +5853,8 @@ function renderGoldShop(){
         <div style="background:#1a1208;border:1px solid #3a2d10;padding:12px;text-align:center;border-radius:3px">
             <div style="font-size:18px;color:#ffcc40;font-weight:bold">${pkg.title}</div>
             <div style="font-size:22px;color:#74d176;margin:6px 0">R$ ${(pkg.priceCents/100).toFixed(2)}</div>
-            <button class="chest-btn" style="width:100%;margin:0" onclick="buyGoldPackage('${id}')">comprar via PIX</button>
+            <button class="chest-btn" style="width:100%;margin:0" onclick="buyGoldPackage('${id}')">comprar</button>
+            <div style="font-size:9px;color:#888;margin-top:4px">PIX · Cartão</div>
         </div>
     `).join('');
 }
