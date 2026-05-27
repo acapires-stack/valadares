@@ -7589,6 +7589,76 @@ canvas.addEventListener('click', e => {
     }
 });
 
+// Right-click no boneco de outro player → menu contextual (Trade / Msg)
+canvas.addEventListener('contextmenu', e => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const cam = getCamera();
+    const tileX = Math.floor(cx / TS + cam.x);
+    const tileY = Math.floor(cy / TS + cam.y);
+    for (const id in remotePlayers){
+        const rp = remotePlayers[id];
+        if (rp.x === tileX && rp.y === tileY && !rp.ghost){
+            e.preventDefault();
+            showPlayerMenu(rp, e.clientX, e.clientY);
+            return;
+        }
+    }
+});
+function closePlayerMenu(){
+    const m = document.getElementById('playerCtxMenu');
+    if (m) m.remove();
+}
+function showPlayerMenu(rp, screenX, screenY){
+    closePlayerMenu();
+    const d = Math.max(Math.abs(rp.x - player.x), Math.abs(rp.y - player.y));
+    const meInSafe    = inSafeZone(player.x, player.y);
+    const otherInSafe = inSafeZone(rp.x, rp.y);
+    const canTrade = d <= 3 && meInSafe && otherInSafe;
+    let tradeHint;
+    if (!meInSafe)         tradeHint = 'fora da PZ';
+    else if (!otherInSafe) tradeHint = 'ele fora da PZ';
+    else if (d > 3)        tradeHint = `${d}sqm — aproxime-se`;
+    else                   tradeHint = '';
+    const menu = document.createElement('div');
+    menu.id = 'playerCtxMenu';
+    menu.style.cssText = `
+        position:fixed; left:${screenX}px; top:${screenY}px;
+        background:#1a1408; border:2px solid #4a3818; border-radius:4px;
+        padding:4px 0; z-index:300; min-width:180px;
+        font-family:'Consolas', monospace; font-size:11px;
+        box-shadow:0 4px 12px rgba(0,0,0,0.6);
+    `;
+    menu.innerHTML = `
+        <div style="padding:4px 12px;color:#ffd060;font-weight:bold;border-bottom:1px solid #3a2d10;letter-spacing:0.5px">${escapeHtml(rp.name)}</div>
+        <div class="pcm-item" data-action="trade" style="padding:6px 12px;color:${canTrade?'#c8a050':'#5a4828'};cursor:${canTrade?'pointer':'help'}" title="${tradeHint}">
+            ⇄ Trade ${tradeHint ? `<span style="color:#888;font-size:10px;float:right">${tradeHint}</span>` : ''}
+        </div>
+        <div class="pcm-item" data-action="msg" style="padding:6px 12px;color:#c8a050;cursor:pointer">
+            ✉ Whisper
+        </div>
+    `;
+    document.body.appendChild(menu);
+    menu.querySelectorAll('.pcm-item').forEach(it => {
+        it.addEventListener('click', () => {
+            const action = it.dataset.action;
+            closePlayerMenu();
+            if (action === 'trade'){
+                if (!canTrade){ log(`<span class="log-sys">Trade indisponível (${tradeHint}).</span>`); return; }
+                startTradeFlow(rp.name);
+            } else if (action === 'msg'){
+                quickWhisper(rp.name);
+            }
+        });
+        it.addEventListener('mouseenter', () => { it.style.background = '#2a1d0c'; });
+        it.addEventListener('mouseleave', () => { it.style.background = ''; });
+    });
+    // Fecha ao clicar fora
+    setTimeout(() => {
+        document.addEventListener('click', closePlayerMenu, { once: true });
+    }, 0);
+}
+
 document.addEventListener('click', e => {
     // Shop buy/sell
     const buyBtn = e.target.closest('[data-buy]');
