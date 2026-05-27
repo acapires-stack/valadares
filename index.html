@@ -5874,7 +5874,8 @@ async function buyGoldPackage(packageId){
             return;
         }
         // Checkout Pro: abre página de pagamento do MP numa nova aba
-        const url = data.sandboxInitPoint || data.initPoint;
+        // Prioriza initPoint (produção). sandbox só como fallback se PROD não vier.
+        const url = data.initPoint || data.sandboxInitPoint;
         if (!url){
             checkout.innerHTML = `<div style="color:#ff5050">Sem link de pagamento.</div>`;
             return;
