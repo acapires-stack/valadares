@@ -4774,6 +4774,9 @@ function connectMP(){
     };
     ws.onerror = () => {
         log('<span class="log-sys">Erro de conexão.</span>');
+        // Em alguns browsers onerror dispara sem onclose — limpa heartbeat aqui
+        // pra não acumular timers órfãos
+        if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
         // Se já teve conexão antes, tenta reconectar
         if (mpWasConnected) scheduleReconnect();
     };
@@ -4865,11 +4868,18 @@ function handleMP(msg){
         }
     } else if (msg.t === 'pos'){
         if (remotePlayers[msg.id]){
-            remotePlayers[msg.id].x = msg.x;
-            remotePlayers[msg.id].y = msg.y;
-            remotePlayers[msg.id].dir = msg.dir;
-            if (typeof msg.hp === 'number') remotePlayers[msg.id].hp = msg.hp;
-            if (typeof msg.maxHp === 'number') remotePlayers[msg.id].maxHp = msg.maxHp;
+            const rp = remotePlayers[msg.id];
+            const prevX = rp.x, prevY = rp.y;
+            rp.x = msg.x;
+            rp.y = msg.y;
+            rp.dir = msg.dir;
+            if (typeof msg.hp === 'number') rp.hp = msg.hp;
+            if (typeof msg.maxHp === 'number') rp.maxHp = msg.maxHp;
+            // Trail cosmético dos outros players — desenha rastro do tile antigo
+            const trailCol = ITEMS[rp.cosmetic]?.trail;
+            if (trailCol && (prevX !== rp.x || prevY !== rp.y)){
+                spawnTrailAt(prevX, prevY, trailCol);
+            }
         }
     } else if (msg.t === 'pvp'){
         if (remotePlayers[msg.id]) remotePlayers[msg.id].pvp = msg.pvp;
@@ -5121,6 +5131,10 @@ function mobKilledByServer(m, serverLoot){
     if (Array.isArray(serverLoot)){
         for (const item of serverLoot){
             if (!item || !item.type) continue;
+            if (!ITEMS[item.type]){
+                console.warn('[loot] item desconhecido descartado:', item.type);
+                continue;
+            }
             const qty = Math.max(1, item.qty | 0);
             groundItems.push({ id: nextItemId++, x: m.x, y: m.y, type: item.type, qty });
         }
@@ -8401,6 +8415,13 @@ function pickupAt(x, y){
         const it = groundItems[i];
         if (Math.abs(it.x - x) > 1 || Math.abs(it.y - y) > 1) continue;
         const def = ITEMS[it.type];
+        // Guard: item desconhecido (server novo droppou item que cliente ainda não conhece
+        // — janela de deploy assíncrono). Descarta silenciosamente em vez de crashar.
+        if (!def){
+            console.warn('[pickup] item desconhecido descartado:', it.type);
+            groundItems.splice(i, 1);
+            continue;
+        }
         if (def.kind === 'gold'){
             player.gold += it.qty;
             log(`<span class="log-xp">+${it.qty} ouro (${player.gold})</span>`);

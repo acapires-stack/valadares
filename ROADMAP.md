@@ -232,6 +232,23 @@ Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/
 | 18 | ✅ **Tutorial in-game** | Modal único no primeiro login com 6 seções (Mundo/Combate/Base/Progressão/PvP/Dicas). Flag `tutSeen:<user>` no localStorage. Reabre pelo settings |
 | 19 | ✅ **Settings panel** | Tecla **O**. Sliders volume geral + efeitos (música reservada). Botão "ver tutorial de novo". Lista de teclas read-only. Persiste em `valadares:settings` |
 
+### Sessão 26/05 (madrugada) — Servidor/Infra/Polish
+| # | Item | Notas |
+|---|---|---|
+| 20 | ✅ **Save server-side** | Conta + senha + skills/inv/gold no Railway Volume (`accounts.json`). Sobrevive a troca de browser/PC. Hash sha256+salt sobre o hash leve do cliente. Throttle 5s, cap 200KB |
+| 21 | ✅ **Friends server-side** | `player.friends` parte do save (servidor). Migração 1× do localStorage legado. Trocar de PC mantém amigos |
+| 22 | ✅ **Guild polish** | Tag `[NOME]` em azul-prata acima do boneco, modal de membros (`/guild info` → líder 👑 + online em verde), nova aba GUILDS no ranking (total = mobs + pvp×5 + bosses×20) |
+| 23 | ✅ **Botões trade/msg na Online** | `⇄ trade` (dim quando >3 sqm) + `✉ msg` (pré-preenche `/msg nome ` no chat). Comandos via chat continuam funcionando |
+| 24 | ✅ **Sprites épicos** | 11 sprites pixel art únicos no inventário + visual no boneco (drawCharacter): ESPADA_HL ★, ESPADA_ETERNA ★★, COROA_VALADARES ★★, ARMADURA_TRONO ★, COROA_VENDEDOR ★, MACHADO_MINO (labrys), MARTELO_GOLEM, ARMADURA_ESCAMA, ESCUDO_PEDRA (runa), ELMO_DRACO (chifres+olhos), CORACAO_HL refeito |
+| 25 | ✅ **Cosméticos novos** | 2 trails (TRAIL_OURO, TRAIL_GELO — rastro estrela) + 2 partículas (PART_FOGO, PART_TROVAO — faíscas ao atacar). Drops do Arauto (10-15%) e Senhor de Valadares (15-25% bônus). Engine: `spawnTrailAt` / `spawnAttackParticles` com fade-out |
+| 26 | ✅ **Áudio ambient por bioma** | Pink noise + bandpass + lowshelf, crossfade 0.6s. PZ=fogueira 220Hz, neve=vento 1400Hz, deserto=700Hz, caverna=eco 280Hz, grama=900Hz, água=320Hz. Slider "Ambient (bioma)" em Settings (era Música disabled) |
+| 27 | ✅ **Magias +50%** | Bola de Fogo 8→12, Cura 20→30, Raio 5→8, Exori 7→11 (rebalanceamento pós-Senhor de Valadares) |
+| 28 | ✅ **Regen na PZ central** | HP 4× / MP 3× mais rápido + bônus de +1/+1 por tick na PZ. Anti-frustração pra novos players |
+| 29 | ✅ **Anti-exploit AFK** | Aba em background (`document.hidden=true`) zera os timers de regen. Sem mais farm passivo com tab oculta |
+| 30 | ✅ **Heartbeat WS** | Cliente manda `{t:'ping'}` a cada 25s, server `{t:'pong'}`. Evita idle timeout de proxy Cloudflare/Railway (~60s). Overlay "RECONECTANDO" com atraso 3s pra não incomodar em blips |
+| 31 | ✅ **Modais com scroll** | `.chest-box` agora tem `max-height: 90vh` + `overflow-y:auto`. Painel ADMIN expandido não estoura mais a tela |
+| 32 | ✅ **Hardening Nível 1+2** | Server clampa gold/skills/itemQty/HP/MP/permaBuffs no `saveUpload`. Drops gerados server-side (`rollLoot` no `handleMobDeath`). Cliente usa loot do server, fallback local. Bloqueia 90% dos ataques de F12. Nível 3 (inv 100% server) fica pra futuro |
+
 ---
 
 ## 🎯 Decisões de Design (alinhadas com o player)

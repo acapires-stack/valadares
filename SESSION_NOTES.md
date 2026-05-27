@@ -1,5 +1,79 @@
 # Notas de Sessão
 
+## 📅 Sessão 26/05/2026 (madrugada) — Polish, hardening e mais features
+
+> Sessão longa após a noite: 15 commits encadeados, foco em fechar
+> features iniciadas, melhorar feedback visual, e dar primeira camada
+> de anti-cheat. Tudo em prod.
+
+### 🛡️ Hardening Nível 1 + 2 (anti-cheat)
+**Server (`sanitizeSave` no saveUpload):**
+- Clampa gold (cap 100M), skills.val (200), itemQty (9999), invKeys/chestKeys (250)
+- Clampa selos (5), HP/MP/maxHp/maxMp (99k), permaBuffs.xpBonus (≤2.0)
+- Cap em stats.mobKills keys (100), quests/flags keys (200)
+- Logs warn `[save:NAME] clamp X: was→now` quando algo é ajustado
+- **Bloqueia ataque caseiro do F12** (`player.gold = Infinity` etc)
+
+**Drops autoritativos (server):**
+- Tabela `LOOT` espelho da `DROPS` do cliente (~70 entries)
+- `rollLoot(mobType)` server-side ao morte do mob (em `handleMobDeath` e `attackMob`)
+- `mobKill` payload carrega `loot: [{type, qty}]`
+- Cliente usa loot do server quando vem; fallback `rollDrops` local se ausente (compat)
+- **Cheater não pode mais editar `DROPS` no console** pra fazer rato dropar épico
+
+### ⚔ Gameplay / Balanceamento
+- **Magias +50% dano**: Bola de Fogo 8→12, Cura 20→30, Raio 5→8, Exori 7→11
+- **Regen na PZ central** (raio 3): HP 4× / MP 3× mais rápido (+1/+1 extra). Pros novos
+- **Anti-exploit AFK**: aba em background (`document.hidden`) NÃO regenera
+
+### 🎨 Visual / UX
+- **11 sprites épicos** no inventário com aura dourada nos lendários ★/★★
+- **Épicos visíveis no boneco** (drawCharacter): armas 2H, armaduras, escudos, elmos, coroas
+- **Coração do Highlander** refeito (forma de pingente com corrente em V + aura)
+- **Modais com scroll** (`.chest-box` agora tem `max-height: 90vh`)
+- **2 cosméticos novos: trail** (TRAIL_OURO, TRAIL_GELO) — rastro estrela cintilante
+- **2 cosméticos novos: partículas** (PART_FOGO, PART_TROVAO) — faíscas ao atacar
+- **Drops dos cosméticos** no Arauto (10-15%) + Senhor de Valadares (15-25% bônus)
+
+### 🔊 Áudio ambient por bioma
+- Loop de pink noise + bandpass + lowshelf moldados por bioma:
+  - PZ (fogueira 220Hz), neve (vento 1400Hz), deserto (700Hz),
+    caverna (eco 280Hz), grama (brisa 900Hz), água (320Hz)
+- Crossfade ~0.6s via `setTargetAtTime`
+- Slider "Ambient (bioma)" ativado em Settings (era "Música" disabled)
+
+### 👥 Sociais
+- **Lista de amigos server-side** (parte do save) — trocar de PC mantém amigos
+- **Tag de guild** `[NOME]` em azul-prata acima do nome do boneco
+- **Modal de membros** (`/guild info` agora abre modal): líder com 👑, online em verde
+- **Ranking de guilds** (nova aba GUILDS no L): total = mobs + pvp×5 + bosses×20
+- **Botões trade/msg** na sidebar Online: `⇄ trade` (dim se >3 sqm) + `✉ msg`
+  (pré-preenche `/msg nome ` no chat)
+
+### 📡 Conexão
+- **Heartbeat WS**: cliente manda `{t:'ping'}` a cada 25s → server `{t:'pong'}`
+  (evita idle timeout de proxy Cloudflare/Railway que matava em ~60s)
+- **Overlay "RECONECTANDO" com atraso 3s** — blips de rede não incomodam
+- Server agora propaga `guild` no snapshot de jogadores
+
+### 🧹 Fixes do review final
+- Trail dos outros players agora renderiza (era só local antes)
+- `pickupAt` e `mobKilledByServer` ignoram items desconhecidos (proteção contra deploy parcial)
+- Heartbeat limpo também em `ws.onerror` (não só `onclose`)
+
+### 📂 Arquivos do server (em Volume Railway)
+- `state.json` — mobs, bosses, rankings, guilds
+- `accounts.json` — `{v:1, accounts: [{name, pwHash, save, savedAt, createdAt}]}`
+
+### 🐛 Conhecidos / pendentes
+- Cliente vê só **trail** dos outros players; **partículas** dos remotes ataques ainda
+  não broadcastam (precisa novo `attackVfx` no server)
+- Trade só foi testado solo — luapires AFK; falta confirmar end-to-end
+- Inv ainda é client-state (Nível 3 do hardening): `player.inv.X = 5` direto via F12
+  ainda funciona (mas qty é clampado em 9999)
+
+---
+
 ## 📅 Sessão 26/05/2026 (noite) — Save server-side
 
 > **Bug grave corrigido:** save vivia 100% no localStorage. Trocar de PC,

@@ -899,6 +899,11 @@ const SAVE_CAPS = {
     invKeys: 250,         // items distintos
     chestKeys: 250,       // items distintos por baú
     seloMax: 5,           // selos não passam de 5
+    hpMax: 99_999,        // HP/MP máximo absurdo
+    xpBonus: 2.0,         // permaBuffs.xpBonus — +200% no máximo
+    statsKeys: 100,       // mobKills tem ~30 tipos; 100 é teto generoso
+    questsKeys: 200,      // active/completed/daily juntos
+    flagsKeys: 200,       // flags + questFlags
 };
 function clampNumber(v, max, fallback = 0){
     if (typeof v !== 'number' || !isFinite(v) || v < 0) return fallback;
@@ -960,6 +965,54 @@ function sanitizeSave(data, ownerName){
                 const v = clampNumber(orig, SAVE_CAPS.itemQty, 0);
                 if (v <= 0){ delete chest[k]; continue; }
                 if (v !== orig){ log(`chest.${cId}.${k}`, orig, v); chest[k] = v; }
+            }
+        }
+    }
+    // HP / MP máximos — clamp em 99k pra evitar HP de 1 bilhão
+    for (const k of ['hp', 'mp', 'maxHp', 'maxMp']){
+        if (k in data){
+            const orig = data[k];
+            data[k] = clampNumber(orig, SAVE_CAPS.hpMax, 0);
+            if (data[k] !== orig) log(k, orig, data[k]);
+        }
+    }
+    // permaBuffs — xpBonus pode dar XP infinito permanente se adulterado
+    if (data.permaBuffs && typeof data.permaBuffs === 'object'){
+        for (const k of Object.keys(data.permaBuffs)){
+            const orig = data.permaBuffs[k];
+            if (typeof orig !== 'number') continue;
+            const cap = k === 'xpBonus' ? SAVE_CAPS.xpBonus : 10;   // outros buffs futuros: cap 10x
+            const v = clampNumber(orig, cap, 0);
+            if (v !== orig){ log(`permaBuffs.${k}`, orig, v); data.permaBuffs[k] = v; }
+        }
+    }
+    // Stats — cap quantidade de keys + valores (evita DoS por save gigante de mobKills fake)
+    if (data.stats && typeof data.stats === 'object'){
+        if (data.stats.mobKills && typeof data.stats.mobKills === 'object'){
+            const mk = data.stats.mobKills;
+            const keys = Object.keys(mk);
+            if (keys.length > SAVE_CAPS.statsKeys){
+                log('stats.mobKills keys', keys.length, SAVE_CAPS.statsKeys);
+                for (const k of keys.slice(SAVE_CAPS.statsKeys)) delete mk[k];
+            }
+            for (const k of Object.keys(mk)){
+                mk[k] = clampNumber(mk[k], 9_999_999, 0);
+            }
+        }
+        for (const k of ['pkKills', 'pkDeaths', 'mobDeaths', 'bossKills']){
+            if (typeof data.stats[k] === 'number'){
+                data.stats[k] = clampNumber(data.stats[k], 9_999_999, 0);
+            }
+        }
+    }
+    // Quests + flags — cap quantidade de keys (evita save inflado por mau ator)
+    for (const field of ['quests', 'flags', 'questFlags']){
+        if (data[field] && typeof data[field] === 'object'){
+            const limit = field === 'quests' ? SAVE_CAPS.questsKeys : SAVE_CAPS.flagsKeys;
+            const keys = Object.keys(data[field]);
+            if (keys.length > limit){
+                log(`${field} keys`, keys.length, limit);
+                for (const k of keys.slice(limit)) delete data[field][k];
             }
         }
     }
