@@ -1,5 +1,51 @@
 # Notas de Sessão
 
+## 📅 Sessão 27/05/2026 — Visual overhaul (4 features)
+
+> Sessão focada em subir o teto visual sem reescrever nada. Tudo procedural
+> em canvas; sem PNG, sem spritesheet. 5 commits, em prod.
+
+### 🌅 Iluminação dinâmica + ciclo dia/noite
+- Canvas offscreen `lightCanvas` com overlay escuro + cutouts via `destination-out`
+- 8 keyframes: madrugada → amanhecer → meio-dia → tarde dourada → entardecer → anoitecer
+- 1 dia in-game = **6 min reais**, começa às 08h ao carregar
+- Tint sutil de cor por hora: laranja amanhecer, rosa-roxo entardecer, azul noite
+- Cavernas: `darkness 0.78+` sempre, override do ciclo
+- Cutouts: player (5-6 tiles), tochas PZ (4.5 + flicker), projéteis (2.2), outros players
+- **Threshold skip 0.10**: manhã/dia/tarde sem overlay → sem cutouts visíveis, ciclo mais marcado
+- Relógio in-game (`☀ 09:04`, `🌅 06:30`, `🌙 22:15`) no minimap
+- **Bug fix**: `globalAlpha` causava acúmulo de resíduo entre frames; agora alpha vai na cor + `clearRect`
+
+### 🚶 Bobbing de walk
+- `getWalkBob(e)`: detecta movimento via `renderX/Y vs x/y`, devolve `sin(t*0.014)*1.6`
+- `drawCharacter` e `drawMonster` ganharam param `bob`
+- Sombra fica fixa no chão e encolhe levemente no pico do pulo
+- Aplicado em player, remotos e todos mobs
+
+### 🌫️ Partículas ambiente por bioma
+- Pool `ambientParticles` cap 90, spawn a cada 70ms (6 amostras por tick)
+- 6 tipos com física própria:
+  - **snow** (norte): floquinhos brancos caindo com vento sutil
+  - **sand** (deserto): riscos amarelos voando horizontal
+  - **spray** (água): gotas pulando com gravidade
+  - **ember** (tochas PZ): faíscas laranja subindo
+  - **pollen** (grass): bolinhas verde-claro flutuando — `cor (220,255,160,0.5)`
+  - **cave_drip** (caverna): gotas azuis caindo
+- Cap impede saturação; spawn condicional ao bioma do tile sob a amostra
+
+### 🎨 Tile blending nas bordas
+- `_blendEdges(t, tx, ty)`: 3 faixas de 2px com alpha 0.55/0.30/0.13 da cor do vizinho
+- Aplicado entre GRASS, SAND, SNOW, DIRT, STONE
+- Cortes definidos preservados em TREE, WATER, CAVE_WALL (intencional)
+- Cada tile pinta seu lado da fronteira → transição simétrica de 6px
+
+### 🐛 Conhecidos / observações
+- Pollen pode parecer ruidoso pra alguns gostos — chance baixável de 8% → 4% se necessário
+- Iluminação só ativa do entardecer (~17h+) em diante; manhã/dia totalmente limpos
+- Tochas e outros players sempre emitem luz mesmo de dia (só visível quando overlay tá ativo)
+
+---
+
 ## 📅 Sessão 26/05/2026 (madrugada) — Polish, hardening e mais features
 
 > Sessão longa após a noite: 15 commits encadeados, foco em fechar
