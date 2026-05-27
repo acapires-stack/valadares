@@ -6477,16 +6477,28 @@ function updateSidebar(){
     document.getElementById('dodgeVal').textContent = (playerDodgeChance()*100).toFixed(1)+'%';
     const skB = playerSpeedBonusFromSkills(), btB = playerSpeedBonusFromBoots();
     const spd = playerMoveDelay();
-    const breakdown = (skB || btB) ? ` (-${skB} sk / -${btB} bt)` : '';
-    document.getElementById('spdVal').textContent = spd + 'ms' + breakdown;
-    // Vel. ataque — mostra delay efetivo + bônus % da forja (atkSpd da arma equipada)
+    const tilesPerSec = (1000 / spd).toFixed(1);
+    const spdEl = document.getElementById('spdVal');
+    if (spdEl){
+        spdEl.textContent = `${tilesPerSec} tiles/s`;
+        // Tooltip detalhado pra quem quiser ver a quebra
+        const breakdown = (skB || btB)
+            ? `${spd}ms entre tiles · skill -${skB}ms · botas -${btB}ms`
+            : `${spd}ms entre tiles`;
+        spdEl.title = breakdown;
+    }
+    // Vel. ataque — converte ms→atk/seg, breakdown vai pro tooltip
     const wK = player.equipped.weapon;
     const wI = wK ? ITEMS[wK] : null;
     const atkSpd = (wI && wI.atkSpd) || 0;
     const atkDelay = effectiveAttackDelay();
     const atkSpdEl = document.getElementById('atkSpdVal');
     if (atkSpdEl){
-        atkSpdEl.textContent = atkDelay + 'ms' + (atkSpd ? ` (-${Math.round(atkSpd*100)}% forja)` : '');
+        const atksPerSec = (1000 / atkDelay).toFixed(2);
+        atkSpdEl.textContent = `${atksPerSec} atk/s`;
+        atkSpdEl.title = atkSpd
+            ? `${atkDelay}ms entre ataques · forja -${Math.round(atkSpd*100)}%`
+            : `${atkDelay}ms entre ataques`;
     }
     // Procs da arma equipada (veneno/sangra/fogo) — mostra ou esconde a linha
     const procsRow = document.getElementById('procsRow');
