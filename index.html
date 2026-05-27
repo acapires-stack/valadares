@@ -5861,7 +5861,7 @@ function renderGoldShop(){
 async function buyGoldPackage(packageId){
     const checkout = document.getElementById('goldShopCheckout');
     checkout.style.display = '';
-    checkout.innerHTML = `<div style="color:#c8a050">Gerando cobrança PIX…</div>`;
+    checkout.innerHTML = `<div style="color:#c8a050">Gerando cobrança…</div>`;
     try {
         const res = await fetch(SERVER_HTTP_BASE + '/api/pix/create', {
             method: 'POST',
@@ -5870,31 +5870,28 @@ async function buyGoldPackage(packageId){
         });
         const data = await res.json();
         if (data.error){
-            checkout.innerHTML = `<div style="color:#ff5050">Erro: ${escapeHtml(data.error)}</div>`;
+            checkout.innerHTML = `<div style="color:#ff5050">Erro: ${escapeHtml(data.error)}${data.detail ? '<br><span style="font-size:10px">'+escapeHtml(data.detail)+'</span>' : ''}</div>`;
             return;
         }
-        const qrImg = data.qrCodeBase64 ? `<img src="data:image/png;base64,${data.qrCodeBase64}" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:4px">` : '';
+        // Checkout Pro: abre página de pagamento do MP numa nova aba
+        const url = data.sandboxInitPoint || data.initPoint;
+        if (!url){
+            checkout.innerHTML = `<div style="color:#ff5050">Sem link de pagamento.</div>`;
+            return;
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
         checkout.innerHTML = `
-            <div style="font-size:14px;color:#ffcc40;margin-bottom:8px">Escaneie o QR Code no seu app do banco:</div>
-            ${qrImg}
-            <div style="margin-top:10px">
-                <button class="chest-btn" style="margin:0;width:auto;padding:6px 16px" onclick="copyPixCode('${escapeAttr(data.qrCode || '')}')">📋 copiar código PIX</button>
-            </div>
-            <div style="margin-top:8px;font-size:10px;color:#888">paymentId: ${data.paymentId} · status: ${data.status}</div>
-            <div style="margin-top:8px;color:#a8e0ff">o ouro cai automaticamente após confirmação. Pode fechar este modal.</div>
+            <div style="font-size:14px;color:#ffcc40;margin-bottom:8px">📲 Abrimos a página de pagamento do Mercado Pago.</div>
+            <div style="color:#a8e0ff;margin-bottom:10px">Conclua o pagamento via <b>PIX</b> na aba que abriu.</div>
+            <button class="chest-btn" style="margin:0;width:auto;padding:6px 16px" onclick="window.open('${escapeAttr(url)}', '_blank')">abrir novamente</button>
+            <div style="margin-top:10px;font-size:10px;color:#888">preferenceId: ${data.preferenceId}</div>
+            <div style="margin-top:8px;color:#a8e0ff">o ouro cai automaticamente após confirmação do MP. Pode fechar este modal.</div>
         `;
     } catch (e){
         checkout.innerHTML = `<div style="color:#ff5050">Falha na conexão: ${escapeHtml(e.message)}</div>`;
     }
 }
 window.buyGoldPackage = buyGoldPackage;
-function copyPixCode(code){
-    if (!code) return;
-    navigator.clipboard.writeText(code).then(() => {
-        log('<span class="log-sys">📋 Código PIX copiado pra área de transferência.</span>');
-    }).catch(() => {});
-}
-window.copyPixCode = copyPixCode;
 function escapeAttr(s){ return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;'); }
 
 // ─── Party 1-4 (widget + helpers) ──────────────────────────────────────

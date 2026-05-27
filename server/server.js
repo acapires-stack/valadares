@@ -84,7 +84,7 @@ async function handleHttpRequest(req, res){
 }
 
 async function handleCreatePix(body, res){
-    if (!mpPreference || !mpPayment){
+    if (!mpPreference){
         return httpJson(res, 503, { error:'mp_not_configured' });
     }
     const playerName = String(body.playerName || '').trim().substring(0, 14);
@@ -92,34 +92,43 @@ async function handleCreatePix(body, res){
     if (!playerName){ return httpJson(res, 400, { error:'missing_player' }); }
     if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
     const pkg = GOLD_PACKAGES[packageId];
-    // Cria cobrança PIX direto via Payment API (resposta inclui QR Code)
+    // Checkout Pro (Preference API) — abre página do MP onde o player paga via PIX.
+    // Mais robusto que Payment API: não exige homologação da conta.
     try {
-        const payment = await mpPayment.create({
+        const preference = await mpPreference.create({
             body: {
-                transaction_amount: pkg.priceCents / 100,
-                description: `Valadares — ${pkg.title} para ${playerName}`,
-                payment_method_id: 'pix',
-                payer: {
-                    email: `valadares.${playerName.toLowerCase().replace(/[^a-z0-9]/g,'') || 'user'}@gmail.com`,
-                    first_name: playerName,
+                items: [{
+                    id: packageId,
+                    title: pkg.title,
+                    description: `Valadares — ${pkg.title} para ${playerName}`,
+                    quantity: 1,
+                    currency_id: 'BRL',
+                    unit_price: pkg.priceCents / 100,
+                }],
+                payment_methods: {
+                    excluded_payment_types: [
+                        { id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' },
+                    ],
+                    installments: 1,
                 },
                 notification_url: `${MP_BASE_URL}/webhook/mp`,
                 external_reference: `${playerName}|${packageId}`,
                 metadata: { playerName, packageId, gold: pkg.gold },
+                back_urls: {
+                    success: `https://valadares-xi.vercel.app/?pix=success`,
+                    failure: `https://valadares-xi.vercel.app/?pix=failure`,
+                    pending: `https://valadares-xi.vercel.app/?pix=pending`,
+                },
             },
         });
-        mpPayments.set(String(payment.id), { playerName, packageId, gold: pkg.gold, status: payment.status });
-        const tx = payment.point_of_interaction?.transaction_data || {};
+        mpPayments.set(String(preference.id), { playerName, packageId, gold: pkg.gold, status: 'pending', kind: 'preference' });
         return httpJson(res, 200, {
-            paymentId: payment.id,
-            status: payment.status,
-            qrCode: tx.qr_code,
-            qrCodeBase64: tx.qr_code_base64,
-            ticketUrl: tx.ticket_url,
-            expiresAt: tx.expiration_date || null,
+            preferenceId: preference.id,
+            initPoint: preference.init_point,
+            sandboxInitPoint: preference.sandbox_init_point,
         });
     } catch (e){
-        console.warn('[mp] erro ao criar PIX:', e.message);
+        console.warn('[mp] erro ao criar preference:', e.message);
         return httpJson(res, 500, { error:'create_failed', detail: e.message });
     }
 }
@@ -131,13 +140,19 @@ async function handleMpWebhook(body, urlPath, res){
     try {
         const payment = await mpPayment.get({ id: paymentId });
         const status = payment.status;
-        const metadata = payment.metadata || {};
-        const playerName = metadata.player_name || metadata.playerName;
-        const gold       = metadata.gold | 0;
-        const pending    = mpPayments.get(paymentId) || { playerName, gold };
+        // external_reference é mais confiável que metadata em Preference→Payment
+        const ref = payment.external_reference || '';
+        const [refName, refPkg] = ref.split('|');
+        let playerName = refName || payment.metadata?.player_name || payment.metadata?.playerName;
+        let gold = 0;
+        if (refPkg && GOLD_PACKAGES[refPkg]){ gold = GOLD_PACKAGES[refPkg].gold; }
+        else if (payment.metadata?.gold){ gold = payment.metadata.gold | 0; }
+        const pending = mpPayments.get(paymentId) || { playerName, gold };
         pending.status = status;
+        pending.playerName = pending.playerName || playerName;
+        pending.gold = pending.gold || gold;
         mpPayments.set(paymentId, pending);
-        console.log(`[mp] webhook payment=${paymentId} status=${status} player=${pending.playerName} gold=${pending.gold}`);
+        console.log(`[mp] webhook payment=${paymentId} status=${status} ref=${ref} player=${pending.playerName} gold=${pending.gold}`);
         if (status === 'approved' && pending.playerName && pending.gold > 0 && !pending.credited){
             pending.credited = true;
             creditGoldToPlayer(pending.playerName, pending.gold, paymentId);
