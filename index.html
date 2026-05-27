@@ -1160,12 +1160,14 @@
 <!-- Toasts do servidor (info/warn/event/admin) — empilham no topo central -->
 <div id="toastContainer"></div>
 
-<!-- Overlay de loading (aparece entre login e primeiro snapshot MP) -->
+<!-- Overlay unificado de loading/update (login, snapshot MP, auto-update) -->
 <div id="loadingOverlay">
     <div class="reconnect-box">
         <div class="reconnect-spinner">⚙</div>
-        <div class="reconnect-title">CARREGANDO MUNDO</div>
-        <div class="reconnect-desc">Aguardando snapshot do servidor…</div>
+        <div class="reconnect-title" id="loadingTitle">CARREGANDO MUNDO</div>
+        <div class="reconnect-desc" id="loadingDesc">Aguardando snapshot do servidor…</div>
+        <button id="loadingReloadBtn" style="display:none;margin-top:14px;background:#3a2818;border:2px solid #6a4818;color:#ffd060;padding:8px 16px;font-family:'Consolas',monospace;font-size:12px;cursor:pointer;letter-spacing:1px;border-radius:3px"
+            onclick="window.location.reload()">🔄 RECARREGAR</button>
     </div>
 </div>
 
@@ -1176,16 +1178,6 @@
         <div class="reconnect-title">SEM CONEXÃO</div>
         <div class="reconnect-desc">Reconectando ao servidor automaticamente…</div>
         <div class="reconnect-hint">Ataques e movimento bloqueados até voltar</div>
-    </div>
-</div>
-
-<!-- Overlay de auto-update (aparece quando uma nova versão é detectada) -->
-<div id="updateOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;align-items:center;justify-content:center;">
-    <div class="reconnect-box">
-        <div class="reconnect-spinner">⚙</div>
-        <div class="reconnect-title">ATUALIZANDO</div>
-        <div class="reconnect-desc">Nova versão do jogo detectada…</div>
-        <div class="reconnect-hint">Salvando progresso e recarregando — combate pausado</div>
     </div>
 </div>
 
@@ -10100,9 +10092,34 @@ function startGame(multiplayer, name){
     }, 5000);
     requestAnimationFrame(loop);
 }
-function showLoadingOverlay(show){
+let _loadingStuckBtnTimer = null;
+let _loadingAutoReloadTimer = null;
+function showLoadingOverlay(show, title, desc){
     const el = document.getElementById('loadingOverlay');
-    if (el) el.style.display = show ? 'flex' : 'none';
+    if (!el) return;
+    const btn = document.getElementById('loadingReloadBtn');
+    if (_loadingStuckBtnTimer){ clearTimeout(_loadingStuckBtnTimer); _loadingStuckBtnTimer = null; }
+    if (_loadingAutoReloadTimer){ clearTimeout(_loadingAutoReloadTimer); _loadingAutoReloadTimer = null; }
+    if (btn) btn.style.display = 'none';
+    if (!show){
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'flex';
+    if (title){
+        const t = document.getElementById('loadingTitle'); if (t) t.textContent = title;
+    }
+    if (desc){
+        const d = document.getElementById('loadingDesc'); if (d) d.textContent = desc;
+    }
+    // Escape: após 8s mostra botão "Recarregar"; após 15s recarrega sozinho
+    _loadingStuckBtnTimer = setTimeout(() => {
+        const b = document.getElementById('loadingReloadBtn'); if (b) b.style.display = '';
+    }, 8000);
+    _loadingAutoReloadTimer = setTimeout(() => {
+        console.warn('[loading] travou 15s — reload automático');
+        window.location.reload();
+    }, 15000);
 }
 
 // ─── Auto-update: detecta nova versão do cliente e recarrega ──────────────
@@ -10122,9 +10139,8 @@ async function checkClientUpdate(){
         if (sig !== _lastHtmlVersion){
             console.log('[autoupdate] nova versão detectada, recarregando em 1.5s…');
             _isUpdating = true;
-            // Overlay claro pro player — combate visualmente pausado
-            const el = document.getElementById('updateOverlay');
-            if (el) el.style.display = 'flex';
+            // Overlay unificado — fase 1: atualizando
+            showLoadingOverlay(true, 'ATUALIZANDO', 'Salvando progresso e recarregando…');
             // Fecha WS imediato pra parar mobHit (servidor para de mandar dano)
             if (ws){ try { ws.close(); } catch{} ws = null; }
             // Cancela targets/auto-attack que poderiam roubar mais um tick
