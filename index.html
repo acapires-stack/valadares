@@ -750,7 +750,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1374,6 +1374,21 @@
         <div id="statsBody" style="margin-top:14px"></div>
         <div class="chest-hint"><kbd>I</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeStats()">×</button>
+    </div>
+</div>
+
+<div id="tradeInviteModal" style="display:none">
+    <div class="chest-box" style="min-width:340px;max-width:420px;text-align:center">
+        <div class="chest-title">🤝 CONVITE DE TROCA</div>
+        <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
+            <span id="tradeInviteName" style="color:#ffd060;font-weight:bold">—</span>
+            <br>quer fazer trade com você.
+            <div id="tradeInviteCountdown" style="margin-top:10px;color:#888;font-size:11px">expira em 20s</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;padding:8px 14px 14px">
+            <button class="craft-btn" id="tradeInviteAccept" style="background:#1a3a18;border-color:#3a6a30;color:#9dd07d">✓ ACEITAR</button>
+            <button class="craft-btn" id="tradeInviteReject" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d">✗ RECUSAR</button>
+        </div>
     </div>
 </div>
 
@@ -5080,13 +5095,9 @@ function handleMP(msg){
         appendChat('🔒 ' + msg.fromName, msg.text, false);
         if (typeof sndPickup === 'function') sndPickup();
     } else if (msg.t === 'tradeOffer'){
-        // Outro player quer iniciar trade — aceitar?
+        // Outro player quer iniciar trade — abre modal estilizado com countdown
         if (_trade) return;
-        if (confirm(`${msg.fromName} quer fazer trade com você. Aceitar?`)){
-            ws.send(JSON.stringify({ t:'tradeAccept', fromId: msg.fromId }));
-        } else {
-            ws.send(JSON.stringify({ t:'tradeReject', fromId: msg.fromId }));
-        }
+        showTradeInvite(msg.fromName, msg.fromId);
     } else if (msg.t === 'tradeStart'){
         _trade = {
             id: msg.tradeId, otherName: msg.otherName,
@@ -9282,6 +9293,43 @@ function startTradeFlow(targetName){
     log(`<span class="log-sys">Convite de trade enviado para ${escapeHtml(targetName)}.</span>`);
 }
 window.startTradeFlow = startTradeFlow;
+
+let _tradeInviteTimer = null;
+let _tradeInviteCountdownId = null;
+function closeTradeInvite(){
+    document.getElementById('tradeInviteModal').style.display = 'none';
+    if (_tradeInviteTimer){ clearTimeout(_tradeInviteTimer); _tradeInviteTimer = null; }
+    if (_tradeInviteCountdownId){ clearInterval(_tradeInviteCountdownId); _tradeInviteCountdownId = null; }
+}
+function showTradeInvite(fromName, fromId){
+    closeTradeInvite();   // limpa qualquer convite anterior
+    document.getElementById('tradeInviteName').textContent = fromName;
+    document.getElementById('tradeInviteModal').style.display = 'flex';
+    if (typeof sndPickup === 'function') sndPickup();
+    let secondsLeft = 20;
+    const cd = document.getElementById('tradeInviteCountdown');
+    cd.textContent = `expira em ${secondsLeft}s`;
+    _tradeInviteCountdownId = setInterval(() => {
+        secondsLeft--;
+        if (cd) cd.textContent = `expira em ${secondsLeft}s`;
+        if (secondsLeft <= 0){
+            // auto-rejeita
+            ws.send(JSON.stringify({ t:'tradeReject', fromId }));
+            log(`<span class="log-sys">Convite de ${escapeHtml(fromName)} expirou.</span>`);
+            closeTradeInvite();
+        }
+    }, 1000);
+    _tradeInviteTimer = setTimeout(() => closeTradeInvite(), 20500);   // safety
+    document.getElementById('tradeInviteAccept').onclick = () => {
+        ws.send(JSON.stringify({ t:'tradeAccept', fromId }));
+        closeTradeInvite();
+    };
+    document.getElementById('tradeInviteReject').onclick = () => {
+        ws.send(JSON.stringify({ t:'tradeReject', fromId }));
+        log(`<span class="log-sys">Você recusou o convite de ${escapeHtml(fromName)}.</span>`);
+        closeTradeInvite();
+    };
+}
 function openTradeModal(otherName){
     closeAllModals();
     document.getElementById('tradeModal').style.display = 'flex';
