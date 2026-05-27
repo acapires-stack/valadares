@@ -2,11 +2,184 @@
 // VALADARES - Servidor Multiplayer (autoritativo de mobs)
 // ═════════════════════════════════════════════════════════════════════════════
 const { WebSocketServer } = require('ws');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
-const wss = new WebSocketServer({ port: PORT });
+
+// HTTP server compartilhado com WS upgrade + endpoints REST (webhook MP, criar PIX, health)
+const httpServer = http.createServer((req, res) => handleHttpRequest(req, res));
+const wss = new WebSocketServer({ server: httpServer });
+httpServer.listen(PORT);
+
+// MercadoPago SDK (carregamento lazy — só se token configurado)
+let mpClient = null;
+let mpPreference = null;
+let mpPayment = null;
+const MP_TOKEN = process.env.MP_ACCESS_TOKEN || '';
+const MP_BASE_URL = process.env.MP_BASE_URL || `https://valadares-production.up.railway.app`;
+if (MP_TOKEN){
+    try {
+        const mercadopago = require('mercadopago');
+        mpClient = new mercadopago.MercadoPagoConfig({ accessToken: MP_TOKEN });
+        mpPreference = new mercadopago.Preference(mpClient);
+        mpPayment = new mercadopago.Payment(mpClient);
+        console.log('[mp] SDK carregado (sandbox=' + MP_TOKEN.startsWith('TEST-') + ' ou TEST-prefixed app_usr)');
+    } catch (e) {
+        console.warn('[mp] erro ao carregar SDK:', e.message);
+    }
+} else {
+    console.log('[mp] MP_ACCESS_TOKEN não setado — integração desabilitada');
+}
+
+// Pacotes de gold (preço em centavos R$, qty de gold in-game)
+const GOLD_PACKAGES = {
+    'p10':  { gold:  10_000, priceCents:  1000, title: '10.000 Gold' },
+    'p30':  { gold:  30_000, priceCents:  2500, title: '30.000 Gold' },
+    'p100': { gold: 100_000, priceCents:  7000, title: '100.000 Gold' },
+    'p300': { gold: 300_000, priceCents: 18000, title: '300.000 Gold' },
+};
+
+// Mapa de pendências: paymentId -> { playerName, packageId, gold, status }
+const mpPayments = new Map();
+
+// ─── HTTP handlers ──────────────────────────────────────────────────────
+function httpJson(res, status, body){
+    res.writeHead(status, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    res.end(typeof body === 'string' ? body : JSON.stringify(body));
+}
+function readBody(req){
+    return new Promise((resolve, reject) => {
+        let raw = '';
+        req.on('data', c => { raw += c; if (raw.length > 200_000) req.destroy(); });
+        req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch(e){ reject(e); } });
+        req.on('error', reject);
+    });
+}
+async function handleHttpRequest(req, res){
+    if (req.method === 'OPTIONS'){ return httpJson(res, 204, ''); }
+    if (req.method === 'GET' && req.url === '/health'){ return httpJson(res, 200, { ok:true }); }
+    if (req.method === 'GET' && req.url === '/api/packages'){
+        return httpJson(res, 200, { packages: GOLD_PACKAGES });
+    }
+    if (req.method === 'POST' && req.url === '/api/pix/create'){
+        try {
+            const body = await readBody(req);
+            return handleCreatePix(body, res);
+        } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
+    }
+    if (req.method === 'POST' && req.url.startsWith('/webhook/mp')){
+        try {
+            const body = await readBody(req);
+            return handleMpWebhook(body, req.url, res);
+        } catch (e){ return httpJson(res, 200, { received:true }); }   // sempre 200 pro MP não re-tentar infinito
+    }
+    return httpJson(res, 404, { error:'not_found' });
+}
+
+async function handleCreatePix(body, res){
+    if (!mpPreference || !mpPayment){
+        return httpJson(res, 503, { error:'mp_not_configured' });
+    }
+    const playerName = String(body.playerName || '').trim().substring(0, 14);
+    const packageId  = String(body.packageId || '');
+    if (!playerName){ return httpJson(res, 400, { error:'missing_player' }); }
+    if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
+    const pkg = GOLD_PACKAGES[packageId];
+    // Cria cobrança PIX direto via Payment API (resposta inclui QR Code)
+    try {
+        const payment = await mpPayment.create({
+            body: {
+                transaction_amount: pkg.priceCents / 100,
+                description: `Valadares — ${pkg.title} para ${playerName}`,
+                payment_method_id: 'pix',
+                payer: {
+                    email: `${playerName.toLowerCase().replace(/[^a-z0-9]/g,'')}@valadares.local`,
+                    first_name: playerName,
+                },
+                notification_url: `${MP_BASE_URL}/webhook/mp`,
+                external_reference: `${playerName}|${packageId}`,
+                metadata: { playerName, packageId, gold: pkg.gold },
+            },
+        });
+        mpPayments.set(String(payment.id), { playerName, packageId, gold: pkg.gold, status: payment.status });
+        const tx = payment.point_of_interaction?.transaction_data || {};
+        return httpJson(res, 200, {
+            paymentId: payment.id,
+            status: payment.status,
+            qrCode: tx.qr_code,
+            qrCodeBase64: tx.qr_code_base64,
+            ticketUrl: tx.ticket_url,
+            expiresAt: tx.expiration_date || null,
+        });
+    } catch (e){
+        console.warn('[mp] erro ao criar PIX:', e.message);
+        return httpJson(res, 500, { error:'create_failed', detail: e.message });
+    }
+}
+
+async function handleMpWebhook(body, urlPath, res){
+    // MP manda 2 formatos: { topic, id, resource } (IPN antigo) ou { type:'payment', data:{id} } (Webhooks v2)
+    const paymentId = String(body?.data?.id || body?.id || '');
+    if (!paymentId || !mpPayment){ return httpJson(res, 200, { received:true }); }
+    try {
+        const payment = await mpPayment.get({ id: paymentId });
+        const status = payment.status;
+        const metadata = payment.metadata || {};
+        const playerName = metadata.player_name || metadata.playerName;
+        const gold       = metadata.gold | 0;
+        const pending    = mpPayments.get(paymentId) || { playerName, gold };
+        pending.status = status;
+        mpPayments.set(paymentId, pending);
+        console.log(`[mp] webhook payment=${paymentId} status=${status} player=${pending.playerName} gold=${pending.gold}`);
+        if (status === 'approved' && pending.playerName && pending.gold > 0 && !pending.credited){
+            pending.credited = true;
+            creditGoldToPlayer(pending.playerName, pending.gold, paymentId);
+        }
+    } catch (e){
+        console.warn('[mp] erro no webhook:', e.message);
+    }
+    return httpJson(res, 200, { received:true });
+}
+
+function creditGoldToPlayer(playerName, gold, paymentId){
+    // Procura player online primeiro; se offline, persiste no accounts.json
+    let credited = false;
+    for (const p of players.values()){
+        if (p.disconnected) continue;
+        if (p.name.toLowerCase() === playerName.toLowerCase()){
+            p.gold = (p.gold || 0) + gold;
+            const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            sendInvUpdate(p, { goldDelta:{ amount: gold, reason:'pix', paymentId } });
+            sendTo(p.id, { t:'serverMsg', level:'event', text:`💰 +${gold.toLocaleString('pt-BR')} de ouro creditados (PIX)!` });
+            credited = true;
+            console.log(`[mp] gold creditado online: ${playerName} +${gold} (payment ${paymentId})`);
+            break;
+        }
+    }
+    if (!credited){
+        // Player offline — persiste no accounts.json (próximo login carrega)
+        try {
+            const acc = getAccount(playerName);
+            if (acc && acc.save){
+                acc.save.gold = (acc.save.gold || 0) + gold;
+                acc.save._pendingPixCredit = (acc.save._pendingPixCredit || 0) + gold;
+                if (typeof flushAccounts === 'function') flushAccounts();
+                console.log(`[mp] gold creditado offline (save): ${playerName} +${gold} (payment ${paymentId})`);
+            } else {
+                console.warn(`[mp] player não encontrado pra creditar: ${playerName} +${gold}`);
+            }
+        } catch (e){
+            console.warn('[mp] erro ao persistir credit offline:', e.message);
+        }
+    }
+}
 
 // Em produção (Railway), Volume montado em /data; localmente fica ao lado do server.js
 const STATE_FILE = process.env.STATE_FILE_PATH || path.join(__dirname, 'state.json');

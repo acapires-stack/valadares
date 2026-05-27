@@ -1,0 +1,49 @@
+{
+  "name": "valadares-desktop",
+  "version": "1.0.0",
+  "description": "Valadares - cliente desktop (Electron wrapper do site oficial)",
+  "main": "main.js",
+  "author": "alcione",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-updater": "^6.3.0"
+  },
+  "build": {
+    "appId": "com.valadares.game",
+    "productName": "Valadares",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Valadares"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "acapires-stack",
+      "repo": "valadares"
+    }
+  }
+}
