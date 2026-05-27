@@ -5777,7 +5777,7 @@ function buyFromShop(idx){
 // FORJA — upgrade de equips usando 3 items iguais + ouro (chance alta de falha)
 // ═══════════════════════════════════════════════════════════════════════════
 const UPGRADE_MAX        = 5;
-const UPGRADE_FAIL       = [0, 0.40, 0.60, 0.75, 0.88, 0.95];
+const UPGRADE_FAIL       = [0, 0.20, 0.35, 0.50, 0.65, 0.80];
 const UPGRADE_COST_MULT  = [0, 3, 8, 20, 50, 120]; // multiplicador do custo base
 // Stats acumulados por nível pra armas (kind:'weapon')
 const WEAPON_UPGRADES = [
@@ -5886,8 +5886,10 @@ function attemptForge(itemKey){
     invSignature = null;
     const failChance = UPGRADE_FAIL[targetPlus];
     if (Math.random() < failChance){
-        // Os 3 explodem
-        log('<span class="log-die">💥 Forja falhou! 3× ' + ITEMS[itemKey].name + ' destruídos. -' + cost + 'g</span>');
+        // Falha: devolve 2 dos 3 (perde só 1 + o ouro). Menos punitivo, mais tentativas.
+        player.inv[itemKey] = (player.inv[itemKey] || 0) + 2;
+        invSignature = null;
+        log('<span class="log-die">💥 Forja falhou! 1× ' + ITEMS[itemKey].name + ' destruído. -' + cost + 'g</span>');
         if (typeof sndDeath === 'function') sndDeath();
         addFloat(player.x, player.y, 'FALHA', '#ff3030', true, -10);
         renderForja();
@@ -5918,7 +5920,7 @@ function switchCraftTab(which){
     } else {
         listEl.style.display = 'none';
         forjaEl.style.display = '';
-        hint.innerHTML = '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói os 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar';
+        hint.innerHTML = '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói 1 dos 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar';
         renderForja();
     }
 }
