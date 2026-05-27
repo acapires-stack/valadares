@@ -1377,6 +1377,82 @@ function dailyEventSnapshot(){
 setInterval(tickDailyEvent, 30_000);
 setTimeout(tickDailyEvent, 8_000);   // primeiro check 8s após boot
 
+// ─── Duelos 1v1 consensuais ──────────────────────────────────────────────
+const duelInvites = new Map();   // toId -> { fromId, fromName, amount, expiresAt }
+const DUEL_INVITE_TIMEOUT_MS = 30_000;
+const DUEL_MAX_MS = 3 * 60_000;   // 3 min cap (sem vencedor = empate)
+
+function startDuel(p1, p2, amount){
+    p1.gold = Math.max(0, (p1.gold || 0) - amount);
+    p2.gold = Math.max(0, (p2.gold || 0) - amount);
+    const r1 = ensureRanking(p1.name); if (r1) r1.gold = p1.gold;
+    const r2 = ensureRanking(p2.name); if (r2) r2.gold = p2.gold;
+    const startedAt = Date.now();
+    p1.duel = { opponentId: p2.id, opponentName: p2.name, amount, startedAt };
+    p2.duel = { opponentId: p1.id, opponentName: p1.name, amount, startedAt };
+    const until = startedAt + DUEL_MAX_MS;
+    sendTo(p1.id, { t:'duelStart', opponentId: p2.id, opponentName: p2.name, amount, until, gold: p1.gold });
+    sendTo(p2.id, { t:'duelStart', opponentId: p1.id, opponentName: p1.name, amount, until, gold: p2.gold });
+    broadcastMsg('event', `⚔ ${p1.name} vs ${p2.name} — DUELO! Aposta: ${amount}g cada`);
+}
+
+function endDuel(winner, loser, draw){
+    const amount = (winner.duel && winner.duel.amount) || (loser.duel && loser.duel.amount) || 0;
+    if (draw){
+        winner.gold = (winner.gold || 0) + amount;
+        loser.gold  = (loser.gold  || 0) + amount;
+    } else {
+        winner.gold = (winner.gold || 0) + amount * 2;
+    }
+    const rW = ensureRanking(winner.name);
+    const rL = ensureRanking(loser.name);
+    if (rW){
+        rW.gold = winner.gold;
+        if (!draw){ rW.duelWins = (rW.duelWins || 0) + 1; }
+    }
+    if (rL){
+        rL.gold = loser.gold;
+        if (!draw){ rL.duelLosses = (rL.duelLosses || 0) + 1; }
+    }
+    sendTo(winner.id, { t:'duelEnd', winner:true,  draw:!!draw, amount, opponentName: loser.name,  gold: winner.gold });
+    sendTo(loser.id,  { t:'duelEnd', winner:false, draw:!!draw, amount, opponentName: winner.name, gold: loser.gold });
+    if (draw){
+        broadcastMsg('warn', `⚔ Duelo entre ${winner.name} e ${loser.name} terminou empate.`);
+    } else {
+        broadcastMsg('event', `🏆 ${winner.name} venceu o duelo contra ${loser.name}! (+${amount * 2}g)`);
+    }
+    winner.duel = null;
+    loser.duel = null;
+}
+
+function tickDuels(){
+    const now = Date.now();
+    // Expira invites
+    for (const [toId, inv] of duelInvites){
+        if (inv.expiresAt <= now){
+            duelInvites.delete(toId);
+            const from = players.get(inv.fromId);
+            if (from) sendTo(from.id, { t:'serverMsg', level:'warn', text:`Convite de duelo a ${inv.toName || '?'} expirou.` });
+        }
+    }
+    // Empata duels que duraram demais
+    const visited = new Set();
+    for (const p of players.values()){
+        if (!p.duel || visited.has(p.id)) continue;
+        if (now - p.duel.startedAt > DUEL_MAX_MS){
+            const opp = players.get(p.duel.opponentId);
+            if (opp && opp.duel && opp.duel.opponentId === p.id){
+                endDuel(p, opp, true);   // draw
+                visited.add(p.id);
+                visited.add(opp.id);
+            } else {
+                p.duel = null;   // opponent sumiu
+            }
+        }
+    }
+}
+setInterval(tickDuels, 5_000);
+
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
 // Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
 function tickBossHeal(){
@@ -1664,8 +1740,13 @@ wss.on('connection', (ws) => {
         // PvP entre players (vivo ou ghost)
         if (msg.t === 'pvpAttack') {
             const tgt = players.get(msg.targetId);
-            if (!tgt || !p.pvp) return;
-            if (!tgt.pvp && !tgt.disconnected) return;   // se vivo, precisa estar com PvP
+            if (!tgt) return;
+            // Duelo consensual: permite ataque mesmo sem PvP toggle, se for o oponente
+            const inDuel = p.duel && p.duel.opponentId === tgt.id && tgt.duel && tgt.duel.opponentId === id;
+            if (!inDuel){
+                if (!p.pvp) return;
+                if (!tgt.pvp && !tgt.disconnected) return;   // se vivo, precisa estar com PvP
+            }
             if (chebyshev(p.x, p.y, tgt.x, tgt.y) > (msg.range || 1)) return;
             const amount = Math.max(1, msg.amount | 0);
             // Se ghost: server processa o dano local (cliente não está)
@@ -1815,6 +1896,11 @@ wss.on('connection', (ws) => {
 
         if (msg.t === 'pkDeath') {
             const killer = players.get(msg.killerId);
+            // Se ambos estavam num duelo entre si, processa como vitória de duel (sem selo, sem drop)
+            if (killer && p.duel && p.duel.opponentId === killer.id && killer.duel && killer.duel.opponentId === id){
+                endDuel(killer, p, false);
+                return;
+            }
             if (killer && killer.ws.readyState === 1){
                 killer.ws.send(JSON.stringify({
                     t:'pkKill',
@@ -1830,6 +1916,69 @@ wss.on('connection', (ws) => {
                 const r = ensureRanking(killer.name);
                 if (r) r.pkKills = (r.pkKills || 0) + 1;
             }
+            return;
+        }
+
+        // Duelo 1v1 — comandos via chat-like (consumido antes do broadcast normal)
+        if (msg.t === 'duelInvite') {
+            const toName = String(msg.toName || '').trim().substring(0, 14);
+            const amount = Math.max(50, Math.min(1_000_000, msg.amount | 0));
+            if (!toName) return;
+            if (toName.toLowerCase() === p.name.toLowerCase()){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Não dá pra duelar consigo mesmo.' });
+                return;
+            }
+            if (p.duel){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você já está em duelo.' }); return; }
+            if ((p.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text:`Aposta acima do seu ouro (${p.gold || 0}g).` }); return; }
+            let target = null;
+            for (const pp of players.values()){
+                if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
+            }
+            if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`"${toName}" não está online.` }); return; }
+            if (target.duel){ sendTo(id, { t:'serverMsg', level:'warn', text:`${target.name} já está em duelo.` }); return; }
+            if ((target.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text:`${target.name} não tem ${amount}g pra cobrir.` }); return; }
+            duelInvites.set(target.id, { fromId: id, fromName: p.name, amount, expiresAt: Date.now() + 30_000 });
+            sendTo(target.id, { t:'duelInvite', fromId: id, fromName: p.name, amount });
+            sendTo(id, { t:'serverMsg', level:'info', text:`⚔ Convite enviado a ${target.name} (${amount}g).` });
+            return;
+        }
+        if (msg.t === 'duelAccept') {
+            const inv = duelInvites.get(id);
+            if (!inv || inv.expiresAt < Date.now()){
+                duelInvites.delete(id);
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Nenhum convite de duelo pendente.' });
+                return;
+            }
+            const from = players.get(inv.fromId);
+            if (!from || from.disconnected){
+                duelInvites.delete(id);
+                sendTo(id, { t:'serverMsg', level:'warn', text:'O desafiante saiu.' });
+                return;
+            }
+            if (from.duel || p.duel){
+                duelInvites.delete(id);
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Um dos jogadores já está em duelo.' });
+                return;
+            }
+            if ((from.gold || 0) < inv.amount || (p.gold || 0) < inv.amount){
+                duelInvites.delete(id);
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Um dos jogadores não tem ouro suficiente.' });
+                sendTo(from.id, { t:'serverMsg', level:'warn', text:'Duelo cancelado: gold insuficiente.' });
+                return;
+            }
+            duelInvites.delete(id);
+            startDuel(from, p, inv.amount);
+            return;
+        }
+        if (msg.t === 'duelReject') {
+            const inv = duelInvites.get(id);
+            if (!inv) return;
+            duelInvites.delete(id);
+            const from = players.get(inv.fromId);
+            if (from && from.ws.readyState === 1){
+                sendTo(from.id, { t:'serverMsg', level:'warn', text:`${p.name} recusou o duelo.` });
+            }
+            sendTo(id, { t:'serverMsg', level:'info', text:'Duelo recusado.' });
             return;
         }
 
@@ -2165,6 +2314,15 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
+        // Duelo ativo: abandonar conta como derrota (oponente leva o pot)
+        if (p.duel){
+            const opp = players.get(p.duel.opponentId);
+            if (opp && opp.duel && opp.duel.opponentId === id){
+                endDuel(opp, p, false);
+            } else {
+                p.duel = null;
+            }
+        }
         // Body stays: mantém ghost por GHOST_TIMEOUT_MS, atacável e droppable
         if (p.disconnected){ players.delete(id); return; }
         // Se o player nunca chegou a logar (WS caiu antes do join), só remove — não vira ghost órfão sem nome

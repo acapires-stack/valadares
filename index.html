@@ -765,7 +765,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1400,6 +1400,23 @@
         <div style="display:flex;gap:10px;justify-content:center;padding:8px 14px 14px">
             <button class="craft-btn" id="tradeInviteAccept" style="background:#1a3a18;border-color:#3a6a30;color:#9dd07d">✓ ACEITAR</button>
             <button class="craft-btn" id="tradeInviteReject" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d">✗ RECUSAR</button>
+        </div>
+    </div>
+</div>
+
+<div id="duelInviteModal" style="display:none">
+    <div class="chest-box" style="min-width:340px;max-width:420px;text-align:center">
+        <div class="chest-title">⚔ CONVITE DE DUELO</div>
+        <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
+            <span id="duelInviteName" style="color:#ffd060;font-weight:bold">—</span>
+            <br>te desafiou pra um duelo.
+            <div style="margin-top:10px;color:#ffcc40;font-size:14px">💰 Aposta: <b id="duelInviteAmount">0g</b></div>
+            <div style="margin-top:4px;font-size:10px;color:#888">vencedor leva o dobro · 3 min máx</div>
+            <div id="duelInviteCountdown" style="margin-top:10px;color:#888;font-size:11px">expira em 30s</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;padding:8px 14px 14px">
+            <button class="craft-btn" id="duelInviteAccept" style="background:#3a2818;border-color:#7a5a20;color:#ffcc40" onclick="acceptDuelInvite()">⚔ ACEITAR</button>
+            <button class="craft-btn" id="duelInviteReject" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d" onclick="rejectDuelInvite()">✗ RECUSAR</button>
         </div>
     </div>
 </div>
@@ -5145,6 +5162,29 @@ function handleMP(msg){
             addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
             log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
         }
+    } else if (msg.t === 'duelInvite'){
+        showDuelInvite(msg);
+    } else if (msg.t === 'duelStart'){
+        player._duel = { opponentId: msg.opponentId, opponentName: msg.opponentName, amount: msg.amount, until: msg.until };
+        if (typeof msg.gold === 'number') player.gold = msg.gold;
+        log(`<span class="log-up">⚔ Duelo iniciado contra ${escapeHtml(msg.opponentName)}! Aposta ${msg.amount}g cada. 3 min máx.</span>`);
+        if (typeof showServerToast === 'function') showServerToast('event', `⚔ DUELO contra ${msg.opponentName} (${msg.amount}g)`);
+    } else if (msg.t === 'duelEnd'){
+        player._duel = null;
+        if (typeof msg.gold === 'number') player.gold = msg.gold;
+        // Restaura HP/MP pra evitar morte real do cliente
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        if (typeof clearStatusEffects === 'function') clearStatusEffects();
+        if (msg.draw){
+            log(`<span class="log-sys">⚔ Duelo contra ${escapeHtml(msg.opponentName)} terminou empate. Aposta devolvida.</span>`);
+        } else if (msg.winner){
+            log(`<span class="log-up">🏆 Você venceu o duelo contra ${escapeHtml(msg.opponentName)}! +${msg.amount * 2}g</span>`);
+            if (typeof sndLevelUp === 'function') sndLevelUp();
+        } else {
+            log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
+        }
+        saveState();
     } else if (msg.t === 'pvpHit'){
         const amount = msg.amount;
         const defT = totalDefense();
@@ -5527,6 +5567,49 @@ function renderDailyEventWidget(){
         <div style="font-size:9px;color:#a08868;margin-top:2px">termina em <b style="color:#e0c060">${mm}:${ss}</b></div>`;
 }
 setInterval(() => { if (_dailyEvent) renderDailyEventWidget(); }, 1000);
+
+// ─── Duelo 1v1 ─────────────────────────────────────────────────────────
+let _duelInvite = null;
+let _duelInviteTimerId = null;
+function showDuelInvite(msg){
+    _duelInvite = { fromId: msg.fromId, fromName: msg.fromName, amount: msg.amount };
+    const m = document.getElementById('duelInviteModal');
+    if (!m) return;
+    document.getElementById('duelInviteName').textContent = msg.fromName;
+    document.getElementById('duelInviteAmount').textContent = msg.amount + 'g';
+    m.style.display = 'flex';
+    let left = 30;
+    const cd = document.getElementById('duelInviteCountdown');
+    if (cd) cd.textContent = `expira em ${left}s`;
+    if (_duelInviteTimerId) clearInterval(_duelInviteTimerId);
+    _duelInviteTimerId = setInterval(() => {
+        left--;
+        if (left <= 0){
+            rejectDuelInvite(true);
+        } else if (cd) {
+            cd.textContent = `expira em ${left}s`;
+        }
+    }, 1000);
+    if (typeof sndLevelUp === 'function') sndLevelUp();
+}
+function hideDuelInvite(){
+    const m = document.getElementById('duelInviteModal');
+    if (m) m.style.display = 'none';
+    if (_duelInviteTimerId){ clearInterval(_duelInviteTimerId); _duelInviteTimerId = null; }
+    _duelInvite = null;
+}
+function acceptDuelInvite(){
+    if (!_duelInvite) return;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'duelAccept' }));
+    hideDuelInvite();
+}
+function rejectDuelInvite(silent){
+    if (!_duelInvite) return;
+    if (ws && ws.readyState === 1 && !silent) ws.send(JSON.stringify({ t:'duelReject' }));
+    hideDuelInvite();
+}
+window.acceptDuelInvite = acceptDuelInvite;
+window.rejectDuelInvite = rejectDuelInvite;
 
 function tierColor(tier){
     return tier === 'ouro' ? '#ffcc40' : tier === 'prata' ? '#c4ccd8' : '#c8884a';
@@ -6458,6 +6541,32 @@ function sendChat(text){
         startTradeFlow(t[1]);
         return;
     }
+    // /duelo nome APOSTA — desafia outro player pra duelo 1v1 consensual
+    const d = text.match(/^\/duelo\s+(\S+)\s+(\d+)$/i);
+    if (d){
+        const toName = d[1], amount = parseInt(d[2], 10);
+        if (!isFinite(amount) || amount < 50){
+            appendChatSystem('Aposta mínima 50g. Uso: /duelo NOME APOSTA');
+            return;
+        }
+        if ((player.gold || 0) < amount){
+            appendChatSystem(`Você não tem ${amount}g.`);
+            return;
+        }
+        ws.send(JSON.stringify({ t:'duelInvite', toName, amount }));
+        appendChatSystem(`⚔ Convite de duelo enviado a ${toName} (${amount}g).`);
+        return;
+    }
+    // /aceitar — aceita convite de duelo pendente
+    if (/^\/aceitar\s*$/i.test(text)){
+        ws.send(JSON.stringify({ t:'duelAccept' }));
+        return;
+    }
+    // /recusar — recusa convite de duelo pendente
+    if (/^\/recusar\s*$/i.test(text)){
+        ws.send(JSON.stringify({ t:'duelReject' }));
+        return;
+    }
     ws.send(JSON.stringify({ t:'chat', text }));
 }
 
@@ -6549,6 +6658,13 @@ function drawMinimap(){
 }
 
 function pkDeathBy(killerId, killerName){
+    // Duelo consensual: server intercepta a "morte" e processa endDuel. Não aplica penalty.
+    if (player._duel && player._duel.opponentId === killerId){
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'pkDeath', killerId, duel:true }));
+        // Mantém o cliente vivo (HP a 1) até receber duelEnd que restaura tudo
+        player.hp = 1;
+        return;
+    }
     // Bênção da Fênix: consome 1 e cancela a morte PvP (sem gold drop, sem perda)
     if ((player.inv.BENCAO_FENIX || 0) > 0){
         player.inv.BENCAO_FENIX -= 1;
@@ -10382,14 +10498,18 @@ function startGame(multiplayer, name){
         if (ws && ws.readyState === 1){
             // Check passivo de achievements baseados em gold/tempo
             if (typeof checkAchievements === 'function') checkAchievements();
-            ws.send(JSON.stringify({
-                t:'playerSync', gold: player.gold, inv: player.inv,
+            // Durante duelo, server tem autoridade sobre gold — não sobrescreve
+            const inDuel = !!player._duel;
+            const payload = {
+                t:'playerSync', inv: player.inv,
                 hp: player.hp, maxHp: player.maxHp,
                 mp: player.mp, maxMp: player.maxMp,
                 cosmetic: player.equipped.cosmetic || null,
                 equipped: player.equipped,
                 badges: (player.equippedBadges || []).slice(0, 2),
-            }));
+            };
+            if (!inDuel) payload.gold = player.gold;
+            ws.send(JSON.stringify(payload));
         }
     }, 5000);
     requestAnimationFrame(loop);
