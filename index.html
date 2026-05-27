@@ -3882,12 +3882,46 @@ function itemStatsCompact(def){
     if (def.base){
         const hand = def.hand === '2h' ? '2H' : '1H';
         const dp = def.def ? ` <span style="color:#5588cc">+${def.def}d</span>` : '';
-        return `<span style="color:#a08020">+${def.base} atk</span>${dp} <span style="color:#666">${hand}</span>`;
+        // Badges de upgrade: atkSpd + procs DoT (veneno/sangra/fogo)
+        let badges = '';
+        if (def.atkSpd) badges += ` <span style="color:#a0c8ff">+${Math.round(def.atkSpd*100)}%spd</span>`;
+        if (def.poison) badges += ` <span style="color:#74d176">☠${Math.round(def.poison.chance*100)}%</span>`;
+        if (def.bleed)  badges += ` <span style="color:#cc6060">🩸${Math.round(def.bleed.chance*100)}%</span>`;
+        if (def.burn)   badges += ` <span style="color:#ff8030">🔥${Math.round(def.burn.chance*100)}%</span>`;
+        return `<span style="color:#a08020">+${def.base} atk</span>${dp}${badges} <span style="color:#666">${hand}</span>`;
     }
     const parts = [];
-    if (def.def)   parts.push(`<span style="color:#5588cc">+${def.def} def</span>`);
-    if (def.speed) parts.push(`<span style="color:#8acdef">+${def.speed} spd</span>`);
+    if (def.def)    parts.push(`<span style="color:#5588cc">+${def.def} def</span>`);
+    if (def.speed)  parts.push(`<span style="color:#8acdef">+${def.speed} spd</span>`);
+    if (def.moveSpd)parts.push(`<span style="color:#a0c8ff">+${Math.round(def.moveSpd*100)}%spd</span>`);
+    if (def.hpRegen)parts.push(`<span style="color:#74d176">+${def.hpRegen} regen</span>`);
     return parts.join(' ');
+}
+
+// Descrição completa em texto puro (pra tooltip via title=)
+function itemFullDesc(def){
+    if (!def) return '';
+    const lines = [def.name];
+    if (def.base){
+        const hand = def.hand === '2h' ? '2 mãos' : '1 mão';
+        lines.push(`+${def.base} ataque · ${hand}`);
+        if (def.def) lines.push(`+${def.def} defesa`);
+        if (def.atkSpd) lines.push(`Velocidade de ataque +${Math.round(def.atkSpd*100)}%`);
+        if (def.meleeRange && def.meleeRange > 1) lines.push(`Alcance corpo a corpo: ${def.meleeRange} tiles`);
+        if (def.ranged) lines.push(`Alcance: ${def.ranged} tiles (consome flechas)`);
+        if (def.poison) lines.push(`☠ ${Math.round(def.poison.chance*100)}% chance de veneno (${def.poison.dmg} dano × ${def.poison.ticks} ticks)`);
+        if (def.bleed)  lines.push(`🩸 ${Math.round(def.bleed.chance*100)}% chance de sangra (${def.bleed.dmg} × ${def.bleed.ticks})`);
+        if (def.burn)   lines.push(`🔥 ${Math.round(def.burn.chance*100)}% chance de fogo (${def.burn.dmg} × ${def.burn.ticks})`);
+    } else {
+        if (def.def) lines.push(`+${def.def} defesa`);
+        if (def.speed) lines.push(`+${def.speed} velocidade`);
+        if (def.moveSpd) lines.push(`Velocidade de movimento +${Math.round(def.moveSpd*100)}%`);
+        if (def.hpRegen) lines.push(`Regen de HP +${def.hpRegen}`);
+        if (def.heal) lines.push(`Recupera ${def.heal} HP`);
+        if (def.manaheal) lines.push(`Regen de mana: 8 mp/s por 10s (80 total)`);
+    }
+    if (def.desc) lines.push(def.desc);
+    return lines.join('\n');
 }
 
 function hasShield(){
@@ -7418,9 +7452,8 @@ function renderInventoryIfChanged(){
         if (k){
             const def = ITEMS[k];
             if (def.ranged) hasRanged = true;
-            const stats = itemStatsCompact(def).replace(/<[^>]+>/g,'').trim();
-            const tip = `${def.name}${stats ? ' — '+stats : ''}\n(click p/ desequipar)`;
-            return `<div class="paper-slot filled" data-slot="${slot}" style="grid-area:${area}" title="${tip.replace(/"/g,'&quot;')}">
+            const tip = itemFullDesc(def) + '\n\nClick p/ desequipar';
+            return `<div class="paper-slot filled" data-slot="${slot}" style="grid-area:${area}" title="${escapeHtml(tip)}">
                 <span class="paper-slot-label">${slotLabels[slot]}</span>
                 <div class="paper-icon" style="background-image:url(${getItemIconURL(k, 26)})"></div>
             </div>`;
@@ -7449,7 +7482,8 @@ function renderInventoryIfChanged(){
             const def = ITEMS[k];
             const equippable = ['weapon','offhand','armor','head','feet','neck'].includes(def.kind);
             const extra = itemStatsCompact(def);
-            return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${equippable?'click p/ equipar':''}">
+            const tip = itemFullDesc(def) + (equippable ? '\n\nClick p/ equipar' : '');
+            return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${escapeHtml(tip)}">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
                 <span style="flex:1;margin-left:4px;color:#bbb">${def.name}</span>
                 ${extra}
