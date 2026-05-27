@@ -4582,19 +4582,14 @@ function canCraft(r){
     return true;
 }
 function doCraft(idx){
+    // N3: craft é autoritativo no server
     const r = RECIPES[idx];
     if (!r || !canCraft(r)) return;
-    for (const [k, q] of Object.entries(r.in)){
-        player.inv[k] -= q;
-        if (player.inv[k] <= 0) delete player.inv[k];
+    if (!ws || ws.readyState !== 1){
+        log('<span class="log-sys">Sem conexão com o servidor — craft não disponível.</span>');
+        return;
     }
-    const cost = recipeGold(r);
-    player.gold -= cost;
-    const qty = r.qtyOut || 1;
-    player.inv[r.out] = (player.inv[r.out] || 0) + qty;
-    log(`<span class="log-xp">Fabricou ${r.name} (-${cost}g)</span>`);
-    renderCraft();
-    invSignature = null;
+    ws.send(JSON.stringify({ t:'invCraft', idx }));
 }
 window.openCraft = openCraft;
 window.closeCraft = closeCraft;
@@ -5250,6 +5245,12 @@ function handleMP(msg){
                 addFloat(player.x, player.y, 'FALHA', '#ff3030', true, -10);
             }
             if (typeof renderForja === 'function') renderForja();
+        }
+        // Craft: feedback
+        if (msg.craft && msg.craft.ok){
+            const out = ITEMS[msg.craft.out];
+            log(`<span class="log-xp">Fabricou ${out ? out.name : msg.craft.out} (-${msg.craft.cost}g)</span>`);
+            if (typeof renderCraft === 'function') renderCraft();
         }
         // invSignature=null força re-render na próxima frame
     } else if (msg.t === 'partyUpdate'){

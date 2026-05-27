@@ -2077,6 +2077,27 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── N3: Craft server-side ───────────────────────────────────────
+        if (msg.t === 'invCraft') {
+            const idx = msg.idx | 0;
+            const r = RECIPES[idx];
+            if (!r){ sendTo(id, { t:'serverMsg', level:'warn', text:'Receita inválida.' }); return; }
+            // Tem que estar perto da bancada (50,52) — chebyshev ≤ 1
+            if (Math.max(Math.abs(p.x - 50), Math.abs(p.y - 52)) > 1){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se da bancada.' }); return;
+            }
+            for (const [k, q] of Object.entries(r.in)){
+                if (!hasInv(p, k, q)){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem material: ${k} (${q}×)` }); return; }
+            }
+            const cost = itemGoldCost(r.out);
+            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem ouro (${cost}g).` }); return; }
+            for (const [k, q] of Object.entries(r.in)) incInv(p, k, -q);
+            p.gold -= cost;
+            incInv(p, r.out, r.qtyOut || 1);
+            sendInvUpdate(p, { craft:{ ok:true, out: r.out, qty: r.qtyOut || 1, cost } });
+            return;
+        }
+
         // ─── N3: Forja server-side ───────────────────────────────────────
         if (msg.t === 'invForge') {
             const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
