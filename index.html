@@ -6442,8 +6442,14 @@ function renderPlayerRow(p){
     let actions = '';
     if (!p.isMe && !p.ghost){
         const d = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
-        const canTrade = d <= 3;
-        const tradeTip = canTrade ? `Trocar com ${p.name}` : `Aproxime-se (≤3 sqm) — está a ${d}sqm`;
+        const meInSafe    = inSafeZone(player.x, player.y);
+        const otherInSafe = inSafeZone(p.x, p.y);
+        const canTrade = d <= 3 && meInSafe && otherInSafe;
+        let tradeTip;
+        if (!meInSafe) tradeTip = 'Trade só na Zona Segura — vá pra PZ central';
+        else if (!otherInSafe) tradeTip = `${p.name} precisa estar na PZ`;
+        else if (d > 3) tradeTip = `Aproxime-se (≤3 sqm) — está a ${d}sqm`;
+        else tradeTip = `Trocar com ${p.name}`;
         actions = `<div class="po-actions">
             <button class="po-btn ${canTrade?'':'po-btn-dim'}" title="${tradeTip}"
                 onclick="startTradeFlow('${p.name.replace(/'/g, "\\'")}')">⇄ trade</button>

@@ -1697,6 +1697,11 @@ wss.on('connection', (ws) => {
                 if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
             }
             if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`${toName} não está online.` }); return; }
+            // Trade só na PZ central (zona segura) — anti-griefing em campo aberto
+            if (!inSafe(p.x, p.y) || !inSafe(target.x, target.y)){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Trade só pode ser feito na Zona Segura (PZ central).' });
+                return;
+            }
             if (chebyshev(p.x, p.y, target.x, target.y) > 3){
                 sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se mais (max 3 tiles).' });
                 return;
