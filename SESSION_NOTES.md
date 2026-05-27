@@ -1,5 +1,55 @@
 # Notas de Sessão
 
+## 📅 Sessão 27/05/2026 (tarde) — Balance, QoL, UX polish
+
+> 13 commits focados em jogabilidade real: balanceamento de forja, conforto de
+> caster, auto-engage, multiplayer (épicos visíveis, trade modal/right-click,
+> trade só na PZ), e polimento de UI.
+
+### ⚖ Balance
+- **Forja menos punitiva**: taxas de falha [40/60/75/88/95] → [20/35/50/65/80]
+  + em falha perde só 1 dos 3 itens (era os 3). Chance de chegar em +5 sobe de
+  0.036% → 1.82%. ~55 tentativas em média (vs ~2700 antes).
+- **POTION_MP vira regen on-the-fly** (anti-chug): +8 mp/seg por 10s = 80 total.
+  Não pode beber outra enquanto o buff tá ativo. Ícone ⚗ azul no status.
+
+### 🎯 Combate / Engage
+- **Auto-engage passivo**: fora da PZ, sem alvo → engaja primeiro mob do viewport
+  automaticamente (não precisa SPACE). Funciona com PUNHO também (boneco novo sem arma).
+- **Entrou em qualquer PZ** → cancela target + autoAttack na hora. Log explica.
+- **Visual AoE pro Exori/Provocação**: anel grande do raio real (3 e 5 tiles) +
+  gradient radial + 16 partículas voando radialmente.
+
+### 🎒 Forja / Itens (display)
+- **Status de armas forjadas** visível: badges inline (☠20% 🩸15% 🔥10%) + tooltip
+  com tudo detalhado (chance, dano, ticks).
+- **Vel. ataque + Procs no painel** do personagem (status sidebar).
+- **Velocidade/Vel. ataque em tiles-por-segundo** (não mais ms): "7.9 tiles/s" e
+  "1.25 atk/s". Quebra detalhada vai pro tooltip.
+
+### 👥 Multiplayer
+- **Épicos visíveis pros outros players**: cliente envia `equipped` em join+sync;
+  server retransmite em pstats/snapshot/join broadcast; remote render usa
+  `p.equipped` em vez do ESPADA hardcoded.
+- **Modal estilizado de convite de trade** (substitui `confirm()` nativo): caixa
+  com nome do inviter, countdown 20s, botões Aceitar/Recusar, auto-rejeita.
+- **Trade só na PZ central** (anti-griefing): server bloqueia, botão fica dim com
+  tooltip explicando.
+- **Right-click no boneco** abre menu contextual (Trade / Whisper). Estilo Tibia.
+  Online list ficou limpo: sem HP bar, sem botões — só nome + badge + distância.
+  Lista só os OUTROS players (você já sabe que tá online).
+
+### 🛠 UI / Auto-update
+- **Overlays unificados**: update + loading viraram um só com title/desc dinâmicos.
+  Após 8s sem responder mostra botão "🔄 RECARREGAR"; após 15s reload automático.
+  Resolve casos de trava onde o usuário precisava lembrar de F5.
+
+### 🐛 Validações em produção
+- Fix de ghosts órfãos da sessão passada confirmado: `[cleanup] 1 ghost(s) de
+  Tester2 removidos` apareceu no log do Railway durante reconexão real.
+
+---
+
 ## 📅 Sessão 27/05/2026 — Visual overhaul (4 features)
 
 > Sessão focada em subir o teto visual sem reescrever nada. Tudo procedural
