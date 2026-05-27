@@ -238,6 +238,7 @@ function snapshotPlayers(){
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
         cosmetic: p.cosmetic || null,
+        guild: findGuildOfPlayer(p.name)?.name || null,
         ghost: !!p.disconnected,
     }));
 }
@@ -640,7 +641,17 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
     }
     if (sub === 'info' || sub === ''){
         if (!myGuild){ sendToFn({ t:'serverMsg', level:'info', text:'Sem guild. Use /guild create NOME ou /guild join (após convite).' }); return; }
-        sendToFn({ t:'serverMsg', level:'info', text:`📜 ${myGuild.name} — líder: ${myGuild.leader} — membros (${myGuild.members.length}): ${myGuild.members.join(', ')}` });
+        // Calcula online status por membro
+        const onlineNames = new Set();
+        for (const pp of players.values()){
+            if (!pp.disconnected) onlineNames.add(pp.name.toLowerCase());
+        }
+        const memberList = myGuild.members.map(name => ({
+            name,
+            online: onlineNames.has(name.toLowerCase()),
+            isLeader: name === myGuild.leader,
+        }));
+        sendToFn({ t:'guildInfo', name: myGuild.name, leader: myGuild.leader, members: memberList, createdAt: myGuild.createdAt || 0 });
         return;
     }
     if (sub === 'list'){
@@ -1165,7 +1176,7 @@ wss.on('connection', (ws) => {
                 motd: SERVER_MOTD_RUNTIME,
                 isAdmin: isAdmin(p.name),
             }));
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp } });
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
