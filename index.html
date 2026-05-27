@@ -1284,6 +1284,11 @@
             <div id="bossesWidget"></div>
         </div>
 
+        <div class="s-section" id="dailyEventSection" style="display:none">
+            <div class="s-label">Evento Diário</div>
+            <div id="dailyEventWidget"></div>
+        </div>
+
         <!-- Alvo + Online dividem o espaço restante -->
         <div class="s-section split-half">
             <div class="s-label">Alvo</div>
@@ -3713,6 +3718,10 @@ function gainSkillXp(name, amount){
     // Aplica permaBuff xpBonus (decisão moral do Vendedor de Almas)
     const bonus = player.permaBuffs?.xpBonus || 0;
     if (bonus > 0) amount = Math.round(amount * (1 + bonus));
+    // Aplica bônus de evento diário "Sabedoria" (servidor avisa via eventBonus)
+    if (typeof _eventXpMul === 'number' && _eventXpMul > 1.01){
+        amount = Math.round(amount * _eventXpMul);
+    }
     sk.xp += amount;
     while (sk.xp >= sk.xpNext){
         sk.xp -= sk.xpNext;
@@ -4880,6 +4889,10 @@ let _authPwHash = null;       // hash da senha pra mandar no auth ao (re)conecta
 let _didInitialAuth = false;  // marca primeira auth da sessão (login). Reconexão = true
 const remotePlayers = {}; // id -> {x,y,dir,name,hp,maxHp}
 
+// Estado do evento diário (vem do server em 'state' e atualiza via 'eventBonus')
+let _eventXpMul = 1.0;
+let _dailyEvent = null;   // { id, name, emoji, desc, until }
+
 // Servidor WebSocket em produção (Railway)
 const PRODUCTION_WS_URL = 'wss://valadares-production.up.railway.app';
 
@@ -5044,6 +5057,7 @@ function handleMP(msg){
         player.isAdmin = !!msg.isAdmin;
         if (typeof showLoadingOverlay === 'function') showLoadingOverlay(false);
         if (msg.motd) showServerToast('event', '📜 ' + msg.motd, null, 7000);
+        if (msg.dailyEvent) applyDailyEventInfo(msg.dailyEvent);
         for (const id in remotePlayers) delete remotePlayers[id];
         msg.players.forEach(p => {
             if (p.id !== msg.you){
@@ -5114,6 +5128,22 @@ function handleMP(msg){
         const rp = remotePlayers[msg.id];
         if (rp && typeof msg.color === 'string'){
             spawnAttackParticles(rp.x, rp.y, msg.color);
+        }
+    } else if (msg.t === 'eventBonus'){
+        // Evento diário abriu/fechou — atualiza multiplier e widget
+        _eventXpMul = (typeof msg.xpMul === 'number' && msg.xpMul > 0) ? msg.xpMul : 1.0;
+        if (msg.id){
+            _dailyEvent = { id: msg.id, name: msg.name || '', emoji: msg.emoji || '', until: msg.until || 0 };
+        } else {
+            _dailyEvent = null;
+        }
+        renderDailyEventWidget();
+    } else if (msg.t === 'eventReward'){
+        // Chuva de Ouro: gold do server (já aplicado lá; replica localmente pra UI)
+        if (msg.kind === 'gold' && typeof msg.amount === 'number'){
+            player.gold = (player.gold || 0) + msg.amount;
+            addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
+            log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
         }
     } else if (msg.t === 'pvpHit'){
         const amount = msg.amount;
@@ -5468,6 +5498,35 @@ const ACHIEVEMENTS = [
 ];
 
 function getAchievementById(id){ return ACHIEVEMENTS.find(a => a.id === id); }
+
+// ─── Daily Event widget ──────────────────────────────────────────────────
+function applyDailyEventInfo(info){
+    if (!info) return;
+    if (info.active){
+        _dailyEvent = { id: info.id, name: info.name, emoji: info.emoji, desc: info.desc || '', until: info.until || 0 };
+        _eventXpMul = (typeof info.xpMul === 'number') ? info.xpMul : 1.0;
+    } else {
+        _dailyEvent = null;
+        _eventXpMul = 1.0;
+    }
+    renderDailyEventWidget();
+}
+function renderDailyEventWidget(){
+    const sec = document.getElementById('dailyEventSection');
+    const el  = document.getElementById('dailyEventWidget');
+    if (!sec || !el) return;
+    if (!_dailyEvent){
+        sec.style.display = 'none';
+        return;
+    }
+    sec.style.display = '';
+    const left = Math.max(0, _dailyEvent.until - Date.now());
+    const mm = Math.floor(left / 60000);
+    const ss = Math.floor((left % 60000) / 1000).toString().padStart(2, '0');
+    el.innerHTML = `<div style="font-size:11px;color:#ffcc40;font-weight:bold">${_dailyEvent.emoji} ${_dailyEvent.name}</div>
+        <div style="font-size:9px;color:#a08868;margin-top:2px">termina em <b style="color:#e0c060">${mm}:${ss}</b></div>`;
+}
+setInterval(() => { if (_dailyEvent) renderDailyEventWidget(); }, 1000);
 
 function tierColor(tier){
     return tier === 'ouro' ? '#ffcc40' : tier === 'prata' ? '#c4ccd8' : '#c8884a';

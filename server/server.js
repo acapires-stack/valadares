@@ -1232,6 +1232,151 @@ function tickEvent(){
 setInterval(tickEvent, 60_000);
 setTimeout(tickEvent, 5_000);   // primeiro check 5s após boot
 
+// ─── Eventos Diários (rotativos por dia) ──────────────────────────────────
+// 3 tipos rotativos por dia (deterministic baseado em dayN). Janela 60min em
+// hora pseudo-random entre 13h e 21h BRT. Anúncio global ao abrir/fechar.
+const DAILY_EVENT_TYPES = [
+    { id:'gold_rain', name:'Chuva de Ouro',       emoji:'💰', desc:'Cai ouro do céu pros players online (a cada 30s)', durationMin: 60 },
+    { id:'siege',     name:'Cerco Demoníaco',     emoji:'👹', desc:'Hordas extras de mobs no centro do mapa',           durationMin: 60 },
+    { id:'wisdom',    name:'Bênção da Sabedoria', emoji:'📜', desc:'+50% de XP em todas as skills',                     durationMin: 60 },
+];
+function getBrtDate(){ return new Date(Date.now() - 3*60*60*1000); }
+function getDayN(){ return Math.floor(getBrtDate().getTime() / 86400000); }
+function getCurrentDailyEvent(){
+    const dayN = getDayN();
+    const type = DAILY_EVENT_TYPES[Math.abs(dayN) % DAILY_EVENT_TYPES.length];
+    // Hora pseudo-random entre 13h-21h (8 horas possíveis) — determinístico por dia
+    const hashHour = (Math.abs(dayN * 2654435761) >>> 0) % 8;
+    const startHour = 13 + hashHour;
+    return { dayN, type, startHour };
+}
+function isDailyEventActive(info){
+    const d = getBrtDate();
+    const nowMin = d.getUTCHours() * 60 + d.getUTCMinutes();
+    const startMin = info.startHour * 60;
+    return nowMin >= startMin && nowMin < startMin + info.type.durationMin;
+}
+function getDailyEventEndMs(info){
+    // Timestamp UTC real do startHour BRT: o "Date BRT" tem o dia-BRT, e startHour+3 = UTC
+    const d = getBrtDate();
+    const realStartUtc = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), info.startHour + 3, 0, 0);
+    return realStartUtc + info.type.durationMin * 60_000;
+}
+let dailyEventState = {
+    currentDay: -1,
+    type: null,
+    isActive: false,
+    announcedOpen: false,
+    announcedClose: false,
+    nextTickAt: 0,
+    extraMobIds: [],
+};
+function tickDailyEvent(){
+    const info = getCurrentDailyEvent();
+    if (dailyEventState.currentDay !== info.dayN){
+        // Vira o dia — reseta tudo
+        if (dailyEventState.isActive){
+            // Cleanup do estado anterior (caso server fique online cruzando meia-noite com evento ativo)
+            cleanupDailyEvent();
+        }
+        dailyEventState = {
+            currentDay: info.dayN,
+            type: info.type,
+            isActive: false,
+            announcedOpen: false,
+            announcedClose: false,
+            nextTickAt: 0,
+            extraMobIds: [],
+        };
+        console.log(`[daily] novo dia: ${info.type.id} às ${info.startHour}h BRT`);
+    }
+    const active = isDailyEventActive(info);
+    const endMs = getDailyEventEndMs(info);
+    if (active && !dailyEventState.isActive){
+        dailyEventState.isActive = true;
+        dailyEventState.announcedOpen = true;
+        broadcastMsg('event', `${info.type.emoji} ${info.type.name}: ${info.type.desc} (${info.type.durationMin} min)`);
+        broadcast(null, { t:'eventBonus', id: info.type.id, name: info.type.name, emoji: info.type.emoji, xpMul: info.type.id === 'wisdom' ? 1.5 : 1.0, until: endMs });
+        console.log(`[daily] ${info.type.id} aberto`);
+    } else if (!active && dailyEventState.isActive){
+        dailyEventState.isActive = false;
+        dailyEventState.announcedClose = true;
+        broadcastMsg('warn', `${info.type.emoji} ${info.type.name} encerrou.`);
+        broadcast(null, { t:'eventBonus', id:null, xpMul: 1.0, until: 0 });
+        cleanupDailyEvent();
+        console.log(`[daily] ${info.type.id} fechado`);
+    }
+    if (active){
+        const now = Date.now();
+        if (now >= dailyEventState.nextTickAt){
+            applyDailyEventTick();
+            const interval = info.type.id === 'gold_rain' ? 30_000 : info.type.id === 'siege' ? 60_000 : 60_000;
+            dailyEventState.nextTickAt = now + interval;
+        }
+    }
+}
+function applyDailyEventTick(){
+    const t = dailyEventState.type;
+    if (!t) return;
+    if (t.id === 'gold_rain'){
+        // Dá 30-60g pra todos online (não fantasmas)
+        for (const p of players.values()){
+            if (p.disconnected) continue;
+            const amount = 30 + Math.floor(Math.random() * 31);
+            p.gold = (p.gold || 0) + amount;
+            const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            if (p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({ t:'eventReward', kind:'gold', amount }));
+            }
+        }
+    } else if (t.id === 'siege'){
+        // Spawna 3-4 mobs random no anel ao redor do centro (raio 12-25)
+        const siegeMobs = ['ORC', 'SKELETON', 'WOLF', 'SPIDER'];
+        const count = 3 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++){
+            const type = siegeMobs[Math.floor(Math.random() * siegeMobs.length)];
+            const ang = Math.random() * Math.PI * 2;
+            const r = 12 + Math.random() * 13;
+            const x = Math.round(50 + Math.cos(ang) * r);
+            const y = Math.round(50 + Math.sin(ang) * r);
+            const m = spawnMob(type, x, y);
+            if (m){
+                m.fromEvent = true;
+                dailyEventState.extraMobIds.push(m.id);
+                if (dailyEventState.extraMobIds.length > 60) dailyEventState.extraMobIds.shift();
+            }
+        }
+    }
+    // 'wisdom' não precisa de tick — multiplier é aplicado pelo cliente
+}
+function cleanupDailyEvent(){
+    // Despawna mobs extras pendentes (siege)
+    for (const id of dailyEventState.extraMobIds){
+        if (monsters.has(id)){
+            monsters.delete(id);
+            broadcast(null, { t:'mobDead', mobId: id, byName:'evento encerrou', level: 1 });
+        }
+    }
+    dailyEventState.extraMobIds = [];
+}
+// Snapshot pro client recém-conectado saber se tem evento ativo
+function dailyEventSnapshot(){
+    const info = getCurrentDailyEvent();
+    const active = isDailyEventActive(info);
+    return {
+        id: info.type.id,
+        name: info.type.name,
+        emoji: info.type.emoji,
+        desc: info.type.desc,
+        startHour: info.startHour,
+        active,
+        xpMul: (active && info.type.id === 'wisdom') ? 1.5 : 1.0,
+        until: active ? getDailyEventEndMs(info) : 0,
+    };
+}
+setInterval(tickDailyEvent, 30_000);
+setTimeout(tickDailyEvent, 8_000);   // primeiro check 8s após boot
+
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
 // Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
 function tickBossHeal(){
@@ -1475,6 +1620,7 @@ wss.on('connection', (ws) => {
                 mobs: snapshotMobs(),
                 motd: SERVER_MOTD_RUNTIME,
                 isAdmin: isAdmin(p.name),
+                dailyEvent: dailyEventSnapshot(),
             }));
             broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
