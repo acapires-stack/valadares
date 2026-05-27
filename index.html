@@ -697,6 +697,21 @@
             box-shadow: 0 0 80px rgba(180,130,40,0.4), 0 8px 30px rgba(0,0,0,0.8);
         }
         #loadingOverlay .reconnect-spinner { color: #ffd060; text-shadow: 0 0 20px rgba(255,200,60,0.5); }
+        #loadingReloadBtn {
+            margin-top: 14px;
+            background: #3a2818; border: 2px solid #6a4818;
+            color: #ffd060; padding: 8px 18px;
+            font-family: 'Consolas', monospace; font-size: 12px;
+            cursor: pointer; letter-spacing: 1.5px; border-radius: 3px;
+            opacity: 0; transition: opacity 0.4s ease-in, background 0.15s;
+        }
+        #loadingReloadBtn.visible { opacity: 1; }
+        #loadingReloadBtn:hover { background: #4a3018; color: #ffe080; }
+        #loadingHint {
+            color: #888; font-size: 10px; font-style: italic;
+            margin-top: 6px; letter-spacing: 0.5px;
+            display: none;
+        }
         #loadingOverlay .reconnect-title   { color: #ffd060; text-shadow: 0 0 14px rgba(255,200,60,0.5); }
 
         /* Overlay de reconexão */
@@ -1166,8 +1181,8 @@
         <div class="reconnect-spinner">⚙</div>
         <div class="reconnect-title" id="loadingTitle">CARREGANDO MUNDO</div>
         <div class="reconnect-desc" id="loadingDesc">Aguardando snapshot do servidor…</div>
-        <button id="loadingReloadBtn" style="display:none;margin-top:14px;background:#3a2818;border:2px solid #6a4818;color:#ffd060;padding:8px 16px;font-family:'Consolas',monospace;font-size:12px;cursor:pointer;letter-spacing:1px;border-radius:3px"
-            onclick="window.location.reload()">🔄 RECARREGAR</button>
+        <div class="reconnect-hint" id="loadingHint"></div>
+        <button id="loadingReloadBtn" onclick="window.location.reload()">🔄 RECARREGAR</button>
     </div>
 </div>
 
@@ -2650,7 +2665,7 @@ const MTYPE = {
     // caçadores do Highlander Hunt
     CACADOR:    { name:'Caçador de Recompensa', hp:350, dmg:18, speed:320, xp:0, color:'#ff8c20', size:1.2, dodge:0.12, crit:0.22, intel:3 },
     // ★★ MEGA RAID BOSS — Senhor de Valadares (spawna quando 3 bosses Lv10)
-    SENHOR_VALADARES: { name:'O Senhor de Valadares ★★', hp:8000, dmg:50, speed:280, xp:5000, color:'#ffd040', size:1.9, dodge:0.05, crit:0.30, unique:true, intel:3 },
+    SENHOR_VALADARES: { name:'O Senhor de Valadares ★★', hp:18000, dmg:75, speed:240, xp:10000, color:'#ffd040', size:1.9, dodge:0.05, crit:0.40, unique:true, intel:3 },
     // Boss de evento semanal (sábado 20h-22h BRT) — só spawna pelo servidor
     ARAUTO: { name:'O Arauto', hp:3000, dmg:30, speed:320, xp:1500, color:'#a880ff', size:1.5, dodge:0.10, crit:0.20, unique:true, intel:3 },
 };
@@ -3653,8 +3668,8 @@ function rollAttackerStatus(mobType){
         case 'MINOTAUR': if (Math.random() < 0.25) applyStun(2000, 'Minotauro');                break;
         // ★★ Senhor de Valadares: stun + bleed (efeitos devastadores)
         case 'SENHOR_VALADARES':
-            if (Math.random() < 0.35) applyStun(2500, 'Senhor de Valadares');
-            if (Math.random() < 0.50) applyBleed(4, 5, 2000, 'Senhor de Valadares');
+            if (Math.random() < 0.45) applyStun(2500, 'Senhor de Valadares');
+            if (Math.random() < 0.60) applyBleed(6, 6, 2000, 'Senhor de Valadares');
             break;
     }
 }
@@ -10107,32 +10122,36 @@ function startGame(multiplayer, name){
 }
 let _loadingStuckBtnTimer = null;
 let _loadingAutoReloadTimer = null;
-function showLoadingOverlay(show, title, desc){
+// Defaults usados quando showLoadingOverlay(true) é chamado sem args (login normal)
+const LOADING_DEFAULTS = { title: 'CARREGANDO MUNDO', desc: 'Aguardando snapshot do servidor…', hint: '' };
+function showLoadingOverlay(show, title, desc, hint){
     const el = document.getElementById('loadingOverlay');
     if (!el) return;
     const btn = document.getElementById('loadingReloadBtn');
     if (_loadingStuckBtnTimer){ clearTimeout(_loadingStuckBtnTimer); _loadingStuckBtnTimer = null; }
     if (_loadingAutoReloadTimer){ clearTimeout(_loadingAutoReloadTimer); _loadingAutoReloadTimer = null; }
-    if (btn) btn.style.display = 'none';
-    if (!show){
-        el.style.display = 'none';
-        return;
-    }
+    if (btn) btn.classList.remove('visible');
+    if (!show){ el.style.display = 'none'; return; }
     el.style.display = 'flex';
-    if (title){
-        const t = document.getElementById('loadingTitle'); if (t) t.textContent = title;
+    // Sempre redefine TODOS os textos (evita resíduo de chamada anterior — ex: 'ATUALIZANDO' ficando depois)
+    const t = document.getElementById('loadingTitle');
+    const d = document.getElementById('loadingDesc');
+    const h = document.getElementById('loadingHint');
+    if (t) t.textContent = title || LOADING_DEFAULTS.title;
+    if (d) d.textContent = desc  || LOADING_DEFAULTS.desc;
+    if (h){
+        const hintTxt = hint || LOADING_DEFAULTS.hint;
+        h.textContent = hintTxt;
+        h.style.display = hintTxt ? '' : 'none';
     }
-    if (desc){
-        const d = document.getElementById('loadingDesc'); if (d) d.textContent = desc;
-    }
-    // Escape: após 8s mostra botão "Recarregar"; após 15s recarrega sozinho
+    // Escape: após 10s mostra botão "Recarregar" (fade-in suave); após 20s recarrega sozinho
     _loadingStuckBtnTimer = setTimeout(() => {
-        const b = document.getElementById('loadingReloadBtn'); if (b) b.style.display = '';
-    }, 8000);
+        const b = document.getElementById('loadingReloadBtn'); if (b) b.classList.add('visible');
+    }, 10000);
     _loadingAutoReloadTimer = setTimeout(() => {
-        console.warn('[loading] travou 15s — reload automático');
+        console.warn('[loading] travou 20s — reload automático');
         window.location.reload();
-    }, 15000);
+    }, 20000);
 }
 
 // ─── Auto-update: detecta nova versão do cliente e recarrega ──────────────
@@ -10153,7 +10172,7 @@ async function checkClientUpdate(){
             console.log('[autoupdate] nova versão detectada, recarregando em 1.5s…');
             _isUpdating = true;
             // Overlay unificado — fase 1: atualizando
-            showLoadingOverlay(true, 'ATUALIZANDO', 'Salvando progresso e recarregando…');
+            showLoadingOverlay(true, 'ATUALIZANDO', 'Nova versão do jogo detectada…', 'Salvando progresso · combate pausado');
             // Fecha WS imediato pra parar mobHit (servidor para de mandar dano)
             if (ws){ try { ws.close(); } catch{} ws = null; }
             // Cancela targets/auto-attack que poderiam roubar mais um tick

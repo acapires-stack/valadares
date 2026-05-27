@@ -39,7 +39,7 @@ const MTYPE = {
     SCORPION:   { hp:75,  dmg:11, speed:320, xp:55,  aggro:4, intel:2 },
     CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999, intel:3 },
     // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
-    SENHOR_VALADARES: { hp:8000, dmg:50, speed:280, xp:5000, aggro:12, unique:true, mega:true, intel:3 },
+    SENHOR_VALADARES: { hp:18000, dmg:75, speed:240, xp:10000, aggro:12, unique:true, mega:true, intel:3 },
     // Boss de evento semanal (sábado 20h-22h BRT)
     ARAUTO: { hp:3000, dmg:30, speed:320, xp:1500, aggro:8, unique:true, intel:3 },
 };
