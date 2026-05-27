@@ -5227,6 +5227,31 @@ function handleMP(msg){
             addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
             log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
         }
+    } else if (msg.t === 'invUpdate'){
+        // N3: server é dono do inv. Cliente reflete autoridade.
+        if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
+        if (typeof msg.gold === 'number') player.gold = msg.gold;
+        // Recria entries em ITEMS pros _PLUS_N novos que o server criou
+        if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
+        invSignature = null;
+        // Forja: feedback de sucesso/falha
+        if (msg.forge){
+            if (msg.forge.ok){
+                const item = ITEMS[msg.forge.newKey];
+                const itemName = item ? item.name : msg.forge.newKey;
+                log(`<span class="log-up">✨ Forjou ${itemName}! (custo ${msg.forge.cost}g)</span>`);
+                if (typeof sndLevelUp === 'function') sndLevelUp();
+                addFloat(player.x, player.y, '★ +' + msg.forge.plus, '#ffcc40', true, -10);
+                checkAchievements();
+            } else {
+                const itemName = ITEMS[msg.forge.itemKey]?.name || msg.forge.itemKey;
+                log(`<span class="log-die">💥 Forja falhou! 1× ${itemName} destruído. -${msg.forge.cost}g</span>`);
+                if (typeof sndDeath === 'function') sndDeath();
+                addFloat(player.x, player.y, 'FALHA', '#ff3030', true, -10);
+            }
+            if (typeof renderForja === 'function') renderForja();
+        }
+        // invSignature=null força re-render na próxima frame
     } else if (msg.t === 'partyUpdate'){
         if (msg.deleted){
             player._party = null;
@@ -6433,6 +6458,7 @@ function forgeCostFor(baseKey, targetPlus){
     return base * mult;
 }
 function attemptForge(itemKey){
+    // N3: forja é autoritativa no server. Só pre-check cosmético e envia.
     const tier = getUpgradeTier(itemKey);
     const targetPlus = tier.plus + 1;
     if (targetPlus > UPGRADE_MAX){
@@ -6444,35 +6470,11 @@ function attemptForge(itemKey){
         log('<span class="log-sys">Precisa de 3× ' + ITEMS[itemKey].name + '.</span>');
         return;
     }
-    const cost = forgeCostFor(tier.base, targetPlus);
-    if (player.gold < cost){
-        log('<span class="log-sys">Sem ouro (' + cost + 'g).</span>');
+    if (!ws || ws.readyState !== 1){
+        log('<span class="log-sys">Sem conexão com o servidor — forja não disponível.</span>');
         return;
     }
-    // Consome material e ouro ANTES do roll
-    player.inv[itemKey] -= 3;
-    if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
-    player.gold -= cost;
-    invSignature = null;
-    const failChance = UPGRADE_FAIL[targetPlus];
-    if (Math.random() < failChance){
-        // Falha: devolve 2 dos 3 (perde só 1 + o ouro). Menos punitivo, mais tentativas.
-        player.inv[itemKey] = (player.inv[itemKey] || 0) + 2;
-        invSignature = null;
-        log('<span class="log-die">💥 Forja falhou! 1× ' + ITEMS[itemKey].name + ' destruído. -' + cost + 'g</span>');
-        if (typeof sndDeath === 'function') sndDeath();
-        addFloat(player.x, player.y, 'FALHA', '#ff3030', true, -10);
-        renderForja();
-        return;
-    }
-    // Sucesso — cria item upgrade
-    const newKey = ensureUpgradeItem(tier.base, targetPlus);
-    player.inv[newKey] = (player.inv[newKey] || 0) + 1;
-    log('<span class="log-up">✨ Forjou ' + ITEMS[newKey].name + '! (custo ' + cost + 'g)</span>');
-    if (typeof sndLevelUp === 'function') sndLevelUp();
-    addFloat(player.x, player.y, '★ +' + targetPlus, '#ffcc40', true, -10);
-    renderForja();
-    checkAchievements();
+    ws.send(JSON.stringify({ t:'invForge', itemKey }));
 }
 window.attemptForge = attemptForge;
 

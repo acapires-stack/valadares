@@ -64,6 +64,171 @@ const BIOME_SPAWNS = [
     { name:'deserto', inBounds:(x,y)=>y>68 && x>52,     types:['LIZARD','LIZARD','SCORPION','SCORPION'],target:12 },
 ];
 
+// ─── ITEM META (espelho mínimo do ITEMS do cliente) ─────────────────────
+// Só os campos que server precisa pra validar mutações: kind + valores.
+// Mantém em paridade com index.html — mudou lá, atualiza aqui.
+const ITEM_META = {
+    // consumíveis
+    CHEESE:   { kind:'food', heal:15 },
+    EGG:      { kind:'food', heal:25 },
+    MEAT:     { kind:'food', heal:45 },
+    HAM:      { kind:'food', heal:75 },
+    POTION:   { kind:'potion', heal:60 },
+    POTION_MP:{ kind:'potion', manaheal:50 },
+    CARNE_LAGARTO: { kind:'food', heal:35 },
+    BENCAO_FENIX:  { kind:'blessing' },
+    // mats
+    SILK:{kind:'mat'}, ASA_MORCEGO:{kind:'mat'}, OSSO:{kind:'mat'}, CHIFRE:{kind:'mat'},
+    ESCAMA:{kind:'mat'}, GARRA:{kind:'mat'}, PEDRA_GOLEM:{kind:'mat'}, ESSENCIA:{kind:'mat'},
+    // armas 1H
+    ADAGA:        { kind:'weapon', hand:'1h', base:3, def:1 },
+    ESPADA:       { kind:'weapon', hand:'1h', base:4, def:2 },
+    PORRETE:      { kind:'weapon', hand:'1h', base:3, def:1 },
+    CLAVA:        { kind:'weapon', hand:'1h', base:4, def:1 },
+    MACA:         { kind:'weapon', hand:'1h', base:5, def:2 },
+    SABRE:        { kind:'weapon', hand:'1h', base:6, def:2 },
+    ADAGA_DUPLA:  { kind:'weapon', hand:'1h', base:5, def:1 },
+    BORDAO:       { kind:'weapon', hand:'1h', base:6, def:2 },
+    ESPADA_OSSO:  { kind:'weapon', hand:'1h', base:5, def:2 },
+    LANCA:        { kind:'weapon', hand:'1h', base:4, def:1 },
+    LANCA_LONGA:  { kind:'weapon', hand:'1h', base:5, def:2 },
+    // armas 2H
+    MACHADO:      { kind:'weapon', hand:'2h', base:8, def:3 },
+    ESPADA_LONGA: { kind:'weapon', hand:'2h', base:7, def:4 },
+    MARTELO:      { kind:'weapon', hand:'2h', base:7, def:2 },
+    MARRETA:      { kind:'weapon', hand:'2h', base:10, def:1 },
+    MACA_GIGANTE: { kind:'weapon', hand:'2h', base:8, def:4 },
+    MACHADO_MINO: { kind:'weapon', hand:'2h', base:11, def:4 },
+    ESPADA_DRACO: { kind:'weapon', hand:'2h', base:14, def:5 },
+    MARTELO_GOLEM:{ kind:'weapon', hand:'2h', base:13, def:6 },
+    ESPADA_HL:    { kind:'weapon', hand:'2h', base:20, def:8 },
+    ESPADA_ETERNA:{ kind:'weapon', hand:'2h', base:30, def:12 },
+    // ranged
+    ARCO:      { kind:'weapon', hand:'2h', base:4, def:1, ranged:6 },
+    ARCO_CACA: { kind:'weapon', hand:'2h', base:6, def:1, ranged:7 },
+    BESTA:     { kind:'weapon', hand:'2h', base:9, def:2, ranged:8 },
+    // offhand/armaduras
+    ESCUDO_MAD:   { kind:'offhand', def:3 },
+    ESCUDO_FERRO: { kind:'offhand', def:6 },
+    ESCUDO_OSSO:  { kind:'offhand', def:5 },
+    ESCUDO_PEDRA: { kind:'offhand', def:8 },
+    COURO:           { kind:'armor', def:2 },
+    ARMADURA:        { kind:'armor', def:5 },
+    ARMADURA_OSSO:   { kind:'armor', def:7 },
+    ARMADURA_ESCAMA: { kind:'armor', def:9 },
+    ARMADURA_TRONO:  { kind:'armor', def:14 },
+    ELMO:            { kind:'head', def:1 },
+    ELMO_CHIFRES:    { kind:'head', def:3 },
+    ELMO_DRACO:      { kind:'head', def:4 },
+    COROA_VENDEDOR:  { kind:'head', def:7 },
+    COROA_VALADARES: { kind:'head', def:20 },
+    BOTAS:        { kind:'feet', def:1 },
+    BOTAS_RAPIDA: { kind:'feet', def:0, speed:30 },
+    BOTAS_VENTO:  { kind:'feet', def:1, speed:50 },
+    BOTAS_COURO:  { kind:'feet', def:2 },
+    CORACAO_HL:   { kind:'neck' },
+    // ammo
+    FLECHA:      { kind:'ammo' },
+    FLECHA_PERF: { kind:'ammo' },
+    // cosméticos (só visuais — server só valida posse)
+    CAPA_REAL:{kind:'cosmetic'}, CAPA_SOMBRA:{kind:'cosmetic'},
+    AURA_FOGO:{kind:'cosmetic'}, AURA_GELO:{kind:'cosmetic'},
+    NOME_DOURADO:{kind:'cosmetic'},
+    TRAIL_OURO:{kind:'cosmetic'}, TRAIL_GELO:{kind:'cosmetic'},
+    PART_FOGO:{kind:'cosmetic'}, PART_TROVAO:{kind:'cosmetic'},
+    AURA_VIDENTE:{kind:'cosmetic'}, CAPA_CETICO:{kind:'cosmetic'},
+    COROA_SOMBRIA:{kind:'cosmetic'}, MANTO_JUSTO:{kind:'cosmetic'},
+};
+
+// Custo derivado de cada item (igual itemGoldCost do cliente)
+const FIXED_COSTS = {};
+function itemGoldCost(key){
+    if (FIXED_COSTS[key] != null) return FIXED_COSTS[key];
+    const d = ITEM_META[key]; if (!d) return 0;
+    let g = 0;
+    if (d.heal)     g += d.heal * 1.5;
+    if (d.manaheal) g += d.manaheal * 2;
+    if (d.base)     g += d.base * 8;
+    if (d.def)      g += d.def  * 12;
+    if (d.speed)    g += d.speed * 3;
+    return Math.round(g);
+}
+function sellPriceFor(key){
+    const def = ITEM_META[key]; if (!def) return 1;
+    if (def.base) return 3 + Math.floor(def.base * 1.5);
+    if (def.def)  return 3 + Math.floor(def.def  * 1.5);
+    if (def.heal) return Math.max(1, Math.floor(def.heal * 0.5));
+    if (def.kind === 'mat') return 4;
+    return 1;
+}
+
+// Receitas (espelho de RECIPES do cliente, exceto display name)
+const RECIPES = [
+    { out:'POTION',         in:{ SILK:2, ASA_MORCEGO:1 } },
+    { out:'POTION_MP',      in:{ SILK:3, ASA_MORCEGO:2 } },
+    { out:'BOTAS_RAPIDA',   in:{ BOTAS:1, ASA_MORCEGO:4, SILK:3 } },
+    { out:'ESPADA_OSSO',    in:{ ESPADA:1, OSSO:4 } },
+    { out:'ESCUDO_OSSO',    in:{ ESCUDO_MAD:1, OSSO:5 } },
+    { out:'ELMO_CHIFRES',   in:{ ELMO:1, CHIFRE:2 } },
+    { out:'BOTAS_COURO',    in:{ BOTAS:1, OSSO:2, SILK:2 } },
+    { out:'ARMADURA_OSSO',  in:{ ARMADURA:1, OSSO:8, CHIFRE:1 } },
+    { out:'MACHADO_MINO',   in:{ MACHADO:1, CHIFRE:3, OSSO:4 } },
+    { out:'BOTAS_VENTO',    in:{ BOTAS_RAPIDA:1, ASA_MORCEGO:10, CHIFRE:5 } },
+    { out:'FLECHA',         in:{ OSSO:1, ASA_MORCEGO:1 }, qtyOut:5 },
+    { out:'FLECHA_PERF',    in:{ OSSO:2, CHIFRE:1 },      qtyOut:3 },
+    { out:'LANCA',          in:{ OSSO:3, SILK:1 } },
+    { out:'LANCA_LONGA',    in:{ OSSO:4, CHIFRE:1, SILK:2 } },
+    { out:'PORRETE',        in:{ OSSO:2 } },
+    { out:'MACA',           in:{ CLAVA:1, OSSO:3, CHIFRE:1 } },
+    { out:'MARRETA',        in:{ MARTELO:1, OSSO:6, CHIFRE:2 } },
+    { out:'MACA_GIGANTE',   in:{ MACA:1, OSSO:8, CHIFRE:3 } },
+    { out:'SABRE',          in:{ ESPADA:1, GARRA:3, SILK:2 } },
+    { out:'ESPADA_DRACO',   in:{ ESPADA_LONGA:1, ESCAMA:6 } },
+    { out:'ELMO_DRACO',     in:{ ELMO_CHIFRES:1, ESCAMA:3 } },
+    { out:'ARMADURA_ESCAMA',in:{ ARMADURA_OSSO:1, ESCAMA:5 } },
+    { out:'BORDAO',         in:{ CLAVA:1, PEDRA_GOLEM:2, OSSO:2 } },
+    { out:'MARTELO_GOLEM',  in:{ MARTELO:1, PEDRA_GOLEM:6 } },
+    { out:'ESCUDO_PEDRA',   in:{ ESCUDO_FERRO:1, PEDRA_GOLEM:5 } },
+    { out:'ESPADA_HL',      in:{ ESPADA_DRACO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 } },
+    { out:'ARMADURA_TRONO', in:{ ARMADURA_ESCAMA:1, CORACAO_HL:2, PEDRA_GOLEM:4, OSSO:8 } },
+    { out:'COROA_VENDEDOR', in:{ ELMO_DRACO:1, CORACAO_HL:1, ESCAMA:3, CHIFRE:2 } },
+];
+
+// Forja
+const UPGRADE_MAX       = 5;
+const UPGRADE_FAIL      = [0, 0.20, 0.35, 0.50, 0.65, 0.80];
+const UPGRADE_COST_MULT = [0, 3, 8, 20, 50, 120];
+function getUpgradeTier(key){
+    const m = key && key.match(/^(.+)_PLUS_(\d+)$/);
+    if (m) return { base: m[1], plus: parseInt(m[2], 10) };
+    return { base: key, plus: 0 };
+}
+function makeUpgradeKey(baseKey, plus){
+    return plus > 0 ? baseKey + '_PLUS_' + plus : baseKey;
+}
+function forgeCostFor(baseKey, targetPlus){
+    const sell = sellPriceFor(baseKey);
+    const base = Math.max(20, sell * 2);
+    const mult = UPGRADE_COST_MULT[targetPlus] || 0;
+    return base * mult;
+}
+
+// Helpers genéricos de mutação inv (servidor é dono)
+function incInv(p, key, qty){
+    if (!p.inv) p.inv = {};
+    p.inv[key] = Math.max(0, (p.inv[key] || 0) + qty);
+    if (p.inv[key] <= 0) delete p.inv[key];
+}
+function hasInv(p, key, qty){
+    return (p.inv && p.inv[key] || 0) >= qty;
+}
+function sendInvUpdate(p, extra){
+    if (!p || p.ws.readyState !== 1) return;
+    const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0 };
+    if (extra) Object.assign(msg, extra);
+    p.ws.send(JSON.stringify(msg));
+}
+
 // ─── LOOT tables (espelho do cliente) ─────────────────────────────────────
 // Drops gerados server-side ao morte do mob, mandados no payload do mobKill.
 // Mantém em paridade com a DROPS no index.html.
@@ -1909,6 +2074,36 @@ wss.on('connection', (ws) => {
             // Cosmético de partícula ao atacar — propaga pros outros renderizarem
             const color = typeof msg.color === 'string' ? msg.color.slice(0, 12) : null;
             if (color) broadcast(id, { t:'attackVfx', id, color });
+            return;
+        }
+
+        // ─── N3: Forja server-side ───────────────────────────────────────
+        if (msg.t === 'invForge') {
+            const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+            if (!itemKey) return;
+            const tier = getUpgradeTier(itemKey);
+            const baseMeta = ITEM_META[tier.base];
+            if (!baseMeta){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item inválido pra forja.' }); return; }
+            const targetPlus = tier.plus + 1;
+            if (targetPlus > UPGRADE_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text:'Já no nível máximo (+' + UPGRADE_MAX + ').' }); return; }
+            const have = (p.inv && p.inv[itemKey]) || 0;
+            if (have < 3){ sendTo(id, { t:'serverMsg', level:'warn', text:'Precisa de 3× pra forjar.' }); return; }
+            const cost = forgeCostFor(tier.base, targetPlus);
+            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem ouro (${cost}g).` }); return; }
+            // Desconta 3× material + ouro ANTES do roll
+            incInv(p, itemKey, -3);
+            p.gold = (p.gold || 0) - cost;
+            const failChance = UPGRADE_FAIL[targetPlus];
+            if (Math.random() < failChance){
+                // Falha: devolve 2 de 3 (perde só 1)
+                incInv(p, itemKey, 2);
+                sendInvUpdate(p, { forge:{ ok:false, itemKey, cost } });
+                return;
+            }
+            // Sucesso — cria item upgrade no inv server
+            const newKey = makeUpgradeKey(tier.base, targetPlus);
+            incInv(p, newKey, 1);
+            sendInvUpdate(p, { forge:{ ok:true, itemKey, newKey, cost, plus: targetPlus } });
             return;
         }
 
