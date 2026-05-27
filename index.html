@@ -1467,9 +1467,9 @@
             <div class="settings-val" id="setVolEffectsVal">80</div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">Música</div>
-            <input id="setVolMusic" type="range" min="0" max="100" value="0" class="settings-slider" disabled>
-            <div class="settings-val" id="setVolMusicVal">—</div>
+            <div class="settings-label">Ambient (bioma)</div>
+            <input id="setVolMusic" type="range" min="0" max="100" value="40" class="settings-slider">
+            <div class="settings-val" id="setVolMusicVal">40</div>
         </div>
 
         <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
@@ -8487,8 +8487,9 @@ const SESSION_KEY = 'valadares:session';
 // ═══════════════════════════════════════════════════════════════════════════
 const SETTINGS_KEY = 'valadares:settings';
 const settings = {
-    volMaster: 70,   // 0-100
-    volEffects: 80,  // 0-100
+    volMaster:  70,   // 0-100
+    volEffects: 80,   // 0-100
+    volAmbient: 40,   // 0-100 — som ambiente por bioma
 };
 function loadSettings(){
     try {
@@ -8496,6 +8497,8 @@ function loadSettings(){
         if (s){
             if (typeof s.volMaster === 'number')  settings.volMaster  = s.volMaster;
             if (typeof s.volEffects === 'number') settings.volEffects = s.volEffects;
+            if (typeof s.volAmbient === 'number') settings.volAmbient = s.volAmbient;
+            else if (typeof s.volMusic === 'number') settings.volAmbient = s.volMusic;   // migra slider antigo
         }
     } catch {}
 }
@@ -8505,6 +8508,9 @@ function saveSettings(){
 loadSettings();
 function effectiveVolume(){
     return (settings.volMaster / 100) * (settings.volEffects / 100);
+}
+function effectiveAmbientVolume(){
+    return (settings.volMaster / 100) * (settings.volAmbient / 100);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8554,6 +8560,93 @@ function makeImpulseResponse(duration, decay){
 }
 function refreshAudioVolume(){
     if (masterGain) masterGain.gain.value = effectiveVolume();
+}
+
+// ─── Áudio Ambient por bioma ───────────────────────────────────────────────
+// Um loop de ruído branco passa por bandpass + low-shelf modulado por bioma.
+// Cross-fade quando bioma muda (~0.6s). Volume independente do SFX.
+let ambientSource = null;
+let ambientFilter = null;
+let ambientLowShelf = null;
+let ambientGain = null;
+let _currentAmbientBiome = null;
+const AMBIENT_PROFILES = {
+    pz:     { freq: 220,  q: 0.8, lowGain: 6,  vol: 0.06 },   // PZ — calor da fogueira
+    snow:   { freq: 1400, q: 0.6, lowGain: -8, vol: 0.16 },   // vento gelado agudo
+    desert: { freq: 700,  q: 0.5, lowGain: -2, vol: 0.12 },   // vento seco
+    cave:   { freq: 280,  q: 2.5, lowGain: 4,  vol: 0.14 },   // eco grave com gota
+    grass:  { freq: 900,  q: 0.4, lowGain: -3, vol: 0.05 },   // brisa leve
+    water:  { freq: 320,  q: 1.5, lowGain: 2,  vol: 0.08 },   // água
+};
+function startAmbient(){
+    if (!audioCtx) initAudio();
+    if (!audioCtx || ambientSource) return;
+    // Buffer de pink-ish noise — 4s loop
+    const dur = 4;
+    const len = Math.floor(audioCtx.sampleRate * dur);
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++){
+        // Approx pink noise (Paul Kellet) — mais "natural" que white
+        const w = Math.random() * 2 - 1;
+        last = 0.97 * last + 0.03 * w;
+        data[i] = last * 5;
+    }
+    ambientSource = audioCtx.createBufferSource();
+    ambientSource.buffer = buf;
+    ambientSource.loop = true;
+    ambientFilter = audioCtx.createBiquadFilter();
+    ambientFilter.type = 'bandpass';
+    ambientFilter.frequency.value = 600;
+    ambientFilter.Q.value = 1;
+    ambientLowShelf = audioCtx.createBiquadFilter();
+    ambientLowShelf.type = 'lowshelf';
+    ambientLowShelf.frequency.value = 200;
+    ambientLowShelf.gain.value = 0;
+    ambientGain = audioCtx.createGain();
+    ambientGain.gain.value = 0;
+    ambientSource.connect(ambientFilter).connect(ambientLowShelf).connect(ambientGain).connect(masterGain);
+    ambientSource.start();
+}
+function detectBiome(x, y){
+    if (typeof inSafeZone === 'function' && inSafeZone(x, y)) return 'pz';
+    if (!map || !map[y]) return 'grass';
+    const t = map[y][x];
+    if (t === T.SNOW) return 'snow';
+    if (t === T.SAND) return 'desert';
+    if (t === T.CAVE) return 'cave';
+    if (t === T.WATER) return 'water';
+    return 'grass';
+}
+function refreshAmbientVolume(){
+    if (!ambientGain || !_currentAmbientBiome || !audioCtx) return;
+    const c = AMBIENT_PROFILES[_currentAmbientBiome] || AMBIENT_PROFILES.grass;
+    const v = effectiveAmbientVolume() * c.vol;
+    ambientGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.3);
+}
+function setAmbientBiome(name){
+    if (!ambientGain || !ambientFilter || !audioCtx) return;
+    if (name === _currentAmbientBiome) return;
+    _currentAmbientBiome = name;
+    const c = AMBIENT_PROFILES[name] || AMBIENT_PROFILES.grass;
+    const v = effectiveAmbientVolume() * c.vol;
+    const now = audioCtx.currentTime;
+    ambientFilter.frequency.setTargetAtTime(c.freq, now, 0.6);
+    ambientFilter.Q.setTargetAtTime(c.q, now, 0.6);
+    ambientLowShelf.gain.setTargetAtTime(c.lowGain, now, 0.6);
+    ambientGain.gain.setTargetAtTime(v, now, 0.6);
+}
+// Chamado periodicamente pelo loop principal (não cada frame — a cada ~500ms basta)
+let _lastAmbientCheck = 0;
+function updateAmbient(){
+    const now = Date.now();
+    if (now - _lastAmbientCheck < 500) return;
+    _lastAmbientCheck = now;
+    if (!audioCtx) return;
+    if (!ambientSource) startAmbient();
+    if (!player || typeof player.x !== 'number') return;
+    setAmbientBiome(detectBiome(player.x, player.y));
 }
 // Helper para tocar um som via callback que recebe (ctx, masterGain, reverbGain, now)
 function playSfx(builder){
@@ -8723,8 +8816,10 @@ function openSettings(){
     // Sincroniza sliders com state atual
     document.getElementById('setVolMaster').value  = settings.volMaster;
     document.getElementById('setVolEffects').value = settings.volEffects;
+    document.getElementById('setVolMusic').value   = settings.volAmbient;
     document.getElementById('setVolMasterVal').textContent  = settings.volMaster;
     document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
+    document.getElementById('setVolMusicVal').textContent   = settings.volAmbient;
     // Info do backup
     const info = document.getElementById('backupInfo');
     if (info && player.name){
@@ -9162,16 +9257,26 @@ window.closeSettings = closeSettings;
 window.addEventListener('DOMContentLoaded', () => {
     const m = document.getElementById('setVolMaster');
     const e = document.getElementById('setVolEffects');
+    const a = document.getElementById('setVolMusic');
     if (m) m.addEventListener('input', () => {
         settings.volMaster = +m.value;
         document.getElementById('setVolMasterVal').textContent = settings.volMaster;
         refreshAudioVolume();
+        refreshAmbientVolume();
+        saveSettings();
     });
     if (e) e.addEventListener('input', () => {
         settings.volEffects = +e.value;
         document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
         refreshAudioVolume();
-        sndPickup();  // preview do volume
+        sndPickup();   // preview do volume
+        saveSettings();
+    });
+    if (a) a.addEventListener('input', () => {
+        settings.volAmbient = +a.value;
+        document.getElementById('setVolMusicVal').textContent = settings.volAmbient;
+        refreshAmbientVolume();
+        saveSettings();
     });
 });
 
@@ -9699,6 +9804,7 @@ function loop(ts){
     tickAuras(dt);
     tickTrails(dt);
     tickParticles(dt);
+    updateAmbient();
     tickStatusEffects();
     tickTraining(dt);
     monsters.forEach(m => updateMonster(m, dt));
