@@ -7892,7 +7892,8 @@ function clearTarget(){
 function engage(){
     const npc = npcAt(player.x, player.y);
     if (npc){ interactNpc(npc); return; }
-    targetNearest(false);   // troca de alvo se aparecer ameaça mais próxima
+    // Se já tem alvo, SPACE cicla pro próximo (igual TAB). Senão, pega o mais próximo.
+    targetNearest(player.target != null);
     const m = player.target ? monsters.find(x=>x.id===player.target) : null;
     if (m && melee(m, player) <= 1 && player.attackTimer <= 0){
         doAttack(m);
