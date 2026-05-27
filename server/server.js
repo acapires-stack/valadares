@@ -175,8 +175,9 @@ function creditGoldToPlayer(playerName, gold, paymentId){
         if (p.name.toLowerCase() === playerName.toLowerCase()){
             p.gold = (p.gold || 0) + gold;
             const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            // goldDelta no invUpdate já dispara toast + log + float + som no cliente.
+            // Não duplicar com serverMsg aqui.
             sendInvUpdate(p, { goldDelta:{ amount: gold, reason:'pix', paymentId } });
-            sendTo(p.id, { t:'serverMsg', level:'event', text:`💰 +${gold.toLocaleString('pt-BR')} de ouro creditados (PIX)!` });
             credited = true;
             console.log(`[mp] gold creditado online: ${playerName} +${gold} (payment ${paymentId})`);
             break;
