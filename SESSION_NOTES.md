@@ -1,5 +1,99 @@
 # Notas de Sessão
 
+## 📅 Sessão 27/05/2026 (noite) — Pacote massivo: features novas + N3 + Electron + MercadoPago
+
+> Sessão muito grande dividida em 3 blocos. ~22 commits, várias features
+> novas, primeira camada do Hardening N3, e infra pra monetização.
+
+### 🆕 Bloco 1: features novas (10 features)
+
+**Visuais/MP:**
+- **attackVfx broadcast** — PART_FOGO/PART_TROVAO dos outros players propagam via server (era só local).
+- **Achievement system** — 14 conquistas iniciais → expandido pra 20 (com 6 ligadas às features novas). Tiers bronze/prata/ouro, modal J, badges visíveis ao lado do nome (até 2). Broadcast via playerSync + join.
+- **Eventos diários rotativos** — 3 tipos (Chuva de Ouro, Cerco Demoníaco, Bênção da Sabedoria) deterministicamente alternados por dayN. Janela 60min em hora random BRT 13h-21h. Widget de countdown na sidebar.
+- **Duelo 1v1 consensual** — `/duelo NOME APOSTA` com modal de convite, gold descontado/restaurado server-side. Vencedor 2× sem penalty PvP. Ranking duelWins/Losses.
+
+**Quest chains:**
+- **Madame Crepúsculo** (28,75) — 4 etapas + escolha moral Aura do Vidente (perma +5% esquiva) ou Capa do Cético (3000g).
+- **Embaixador Vohrim** (15,50) — 5 etapas, vilão revelado. Coroa Sombria (pacto) ou Manto do Justo (recusa).
+
+**Sistemas:**
+- **Party 1-4 players** — `/party` system. XP 60% pra cada membro no raio 12. HP no minimap (verde, ignora fog). Widget sidebar.
+- **Spectator mode** — 15s pós-morte câmera segue killer (player ou mob). Input bloqueado. ESC respawna. Overlay vermelho com countdown.
+- **Death replay** — buffer rolling dos últimos 5s. Timeline +Xs · HP · evento no modal Stats.
+
+**Cosméticos novos:** AURA_VIDENTE, CAPA_CETICO, COROA_SOMBRIA, MANTO_JUSTO
+
+### 🛡 Bloco 2: Hardening N3 (parcial — 5 ops migradas)
+
+Estratégia incremental, não big-bang. Cliente envia intenção → server valida + aplica → invUpdate de volta.
+
+- **Forja** server-side — UPGRADE_FAIL/COST_MULT/MAX + getUpgradeTier portados. Server faz fail roll + cria _PLUS_N. F12 spawn de lendário via forja parou de funcionar.
+- **Craft** server-side — RECIPES (28) espelhadas. Valida posição perto da bancada (50,52) + materiais + gold.
+- **Shop buy/sell** server-side — SHOP_BUY espelhada. Valida adjacência ao Mercador (52,49) + gold/qty. Suporta venda de _PLUS_N.
+- **Bênção da Fênix** server-side — cliente envia invUseBlessing e ESPERA confirmação antes de aplicar revive. playerDie/pkDeathBy viraram async com _dying guard.
+- **Use potion/food** server-side — eatBestFood envia invConsume. Cliente aplica HP/manaBuff APENAS ao receber consume:{ok:true} do server.
+
+**Server: ITEM_META** espelhado (87 items, só campos kind/heal/manaheal/base/def/speed/ranged).
+
+**Pendente (deferred — vetores menos críticos):**
+- Equip/Unequip (move, não cria)
+- Chest deposit/withdraw (move)
+- Pickup do chão (precisa server manter groundItems)
+- Munição consumida (arrow/lança)
+- saveUpload block do inv (depende dos outros virem)
+
+Os 5 vetores **CRÍTICOS** (criar item do nada, gold infinito, etc) tão fechados. Equip/Chest são moves — não criam item — protegidos pelo cap de N1.
+
+### 💻 Bloco 3: Electron desktop wrapper
+
+`valadares/electron/` — main.js carrega site oficial num BrowserWindow nativo.
+- F12 / Ctrl+Shift+I/J / Ctrl+U bloqueados em prod
+- Auto-update via electron-updater apontando pra GitHub Releases
+- electron-builder configurado (NSIS + Portable Windows x64)
+- npm install local feito (~150MB)
+- Pra build: `cd valadares/electron && npm run build` → gera `.exe` em `dist/`
+
+### 💰 Bloco 4: MercadoPago PIX + Cartão (CHECKOUT PRO)
+
+**Server (valadares/server/server.js):**
+- HTTP server compartilhado com WS (`http.createServer` + `wss.on('upgrade')`)
+- SDK `mercadopago@2.13` (instalado no package.json RAIZ, não no server/ — Railway usa o raiz)
+- Endpoints: `/api/packages`, `/api/pix/create`, `/webhook/mp`, `/health`
+- Token via env var `MP_ACCESS_TOKEN` no Railway
+- 4 pacotes de gold: 10k/30k/100k/300k → R$10/25/70/180
+- Mudou de **Payment API → Preference API (Checkout Pro)** porque Payment direto deu "Unauthorized use of live credentials" (exigia homologação da conta MP)
+- Aceita PIX + Cartão Crédito (1× sem juros) + Débito. Boleto excluído.
+- `creditGoldToPlayer` — online via WS (sendInvUpdate goldDelta), offline persiste em accounts.json
+
+**Cliente (index.html):**
+- Modal `/loja` com 4 pacotes
+- `buyGoldPackage` POSTa `/api/pix/create`, abre `initPoint` numa nova aba
+- Handler `invUpdate.goldDelta` exibe toast + addFloat quando MP confirma
+- `SERVER_HTTP_BASE` derivado de `WS_URL`
+
+**Configuração no painel MP necessária (ele fez):**
+- Webhook URL PRODUÇÃO: `https://valadares-production.up.railway.app/webhook/mp`
+- Evento: Pagamentos
+- Cuidado: TESTE e PRODUÇÃO têm webhooks SEPARADOS no painel — configurar PROD
+
+**Bug conhecido**: sandbox MP dá ERR_TOO_MANY_REDIRECTS quando test_user pertence à mesma conta de developer. Pular pra prod foi a saída.
+
+### 📝 Decisões de design tomadas
+
+- N3 fase 1 prioriza CRIAÇÃO de items (forja/craft) e GOLD/HP-impacto (shop/bençao/potion). Equip/Chest ficam pra fase 2.
+- MercadoPago via Checkout Pro (não Payment API) — mais robusto, não exige homologação.
+- Pra produção: env var no Railway (Restart pode ser necessário em vez de só Redeploy).
+- Electron wrapper antes de N3 completo é OK porque inv será server-side em fase 2.
+
+### 🐛 Conhecidos / pra próxima sessão
+
+- N3 fase 2: Equip/Unequip/Chest/Pickup/Munição + bloquear writes do inv no saveUpload
+- Webhook signature HMAC ainda não validada (server aceita qualquer POST). Adicionar `x-signature` check.
+- Em produção, payer.email é forçado pra `valadares.{name}@gmail.com` (fake) — MP usa o email da conta logada se houver. Pra futuro: pedir email no checkout.
+
+---
+
 ## 📅 Sessão 27/05/2026 (tarde) — Balance, QoL, UX polish
 
 > 13 commits focados em jogabilidade real: balanceamento de forja, conforto de

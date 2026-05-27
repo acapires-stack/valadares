@@ -5,6 +5,27 @@
 
 ---
 
+## 🆕 Adicionado em 27/05/2026 (sessão noite)
+
+**Features:** Party 1-4 com XP shared (raio 12) · Spectator pós-morte 15s · Death replay
+5s no Stats · 2 novas quest chains (Madame Crepúsculo, Embaixador Vohrim) · 20
+achievements totais (tiers bronze/prata/ouro + badges no boneco) · Eventos diários
+rotativos (Chuva de Ouro / Cerco / Sabedoria) · Duelo 1v1 consensual com aposta · 4
+cosméticos novos · attackVfx broadcast.
+
+**Infra/Seg:**
+- Hardening N3 fase 1 (5 ops server-side): Forja, Craft, Shop, Bênção da Fênix,
+  consumo de food/potion. ITEM_META + RECIPES + SHOP_BUY portadas no server.
+- Electron desktop wrapper (`valadares/electron/`) com F12 off + electron-updater.
+- MercadoPago Checkout Pro com PIX + Cartão. HTTP server compartilhado com WS,
+  endpoints /api/packages, /api/pix/create, /webhook/mp. 4 pacotes de gold em produção.
+
+**Pendente N3 fase 2 (próxima sessão):**
+- Equip/Unequip · Chest deposit/withdraw · Pickup do chão · Munição consumida ·
+  Bloquear writes do inv no saveUpload.
+
+---
+
 ## 📂 Estrutura de arquivos
 
 ```
