@@ -1449,6 +1449,18 @@
     </div>
 </div>
 
+<div id="achievementsModal" style="display:none">
+    <div class="chest-box" style="min-width:560px;max-width:640px">
+        <div class="chest-title">🏆 CONQUISTAS</div>
+        <div id="achievementsSummary" style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:13px"></div>
+        <div id="achievementsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
+        <div class="chest-hint" style="margin-top:10px">
+            clique no badge equipado pra trocar (2 slots) &nbsp;|&nbsp; <kbd>J</kbd> ou <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeAchievements()">×</button>
+    </div>
+</div>
+
 <div id="guildModal" style="display:none">
     <div class="chest-box" style="min-width:480px;max-width:520px">
         <div class="chest-title">📜 GUILD</div>
@@ -2551,6 +2563,23 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
         // Cor do nome: override via equip.nameColor (cosmético)
         ctx.fillStyle = (equip && equip.nameColor) || '#e0c060';
         ctx.fillText(nameTag, px+TS/2, py-3);
+        // Badges de conquista — render à direita do nome (até 2 ícones com glow da tier)
+        if (eq.badges && eq.badges.length && typeof ACHIEVEMENTS !== 'undefined'){
+            const startX = px + TS/2 + nameTag.length * 3 + 4;
+            ctx.textAlign = 'left';
+            for (let i = 0; i < Math.min(2, eq.badges.length); i++){
+                const a = getAchievementById(eq.badges[i]);
+                if (!a) continue;
+                const col = tierColor(a.tier);
+                ctx.font = 'bold 10px monospace';
+                ctx.shadowColor = col;
+                ctx.shadowBlur = 4;
+                ctx.fillStyle = col;
+                ctx.fillText(a.icon, startX + i * 11, py-3);
+                ctx.shadowBlur = 0;
+            }
+            ctx.textAlign = 'center';
+        }
         // Tag de guild — bloco menor logo acima do nome
         if (eq.guild){
             const gTxt = '[' + eq.guild.substring(0, 14) + ']';
@@ -3586,6 +3615,9 @@ const player = {
     permaBuffs: {},   // ex: { xpBonus: 0.05 }
     // Lista de amigos (cap 50). Persiste no save server-side.
     friends: [],
+    // Conquistas ganhas (ids de ACHIEVEMENTS) e badges equipadas (até 2 ids exibidos no boneco)
+    achievements: [],
+    equippedBadges: [],
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4167,7 +4199,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','tradeModal','guildModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -4965,7 +4997,8 @@ function sendJoinNow(){
     if (!ws || ws.readyState !== 1) return;
     try {
         ws.send(JSON.stringify({t:'join', name:player.name, x:player.x, y:player.y, pvp:player.pvp,
-                                hp:player.hp, maxHp:player.maxHp, equipped:player.equipped}));
+                                hp:player.hp, maxHp:player.maxHp, equipped:player.equipped,
+                                badges: (player.equippedBadges || []).slice(0, 2)}));
     } catch {}
 }
 
@@ -5068,6 +5101,7 @@ function handleMP(msg){
             if (typeof msg.maxMp === 'number') rp.maxMp = msg.maxMp;
             if ('cosmetic' in msg) rp.cosmetic = msg.cosmetic;
             if (msg.equipped && typeof msg.equipped === 'object') rp.equipped = msg.equipped;
+            if (Array.isArray(msg.badges)) rp.badges = msg.badges.slice(0, 2);
         }
     } else if (msg.t === 'float'){
         // mostra float text na posição do player remoto
@@ -5369,6 +5403,164 @@ function statsRecordMobKill(type, isBoss){
     if (!player.stats) return;
     player.stats.mobKills[type] = (player.stats.mobKills[type] || 0) + 1;
     if (isBoss) player.stats.bossKills = (player.stats.bossKills || 0) + 1;
+    checkAchievements();
+}
+
+// ─── Achievements ────────────────────────────────────────────────────────────
+function totalMobKills(p){
+    return Object.values(p.stats?.mobKills || {}).reduce((a,b) => a+b, 0);
+}
+function maxForgePlus(p){
+    let max = 0;
+    for (const k in (p.inv || {})){
+        const t = getUpgradeTier(k);
+        if (t.plus > max) max = t.plus;
+    }
+    if (p.equipped){
+        for (const slot in p.equipped){
+            const v = p.equipped[slot];
+            if (!v) continue;
+            const t = getUpgradeTier(v);
+            if (t.plus > max) max = t.plus;
+        }
+    }
+    return max;
+}
+function playtimeHours(p){
+    return (Date.now() - (p.stats?.startedAt || Date.now())) / 3600000;
+}
+
+const ACHIEVEMENTS = [
+    // Caça
+    { id:'first_blood',  name:'Primeiro Sangue',    desc:'Mate 1 mob',                       icon:'⚔',  tier:'bronze',
+      progress: p => ({ cur: Math.min(1, totalMobKills(p)), max:1 }) },
+    { id:'hunter',       name:'Caçador',            desc:'Mate 100 mobs',                    icon:'🗡',  tier:'bronze',
+      progress: p => ({ cur: Math.min(100, totalMobKills(p)), max:100 }) },
+    { id:'butcher',      name:'Carniceiro',         desc:'Mate 1.000 mobs',                  icon:'💀', tier:'prata',
+      progress: p => ({ cur: Math.min(1000, totalMobKills(p)), max:1000 }) },
+    { id:'legend_hunt',  name:'Lenda da Caça',      desc:'Mate 5.000 mobs',                  icon:'🏆', tier:'ouro',
+      progress: p => ({ cur: Math.min(5000, totalMobKills(p)), max:5000 }) },
+    // Bosses
+    { id:'boss_slayer',  name:'Caçador de Bosses',  desc:'Mate 1 boss',                      icon:'★',  tier:'bronze',
+      progress: p => ({ cur: Math.min(1, p.stats?.bossKills||0), max:1 }) },
+    { id:'boss_lord',    name:'Senhor dos Bosses',  desc:'Mate 50 bosses',                   icon:'👑', tier:'ouro',
+      progress: p => ({ cur: Math.min(50, p.stats?.bossKills||0), max:50 }) },
+    { id:'chosen_one',   name:'O Eleito',           desc:'Mate o Senhor de Valadares',       icon:'✨', tier:'ouro',
+      progress: p => ({ cur: Math.min(1, p.stats?.mobKills?.SENHOR_VALADARES || 0), max:1 }) },
+    // Economia
+    { id:'tycoon',       name:'Magnata',            desc:'Tenha 100.000 ouro de uma vez',    icon:'💰', tier:'prata',
+      progress: p => ({ cur: Math.min(100000, p.gold||0), max:100000 }) },
+    // PvP
+    { id:'first_pk',     name:'Primeiro PK',        desc:'Mate 1 player em PvP',             icon:'☠',  tier:'bronze',
+      progress: p => ({ cur: Math.min(1, p.stats?.pkKills||0), max:1 }) },
+    { id:'serial_pker',  name:'Carniceiro de PKs',  desc:'Mate 25 players em PvP',           icon:'🔪', tier:'prata',
+      progress: p => ({ cur: Math.min(25, p.stats?.pkKills||0), max:25 }) },
+    { id:'first_crown',  name:'Primeira Coroa',     desc:'Vire Highlander pela 1ª vez',      icon:'👑', tier:'ouro',
+      progress: p => ({ cur: ((p.flags?.everHighlander || p.highlander) ? 1 : 0), max:1 }) },
+    // Forja
+    { id:'forge_master', name:'Senhor da Forja',    desc:'Forje um item até +3',             icon:'🔨', tier:'prata',
+      progress: p => ({ cur: Math.min(3, maxForgePlus(p)), max:3 }) },
+    { id:'forge_legend', name:'Mestre da Forja',    desc:'Forje um item até +5',             icon:'⚒', tier:'ouro',
+      progress: p => ({ cur: Math.min(5, maxForgePlus(p)), max:5 }) },
+    // Tempo
+    { id:'veteran',      name:'Veterano',           desc:'24h de tempo de jogo',             icon:'⏳', tier:'prata',
+      progress: p => { const h = playtimeHours(p)|0; return { cur: Math.min(24, h), max:24 }; } },
+];
+
+function getAchievementById(id){ return ACHIEVEMENTS.find(a => a.id === id); }
+
+function tierColor(tier){
+    return tier === 'ouro' ? '#ffcc40' : tier === 'prata' ? '#c4ccd8' : '#c8884a';
+}
+
+function openAchievements(){
+    closeAllModals();
+    document.getElementById('achievementsModal').style.display = 'flex';
+    checkAchievements();   // pega progresso passivo (gold/playtime/etc)
+    renderAchievements();
+}
+function closeAchievements(){ document.getElementById('achievementsModal').style.display = 'none'; saveState(); }
+window.openAchievements = openAchievements;
+window.closeAchievements = closeAchievements;
+
+function toggleBadge(id){
+    if (!player.equippedBadges) player.equippedBadges = [];
+    if (!player.achievements?.includes(id)) return;
+    const i = player.equippedBadges.indexOf(id);
+    if (i >= 0){
+        player.equippedBadges.splice(i, 1);
+    } else {
+        if (player.equippedBadges.length >= 2) player.equippedBadges.shift();   // FIFO
+        player.equippedBadges.push(id);
+    }
+    saveState();
+    renderAchievements();
+}
+window.toggleBadge = toggleBadge;
+
+function renderAchievements(){
+    const list = document.getElementById('achievementsList');
+    const summary = document.getElementById('achievementsSummary');
+    if (!list) return;
+    const got = (player.achievements || []).length;
+    const total = ACHIEVEMENTS.length;
+    const eq = player.equippedBadges || [];
+    if (summary){
+        summary.innerHTML = `${got}/${total} conquistas · ${eq.length}/2 badges equipadas`;
+    }
+    list.innerHTML = ACHIEVEMENTS.map(a => {
+        const have = (player.achievements || []).includes(a.id);
+        const { cur, max } = a.progress(player);
+        const pct = Math.min(100, Math.round((cur / max) * 100));
+        const col = tierColor(a.tier);
+        const eqIdx = eq.indexOf(a.id);
+        const btn = have
+            ? `<button class="chest-btn" style="margin:0;width:auto;padding:3px 10px;background:${eqIdx>=0?'#3a2d10':'#1a1208'};border-color:${col};color:${col}" onclick="toggleBadge('${a.id}')">${eqIdx>=0?'★ equipada':'equipar'}</button>`
+            : `<span style="font-size:11px;color:#888">${cur}/${max} (${pct}%)</span>`;
+        return `<div class="ach-row" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid ${have?col:'#2a1f0a'};background:${have?'rgba(60,40,15,0.5)':'rgba(15,10,5,0.4)'};margin-bottom:6px;border-radius:3px">
+            <div style="font-size:20px;width:28px;text-align:center;color:${have?col:'#555'};text-shadow:${have?`0 0 8px ${col}`:'none'}">${a.icon}</div>
+            <div style="flex:1;min-width:0">
+                <div style="color:${have?col:'#a08868'};font-weight:bold;font-size:12px">${a.name} <span style="font-size:9px;color:${col};opacity:${have?1:0.6};text-transform:uppercase;letter-spacing:1px">${a.tier}</span></div>
+                <div style="color:#a08868;font-size:11px;opacity:${have?1:0.7}">${a.desc}</div>
+                ${!have ? `<div style="margin-top:3px;height:4px;background:#1a1208;border:1px solid #3a2d10"><div style="height:100%;width:${pct}%;background:${col};opacity:0.7"></div></div>` : ''}
+            </div>
+            <div style="flex-shrink:0">${btn}</div>
+        </div>`;
+    }).join('');
+}
+window.renderAchievements = renderAchievements;
+
+function checkAchievements(){
+    if (!player.achievements) player.achievements = [];
+    if (!player.equippedBadges) player.equippedBadges = [];
+    let unlocked = [];
+    for (const a of ACHIEVEMENTS){
+        if (player.achievements.includes(a.id)) continue;
+        const { cur, max } = a.progress(player);
+        if (cur >= max){
+            player.achievements.push(a.id);
+            unlocked.push(a);
+        }
+    }
+    if (!unlocked.length) return;
+    // Auto-equipa as primeiras badges até preencher 2 slots
+    for (const a of unlocked){
+        if (player.equippedBadges.length < 2 && !player.equippedBadges.includes(a.id)){
+            player.equippedBadges.push(a.id);
+        }
+    }
+    // Anúncios
+    for (const a of unlocked){
+        log(`<span class="log-up">🏆 Conquista desbloqueada: ${a.icon} <b>${a.name}</b></span>`);
+        addFloat(player.x, player.y, '🏆 ' + a.name, '#ffcc40', true, -22);
+    }
+    if (typeof sndLevelUp === 'function') sndLevelUp();
+    // Reflete badges nos remotos via playerSync (próximo tick)
+    if (typeof renderAchievements === 'function'){
+        const m = document.getElementById('achievementsModal');
+        if (m && m.style.display === 'flex') renderAchievements();
+    }
+    saveState();
 }
 
 // ─── Quests ──────────────────────────────────────────────────────────────────
@@ -5934,6 +6126,7 @@ function attemptForge(itemKey){
     if (typeof sndLevelUp === 'function') sndLevelUp();
     addFloat(player.x, player.y, '★ +' + targetPlus, '#ffcc40', true, -10);
     renderForja();
+    checkAchievements();
 }
 window.attemptForge = attemptForge;
 
@@ -6398,6 +6591,7 @@ function pkKilledSomeone(msg){
             invSignature = null;
         }
     }
+    checkAchievements();
     saveState();
 }
 
@@ -7832,8 +8026,12 @@ document.addEventListener('keydown', e => {
         const m = document.getElementById('friendsModal');
         if (m && m.style.display !== 'none') closeFriends(); else openFriends();
     }
+    if (e.key==='j' || e.key==='J'){
+        const m = document.getElementById('achievementsModal');
+        if (m && m.style.display !== 'none') closeAchievements(); else openAchievements();
+    }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); closeFriends(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); closeFriends(); closeAchievements(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -8742,6 +8940,8 @@ function tryAscendHighlander(victimHadSelos){
     if (player.highlander) return;
     if (player.selos < 5 || !victimHadSelos) return;
     player.highlander = true;
+    if (!player.flags) player.flags = {};
+    player.flags.everHighlander = true;
     hlHuntActive = false; hlHuntTimer = 0;
     log(`<span class="log-up">👑 VOCÊ ASCENDEU AO HIGHLANDER!</span>`);
     log(`<span class="log-die">☠ Caçadores serão enviados em 3 minutos...</span>`);
@@ -8749,6 +8949,7 @@ function tryAscendHighlander(victimHadSelos){
         ws.send(JSON.stringify({t:'pvp', pvp:player.pvp, selos:player.selos, highlander:true}));
         ws.send(JSON.stringify({t:'announce', text:`⚔ ${player.name} ascendeu ao Highlander!`}));
     }
+    checkAchievements();
 }
 
 function applyPvpPenalty(double){
@@ -10120,12 +10321,15 @@ function startGame(multiplayer, name){
     _saveStateIntervalId = setInterval(saveState, 5000);
     _playerSyncIntervalId = setInterval(() => {
         if (ws && ws.readyState === 1){
+            // Check passivo de achievements baseados em gold/tempo
+            if (typeof checkAchievements === 'function') checkAchievements();
             ws.send(JSON.stringify({
                 t:'playerSync', gold: player.gold, inv: player.inv,
                 hp: player.hp, maxHp: player.maxHp,
                 mp: player.mp, maxMp: player.maxMp,
                 cosmetic: player.equipped.cosmetic || null,
                 equipped: player.equipped,
+                badges: (player.equippedBadges || []).slice(0, 2),
             }));
         }
     }, 5000);
@@ -10243,6 +10447,8 @@ function saveState(){
         questFlags: player.questFlags,
         permaBuffs: player.permaBuffs,
         friends: Array.isArray(player.friends) ? player.friends.slice(0, 50) : [],
+        achievements: Array.isArray(player.achievements) ? player.achievements.slice(0, 100) : [],
+        equippedBadges: Array.isArray(player.equippedBadges) ? player.equippedBadges.slice(0, 2) : [],
         savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
@@ -10363,6 +10569,10 @@ function applySaveData(d){
                 if (Array.isArray(legacy) && legacy.length) player.friends = legacy.slice(0, 50);
             } catch {}
         }
+        if (Array.isArray(d.achievements)) player.achievements = d.achievements.slice(0, 100);
+        else player.achievements = [];
+        if (Array.isArray(d.equippedBadges)) player.equippedBadges = d.equippedBadges.slice(0, 2);
+        else player.equippedBadges = [];
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
@@ -10784,7 +10994,7 @@ function loop(ts){
             const hpPct = (p.maxHp > 0) ? Math.max(0, Math.min(1, (p.hp ?? p.maxHp) / p.maxHp)) : 1;
             const mpPct = (p.maxMp > 0) ? Math.max(0, Math.min(1, (p.mp ?? 0) / p.maxMp)) : null;
             drawCharacter(px, py, p.dir||'down',
-                withCosmetics({ ...(p.equipped || { weapon:'ESPADA' }), bodyColor: bodyCol, guild: p.guild || null }, p.cosmetic),
+                withCosmetics({ ...(p.equipped || { weapon:'ESPADA' }), bodyColor: bodyCol, guild: p.guild || null, badges: p.badges || null }, p.cosmetic),
                 p.name, hpPct, 0, mpPct, getWalkBob(p));
             // overlay cinza translúcido se for ghost (corpo desconectado)
             if (p.ghost){

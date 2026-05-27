@@ -329,6 +329,7 @@ function snapshotPlayers(){
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
         cosmetic: p.cosmetic || null,
         equipped: p.equipped || null,
+        badges: p.badges || [],
         guild: findGuildOfPlayer(p.name)?.name || null,
         ghost: !!p.disconnected,
     }));
@@ -1461,6 +1462,9 @@ wss.on('connection', (ws) => {
             p.hp    = msg.hp ?? 100;
             p.maxHp = msg.maxHp ?? 100;
             if (msg.equipped && typeof msg.equipped === 'object') p.equipped = msg.equipped;
+            if (Array.isArray(msg.badges)){
+                p.badges = msg.badges.filter(s => typeof s === 'string' && s.length < 32).slice(0, 2);
+            }
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
             // (race condition de reconexões rápidas, ou WS órfão antes do join).
             removeGhostsByName(p.name, id);
@@ -1472,7 +1476,7 @@ wss.on('connection', (ws) => {
                 motd: SERVER_MOTD_RUNTIME,
                 isAdmin: isAdmin(p.name),
             }));
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, guild: findGuildOfPlayer(p.name)?.name || null } });
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
@@ -1575,8 +1579,14 @@ wss.on('connection', (ws) => {
                 p.equipped = msg.equipped;
                 statsChanged = true;
             }
+            // Badges de conquista: até 2 strings curtas
+            if (Array.isArray(msg.badges)){
+                const bs = msg.badges.filter(s => typeof s === 'string' && s.length < 32).slice(0, 2);
+                p.badges = bs;
+                statsChanged = true;
+            }
             if (statsChanged){
-                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped });
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
             }
             return;
         }
