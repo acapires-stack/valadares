@@ -2230,9 +2230,11 @@ function withCosmetics(equipObj, cosmeticKey){
     if (!c || !ITEMS[c]) return equipObj;
     const def = ITEMS[c];
     const out = { ...equipObj };
-    if (def.cape && !out.cape)           out.cape = def.cape;
-    if (def.aura && !out.aura)           out.aura = def.aura;
-    if (def.nameColor && !out.nameColor) out.nameColor = def.nameColor;
+    if (def.cape && !out.cape)             out.cape = def.cape;
+    if (def.aura && !out.aura)             out.aura = def.aura;
+    if (def.nameColor && !out.nameColor)   out.nameColor = def.nameColor;
+    if (def.trail && !out.trail)           out.trail = def.trail;
+    if (def.particles && !out.particles)   out.particles = def.particles;
     return out;
 }
 function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
@@ -2574,6 +2576,10 @@ const ITEMS = {
     AURA_FOGO:    { name:'Aura de Fogo',    color:'#ff4020', kind:'cosmetic', aura:'#ff4020', desc:'Anel pulsante laranja ao redor.' },
     AURA_GELO:    { name:'Aura de Gelo',    color:'#60c0ff', kind:'cosmetic', aura:'#60c0ff', desc:'Anel pulsante azul ao redor.' },
     NOME_DOURADO: { name:'Nome Dourado',    color:'#ffd040', kind:'cosmetic', nameColor:'#ffd040', desc:'Nome do boneco em dourado.' },
+    TRAIL_OURO:   { name:'Rastro Dourado',  color:'#ffd040', kind:'cosmetic', trail:'#ffd040', desc:'Deixa um rastro dourado por onde anda.' },
+    TRAIL_GELO:   { name:'Rastro Glacial',  color:'#80d0ff', kind:'cosmetic', trail:'#80d0ff', desc:'Deixa um rastro azul cintilante.' },
+    PART_FOGO:    { name:'Faíscas de Fogo', color:'#ff5020', kind:'cosmetic', particles:'#ff5020', desc:'Solta faíscas laranjas ao atacar.' },
+    PART_TROVAO:  { name:'Faíscas de Trovão', color:'#aacdff', kind:'cosmetic', particles:'#aacdff', desc:'Solta faíscas elétricas ao atacar.' },
     GOLD:     { name:'Ouro',           color:'#ffcc40', kind:'gold' },
     SILK:     { name:'Seda',           color:'#d0d0e0', kind:'mat' },
     // armas — hand: '1h' permite escudo, '2h' bloqueia. base=ataque, def=bloqueio da arma.
@@ -3462,6 +3468,29 @@ const player = {
 // SISTEMA DE COMBATE
 // ═══════════════════════════════════════════════════════════════════════════
 const floatTexts = []; // damage numbers
+// Trails (cosmético TRAIL_*): pontos atrás do boneco que fade-out
+const trails = [];      // { x, y, color, life, maxLife }
+// Partículas (cosmético PART_*): centelhas saindo do boneco ao atacar
+const particles = [];   // { x, y, dx, dy, color, life, maxLife }
+
+function spawnTrailAt(rx, ry, color){
+    trails.push({ x: rx, y: ry, color, life: 800, maxLife: 800 });
+    if (trails.length > 80) trails.shift();
+}
+function spawnAttackParticles(rx, ry, color){
+    // 6-8 partículas saindo em direções aleatórias
+    const n = 6 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++){
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
+        const sp = 30 + Math.random() * 50;
+        particles.push({
+            x: rx, y: ry,
+            dx: Math.cos(a) * sp, dy: Math.sin(a) * sp - 20,
+            color, life: 500, maxLife: 500,
+        });
+    }
+    if (particles.length > 120) particles.splice(0, particles.length - 120);
+}
 
 function addFloat(x,y,text,color,big,offsetY){
     floatTexts.push({ x, y, text, color, life: 900, size: big ? 20 : 14, offsetY: offsetY || 0 });
@@ -4467,6 +4496,9 @@ function doAttack(m){
         return;
     }
     player.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
+    // Partículas cosméticas no momento do ataque (visual local)
+    const partCol = ITEMS[player.equipped.cosmetic]?.particles;
+    if (partCol) spawnAttackParticles(player.x, player.y, partCol);
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
     const isRanged = wItem && wItem.ranged;
@@ -7843,6 +7875,55 @@ function tickProjectiles(dt){
     }
 }
 
+function tickTrails(dt){
+    for (let i = trails.length - 1; i >= 0; i--){
+        trails[i].life -= dt;
+        if (trails[i].life <= 0) trails.splice(i, 1);
+    }
+}
+function drawTrails(cam){
+    for (const t of trails){
+        const sx = (t.x - cam.x) * TS + TS/2;
+        const sy = (t.y - cam.y) * TS + TS/2;
+        const a = Math.max(0, t.life / t.maxLife);
+        ctx.save();
+        ctx.globalAlpha = a * 0.7;
+        ctx.fillStyle = t.color;
+        // estrela de 4 pontas (rombo)
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 4);
+        ctx.lineTo(sx + 3, sy);
+        ctx.lineTo(sx, sy + 4);
+        ctx.lineTo(sx - 3, sy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+}
+function tickParticles(dt){
+    const dts = dt / 1000;
+    for (let i = particles.length - 1; i >= 0; i--){
+        const p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0){ particles.splice(i, 1); continue; }
+        p.x += p.dx * dts / TS;   // dx em pixels/seg, mas pos é em tiles
+        p.y += p.dy * dts / TS;
+        p.dy += 60 * dts / TS;    // gravidade leve (pixels/seg² → tiles)
+    }
+}
+function drawParticles(cam){
+    for (const p of particles){
+        const sx = (p.x - cam.x) * TS + TS/2;
+        const sy = (p.y - cam.y) * TS + TS/2;
+        const a = Math.max(0, p.life / p.maxLife);
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(sx-1, sy-1, 3, 3);
+        ctx.restore();
+    }
+}
+
 function drawProjectiles(cam){
     for (const p of projectiles){
         const sx = (p.x - cam.x) * TS + TS/2;
@@ -8287,6 +8368,9 @@ function handleMovement(dt){
     player.moveTimer = dur;
     player.moveDuration = dur;
     player.moveProgress = 0;
+    // Trail cosmético — deixa rastro no tile que acabou de sair
+    const trailCol = ITEMS[player.equipped.cosmetic]?.trail;
+    if (trailCol) spawnTrailAt(player.prevX, player.prevY, trailCol);
     pickupAt(nx, ny);
     if (ws && ws.readyState===1) ws.send(JSON.stringify({t:'pos', x:nx, y:ny, dir:player.dir}));
 }
@@ -9613,6 +9697,8 @@ function loop(ts){
     tickSpellCooldowns(dt);
     tickProjectiles(dt);
     tickAuras(dt);
+    tickTrails(dt);
+    tickParticles(dt);
     tickStatusEffects();
     tickTraining(dt);
     monsters.forEach(m => updateMonster(m, dt));
@@ -9954,6 +10040,9 @@ function loop(ts){
         }
     });
 
+    // Trails cosméticos — desenhados antes dos mobs/players pra ficarem no chão
+    drawTrails(cam);
+
     // monstros visíveis (usa renderX/Y para animação suave)
     monsters.forEach(m => {
         if (m.renderX>=cam.x-1&&m.renderX<cam.x+VP_W+1 && m.renderY>=cam.y-1&&m.renderY<cam.y+VP_H+1){
@@ -10060,9 +10149,10 @@ function loop(ts){
         ctx.fillRect(ppx+TS/2-1, ppy-21, 2, 2);
     }
 
-    // Projéteis de magia + auras (acima de monstros e player)
+    // Projéteis de magia + auras + partículas cosméticas (acima de monstros e player)
     drawProjectiles(cam);
     drawAuras(cam);
+    drawParticles(cam);
 
     // floating texts
     for (let i=floatTexts.length-1; i>=0; i--){
