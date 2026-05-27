@@ -5040,7 +5040,7 @@ function handleMP(msg){
         if (def){
             const fakeMob = { id: msg.mobId, type: msg.mobType, name: def.name, x: msg.x, y: msg.y, xpReward: msg.xp };
             // dispara o "ganhar XP" + drops, mas pula o splice (server já removeu via mobDead)
-            mobKilledByServer(fakeMob);
+            mobKilledByServer(fakeMob, msg.loot || null);
         }
     } else if (msg.t === 'mobMissing'){
         // mob que tentei atacar já morreu/sumiu
@@ -5111,11 +5111,22 @@ function applyMobsSnapshot(list){
 }
 
 // Quando o server confirma que MATEI um mob: dispara loot + xp localmente
-function mobKilledByServer(m){
+function mobKilledByServer(m, serverLoot){
     statsRecordMobKill(m.type, MTYPE[m.type] && MTYPE[m.type].unique);
     notifyMobKilledForQuests(m.type);
     sndKill();
-    if (typeof rollDrops === 'function') rollDrops(m.type, m.x, m.y);
+    // Hardening Nível 2: server agora gera loot autoritativamente.
+    // Se serverLoot veio (array de {type, qty}), spawnamos aqui no chão.
+    // Caso contrário (cliente conectado em server velho), fallback pra tabela local.
+    if (Array.isArray(serverLoot)){
+        for (const item of serverLoot){
+            if (!item || !item.type) continue;
+            const qty = Math.max(1, item.qty | 0);
+            groundItems.push({ id: nextItemId++, x: m.x, y: m.y, type: item.type, qty });
+        }
+    } else if (typeof rollDrops === 'function') {
+        rollDrops(m.type, m.x, m.y);
+    }
     // XP no skill da arma equipada (simula killMonster sem mexer no monsters[])
     const wKey = player.equipped.weapon;
     const skill = wKey ? ITEMS[wKey].skill : 'Punho';

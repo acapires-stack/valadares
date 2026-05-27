@@ -64,6 +64,96 @@ const BIOME_SPAWNS = [
     { name:'deserto', inBounds:(x,y)=>y>68 && x>52,     types:['LIZARD','LIZARD','SCORPION','SCORPION'],target:12 },
 ];
 
+// ─── LOOT tables (espelho do cliente) ─────────────────────────────────────
+// Drops gerados server-side ao morte do mob, mandados no payload do mobKill.
+// Mantém em paridade com a DROPS no index.html.
+const LOOT = {
+    RAT:    [ ['CHEESE', 0.7, 1, 1], ['PORRETE', 0.04, 1, 1] ],
+    SNAKE:  [ ['EGG', 0.5, 1, 1], ['GOLD', 0.6, 1, 4], ['ADAGA', 0.05, 1, 1], ['LANCA', 0.06, 1, 1], ['PORRETE', 0.05, 1, 1] ],
+    SPIDER: [ ['SILK', 0.4, 1, 2], ['GOLD', 0.5, 2, 6], ['POTION', 0.08, 1, 1], ['POTION_MP', 0.12, 1, 1],
+              ['BOTAS', 0.05, 1, 1], ['ESCUDO_MAD', 0.06, 1, 1], ['BOTAS_RAPIDA', 0.04, 1, 1], ['FLECHA', 0.30, 2, 6] ],
+    WOLF:   [ ['MEAT', 0.7, 1, 1], ['GOLD', 0.7, 3, 10], ['POTION', 0.12, 1, 1],
+              ['CLAVA', 0.08, 1, 1], ['MACA', 0.05, 1, 1], ['COURO', 0.06, 1, 1], ['ESCUDO_MAD', 0.08, 1, 1],
+              ['BOTAS_RAPIDA', 0.05, 1, 1], ['ARCO', 0.04, 1, 1], ['FLECHA', 0.25, 2, 5] ],
+    ORC:    [ ['HAM', 0.5, 1, 1], ['GOLD', 1.0, 10, 28], ['POTION', 0.25, 1, 2],
+              ['ESPADA', 0.10, 1, 1], ['MACHADO', 0.06, 1, 1], ['ESPADA_LONGA', 0.04, 1, 1],
+              ['MARTELO', 0.04, 1, 1], ['MACA', 0.06, 1, 1], ['MARRETA', 0.03, 1, 1], ['MACA_GIGANTE', 0.03, 1, 1],
+              ['ARMADURA', 0.08, 1, 1], ['ELMO', 0.10, 1, 1], ['ESCUDO_FERRO', 0.05, 1, 1],
+              ['ARCO_CACA', 0.05, 1, 1], ['BESTA', 0.03, 1, 1], ['FLECHA_PERF', 0.15, 1, 3], ['LANCA_LONGA', 0.05, 1, 1] ],
+    ORC_LIDER: [
+        ['HAM', 1.00, 3, 5], ['GOLD', 1.00, 60, 150], ['POTION', 1.00, 3, 6],
+        ['ESPADA_LONGA', 0.40, 1, 1], ['MACHADO', 0.40, 1, 1], ['MARTELO', 0.30, 1, 1],
+        ['MARRETA', 0.20, 1, 1], ['MACA_GIGANTE', 0.20, 1, 1],
+        ['ARMADURA', 0.55, 1, 1], ['ELMO', 0.50, 1, 1], ['BOTAS', 0.40, 1, 1], ['ESCUDO_FERRO', 0.45, 1, 1],
+        ['BOTAS_VENTO', 0.02, 1, 1],
+    ],
+    BAT:      [ ['GOLD', 0.50, 1, 4], ['ASA_MORCEGO', 0.45, 1, 1], ['POTION_MP', 0.10, 1, 1] ],
+    SKELETON: [ ['GOLD', 0.80, 3, 12], ['OSSO', 0.65, 1, 2], ['POTION', 0.15, 1, 1], ['POTION_MP', 0.15, 1, 1],
+                ['ESPADA', 0.08, 1, 1], ['ELMO', 0.08, 1, 1], ['ESCUDO_MAD', 0.10, 1, 1],
+                ['ESPADA_OSSO', 0.06, 1, 1], ['ESCUDO_OSSO', 0.05, 1, 1], ['ARMADURA_OSSO', 0.04, 1, 1] ],
+    MINOTAUR: [ ['HAM', 0.40, 1, 2], ['GOLD', 1.00, 25, 60], ['POTION', 0.40, 1, 2], ['POTION_MP', 0.30, 1, 2],
+                ['CHIFRE', 0.55, 1, 1], ['OSSO', 0.30, 1, 1],
+                ['MACHADO', 0.14, 1, 1], ['ESPADA_LONGA', 0.10, 1, 1], ['MARTELO', 0.10, 1, 1],
+                ['ARMADURA', 0.15, 1, 1], ['ELMO', 0.18, 1, 1], ['BOTAS', 0.15, 1, 1], ['ESCUDO_FERRO', 0.12, 1, 1],
+                ['MACHADO_MINO', 0.06, 1, 1], ['ELMO_CHIFRES', 0.10, 1, 1], ['ARMADURA_OSSO', 0.08, 1, 1], ['BOTAS_COURO', 0.12, 1, 1] ],
+    TROLL:  [ ['MEAT', 0.65, 1, 2], ['GOLD', 0.85, 8, 22], ['POTION', 0.20, 1, 1],
+              ['CLAVA', 0.10, 1, 1], ['MACA', 0.07, 1, 1], ['MARTELO', 0.06, 1, 1],
+              ['COURO', 0.10, 1, 1], ['ARMADURA', 0.06, 1, 1], ['ELMO', 0.08, 1, 1],
+              ['BOTAS', 0.10, 1, 1], ['ESCUDO_MAD', 0.08, 1, 1] ],
+    LIZARD: [ ['GARRA', 0.60, 1, 1], ['CARNE_LAGARTO', 0.65, 1, 1], ['GOLD', 0.70, 2, 8],
+              ['POTION', 0.08, 1, 1], ['ADAGA', 0.08, 1, 1], ['LANCA', 0.07, 1, 1], ['ADAGA_DUPLA', 0.05, 1, 1] ],
+    SCORPION: [ ['GOLD', 0.85, 4, 14], ['GARRA', 0.35, 1, 1], ['POTION', 0.15, 1, 1],
+                ['ADAGA', 0.07, 1, 1], ['LANCA', 0.10, 1, 1], ['LANCA_LONGA', 0.04, 1, 1], ['FLECHA', 0.20, 1, 4] ],
+    DRAKE:  [ ['ESCAMA', 0.60, 1, 1], ['GOLD', 0.90, 12, 30], ['POTION', 0.22, 1, 1], ['POTION_MP', 0.15, 1, 1],
+              ['ESPADA', 0.09, 1, 1], ['MACHADO', 0.08, 1, 1], ['ESPADA_LONGA', 0.06, 1, 1],
+              ['ARMADURA', 0.10, 1, 1], ['ELMO', 0.08, 1, 1] ],
+    DRAKE_LIDER: [
+        ['ESCAMA', 1.00, 5, 10], ['GOLD', 1.00, 120, 250], ['POTION', 1.00, 5, 8], ['POTION_MP', 1.00, 3, 5],
+        ['ESPADA_DRACO', 0.30, 1, 1], ['ARMADURA_ESCAMA', 0.45, 1, 1], ['ELMO_DRACO', 0.40, 1, 1],
+        ['BOTAS_VENTO', 0.06, 1, 1], ['MACHADO_MINO', 0.15, 1, 1], ['CORACAO_HL', 0.05, 1, 1],
+    ],
+    GOLEM:  [ ['PEDRA_GOLEM', 0.65, 1, 1], ['GOLD', 0.90, 15, 40], ['POTION', 0.20, 1, 1], ['OSSO', 0.40, 1, 2],
+              ['MARTELO', 0.12, 1, 1], ['MARRETA', 0.08, 1, 1], ['MACA_GIGANTE', 0.06, 1, 1],
+              ['ARMADURA', 0.10, 1, 1], ['ELMO', 0.08, 1, 1], ['ESCUDO_FERRO', 0.07, 1, 1] ],
+    GOLEM_REI: [
+        ['PEDRA_GOLEM', 1.00, 5, 10], ['GOLD', 1.00, 120, 250], ['POTION', 1.00, 5, 8],
+        ['MARTELO_GOLEM', 0.30, 1, 1], ['ESCUDO_PEDRA', 0.40, 1, 1], ['ARMADURA_ESCAMA', 0.40, 1, 1],
+        ['ELMO_DRACO', 0.32, 1, 1], ['BORDAO', 0.22, 1, 1], ['BOTAS_VENTO', 0.05, 1, 1],
+    ],
+    CACADOR: [
+        ['GOLD', 1.00, 40, 100], ['POTION', 1.00, 2, 4],
+        ['SABRE', 0.30, 1, 1], ['BESTA', 0.25, 1, 1], ['ARMADURA', 0.40, 1, 1],
+    ],
+    SENHOR_VALADARES: [
+        ['GOLD', 1.00, 5000, 10000], ['ESSENCIA', 1.00, 5, 10], ['CORACAO_HL', 1.00, 3, 5],
+        ['POTION', 1.00, 10, 20], ['POTION_MP', 1.00, 10, 20],
+        ['COROA_VALADARES', 0.30, 1, 1], ['ESPADA_ETERNA', 0.20, 1, 1],
+        ['ARMADURA_TRONO', 0.50, 1, 1], ['ESPADA_HL', 0.40, 1, 1],
+        ['TRAIL_OURO', 0.25, 1, 1], ['PART_FOGO', 0.20, 1, 1], ['PART_TROVAO', 0.15, 1, 1],
+    ],
+    ARAUTO: [
+        ['GOLD', 1.00, 500, 1500], ['BENCAO_FENIX', 1.00, 1, 2],
+        ['POTION', 1.00, 5, 10], ['POTION_MP', 1.00, 5, 10],
+        ['CORACAO_HL', 0.25, 1, 1],
+        ['CAPA_REAL', 0.20, 1, 1], ['CAPA_SOMBRA', 0.20, 1, 1],
+        ['AURA_FOGO', 0.15, 1, 1], ['AURA_GELO', 0.15, 1, 1], ['NOME_DOURADO', 0.10, 1, 1],
+        ['TRAIL_OURO', 0.15, 1, 1], ['TRAIL_GELO', 0.15, 1, 1],
+        ['PART_FOGO', 0.10, 1, 1], ['PART_TROVAO', 0.10, 1, 1],
+    ],
+};
+function rollLoot(mobType){
+    const table = LOOT[mobType];
+    if (!table) return [];
+    const out = [];
+    for (const [type, chance, qMin, qMax] of table){
+        if (Math.random() < chance){
+            const qty = qMin + Math.floor(Math.random() * (qMax - qMin + 1));
+            out.push({ type, qty });
+        }
+    }
+    return out;
+}
+
 const BOSS_RESPAWN_MS = 5 * 60 * 1000;
 const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
 const BOSS_POS  = { type:'ORC_LIDER',   x:46, y:95, respawn: BOSS_RESPAWN_MS };
@@ -800,6 +890,82 @@ const SAVE_MAX_BYTES = 200 * 1024;   // 200KB por save é folgado pro JSON atual
 
 const accounts = new Map();   // nameLower -> { name, pwHash, save, savedAt, createdAt }
 
+// Sanity caps pra detectar/bloquear save adulterado via F12.
+// Valores generosos pra qualquer progressão legítima, mas barram trapaça óbvia.
+const SAVE_CAPS = {
+    gold: 100_000_000,    // 100M de ouro
+    skill: 200,           // skills raramente passam de 100 naturalmente
+    itemQty: 9999,        // qty por item no inv/baú
+    invKeys: 250,         // items distintos
+    chestKeys: 250,       // items distintos por baú
+    seloMax: 5,           // selos não passam de 5
+};
+function clampNumber(v, max, fallback = 0){
+    if (typeof v !== 'number' || !isFinite(v) || v < 0) return fallback;
+    return Math.min(v, max);
+}
+function sanitizeSave(data, ownerName){
+    if (!data || typeof data !== 'object') return data;
+    let touched = false;
+    const log = (k, was, now) => { touched = true; console.warn(`[save:${ownerName}] clamp ${k}: ${was} → ${now}`); };
+    // Gold
+    if ('gold' in data){
+        const orig = data.gold;
+        data.gold = clampNumber(orig, SAVE_CAPS.gold, 0);
+        if (data.gold !== orig) log('gold', orig, data.gold);
+    }
+    // Selos PvP
+    if ('selos' in data){
+        const orig = data.selos;
+        data.selos = clampNumber(orig, SAVE_CAPS.seloMax, 0);
+        if (data.selos !== orig) log('selos', orig, data.selos);
+    }
+    // Skills — cap em val
+    if (data.skills && typeof data.skills === 'object'){
+        for (const sk of Object.keys(data.skills)){
+            const s = data.skills[sk];
+            if (!s || typeof s !== 'object') continue;
+            if (typeof s.val === 'number' && s.val > SAVE_CAPS.skill){
+                log(`skill.${sk}.val`, s.val, SAVE_CAPS.skill);
+                s.val = SAVE_CAPS.skill;
+            }
+        }
+    }
+    // Inv — limita qty por item e quantidade de keys
+    if (data.inv && typeof data.inv === 'object'){
+        const keys = Object.keys(data.inv);
+        if (keys.length > SAVE_CAPS.invKeys){
+            log('inv keys', keys.length, SAVE_CAPS.invKeys);
+            for (const k of keys.slice(SAVE_CAPS.invKeys)) delete data.inv[k];
+        }
+        for (const k of Object.keys(data.inv)){
+            const orig = data.inv[k];
+            const v = clampNumber(orig, SAVE_CAPS.itemQty, 0);
+            if (v <= 0){ delete data.inv[k]; continue; }
+            if (v !== orig){ log(`inv.${k}`, orig, v); data.inv[k] = v; }
+        }
+    }
+    // Baús — mesmo tratamento
+    if (data.chests && typeof data.chests === 'object'){
+        for (const cId of Object.keys(data.chests)){
+            const chest = data.chests[cId];
+            if (!chest || typeof chest !== 'object') continue;
+            const keys = Object.keys(chest);
+            if (keys.length > SAVE_CAPS.chestKeys){
+                log(`chest.${cId} keys`, keys.length, SAVE_CAPS.chestKeys);
+                for (const k of keys.slice(SAVE_CAPS.chestKeys)) delete chest[k];
+            }
+            for (const k of Object.keys(chest)){
+                const orig = chest[k];
+                const v = clampNumber(orig, SAVE_CAPS.itemQty, 0);
+                if (v <= 0){ delete chest[k]; continue; }
+                if (v !== orig){ log(`chest.${cId}.${k}`, orig, v); chest[k] = v; }
+            }
+        }
+    }
+    return data;
+}
+
 function hashPwServer(clientHash){
     return crypto.createHash('sha256').update(ACCOUNTS_SALT + ':' + String(clientHash || '')).digest('hex');
 }
@@ -881,8 +1047,9 @@ function handleMobDeath(m, killerId){
     }
     monsters.delete(m.id);
     const killer = players.get(killerId);
+    const loot = rollLoot(m.type);
     if (killer && killer.ws.readyState === 1){
-        killer.ws.send(JSON.stringify({ t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level }));
+        killer.ws.send(JSON.stringify({ t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot }));
     }
     broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
     if (killer){
@@ -1158,6 +1325,8 @@ wss.on('connection', (ws) => {
                 }
             } catch { return; }
             p.lastSaveAt = now;
+            // Hardening Nível 1: clampa valores absurdos antes de persistir
+            sanitizeSave(data, p.authedName);
             setPlayerSave(p.authedName, data);
             return;
         }
@@ -1353,8 +1522,9 @@ wss.on('connection', (ws) => {
                     }
                 }
                 monsters.delete(m.id);
-                // notifica killer com xp + spawn de loot fica com o killer (cliente)
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level });
+                // Loot autoritativo: server roda LOOT e manda lista pro killer (anti-trapaça)
+                const loot = rollLoot(m.type);
+                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot });
                 broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level });
                 // Ranking: incrementa mobKills (e bossKills se for unique)
                 const r = ensureRanking(p.name);
