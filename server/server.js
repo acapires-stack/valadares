@@ -1348,6 +1348,23 @@ function tickGhosts(){
 }
 setInterval(tickGhosts, 15 * 1000);
 
+// Remove TODOS os ghosts com este nome (exceto o próprio id, se passado).
+// Chamado em auth, join e close pra impedir acúmulo quando o WS cai antes do join.
+function removeGhostsByName(name, exceptId){
+    if (!name) return 0;
+    let n = 0;
+    for (const [oid, op] of players){
+        if (oid === exceptId) continue;
+        if (op.disconnected && op.name === name){
+            players.delete(oid);
+            broadcast(null, { t:'leave', id: oid });
+            n++;
+        }
+    }
+    if (n > 0) console.log(`    [cleanup] ${n} ghost(s) de ${name} removidos`);
+    return n;
+}
+
 // ─── Conexões ───────────────────────────────────────────────────────────────
 wss.on('connection', (ws) => {
     const id = nextId++;
@@ -1392,6 +1409,9 @@ wss.on('connection', (ws) => {
             }
             p.authed = true;
             p.authedName = acc.name;
+            // Já limpa ghosts antigos no momento do auth — mesmo se o WS cair antes do join,
+            // não acumula corpos órfãos. Importante quando rede do user oscila bastante.
+            removeGhostsByName(acc.name, id);
             ws.send(JSON.stringify({ t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0 }));
             return;
         }
@@ -1431,16 +1451,9 @@ wss.on('connection', (ws) => {
             p.pvp   = !!msg.pvp;
             p.hp    = msg.hp ?? 100;
             p.maxHp = msg.maxHp ?? 100;
-            // Se já existe um ghost com mesmo nome → o player tá voltando, remove o corpo antigo
-            for (const [oid, op] of players){
-                if (oid === id) continue;
-                if (op.disconnected && op.name === p.name){
-                    players.delete(oid);
-                    broadcast(null, { t:'leave', id: oid });
-                    console.log(`    [merge] ghost antigo de ${p.name} (id ${oid}) removido — player voltou como id ${id}`);
-                    break;
-                }
-            }
+            // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
+            // (race condition de reconexões rápidas, ou WS órfão antes do join).
+            removeGhostsByName(p.name, id);
             console.log(`    ${id} = ${p.name}${isAdmin(p.name) ? ' [admin]' : ''}`);
             ws.send(JSON.stringify({
                 t:'state', you: id,
@@ -1937,8 +1950,20 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         // Body stays: mantém ghost por GHOST_TIMEOUT_MS, atacável e droppable
         if (p.disconnected){ players.delete(id); return; }
+        // Se o player nunca chegou a logar (WS caiu antes do join), só remove — não vira ghost órfão sem nome
+        if (!p.name || p.name === 'Anônimo'){
+            // Mas ainda pode ter autenticado — usa authedName se houver
+            if (p.authedName){
+                removeGhostsByName(p.authedName, id);
+            }
+            players.delete(id);
+            console.log(`[x] ${id} desconectou antes do join — removido`);
+            return;
+        }
         p.disconnected = true;
         p.disconnectedAt = Date.now();
+        // Remove ghosts antigos com mesmo nome — mantém só este (o mais recente)
+        removeGhostsByName(p.name, id);
         console.log(`[~] ${id} (${p.name}) virou ghost — ${(GHOST_TIMEOUT_MS/60000).toFixed(0)}min até sumir`);
         broadcast(id, { t:'ghost', id, name:p.name });
     });
