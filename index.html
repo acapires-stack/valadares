@@ -6394,18 +6394,56 @@ function drawItemSprite(ctx, def, key, S){
 
     // Items específicos com sprite único
     if (key === 'CORACAO_HL'){
-        // coração vermelho com aura dourada
-        const r = c;
-        P(7,7,4,4,r); P(13,7,4,4,r);
-        P(6,9,12,4,r);
-        P(7,13,10,2,r);
-        P(9,15,6,2,r);
-        P(11,17,2,1,r);
-        // brilhos
-        P(8,8,1,1, '#ffffff');
-        P(9,9,1,1, _shade(c,80));
-        P(14,8,1,1, _shade(c,60));
-        drawEpicAura('#ffcc40');
+        // Coração do Highlander — pingente com corrente de ouro + coração rubi
+        const red = '#d8202a';      // vermelho rubi
+        const redL = '#ff6060';     // highlight
+        const redD = '#7a1018';     // sombra
+        const gold = '#ffcc40';
+        const goldL = '#fff0a0';
+        // Corrente de ouro em "V" no topo (V mais aberto e visível)
+        P(5, 3, 1, 1, gold); P(7, 4, 1, 1, gold); P(9, 5, 1, 1, gold);
+        P(18, 3, 1, 1, gold); P(16, 4, 1, 1, gold); P(14, 5, 1, 1, gold);
+        P(10, 6, 4, 1, gold);   // base da corrente
+        // Argola que une coração à corrente
+        P(11, 7, 2, 1, goldL);
+        // Coração — forma clássica com 2 lobos
+        // Linha 8 (topo dos lobos)
+        P(7, 8, 4, 1, red);
+        P(13, 8, 4, 1, red);
+        // Linha 9 (lobos cheios)
+        P(6, 9, 6, 1, red);
+        P(12, 9, 6, 1, red);
+        // Linha 10-11 (corpo principal)
+        P(5, 10, 14, 2, red);
+        // Linha 12 (começa a estreitar)
+        P(6, 12, 12, 1, red);
+        // Linha 13
+        P(7, 13, 10, 1, red);
+        // Linha 14
+        P(8, 14, 8, 1, red);
+        // Linha 15
+        P(9, 15, 6, 1, red);
+        // Linha 16
+        P(10, 16, 4, 1, red);
+        // Linha 17 — ponta
+        P(11, 17, 2, 1, red);
+        // Sombras pra dar volume (lado direito)
+        P(11, 9, 1, 1, redD);    // entre os lobos (vinco)
+        P(16, 10, 2, 1, redD);
+        P(17, 11, 1, 1, redD);
+        P(15, 12, 2, 1, redD);
+        P(14, 13, 2, 1, redD);
+        P(13, 14, 2, 1, redD);
+        P(12, 15, 2, 1, redD);
+        // Highlights (lado esquerdo dos lobos)
+        P(7, 9, 2, 1, redL);
+        P(6, 10, 1, 1, redL);
+        P(13, 9, 2, 1, redL);
+        // Brilho/reflexo concentrado no lobo esquerdo
+        P(7, 10, 1, 1, '#ffffff');
+        P(8, 11, 1, 1, redL);
+        // Aura dourada épica nos cantos
+        drawEpicAura(gold);
         return;
     }
     if (key === 'ESPADA_HL'){
