@@ -1146,6 +1146,7 @@ function handleMobDeath(m, killerId){
             r.mobKills = (r.mobKills || 0) + 1;
             if (m.unique) r.bossKills = (r.bossKills || 0) + 1;
         }
+        sharePartyKill(killer, m);
     }
 }
 
@@ -1452,6 +1453,180 @@ function tickDuels(){
     }
 }
 setInterval(tickDuels, 5_000);
+
+// ─── Party 1-4 players ─────────────────────────────────────────────────────
+// Grupo efêmero (não persiste). Lidera quem cria. Compartilha XP de mob por
+// proximidade (raio 12) e dá visibilidade do HP dos colegas no minimap.
+const parties = new Map();        // partyId → { id, leader, members:[name], createdAt }
+const partyInvites = new Map();   // toName(lower) → { partyId, fromId, fromName, expiresAt }
+const PARTY_MAX = 4;
+const PARTY_INVITE_TIMEOUT_MS = 60_000;
+const PARTY_SHARE_RADIUS = 12;
+const PARTY_XP_FRACTION = 0.6;    // membros próximos ganham 60% do XP base do mob
+let nextPartyId = 1;
+
+function findPartyOfPlayer(name){
+    const low = name.toLowerCase();
+    for (const party of parties.values()){
+        if (party.members.some(n => n.toLowerCase() === low)) return party;
+    }
+    return null;
+}
+function partyMembersOnline(party){
+    const out = [];
+    const wanted = new Set(party.members.map(n => n.toLowerCase()));
+    for (const pp of players.values()){
+        if (pp.disconnected) continue;
+        if (wanted.has(pp.name.toLowerCase())) out.push(pp);
+    }
+    return out;
+}
+function broadcastPartyUpdate(party){
+    if (!party) return;
+    const payload = { t:'partyUpdate', partyId: party.id, leader: party.leader, members: party.members };
+    for (const pp of partyMembersOnline(party)){
+        if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify(payload));
+    }
+}
+function sendPartyEnded(memberName){
+    for (const pp of players.values()){
+        if (!pp.disconnected && pp.name.toLowerCase() === memberName.toLowerCase() && pp.ws.readyState === 1){
+            pp.ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
+            break;
+        }
+    }
+}
+function handlePartyCommand(p, text){
+    const parts = text.split(/\s+/);
+    const sub = (parts[1] || '').toLowerCase();
+    const arg = parts.slice(2).join(' ').trim();
+    const myParty = findPartyOfPlayer(p.name);
+    const id = p.id;
+    if (sub === 'invite'){
+        if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /party invite NOME' }); return; }
+        if (arg.toLowerCase() === p.name.toLowerCase()){ sendTo(id, { t:'serverMsg', level:'warn', text:'Não dá pra convidar a si mesmo.' }); return; }
+        let target = null;
+        for (const pp of players.values()){
+            if (!pp.disconnected && pp.name.toLowerCase() === arg.toLowerCase()){ target = pp; break; }
+        }
+        if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`"${arg}" não está online.` }); return; }
+        const targetParty = findPartyOfPlayer(target.name);
+        if (targetParty){ sendTo(id, { t:'serverMsg', level:'warn', text:`${target.name} já está em outra party.` }); return; }
+        let party = myParty;
+        if (!party){
+            // Cria party com o convidante como líder
+            party = { id: nextPartyId++, leader: p.name, members: [p.name], createdAt: Date.now() };
+            parties.set(party.id, party);
+            broadcastPartyUpdate(party);
+        } else if (party.leader !== p.name){
+            sendTo(id, { t:'serverMsg', level:'warn', text:'Só o líder convida.' });
+            return;
+        }
+        if (party.members.length >= PARTY_MAX){
+            sendTo(id, { t:'serverMsg', level:'warn', text:`Party cheia (max ${PARTY_MAX}).` });
+            return;
+        }
+        partyInvites.set(target.name.toLowerCase(), { partyId: party.id, fromId: id, fromName: p.name, expiresAt: Date.now() + PARTY_INVITE_TIMEOUT_MS });
+        sendTo(target.id, { t:'serverMsg', level:'event', text:`👥 ${p.name} te convidou pra party. Use /party accept` });
+        sendTo(id, { t:'serverMsg', level:'info', text:`Convite enviado pra ${target.name} (60s).` });
+        return;
+    }
+    if (sub === 'accept'){
+        const inv = partyInvites.get(p.name.toLowerCase());
+        if (!inv || inv.expiresAt < Date.now()){
+            partyInvites.delete(p.name.toLowerCase());
+            sendTo(id, { t:'serverMsg', level:'warn', text:'Sem convites de party pendentes.' });
+            return;
+        }
+        const party = parties.get(inv.partyId);
+        if (!party){ partyInvites.delete(p.name.toLowerCase()); sendTo(id, { t:'serverMsg', level:'warn', text:'A party não existe mais.' }); return; }
+        if (myParty){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você já está numa party. /party leave primeiro.' }); return; }
+        if (party.members.length >= PARTY_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text:`Party cheia (max ${PARTY_MAX}).` }); return; }
+        party.members.push(p.name);
+        partyInvites.delete(p.name.toLowerCase());
+        // Notifica todos os membros
+        for (const pp of partyMembersOnline(party)){
+            if (pp.ws.readyState === 1){
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'event', text:`✦ ${p.name} entrou na party!` }));
+            }
+        }
+        broadcastPartyUpdate(party);
+        return;
+    }
+    if (sub === 'leave'){
+        if (!myParty){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você não está em party.' }); return; }
+        const wasLeader = myParty.leader === p.name;
+        myParty.members = myParty.members.filter(n => n !== p.name);
+        sendTo(id, { t:'partyUpdate', deleted: true });
+        sendTo(id, { t:'serverMsg', level:'info', text:'Você saiu da party.' });
+        if (myParty.members.length === 0){
+            parties.delete(myParty.id);
+            return;
+        }
+        if (wasLeader) myParty.leader = myParty.members[0];
+        for (const pp of partyMembersOnline(myParty)){
+            if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} saiu da party.` }));
+        }
+        broadcastPartyUpdate(myParty);
+        return;
+    }
+    if (sub === 'kick'){
+        if (!myParty){ sendTo(id, { t:'serverMsg', level:'warn', text:'Sem party.' }); return; }
+        if (myParty.leader !== p.name){ sendTo(id, { t:'serverMsg', level:'warn', text:'Só o líder dá kick.' }); return; }
+        if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /party kick NOME' }); return; }
+        if (arg.toLowerCase() === p.name.toLowerCase()){ sendTo(id, { t:'serverMsg', level:'warn', text:'Use /party leave pra sair.' }); return; }
+        if (!myParty.members.find(n => n.toLowerCase() === arg.toLowerCase())){
+            sendTo(id, { t:'serverMsg', level:'warn', text:`"${arg}" não está na party.` });
+            return;
+        }
+        myParty.members = myParty.members.filter(n => n.toLowerCase() !== arg.toLowerCase());
+        sendPartyEnded(arg);
+        if (myParty.members.length === 0){
+            parties.delete(myParty.id);
+        } else {
+            for (const pp of partyMembersOnline(myParty)){
+                if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} removeu ${arg} da party.` }));
+            }
+            broadcastPartyUpdate(myParty);
+        }
+        return;
+    }
+    if (sub === 'info' || sub === ''){
+        if (!myParty){ sendTo(id, { t:'serverMsg', level:'info', text:'Sem party. /party invite NOME pra criar.' }); return; }
+        const memberLine = myParty.members.map(n => n === myParty.leader ? `👑 ${n}` : n).join(', ');
+        sendTo(id, { t:'serverMsg', level:'info', text:`Party (${myParty.members.length}/${PARTY_MAX}): ${memberLine}` });
+        return;
+    }
+    sendTo(id, { t:'serverMsg', level:'warn', text:'Subcomandos: invite NOME, accept, leave, kick NOME, info' });
+}
+
+function sharePartyKill(killer, mob){
+    if (!killer) return;
+    const party = findPartyOfPlayer(killer.name);
+    if (!party || party.members.length < 2) return;
+    const shareXp = Math.max(1, Math.round((mob.xp || 0) * PARTY_XP_FRACTION));
+    for (const pp of partyMembersOnline(party)){
+        if (pp.name === killer.name) continue;
+        // Só os membros no raio do mob recebem XP (incentiva ficar perto)
+        if (chebyshev(pp.x, pp.y, mob.x, mob.y) > PARTY_SHARE_RADIUS) continue;
+        if (pp.ws.readyState !== 1) continue;
+        pp.ws.send(JSON.stringify({ t:'partyShareKill', mobType: mob.type, xp: shareXp, fromName: killer.name }));
+    }
+}
+
+function tickPartyInvites(){
+    const now = Date.now();
+    for (const [key, inv] of partyInvites){
+        if (inv.expiresAt <= now){
+            partyInvites.delete(key);
+            const from = players.get(inv.fromId);
+            if (from && from.ws.readyState === 1){
+                from.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:`Convite de party expirou.` }));
+            }
+        }
+    }
+}
+setInterval(tickPartyInvites, 10_000);
 
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
 // Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
@@ -1890,6 +2065,7 @@ wss.on('connection', (ws) => {
                     r.mobKills = (r.mobKills || 0) + 1;
                     if (m.unique) r.bossKills = (r.bossKills || 0) + 1;
                 }
+                sharePartyKill(p, m);
             }
             return;
         }
@@ -2196,6 +2372,11 @@ wss.on('connection', (ws) => {
                 handleGuildCommand(p, text, (m) => sendTo(id, m), broadcast);
                 return;
             }
+            // /party ... — sistema de party (XP shared)
+            if (text.startsWith('/party')){
+                handlePartyCommand(p, text);
+                return;
+            }
             // /g msg — chat exclusivo da guild
             if (text.startsWith('/g ')){
                 const body = text.substring(3).trim();
@@ -2321,6 +2502,22 @@ wss.on('connection', (ws) => {
                 endDuel(opp, p, false);
             } else {
                 p.duel = null;
+            }
+        }
+        // Party: ao desconectar, sai da party (se único membro, dissolve)
+        if (p.name){
+            const party = findPartyOfPlayer(p.name);
+            if (party){
+                party.members = party.members.filter(n => n !== p.name);
+                if (party.members.length === 0){
+                    parties.delete(party.id);
+                } else {
+                    if (party.leader === p.name) party.leader = party.members[0];
+                    for (const pp of partyMembersOnline(party)){
+                        if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} desconectou da party.` }));
+                    }
+                    broadcastPartyUpdate(party);
+                }
             }
         }
         // Body stays: mantém ghost por GHOST_TIMEOUT_MS, atacável e droppable

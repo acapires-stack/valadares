@@ -1289,6 +1289,11 @@
             <div id="dailyEventWidget"></div>
         </div>
 
+        <div class="s-section" id="partySection" style="display:none">
+            <div class="s-label">Party</div>
+            <div id="partyWidget"></div>
+        </div>
+
         <!-- Alvo + Online dividem o espaço restante -->
         <div class="s-section split-half">
             <div class="s-label">Alvo</div>
@@ -5167,6 +5172,21 @@ function handleMP(msg){
             addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
             log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
         }
+    } else if (msg.t === 'partyUpdate'){
+        if (msg.deleted){
+            player._party = null;
+        } else {
+            player._party = { id: msg.partyId, leader: msg.leader, members: Array.isArray(msg.members) ? msg.members.slice(0, 4) : [] };
+        }
+        renderPartyWidget();
+    } else if (msg.t === 'partyShareKill'){
+        // Recebe XP por kill de colega de party — aplica na arma equipada
+        const wKey = player.equipped?.weapon;
+        const skill = wKey ? ITEMS[wKey]?.skill : 'Punho';
+        if (skill && player.skills[skill] && msg.xp > 0){
+            gainSkillXp(skill, msg.xp);
+            addFloat(player.x, player.y, `+${msg.xp}xp (party)`, '#a8e0ff', false, -34);
+        }
     } else if (msg.t === 'duelInvite'){
         showDuelInvite(msg);
     } else if (msg.t === 'duelStart'){
@@ -5615,6 +5635,48 @@ function rejectDuelInvite(silent){
 }
 window.acceptDuelInvite = acceptDuelInvite;
 window.rejectDuelInvite = rejectDuelInvite;
+
+// ─── Party 1-4 (widget + helpers) ──────────────────────────────────────
+function isPartyMate(name){
+    if (!player._party || !name) return false;
+    const low = name.toLowerCase();
+    if (low === (player.name || '').toLowerCase()) return false;
+    return player._party.members.some(n => n.toLowerCase() === low);
+}
+function renderPartyWidget(){
+    const sec = document.getElementById('partySection');
+    const el  = document.getElementById('partyWidget');
+    if (!sec || !el) return;
+    if (!player._party){
+        sec.style.display = 'none';
+        return;
+    }
+    sec.style.display = '';
+    const lines = player._party.members.map(n => {
+        const isMe = (n.toLowerCase() === (player.name || '').toLowerCase());
+        const isLeader = (n === player._party.leader);
+        let hpStr = '';
+        if (isMe){
+            hpStr = `${player.hp}/${player.maxHp}`;
+        } else {
+            // Procura nas remotePlayers pelo nome
+            for (const id in remotePlayers){
+                const rp = remotePlayers[id];
+                if (rp.name && rp.name.toLowerCase() === n.toLowerCase()){
+                    hpStr = `${rp.hp ?? '?'}/${rp.maxHp ?? '?'}`;
+                    break;
+                }
+            }
+            if (!hpStr) hpStr = '<span style="color:#666">offline</span>';
+        }
+        const tag = isLeader ? '👑 ' : '';
+        const nameCol = isMe ? '#ffd060' : '#a8e0ff';
+        return `<div style="font-size:11px;color:${nameCol};display:flex;justify-content:space-between"><span>${tag}${n}</span><span style="color:#9dd07d;font-size:10px">${hpStr}</span></div>`;
+    }).join('');
+    el.innerHTML = lines + `<div style="font-size:9px;color:#888;margin-top:4px">/party leave</div>`;
+}
+window.renderPartyWidget = renderPartyWidget;
+setInterval(() => { if (player._party) renderPartyWidget(); }, 1500);
 
 function tierColor(tier){
     return tier === 'ouro' ? '#ffcc40' : tier === 'prata' ? '#c4ccd8' : '#c8884a';
@@ -6598,6 +6660,11 @@ function sendChat(text){
         ws.send(JSON.stringify({ t:'duelReject' }));
         return;
     }
+    // /party ... — comandos de party (server processa)
+    if (/^\/party\b/i.test(text)){
+        ws.send(JSON.stringify({ t:'chat', text }));
+        return;
+    }
     ws.send(JSON.stringify({ t:'chat', text }));
 }
 
@@ -6660,12 +6727,18 @@ function drawMinimap(){
         mctx.fillStyle = m.unique ? '#ffcc40' : m.hunter ? '#ff6010' : '#cc3030';
         mctx.fillRect(m.x*scale - 1, m.y*scale - 1, scale+2, scale+2);
     }
-    // outros players
+    // outros players (party mates aparecem em verde mesmo sem visited; sempre visíveis)
     for (const id in remotePlayers){
         const rp = remotePlayers[id];
-        if (!player.visited[rp.y*M_W + rp.x]) continue;
-        mctx.fillStyle = rp.pvp ? '#ff0000' : '#5af';
-        mctx.fillRect(rp.x*scale - 1, rp.y*scale - 1, scale+2, scale+2);
+        const mate = isPartyMate(rp.name);
+        if (!mate && !player.visited[rp.y*M_W + rp.x]) continue;
+        if (mate){
+            mctx.fillStyle = '#74e08c';
+            mctx.fillRect(rp.x*scale - 1.5, rp.y*scale - 1.5, scale+3, scale+3);
+        } else {
+            mctx.fillStyle = rp.pvp ? '#ff0000' : '#5af';
+            mctx.fillRect(rp.x*scale - 1, rp.y*scale - 1, scale+2, scale+2);
+        }
     }
     // player (pulsa)
     const pulse = (Math.sin(performance.now()*0.005)+1) * 0.5;
