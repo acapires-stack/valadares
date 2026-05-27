@@ -2096,6 +2096,23 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── N3: consumir item (food/potion) ────────────────────────────
+        if (msg.t === 'invConsume') {
+            const key = typeof msg.key === 'string' ? msg.key.slice(0, 64) : null;
+            const meta = key && ITEM_META[key];
+            if (!meta || (meta.kind !== 'food' && meta.kind !== 'potion')){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Item não consumível.' });
+                return;
+            }
+            if (!hasInv(p, key, 1)){
+                sendInvUpdate(p, { consume:{ ok:false, key, reason:'no_item' } });
+                return;
+            }
+            incInv(p, key, -1);
+            sendInvUpdate(p, { consume:{ ok:true, key, heal: meta.heal || 0, manaheal: meta.manaheal || 0 } });
+            return;
+        }
+
         // ─── N3: Bênção da Fênix (consumo autoritativo) ─────────────────
         if (msg.t === 'invUseBlessing') {
             if (!hasInv(p, 'BENCAO_FENIX', 1)){

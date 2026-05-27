@@ -5247,6 +5247,23 @@ function handleMP(msg){
             _blessingPromise.resolve(!!msg.bencao.applied);
             _blessingPromise = null;
         }
+        // Consume (food/potion): aplica efeito ao receber confirmação
+        if (msg.consume && msg.consume.ok){
+            const def = ITEMS[msg.consume.key];
+            const name = def ? def.name : msg.consume.key;
+            if (msg.consume.heal > 0){
+                const healed = Math.min(msg.consume.heal, player.maxHp - player.hp);
+                player.hp = Math.min(player.maxHp, player.hp + msg.consume.heal);
+                addFloat(player.x, player.y, `+${healed}`, '#66cc66', false, 0);
+                log(`<span class="log-xp">Comeu ${name} (+${healed} HP)</span>`);
+            }
+            if (msg.consume.manaheal > 0){
+                const lifeMs = 10000, mpPerSec = 8;
+                player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs };
+                addFloat(player.x, player.y, `+${mpPerSec}/s por ${lifeMs/1000}s`, '#5599ff', false, -14);
+                log(`<span class="log-xp">Bebeu ${name} — regen ${mpPerSec} mp/s por ${lifeMs/1000}s</span>`);
+            }
+        }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
         if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
         invSignature = null;
@@ -9609,57 +9626,39 @@ function pickupAt(x, y){
 }
 
 function eatBestFood(){
-    // Consome 1 item de cada tipo se necessário: HP (food/poção) E MP (poção mana).
+    // N3: server valida cada consumo. Cliente identifica candidato e envia invConsume.
+    // Server desconta + envia invUpdate.consume; cliente aplica efeito ao receber confirmação.
+    if (!ws || ws.readyState !== 1){
+        log('<span class="log-sys">Sem conexão com o servidor.</span>');
+        return;
+    }
     const needHp = player.maxHp - player.hp;
     const needMp = player.maxMp - player.mp;
-    let didSomething = false;
-    let offY = 0;
-
+    let sent = false;
     if (needHp > 0){
         const owned = Object.entries(player.inv)
-            .filter(([k,q]) => q > 0 && ITEMS[k].heal)
+            .filter(([k,q]) => q > 0 && ITEMS[k] && ITEMS[k].heal)
             .map(([k,q]) => ({ k, q, heal: ITEMS[k].heal }));
         if (owned.length){
             owned.sort((a,b) => Math.abs(a.heal - needHp) - Math.abs(b.heal - needHp));
-            const pick = owned[0]; const def = ITEMS[pick.k];
-            const healed = Math.min(def.heal, needHp);
-            player.hp += healed;
-            player.inv[pick.k]--;
-            if (player.inv[pick.k] <= 0) delete player.inv[pick.k];
-            addFloat(player.x, player.y, `+${healed}`, '#66cc66', false, offY);
-            log(`<span class="log-xp">Comeu ${def.name} (+${healed} HP)</span>`);
-            didSomething = true;
-            offY -= 14;   // próximo floater fica acima
+            ws.send(JSON.stringify({ t:'invConsume', key: owned[0].k }));
+            sent = true;
         }
     }
-    if (needMp > 0){
-        // Pot de mana vira regen on-the-fly (não cura instantânea):
-        // libera tick extra de mana enquanto o buff está ativo. Não pode beber outra
-        // enquanto a regen anterior não terminar — força planejamento de combate.
-        if (player.manaBuff && player.manaBuff.life > 0){
-            log('<span class="log-sys">Regen de mana ainda ativa — aguarde acabar.</span>');
-        } else {
-            const mana = Object.entries(player.inv)
-                .filter(([k,q]) => q > 0 && ITEMS[k].manaheal)
-                .map(([k,q]) => ({ k, q, mp: ITEMS[k].manaheal }));
-            if (mana.length){
-                const pick = mana[0]; const def = ITEMS[pick.k];
-                // Explosivo: 8 mp/seg por 10s = 80 mp total
-                const lifeMs = 10000, mpPerSec = 8;
-                player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs };
-                player.inv[pick.k]--;
-                if (player.inv[pick.k] <= 0) delete player.inv[pick.k];
-                addFloat(player.x, player.y, `+${mpPerSec}/s por ${lifeMs/1000}s`, '#5599ff', false, offY);
-                log(`<span class="log-xp">Bebeu ${def.name} — regen ${mpPerSec} mp/s por ${lifeMs/1000}s</span>`);
-                didSomething = true;
-            }
+    if (needMp > 0 && !(player.manaBuff && player.manaBuff.life > 0)){
+        const mana = Object.entries(player.inv)
+            .filter(([k,q]) => q > 0 && ITEMS[k] && ITEMS[k].manaheal)
+            .map(([k,q]) => ({ k, q, mp: ITEMS[k].manaheal }));
+        if (mana.length){
+            ws.send(JSON.stringify({ t:'invConsume', key: mana[0].k }));
+            sent = true;
         }
     }
-    if (!didSomething){
-        if (needHp <= 0 && needMp <= 0)
-            log('<span class="log-sys">HP e MP já estão cheios.</span>');
-        else
-            log('<span class="log-sys">Sem comida/poção disponível.</span>');
+    if (player.manaBuff && player.manaBuff.life > 0 && needMp > 0){
+        log('<span class="log-sys">Regen de mana ainda ativa — aguarde acabar.</span>');
+    } else if (!sent){
+        if (needHp <= 0 && needMp <= 0) log('<span class="log-sys">HP e MP já estão cheios.</span>');
+        else log('<span class="log-sys">Sem comida/poção disponível.</span>');
     }
 }
 
