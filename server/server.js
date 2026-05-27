@@ -100,7 +100,7 @@ async function handleCreatePix(body, res){
                 description: `Valadares — ${pkg.title} para ${playerName}`,
                 payment_method_id: 'pix',
                 payer: {
-                    email: `${playerName.toLowerCase().replace(/[^a-z0-9]/g,'')}@valadares.local`,
+                    email: `valadares-${playerName.toLowerCase().replace(/[^a-z0-9]/g,'') || 'user'}@example.com`,
                     first_name: playerName,
                 },
                 notification_url: `${MP_BASE_URL}/webhook/mp`,
