@@ -129,7 +129,9 @@ async function handleCreatePix(body, res){
         });
     } catch (e){
         console.warn('[mp] erro ao criar preference:', e.message);
-        return httpJson(res, 500, { error:'create_failed', detail: e.message });
+        console.warn('[mp] erro completo:', JSON.stringify(e, Object.getOwnPropertyNames(e)).slice(0, 2000));
+        const detail = e.cause?.[0]?.description || e.cause?.[0]?.message || e.message;
+        return httpJson(res, 500, { error:'create_failed', detail, message: e.message, cause: e.cause || null });
     }
 }
 
