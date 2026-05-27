@@ -695,6 +695,24 @@ function ensureRanking(name){
     if (!r){ r = { mobKills:0, pkKills:0, bossKills:0, gold:0 }; rankings.set(name, r); }
     return r;
 }
+function topGuildRanking(limit){
+    // Agrega stats por guild somando os rankings de cada membro.
+    // total = mobs + pvp*5 + bosses*20 (PvP e bosses pesam mais)
+    const out = [];
+    for (const g of guilds.values()){
+        let mobs = 0, pvp = 0, bosses = 0;
+        for (const name of g.members){
+            const r = rankings.get(name);
+            if (!r) continue;
+            mobs   += r.mobKills  || 0;
+            pvp    += r.pkKills   || 0;
+            bosses += r.bossKills || 0;
+        }
+        const total = mobs + pvp * 5 + bosses * 20;
+        if (total > 0) out.push({ name: g.name, members: g.members.length, total, mobs, pvp, bosses });
+    }
+    return out.sort((a,b) => b.total - a.total).slice(0, limit);
+}
 function topRanking(field, limit){
     return Array.from(rankings.entries())
         .map(([name, r]) => ({ name, value: r[field] || 0 }))
@@ -1376,6 +1394,7 @@ wss.on('connection', (ws) => {
                 pvp:    topRanking('pkKills',   limit),
                 bosses: topRanking('bossKills', limit),
                 gold:   topRanking('gold',      limit),
+                guilds: topGuildRanking(limit),
             });
             return;
         }

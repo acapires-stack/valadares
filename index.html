@@ -1438,11 +1438,12 @@
 <div id="rankingModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:580px">
         <div class="chest-title">🏆 RANKING</div>
-        <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px">
+        <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;flex-wrap:wrap">
             <button class="train-tab active" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
             <button class="train-tab" data-rank-tab="pvp" onclick="switchRankingTab('pvp')">PvP</button>
             <button class="train-tab" data-rank-tab="bosses" onclick="switchRankingTab('bosses')">BOSSES</button>
             <button class="train-tab" data-rank-tab="gold" onclick="switchRankingTab('gold')">GOLD</button>
+            <button class="train-tab" data-rank-tab="guilds" onclick="switchRankingTab('guilds')">GUILDS</button>
         </div>
         <div id="rankingBody" style="min-height:300px"></div>
         <div class="chest-hint"><kbd>L</kbd> ou <kbd>ESC</kbd> fechar</div>
@@ -8941,12 +8942,35 @@ function renderRankingBody(){
         return;
     }
     const list = _rankingCache[_rankingTab] || [];
-    const labels = { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro' };
+    const labels = { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds' };
     if (!list.length){
         el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ninguém com ${labels[_rankingTab]} ainda.</div>`;
         return;
     }
     const colorMedal = i => i === 0 ? '#ffd040' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#5a4818';
+    // Aba GUILDS tem layout diferente — mostra total agregado + breakdown
+    if (_rankingTab === 'guilds'){
+        el.innerHTML = `
+            <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">TOP ${list.length} GUILDS · pontos = mobs + pvp×5 + bosses×20</div>
+            ${list.map((e, i) => {
+                const isMine = e.name === player.guild;
+                return `
+                <div style="padding:6px 10px;border-bottom:1px solid #1a1408;${isMine ? 'background:#1a1a08' : ''}">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
+                        <span style="flex:1;color:${isMine ? '#e0c060' : '#9ab8e8'};font-weight:${isMine ? 600 : 500}">${escapeHtml(e.name)}${isMine ? ' <span style="color:#888;font-size:10px">(sua)</span>' : ''}</span>
+                        <span style="color:#888;font-size:10px">${e.members} membros</span>
+                        <span style="color:#ffcc40;font-family:Consolas,monospace;min-width:50px;text-align:right">${e.total}</span>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:#7a6520;margin-left:34px">
+                        <span>🐺 ${e.mobs}</span>
+                        <span>☠ ${e.pvp}</span>
+                        <span>👑 ${e.bosses}</span>
+                    </div>
+                </div>`;
+            }).join('')}`;
+        return;
+    }
     el.innerHTML = `
         <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">TOP ${list.length} — ${labels[_rankingTab].toUpperCase()}</div>
         ${list.map((e, i) => `
