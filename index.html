@@ -5242,6 +5242,12 @@ function handleMP(msg){
             gainSkillXp(skill, msg.xp);
             addFloat(player.x, player.y, `+${msg.xp}xp (party)`, '#a8e0ff', false, -34);
         }
+        // Marca flag pra achievement "Companheiro"
+        if (!player.flags) player.flags = {};
+        if (!player.flags.firstPartyShare){
+            player.flags.firstPartyShare = true;
+            if (typeof checkAchievements === 'function') checkAchievements();
+        }
     } else if (msg.t === 'duelInvite'){
         showDuelInvite(msg);
     } else if (msg.t === 'duelStart'){
@@ -5261,6 +5267,9 @@ function handleMP(msg){
         } else if (msg.winner){
             log(`<span class="log-up">🏆 Você venceu o duelo contra ${escapeHtml(msg.opponentName)}! +${msg.amount * 2}g</span>`);
             if (typeof sndLevelUp === 'function') sndLevelUp();
+            // Contador local pra achievements (server tem authoritative em ranking)
+            player.duelWins = (player.duelWins || 0) + 1;
+            if (typeof checkAchievements === 'function') checkAchievements();
         } else {
             log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
         }
@@ -5615,6 +5624,22 @@ const ACHIEVEMENTS = [
     // Tempo
     { id:'veteran',      name:'Veterano',           desc:'24h de tempo de jogo',             icon:'⏳', tier:'prata',
       progress: p => { const h = playtimeHours(p)|0; return { cur: Math.min(24, h), max:24 }; } },
+    // Arena / Duelos
+    { id:'first_duel',   name:'Primeiro Duelo',     desc:'Vença 1 duelo consensual',         icon:'⚔', tier:'bronze',
+      progress: p => ({ cur: Math.min(1, p.duelWins || 0), max:1 }) },
+    { id:'gladiador',    name:'Gladiador',          desc:'Vença 10 duelos consensuais',      icon:'🛡', tier:'prata',
+      progress: p => ({ cur: Math.min(10, p.duelWins || 0), max:10 }) },
+    // Party
+    { id:'companheiro',  name:'Companheiro',        desc:'Ganhe XP em party (1ª vez)',       icon:'👥', tier:'bronze',
+      progress: p => ({ cur: (p.flags?.firstPartyShare ? 1 : 0), max:1 }) },
+    // Quest chains
+    { id:'diplomata',    name:'Diplomata',          desc:'Conclua a chain do Embaixador Vohrim', icon:'🎩', tier:'prata',
+      progress: p => ({ cur: ((p.questFlags?.vohrim?.vh5) ? 1 : 0), max:1 }) },
+    { id:'visionario',   name:'Visionário',         desc:'Conclua a chain de Madame Crepúsculo', icon:'🔮', tier:'prata',
+      progress: p => ({ cur: ((p.questFlags?.crepusculo?.cp4) ? 1 : 0), max:1 }) },
+    // Riqueza extrema
+    { id:'imperador',    name:'Imperador',          desc:'Tenha 1.000.000 ouro',             icon:'💎', tier:'ouro',
+      progress: p => ({ cur: Math.min(1_000_000, p.gold||0), max:1_000_000 }) },
 ];
 
 function getAchievementById(id){ return ACHIEVEMENTS.find(a => a.id === id); }
@@ -10874,6 +10899,7 @@ function saveState(){
         friends: Array.isArray(player.friends) ? player.friends.slice(0, 50) : [],
         achievements: Array.isArray(player.achievements) ? player.achievements.slice(0, 100) : [],
         equippedBadges: Array.isArray(player.equippedBadges) ? player.equippedBadges.slice(0, 2) : [],
+        duelWins: player.duelWins || 0,
         savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
@@ -10998,6 +11024,7 @@ function applySaveData(d){
         else player.achievements = [];
         if (Array.isArray(d.equippedBadges)) player.equippedBadges = d.equippedBadges.slice(0, 2);
         else player.equippedBadges = [];
+        if (typeof d.duelWins === 'number') player.duelWins = d.duelWins; else player.duelWins = 0;
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
