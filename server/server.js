@@ -371,6 +371,7 @@ function spawnMob(type, x, y){
     const xp  = def.unique ? Math.round(def.xp  * (1 + k * 0.20)) : def.xp;
     const m = {
         id: nextMobId++, type, x, y, dir:'down',
+        spawnX: x, spawnY: y,    // âncora pra wandering (volta pra perto)
         hp, maxHp: hp, dmg, speed: def.speed, xp,
         aggro: def.aggro, unique: !!def.unique,
         level,
@@ -582,7 +583,39 @@ function tickAI(){
             const d = chebyshev(m.x, m.y, p.x, p.y);
             if (d <= m.aggro && d < td){ target = p; td = d; }
         }
-        if (!target) continue;
+        // Sem target: wandering leve (não vale pra bosses/unique — eles ficam no spot)
+        if (!target){
+            if (m.unique) continue;
+            const wanderCd = Math.floor(m.speed * 1.8);
+            if (now - m.lastMoveAt < wanderCd) continue;
+            if (Math.random() > 0.25) continue;   // 25% chance por tentativa
+            const sx = m.spawnX ?? m.x, sy = m.spawnY ?? m.y;
+            if (m.spawnX == null){ m.spawnX = sx; m.spawnY = sy; }   // hidrata legados
+            const dxh = m.x - sx, dyh = m.y - sy;
+            const distHome = Math.max(Math.abs(dxh), Math.abs(dyh));
+            let dx = 0, dy = 0;
+            if (distHome > 6 && Math.random() < 0.65){
+                // longe de casa: volta
+                dx = -Math.sign(dxh); dy = -Math.sign(dyh);
+                // escolhe um eixo (não diagonal)
+                if (Math.random() < 0.5){ if (dx) dy = 0; else if (dy) dx = 0; }
+                else { if (dy) dx = 0; else if (dx) dy = 0; }
+            } else {
+                const d = Math.floor(Math.random() * 4);
+                dx = d === 0 ? -1 : d === 1 ? 1 : 0;
+                dy = d === 2 ? -1 : d === 3 ? 1 : 0;
+            }
+            const nx = m.x + dx, ny = m.y + dy;
+            if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
+            if (!isWalkable(nx, ny)) continue;
+            if (inSafe(nx, ny)) continue;
+            if (mobAt(nx, ny)) continue;
+            if (playerAt(nx, ny)) continue;
+            m.x = nx; m.y = ny;
+            m.dir = dy > 0 ? 'down' : dy < 0 ? 'up' : dx > 0 ? 'right' : 'left';
+            m.lastMoveAt = now;
+            continue;
+        }
         // adjacente → atacar
         if (td <= 1){
             if (now - m.lastAttackAt >= ATTACK_CD_MS){
