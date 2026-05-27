@@ -2096,6 +2096,17 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── N3: Bênção da Fênix (consumo autoritativo) ─────────────────
+        if (msg.t === 'invUseBlessing') {
+            if (!hasInv(p, 'BENCAO_FENIX', 1)){
+                sendTo(id, { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, bencao:{ applied:false, reason:'no_item' } });
+                return;
+            }
+            incInv(p, 'BENCAO_FENIX', -1);
+            sendInvUpdate(p, { bencao:{ applied:true } });
+            return;
+        }
+
         // ─── N3: Shop buy/sell server-side ───────────────────────────────
         if (msg.t === 'invShop') {
             const op = msg.op;

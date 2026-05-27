@@ -3824,26 +3824,40 @@ function restoreAdminSnapshot(snap){
     return true;
 }
 
-function playerDie(){
-    // Bênção da Fênix: consome 1 e cancela a morte completamente
-    if ((player.inv.BENCAO_FENIX || 0) > 0){
-        player.inv.BENCAO_FENIX -= 1;
-        if (player.inv.BENCAO_FENIX <= 0) delete player.inv.BENCAO_FENIX;
-        invSignature = null;
-        clearStatusEffects();
-        player.hp = player.maxHp;
-        player.mp = player.maxMp;
-        player.x = spawn.x; player.y = spawn.y;
-        player.target = null; player.autoAttack = false;
-        snapRender(player);
-        if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
-        log('<span class="log-up">✨ ━━ A Bênção da Fênix te salvou! ━━ ✨</span>');
-        if (typeof showServerToast === 'function') showServerToast('event', '✨ Bênção da Fênix consumida! Você renasceu.');
-        if (typeof sndLevelUp === 'function') sndLevelUp();
-        addFloat(player.x, player.y, '✨ RENASCIDO', '#ffcc40', true, -10);
-        saveState();
-        return;
-    }
+// N3: Bênção da Fênix exige confirmação do server (anti-cheat).
+// Retorna Promise<bool> — true se server confirmou consumo.
+let _blessingPromise = null;
+function tryUseBlessing(){
+    return new Promise(resolve => {
+        if (!ws || ws.readyState !== 1){ resolve(false); return; }
+        if ((player.inv.BENCAO_FENIX || 0) <= 0){ resolve(false); return; }
+        if (_blessingPromise){ resolve(false); return; }   // já tem um pendente
+        const timeoutId = setTimeout(() => { _blessingPromise = null; resolve(false); }, 1500);
+        _blessingPromise = { resolve, timeoutId };
+        ws.send(JSON.stringify({ t:'invUseBlessing' }));
+    });
+}
+function applyBlessingRevive(){
+    clearStatusEffects();
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    player.x = spawn.x; player.y = spawn.y;
+    player.target = null; player.autoAttack = false;
+    snapRender(player);
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
+    log('<span class="log-up">✨ ━━ A Bênção da Fênix te salvou! ━━ ✨</span>');
+    if (typeof showServerToast === 'function') showServerToast('event', '✨ Bênção da Fênix consumida! Você renasceu.');
+    if (typeof sndLevelUp === 'function') sndLevelUp();
+    addFloat(player.x, player.y, '✨ RENASCIDO', '#ffcc40', true, -10);
+    saveState();
+}
+
+async function playerDie(){
+    if (player._dying) return;   // re-entrancy guard durante janela de bênção
+    player._dying = true;
+    try {
+        const blessed = await tryUseBlessing();
+        if (blessed){ applyBlessingRevive(); return; }
     // Admin: captura snapshot ANTES de processar a perda
     if (player.isAdmin) _preDeathSnapshot = captureAdminSnapshot();
     if (player.stats) player.stats.mobDeaths = (player.stats.mobDeaths || 0) + 1;
@@ -3881,6 +3895,7 @@ function playerDie(){
         startSpectate(_lastHitBy.id, _lastHitBy.name, 'mob');
     }
     saveState();
+    } finally { player._dying = false; }
 }
 
 function killMonster(m){
@@ -5226,6 +5241,12 @@ function handleMP(msg){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
+        // Bênção: resolve promise pendente
+        if (msg.bencao && _blessingPromise){
+            clearTimeout(_blessingPromise.timeoutId);
+            _blessingPromise.resolve(!!msg.bencao.applied);
+            _blessingPromise = null;
+        }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
         if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
         invSignature = null;
@@ -6884,7 +6905,7 @@ function drawMinimap(){
     }
 }
 
-function pkDeathBy(killerId, killerName){
+async function pkDeathBy(killerId, killerName){
     // Duelo consensual: server intercepta a "morte" e processa endDuel. Não aplica penalty.
     if (player._duel && player._duel.opponentId === killerId){
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'pkDeath', killerId, duel:true }));
@@ -6892,23 +6913,16 @@ function pkDeathBy(killerId, killerName){
         player.hp = 1;
         return;
     }
-    // Bênção da Fênix: consome 1 e cancela a morte PvP (sem gold drop, sem perda)
-    if ((player.inv.BENCAO_FENIX || 0) > 0){
-        player.inv.BENCAO_FENIX -= 1;
-        if (player.inv.BENCAO_FENIX <= 0) delete player.inv.BENCAO_FENIX;
-        invSignature = null;
-        clearStatusEffects();
-        player.hp = player.maxHp;
-        player.mp = player.maxMp;
-        player.x = spawn.x; player.y = spawn.y;
-        snapRender(player);
-        if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
-        log(`<span class="log-up">✨ ━━ Bênção da Fênix te salvou de ${escapeHtml(killerName)}! ━━ ✨</span>`);
-        if (typeof showServerToast === 'function') showServerToast('event', '✨ Bênção da Fênix consumida! Você renasceu.');
-        if (typeof sndLevelUp === 'function') sndLevelUp();
-        saveState();
-        return;
-    }
+    if (player._dying) return;
+    player._dying = true;
+    try {
+        // Bênção da Fênix: server-side (N3)
+        const blessed = await tryUseBlessing();
+        if (blessed){
+            applyBlessingRevive();
+            log(`<span class="log-up">✨ Bênção te salvou de ${escapeHtml(killerName)}!</span>`);
+            return;
+        }
     if (player.stats) player.stats.pkDeaths = (player.stats.pkDeaths || 0) + 1;
     snapshotDeathReplay();
     // Vingança: se eu já tinha matado o killer recentemente, ele leva penalty dobrado?
@@ -6952,6 +6966,7 @@ function pkDeathBy(killerId, killerName){
     // Spectator: câmera segue o killer por 15s
     startSpectate(killerId, killerName, 'player');
     saveState();
+    } finally { player._dying = false; }
 }
 
 function pkKilledSomeone(msg){
