@@ -6390,32 +6390,35 @@ function updatePlayersOnline(){ renderPlayersOnline(); }
 function renderPlayersOnline(){
     const el = document.getElementById('players-online');
     if (!el) return;
-    // Monta lista: você primeiro, depois remotos
-    const me = {
-        name: player.name, x: player.x, y: player.y,
-        hp: player.hp, maxHp: player.maxHp,
-        pvp: !!player.pvp, highlander: !!player.highlander, ghost: false, isMe: true,
-    };
+    // Lista só os OUTROS players — você já sabe que está online. Conta o total incluindo você no header.
     const remotes = Object.values(remotePlayers).map(r => ({
         name: r.name || '?', x: r.x, y: r.y,
         hp: r.hp ?? 100, maxHp: r.maxHp ?? 100,
         pvp: !!r.pvp, highlander: !!r.highlander, ghost: !!r.ghost, isMe: false,
     }));
-    // ordena: ghosts no fim, depois por distância
     remotes.sort((a,b) => {
         if (a.ghost !== b.ghost) return a.ghost ? 1 : -1;
         const da = Math.max(Math.abs(a.x-player.x), Math.abs(a.y-player.y));
         const db = Math.max(Math.abs(b.x-player.x), Math.abs(b.y-player.y));
         return da - db;
     });
-    const all = [me, ...remotes];
-    const alive = all.filter(p => !p.ghost).length;
-    const ghosts = all.length - alive;
-    const headerTxt = ghosts > 0 ? `${alive} vivo${alive!==1?'s':''} · ${ghosts} 💤` : `${alive} online`;
+    const aliveOthers = remotes.filter(p => !p.ghost).length;
+    const ghosts = remotes.length - aliveOthers;
+    const totalOnline = aliveOthers + 1;   // +1 = você
+    const headerTxt = ghosts > 0
+        ? `${totalOnline} online · ${ghosts} 💤`
+        : `${totalOnline} online`;
 
+    if (remotes.length === 0){
+        el.innerHTML = `
+            <div class="po-header">${headerTxt}</div>
+            <div style="padding:8px 6px;color:#666;font-size:10px;text-align:center;font-style:italic">só você por aqui</div>
+        `;
+        return;
+    }
     el.innerHTML = `
         <div class="po-header">${headerTxt}</div>
-        ${all.map(p => renderPlayerRow(p)).join('')}
+        ${remotes.map(p => renderPlayerRow(p)).join('')}
     `;
 }
 
