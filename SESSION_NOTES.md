@@ -48,6 +48,19 @@
 - Fix de ghosts órfãos da sessão passada confirmado: `[cleanup] 1 ghost(s) de
   Tester2 removidos` apareceu no log do Railway durante reconexão real.
 
+### 🎯 Tarde extra (combat + raid)
+- **SPACE cicla alvo** quando já tem target (igual TAB). 1ª tecla pega o mais
+  próximo, próximas ciclam pelos mobs do viewport.
+- **Admin /megaboss status|spawn|reset**: debug + force-spawn pro Senhor de Valadares.
+  Resolve "matei tudo Lv10 e não apareceu" (cooldown 24h era invisível).
+- **checkMegaBossSpawn loga motivo** do skip (já vivo / não maxados / cooldown).
+- **Buff do Senhor de Valadares** (raid boss endgame, 24h cooldown):
+  HP 8000→18000 · DMG 50→75 · Speed 280→240ms · Crit 30%→40%
+  Stun 35%→45% (2.5s) · Bleed 4×5→6×6 (36 dano cumulativo) · XP 5000→10000
+- **Overlay update/loading cleanup**: resetava texto a cada chamada (sem resíduo),
+  CSS class pro botão Reload com fade-in, timers 8s→10s e 15s→20s
+  (menos chance de reload-loop em rede lenta), linha 'hint' restaurada.
+
 ---
 
 ## 📅 Sessão 27/05/2026 — Visual overhaul (4 features)
