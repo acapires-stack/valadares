@@ -106,10 +106,12 @@ async function handleCreatePix(body, res){
                     unit_price: pkg.priceCents / 100,
                 }],
                 payment_methods: {
+                    // PIX + cartão de crédito + cartão de débito habilitados.
+                    // Exclui só boleto (ticket) — demora 1-3 dias úteis e atrasa o crédito de gold.
                     excluded_payment_types: [
-                        { id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' },
+                        { id: 'ticket' },
                     ],
-                    installments: 1,
+                    installments: 1,   // 1× sem juros (simplifica preço)
                 },
                 notification_url: `${MP_BASE_URL}/webhook/mp`,
                 external_reference: `${playerName}|${packageId}`,

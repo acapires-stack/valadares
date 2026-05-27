@@ -1413,7 +1413,7 @@
     <div class="chest-box" style="min-width:520px;max-width:600px">
         <div class="chest-title">💰 LOJA DE OURO</div>
         <div style="text-align:center;color:#c8a050;font-size:11px;margin-bottom:12px">
-            pagamento via <b style="color:#00b1ea">PIX</b> · crédito automático após confirmação
+            <b style="color:#00b1ea">PIX</b> · <b style="color:#9dd07d">Cartão</b> · crédito automático após confirmação
         </div>
         <div id="goldShopList" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
         <div id="goldShopCheckout" style="display:none;margin-top:14px;padding:14px;background:#0a0805;border:1px solid #3a2d10;border-radius:3px;text-align:center"></div>
@@ -5882,7 +5882,7 @@ async function buyGoldPackage(packageId){
         window.open(url, '_blank', 'noopener,noreferrer');
         checkout.innerHTML = `
             <div style="font-size:14px;color:#ffcc40;margin-bottom:8px">📲 Abrimos a página de pagamento do Mercado Pago.</div>
-            <div style="color:#a8e0ff;margin-bottom:10px">Conclua o pagamento via <b>PIX</b> na aba que abriu.</div>
+            <div style="color:#a8e0ff;margin-bottom:10px">Escolha <b>PIX</b> ou <b>Cartão</b> na aba que abriu.</div>
             <button class="chest-btn" style="margin:0;width:auto;padding:6px 16px" onclick="window.open('${escapeAttr(url)}', '_blank')">abrir novamente</button>
             <div style="margin-top:10px;font-size:10px;color:#888">preferenceId: ${data.preferenceId}</div>
             <div style="margin-top:8px;color:#a8e0ff">o ouro cai automaticamente após confirmação do MP. Pode fechar este modal.</div>
