@@ -1228,6 +1228,8 @@
             <div class="s-label" style="margin-top:4px">Crítico <span style="float:right;color:#ffaa20" id="critVal">4%</span></div>
             <div class="s-label" style="margin-top:4px">Esquiva <span style="float:right;color:#aaffaa" id="dodgeVal">2%</span></div>
             <div class="s-label" style="margin-top:4px">Velocidade <span style="float:right;color:#8acdef" id="spdVal">—</span></div>
+            <div class="s-label" style="margin-top:4px">Vel. ataque <span style="float:right;color:#a0c8ff" id="atkSpdVal">—</span></div>
+            <div class="s-label" id="procsRow" style="margin-top:4px;display:none">Procs <span style="float:right" id="procsVal">—</span></div>
             <div class="s-label" style="margin-top:6px">Posição</div>
             <div class="s-value" id="posVal" style="font-size:11px">—</div>
         </div>
@@ -6488,6 +6490,30 @@ function updateSidebar(){
     const spd = playerMoveDelay();
     const breakdown = (skB || btB) ? ` (-${skB} sk / -${btB} bt)` : '';
     document.getElementById('spdVal').textContent = spd + 'ms' + breakdown;
+    // Vel. ataque — mostra delay efetivo + bônus % da forja (atkSpd da arma equipada)
+    const wK = player.equipped.weapon;
+    const wI = wK ? ITEMS[wK] : null;
+    const atkSpd = (wI && wI.atkSpd) || 0;
+    const atkDelay = effectiveAttackDelay();
+    const atkSpdEl = document.getElementById('atkSpdVal');
+    if (atkSpdEl){
+        atkSpdEl.textContent = atkDelay + 'ms' + (atkSpd ? ` (-${Math.round(atkSpd*100)}% forja)` : '');
+    }
+    // Procs da arma equipada (veneno/sangra/fogo) — mostra ou esconde a linha
+    const procsRow = document.getElementById('procsRow');
+    const procsVal = document.getElementById('procsVal');
+    if (procsRow && procsVal){
+        const procs = [];
+        if (wI && wI.poison) procs.push(`<span style="color:#74d176">☠${Math.round(wI.poison.chance*100)}%</span>`);
+        if (wI && wI.bleed)  procs.push(`<span style="color:#cc6060">🩸${Math.round(wI.bleed.chance*100)}%</span>`);
+        if (wI && wI.burn)   procs.push(`<span style="color:#ff8030">🔥${Math.round(wI.burn.chance*100)}%</span>`);
+        if (procs.length){
+            procsRow.style.display = '';
+            procsVal.innerHTML = procs.join(' ');
+        } else {
+            procsRow.style.display = 'none';
+        }
+    }
 
     // Sidebar de magia ativa
     const spEl = document.getElementById('spellList');
