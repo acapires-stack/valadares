@@ -2279,14 +2279,24 @@ function withCosmetics(equipObj, cosmeticKey){
     if (def.particles && !out.particles)   out.particles = def.particles;
     return out;
 }
-function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct){
+function getWalkBob(e){
+    if (!e || e.renderX == null) return 0;
+    const dx = e.renderX - e.x, dy = e.renderY - e.y;
+    if (Math.abs(dx) < 0.04 && Math.abs(dy) < 0.04) return 0;
+    return Math.sin(performance.now() * 0.014) * 1.6;
+}
+function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     // Equipamento default vazio
     const eq = equip || {};
     const bodyColor = eq.armor ? ITEMS[eq.armor].color : (eq.bodyColor || '#3a3a3a');
     const bootsColor = eq.feet ? ITEMS[eq.feet].color : '#2a3880';
-    // sombra
-    ctx.fillStyle='rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(px+TS/2,py+TS-5,11,5,0,0,Math.PI*2); ctx.fill();
+    // sombra (fica fixa no chão, varia ligeiramente com o bob — quando pula, sombra encolhe)
+    const b = bob || 0;
+    const shadowScale = b < 0 ? 1 - Math.abs(b)*0.04 : 1;
+    ctx.fillStyle = `rgba(0,0,0,${0.32 - Math.abs(b)*0.04})`;
+    ctx.beginPath(); ctx.ellipse(px+TS/2,py+TS-5,11*shadowScale,5*shadowScale,0,0,Math.PI*2); ctx.fill();
+    // aplica bob ao py (corpo "pula")
+    py += b;
     // Capa (cosmético) — desenhada atrás do corpo
     if (eq.cape){
         ctx.fillStyle = eq.cape;
@@ -3179,9 +3189,12 @@ function tickRespawns(dt){
 function drawMonster(m, px, py){
     const sz = m.size;
     const w = 28*sz, h = 22*sz;
-    // sombra
-    ctx.fillStyle='rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(px+TS/2,py+TS-5,11*sz,5*sz,0,0,Math.PI*2); ctx.fill();
+    // sombra (com encolhimento durante "pulo" do walk bob)
+    const b = getWalkBob(m);
+    const shadowScale = b < 0 ? 1 - Math.abs(b)*0.04 : 1;
+    ctx.fillStyle = `rgba(0,0,0,${0.32 - Math.abs(b)*0.04})`;
+    ctx.beginPath(); ctx.ellipse(px+TS/2,py+TS-5,11*sz*shadowScale,5*sz*shadowScale,0,0,Math.PI*2); ctx.fill();
+    py += b;
     // corpo
     ctx.fillStyle = m.color;
     ctx.fillRect(px+TS/2-w/2, py+TS/2-h/2+4, w, h);
@@ -10328,7 +10341,7 @@ function loop(ts){
             const mpPct = (p.maxMp > 0) ? Math.max(0, Math.min(1, (p.mp ?? 0) / p.maxMp)) : null;
             drawCharacter(px, py, p.dir||'down',
                 withCosmetics({ weapon:'ESPADA', bodyColor: bodyCol, guild: p.guild || null }, p.cosmetic),
-                p.name, hpPct, 0, mpPct);
+                p.name, hpPct, 0, mpPct, getWalkBob(p));
             // overlay cinza translúcido se for ghost (corpo desconectado)
             if (p.ghost){
                 ctx.fillStyle = 'rgba(120,120,140,0.45)';
@@ -10349,7 +10362,8 @@ function loop(ts){
     drawCharacter(ppx, ppy, player.dir,
         withCosmetics({ ...player.equipped, bodyColor: player.color }),
         null, player.hp/player.maxHp, player.hurtTimer/450,
-        player.maxMp > 0 ? player.mp/player.maxMp : null);
+        player.maxMp > 0 ? player.mp/player.maxMp : null,
+        getWalkBob(player));
     // Status effects: ícones acima da barra de HP
     {
         const icons = [];
