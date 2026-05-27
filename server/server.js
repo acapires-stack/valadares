@@ -328,6 +328,7 @@ function snapshotPlayers(){
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
         cosmetic: p.cosmetic || null,
+        equipped: p.equipped || null,
         guild: findGuildOfPlayer(p.name)?.name || null,
         ghost: !!p.disconnected,
     }));
@@ -1451,6 +1452,7 @@ wss.on('connection', (ws) => {
             p.pvp   = !!msg.pvp;
             p.hp    = msg.hp ?? 100;
             p.maxHp = msg.maxHp ?? 100;
+            if (msg.equipped && typeof msg.equipped === 'object') p.equipped = msg.equipped;
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
             // (race condition de reconexões rápidas, ou WS órfão antes do join).
             removeGhostsByName(p.name, id);
@@ -1462,7 +1464,7 @@ wss.on('connection', (ws) => {
                 motd: SERVER_MOTD_RUNTIME,
                 isAdmin: isAdmin(p.name),
             }));
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, guild: findGuildOfPlayer(p.name)?.name || null } });
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
@@ -1553,8 +1555,13 @@ wss.on('connection', (ws) => {
                 const cos = (typeof msg.cosmetic === 'string' && msg.cosmetic.length < 32) ? msg.cosmetic : null;
                 if (cos !== p.cosmetic){ p.cosmetic = cos; statsChanged = true; }
             }
+            // Equipped: propaga slots equipados pros outros (épicos/forjados visíveis pra todos)
+            if (msg.equipped && typeof msg.equipped === 'object'){
+                p.equipped = msg.equipped;
+                statsChanged = true;
+            }
             if (statsChanged){
-                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic });
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped });
             }
             return;
         }
