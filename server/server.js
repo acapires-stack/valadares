@@ -282,8 +282,8 @@ const ITEM_META = {
     ADAGA_DUPLA:  { kind:'weapon', hand:'1h', base:5, def:1 },
     BORDAO:       { kind:'weapon', hand:'1h', base:6, def:2 },
     ESPADA_OSSO:  { kind:'weapon', hand:'1h', base:5, def:2 },
-    LANCA:        { kind:'weapon', hand:'1h', base:4, def:1 },
-    LANCA_LONGA:  { kind:'weapon', hand:'1h', base:5, def:2 },
+    LANCA:        { kind:'weapon', hand:'1h', base:4, def:1, throwable:5 },
+    LANCA_LONGA:  { kind:'weapon', hand:'1h', base:5, def:2, throwable:6 },
     // armas 2H
     MACHADO:      { kind:'weapon', hand:'2h', base:8, def:3 },
     ESPADA_LONGA: { kind:'weapon', hand:'2h', base:7, def:4 },
@@ -435,9 +435,51 @@ function hasInv(p, key, qty){
 }
 function sendInvUpdate(p, extra){
     if (!p || p.ws.readyState !== 1) return;
-    const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0 };
+    const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null };
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
+}
+
+// Slot derivado do tipo de item (espelha SLOT_OF_KIND do cliente)
+const SLOT_OF_KIND = {
+    weapon:'weapon', offhand:'offhand', armor:'armor',
+    head:'head', feet:'feet', neck:'neck', cosmetic:'cosmetic',
+};
+// Posição dos 4 baús (espelha CHESTS do cliente)
+const CHEST_POS = {
+    b1: { x:47, y:48 }, b2: { x:53, y:48 },
+    b3: { x:47, y:52 }, b4: { x:53, y:52 },
+};
+// N3 fase 2: groundItems autoritativos
+const groundDrops = new Map();   // id -> { id, x, y, type, qty, spawnedAt }
+let _nextGroundId = 1;
+const GROUND_TTL_MS = 5 * 60 * 1000;  // 5min — após isso, despawna
+function spawnGroundDrop(x, y, type, qty){
+    const id = 'g' + (_nextGroundId++);
+    const drop = { id, x, y, type, qty, spawnedAt: Date.now() };
+    groundDrops.set(id, drop);
+    return drop;
+}
+function snapshotGroundDrops(){
+    return Array.from(groundDrops.values()).map(d => ({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }));
+}
+function tickGroundDespawn(){
+    const now = Date.now();
+    const expired = [];
+    for (const d of groundDrops.values()){
+        if (now - d.spawnedAt > GROUND_TTL_MS) expired.push(d.id);
+    }
+    if (!expired.length) return;
+    for (const id of expired) groundDrops.delete(id);
+    broadcast(null, { t:'groundRemove', ids: expired });
+}
+setInterval(tickGroundDespawn, 30 * 1000);
+// Defaults pra player novo
+function ensurePlayerInvSlots(p){
+    if (!p.inv) p.inv = {};
+    if (!p.equipped) p.equipped = { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null };
+    if (!p.chests)  p.chests  = { b1:{}, b2:{}, b3:{}, b4:{} };
+    if (typeof p.gold !== 'number') p.gold = 0;
 }
 
 // ─── LOOT tables (espelho do cliente) ─────────────────────────────────────
@@ -2215,6 +2257,20 @@ wss.on('connection', (ws) => {
             p.lastSaveAt = now;
             // Hardening Nível 1: clampa valores absurdos antes de persistir
             sanitizeSave(data, p.authedName);
+            // N3 fase 2: sincroniza inv/gold/equipped/chests do save → p (server fica em paridade
+            // com cliente que pode ter mutado via quest/event/cosmético que ainda é client-side).
+            // Lockdown FULL é pra próxima fase (depende de migrar quest rewards pro server).
+            ensurePlayerInvSlots(p);
+            if (data.inv && typeof data.inv === 'object') p.inv = { ...data.inv };
+            if (data.equipped && typeof data.equipped === 'object') p.equipped = { ...p.equipped, ...data.equipped };
+            if (typeof data.gold === 'number') p.gold = data.gold;
+            if (data.chests && typeof data.chests === 'object'){
+                for (const cid of ['b1','b2','b3','b4']){
+                    if (data.chests[cid] && typeof data.chests[cid] === 'object'){
+                        p.chests[cid] = { ...data.chests[cid] };
+                    }
+                }
+            }
             setPlayerSave(p.authedName, data);
             return;
         }
@@ -2233,7 +2289,24 @@ wss.on('connection', (ws) => {
             p.pvp   = !!msg.pvp;
             p.hp    = msg.hp ?? 100;
             p.maxHp = msg.maxHp ?? 100;
-            if (msg.equipped && typeof msg.equipped === 'object') p.equipped = msg.equipped;
+            // N3 fase 2: hidrata inv/equipped/gold/chests do save (server vira dono).
+            // Se cliente legado (sem auth) ou conta nova, pega do msg como antes.
+            ensurePlayerInvSlots(p);
+            const acc = p.authedName ? getAccount(p.authedName) : null;
+            if (acc && acc.save){
+                if (acc.save.inv && typeof acc.save.inv === 'object') p.inv = { ...acc.save.inv };
+                if (acc.save.equipped && typeof acc.save.equipped === 'object') p.equipped = { ...p.equipped, ...acc.save.equipped };
+                if (acc.save.chests && typeof acc.save.chests === 'object'){
+                    for (const cid of ['b1','b2','b3','b4']){
+                        if (acc.save.chests[cid] && typeof acc.save.chests[cid] === 'object'){
+                            p.chests[cid] = { ...acc.save.chests[cid] };
+                        }
+                    }
+                }
+                if (typeof acc.save.gold === 'number') p.gold = acc.save.gold;
+            } else {
+                if (msg.equipped && typeof msg.equipped === 'object') p.equipped = { ...p.equipped, ...msg.equipped };
+            }
             if (Array.isArray(msg.badges)){
                 p.badges = msg.badges.filter(s => typeof s === 'string' && s.length < 32).slice(0, 2);
             }
@@ -2248,7 +2321,11 @@ wss.on('connection', (ws) => {
                 motd: SERVER_MOTD_RUNTIME,
                 isAdmin: isAdmin(p.name),
                 dailyEvent: dailyEventSnapshot(),
+                groundDrops: snapshotGroundDrops(),
             }));
+            // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
+            // pra cobrir o caso do save server ser mais recente que o save local.
+            sendInvUpdate(p, { chests: p.chests, reason:'join' });
             broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
@@ -2404,6 +2481,195 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── N3 fase 2: Equip / Unequip server-side ─────────────────────
+        if (msg.t === 'invEquip') {
+            ensurePlayerInvSlots(p);
+            const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+            if (!itemKey) return;
+            // Item upgrade _PLUS_N usa o base pra slot lookup
+            const tier = getUpgradeTier(itemKey);
+            const def = ITEM_META[tier.base];
+            if (!def){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item inválido.' }); return; }
+            const slot = SLOT_OF_KIND[def.kind];
+            if (!slot){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item não-equipável.' }); return; }
+            if (!hasInv(p, itemKey, 1)){
+                sendInvUpdate(p, { equipOp:{ ok:false, reason:'no_item' } });
+                return;
+            }
+            // Conflito 2H ↔ escudo
+            if (slot === 'weapon' && def.hand === '2h' && p.equipped.offhand){
+                incInv(p, p.equipped.offhand, 1);
+                p.equipped.offhand = null;
+            }
+            if (slot === 'offhand' && p.equipped.weapon){
+                const wTier = getUpgradeTier(p.equipped.weapon);
+                const wDef = ITEM_META[wTier.base];
+                if (wDef && wDef.hand === '2h'){
+                    incInv(p, p.equipped.weapon, 1);
+                    p.equipped.weapon = null;
+                }
+            }
+            // Tira o atual do slot e equipa o novo
+            if (p.equipped[slot]) incInv(p, p.equipped[slot], 1);
+            incInv(p, itemKey, -1);
+            p.equipped[slot] = itemKey;
+            sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey } });
+            // Broadcast pstats pros outros verem o visual
+            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+            return;
+        }
+        if (msg.t === 'invUnequip') {
+            ensurePlayerInvSlots(p);
+            const slot = typeof msg.slot === 'string' ? msg.slot : null;
+            if (!slot || !(slot in p.equipped)) return;
+            const k = p.equipped[slot];
+            if (!k) return;
+            incInv(p, k, 1);
+            p.equipped[slot] = null;
+            sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey:null } });
+            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+            return;
+        }
+
+        // ─── N3 fase 2: Pickup do chão (groundDrops autoritativo) ───────
+        if (msg.t === 'groundPickup') {
+            ensurePlayerInvSlots(p);
+            const ids = Array.isArray(msg.ids) ? msg.ids.slice(0, 20) : (msg.id ? [msg.id] : []);
+            if (!ids.length) return;
+            const removed = [];
+            let pickedGold = 0;
+            for (const dropId of ids){
+                const d = groundDrops.get(dropId);
+                if (!d) continue;
+                // Pickup auto-range: chebyshev ≤1 (mesma regra do cliente pickupAt)
+                if (Math.max(Math.abs(p.x - d.x), Math.abs(p.y - d.y)) > 1) continue;
+                groundDrops.delete(dropId);
+                if (d.type === 'GOLD'){
+                    p.gold = (p.gold | 0) + (d.qty | 0);
+                    pickedGold += d.qty;
+                    const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                } else {
+                    incInv(p, d.type, d.qty | 0 || 1);
+                }
+                removed.push(dropId);
+            }
+            if (removed.length){
+                broadcast(null, { t:'groundRemove', ids: removed });
+                sendInvUpdate(p, { pickup:{ ids: removed, gold: pickedGold } });
+            }
+            return;
+        }
+
+        // ─── N3 fase 2: Chest deposit/withdraw server-side ──────────────
+        if (msg.t === 'invChest') {
+            ensurePlayerInvSlots(p);
+            const cid = typeof msg.chestId === 'string' ? msg.chestId : null;
+            const op  = typeof msg.op === 'string' ? msg.op : null;
+            if (!cid || !CHEST_POS[cid]){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Baú inválido.' });
+                return;
+            }
+            // Adjacência ao baú (chebyshev ≤ 1)
+            const pos = CHEST_POS[cid];
+            if (Math.max(Math.abs(p.x - pos.x), Math.abs(p.y - pos.y)) > 1){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se do baú.' });
+                return;
+            }
+            if (!p.chests[cid]) p.chests[cid] = {};
+            const bag = p.chests[cid];
+            const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+            const rawQty  = msg.qty;
+            const wantAll = rawQty === 'all';
+            const reqQty  = wantAll ? 0 : Math.max(1, rawQty | 0);
+
+            const cleanBagAfter = () => {
+                if (Object.keys(bag).filter(k => k !== '_GOLD').length === 0 && !bag._GOLD){
+                    p.chests[cid] = {};
+                }
+            };
+            const replyChests = (extra) => sendInvUpdate(p, Object.assign({ chests: p.chests, chestOp:{ chestId: cid, op } }, extra || {}));
+
+            if (op === 'deposit'){
+                if (!itemKey) return;
+                const have = (p.inv && p.inv[itemKey]) || 0;
+                if (!have) return;
+                const qty = wantAll ? have : Math.min(have, reqQty);
+                if (qty <= 0) return;
+                incInv(p, itemKey, -qty);
+                bag[itemKey] = (bag[itemKey] || 0) + qty;
+                replyChests({ moved:{ item:itemKey, qty, dir:'in' } });
+                return;
+            }
+            if (op === 'withdraw'){
+                if (!itemKey) return;
+                const have = bag[itemKey] || 0;
+                if (!have) return;
+                const qty = wantAll ? have : Math.min(have, reqQty);
+                if (qty <= 0) return;
+                bag[itemKey] -= qty;
+                if (bag[itemKey] <= 0) delete bag[itemKey];
+                incInv(p, itemKey, qty);
+                cleanBagAfter();
+                replyChests({ moved:{ item:itemKey, qty, dir:'out' } });
+                return;
+            }
+            if (op === 'depositGold'){
+                const gold = Math.max(0, (p.gold | 0));
+                if (gold <= 0) return;
+                p.gold = 0;
+                bag._GOLD = (bag._GOLD || 0) + gold;
+                const r = ensureRanking(p.name); if (r) r.gold = 0;
+                replyChests({ goldMoved:{ amount: gold, dir:'in' } });
+                return;
+            }
+            if (op === 'withdrawGold'){
+                const gold = bag._GOLD || 0;
+                if (gold <= 0) return;
+                delete bag._GOLD;
+                p.gold = (p.gold | 0) + gold;
+                const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                cleanBagAfter();
+                replyChests({ goldMoved:{ amount: gold, dir:'out' } });
+                return;
+            }
+            if (op === 'depositAll'){
+                let moved = 0;
+                for (const [k, q] of Object.entries(p.inv || {})){
+                    if (!q) continue;
+                    bag[k] = (bag[k] || 0) + q;
+                    moved += q;
+                }
+                p.inv = {};
+                let goldMoved = 0;
+                if (p.gold){
+                    goldMoved = p.gold;
+                    bag._GOLD = (bag._GOLD || 0) + p.gold;
+                    p.gold = 0;
+                    const r = ensureRanking(p.name); if (r) r.gold = 0;
+                }
+                replyChests({ depositAll:{ moved, goldMoved } });
+                return;
+            }
+            if (op === 'withdrawAll'){
+                let moved = 0;
+                for (const [k, q] of Object.entries(bag)){
+                    if (k === '_GOLD' || !q) continue;
+                    incInv(p, k, q);
+                    moved += q;
+                }
+                const gold = bag._GOLD || 0;
+                if (gold){
+                    p.gold = (p.gold | 0) + gold;
+                    const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                }
+                p.chests[cid] = {};
+                replyChests({ withdrawAll:{ moved, gold } });
+                return;
+            }
+            sendTo(id, { t:'serverMsg', level:'warn', text:'Operação de baú inválida.' });
+            return;
+        }
+
         // PvP entre players (vivo ou ghost)
         if (msg.t === 'pvpAttack') {
             const tgt = players.get(msg.targetId);
@@ -2433,6 +2699,15 @@ wss.on('connection', (ws) => {
                             if (tgt.inv[droppedItem] <= 0) delete tgt.inv[droppedItem];
                         }
                     }
+                    // N3 fase 2: credita gold + item authoritativos no killer (cliente já não soma local)
+                    if (goldDrop > 0){
+                        p.gold = (p.gold | 0) + goldDrop;
+                        const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                    }
+                    if (droppedItem){
+                        incInv(p, droppedItem, 1);
+                    }
+                    sendInvUpdate(p, { pvpGain:{ amount: goldDrop, item: droppedItem || null, ghost:true } });
                     sendTo(id, { t:'pkKill', victimId: msg.targetId, victimName: tgt.name,
                                  victimHadSelos:false, goldGain: goldDrop, dropHighlander:false,
                                  droppedItem, ghost:true, dropX: tgt.x, dropY: tgt.y });
@@ -2452,6 +2727,8 @@ wss.on('connection', (ws) => {
 
         // Cliente envia snapshot de gold/inv/stats pra body stays + visibility
         if (msg.t === 'playerSync') {
+            // N3 fase 2: ainda aceita inv/gold do cliente pra cobrir quest/event rewards
+            // que continuam client-side. Lockdown FULL será fase 3.
             if (typeof msg.gold === 'number'){
                 p.gold = msg.gold;
                 const r = ensureRanking(p.name);
@@ -2468,7 +2745,7 @@ wss.on('connection', (ws) => {
                 const cos = (typeof msg.cosmetic === 'string' && msg.cosmetic.length < 32) ? msg.cosmetic : null;
                 if (cos !== p.cosmetic){ p.cosmetic = cos; statsChanged = true; }
             }
-            // Equipped: propaga slots equipados pros outros (épicos/forjados visíveis pra todos)
+            // Equipped: cliente pode ter mutado cosmetic (continua client-side); aceita.
             if (msg.equipped && typeof msg.equipped === 'object'){
                 p.equipped = msg.equipped;
                 statsChanged = true;
@@ -2494,6 +2771,40 @@ wss.on('connection', (ws) => {
             p.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
             // LOS — só valida pra ranged (range > 1); melee adjacente passa sem check
             if (range > 1 && !hasLineOfSight(p.x, p.y, m.x, m.y)) return;
+            // ─── N3 fase 2: consumo de munição/lança autoritativo ────
+            // Munição (arco/besta): cliente indica ammoKey usado; server decrementa.
+            // Se cliente mentiu (não tinha), rejeita o ataque.
+            let invDirty = false;
+            if (typeof msg.ammoKey === 'string'){
+                const ammoKey = msg.ammoKey.slice(0, 32);
+                const meta = ITEM_META[ammoKey];
+                if (!meta || meta.kind !== 'ammo' || !hasInv(p, ammoKey, 1)){
+                    sendInvUpdate(p, { ammoBlocked: ammoKey });
+                    return;
+                }
+                incInv(p, ammoKey, -1);
+                invDirty = true;
+            }
+            // Lança arremessada: tira do equipped.weapon. Se houver outra no inv, re-equipa.
+            if (msg.throwSpear){
+                ensurePlayerInvSlots(p);
+                const wKey = p.equipped.weapon;
+                const wTier = wKey ? getUpgradeTier(wKey) : null;
+                const wMeta = wTier && ITEM_META[wTier.base];
+                if (!wMeta || !wMeta.throwable){
+                    sendInvUpdate(p, { ammoBlocked: 'no_spear' });
+                    return;
+                }
+                p.equipped.weapon = null;
+                if (hasInv(p, wKey, 1)){
+                    incInv(p, wKey, -1);
+                    p.equipped.weapon = wKey;
+                }
+                invDirty = true;
+                // Propaga equipped pra outros players
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+            }
+            if (invDirty) sendInvUpdate(p, { reason:'ammo' });
             // teto de dano: 3x o dmg base do mob (margem confortável pros crits)
             const cap = (MTYPE[m.type]?.hp || 50) + 50;  // teto generoso
             const dmg = Math.max(1, Math.min(msg.amount | 0, cap));
@@ -2547,10 +2858,20 @@ wss.on('connection', (ws) => {
                     }
                 }
                 monsters.delete(m.id);
-                // Loot autoritativo: server roda LOOT e manda lista pro killer (anti-trapaça)
+                // Loot autoritativo: server roda LOOT e mantém drops no chão.
+                // Cada item ganha id server-side; broadcast spawn pra TODOS verem.
                 const loot = rollLoot(m.type);
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot });
+                const spawnedDrops = [];
+                for (const it of loot){
+                    if (!it || !it.type) continue;
+                    const d = spawnGroundDrop(m.x, m.y, it.type, it.qty | 0 || 1);
+                    spawnedDrops.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty });
+                }
+                // killer recebe mobKill (com loot legado pra compat de fallback no client)
+                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot, drops: spawnedDrops });
+                // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
                 broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level });
+                if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops });
                 // Ranking: incrementa mobKills (e bossKills se for unique)
                 const r = ensureRanking(p.name);
                 if (r){
@@ -2569,12 +2890,31 @@ wss.on('connection', (ws) => {
                 endDuel(killer, p, false);
                 return;
             }
+            // N3 fase 2: transfere gold authoritative entre vítima e killer
+            // (cliente legacy ainda atualizava player.gold via playerSync; agora server faz)
+            const requestedGain = Math.max(0, msg.goldGain | 0);
+            const actualGain = Math.min(requestedGain, p.gold | 0);
+            if (actualGain > 0){
+                p.gold -= actualGain;
+                const rv = ensureRanking(p.name); if (rv) rv.gold = p.gold;
+                if (killer){
+                    killer.gold = (killer.gold | 0) + actualGain;
+                    const rk = ensureRanking(killer.name); if (rk) rk.gold = killer.gold;
+                }
+            }
+            // Highlander drop: vítima perde CORACAO_HL (se tinha) e killer ganha 1
+            if (msg.dropHighlander && killer && hasInv(p, 'CORACAO_HL', 1)){
+                incInv(p, 'CORACAO_HL', -1);
+                incInv(killer, 'CORACAO_HL', 1);
+            }
+            if (actualGain > 0 || msg.dropHighlander) sendInvUpdate(p, { pvpLoss:{ amount: actualGain, dropHighlander: !!msg.dropHighlander } });
+            if (killer && (actualGain > 0 || msg.dropHighlander)) sendInvUpdate(killer, { pvpGain:{ amount: actualGain, dropHighlander: !!msg.dropHighlander } });
             if (killer && killer.ws.readyState === 1){
                 killer.ws.send(JSON.stringify({
                     t:'pkKill',
                     victimId: id, victimName: p.name,
                     victimHadSelos: !!msg.hadSelos,
-                    goldGain: msg.goldGain || 0,
+                    goldGain: actualGain,
                     dropHighlander: !!msg.dropHighlander,
                 }));
             }

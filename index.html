@@ -4125,7 +4125,7 @@ function equip(itemKey){
             player.weapon = null;
         }
     }
-    // Tirar atual do slot e equipar novo
+    // Tirar atual do slot e equipar novo (otimista local; server reconcilia)
     returnToInv(player.equipped[slot]);
     player.inv[itemKey]--;
     if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
@@ -4137,6 +4137,10 @@ function equip(itemKey){
         log('<span class="log-dmg">⚠ Sem flechas! Use automaticamente quando tiver no inventário.</span>');
     }
     buildSkillList();
+    // N3 fase 2: server é dono — envia intenção. invUpdate volta com inv/equipped autoritativos.
+    if (ws && ws.readyState === 1){
+        try { ws.send(JSON.stringify({ t:'invEquip', itemKey })); } catch {}
+    }
     saveState();
 }
 
@@ -4148,6 +4152,9 @@ function unequip(slot){
     if (slot === 'weapon') player.weapon = null;
     log(`<span class="log-sys">Desequipou ${ITEMS[k].name}</span>`);
     buildSkillList();
+    if (ws && ws.readyState === 1){
+        try { ws.send(JSON.stringify({ t:'invUnequip', slot })); } catch {}
+    }
     saveState();
 }
 window.equip = equip;
@@ -4171,29 +4178,40 @@ function closeChest(){
 }
 function bagOf(){ return currentChest ? player.chests[currentChest.id] : null; }
 
+// Helper N3 fase 2: envia op de baú pro server (cliente faz mutação otimista; server reconcilia)
+function sendChestOp(op, extra){
+    if (!ws || ws.readyState !== 1 || !currentChest) return;
+    try {
+        ws.send(JSON.stringify(Object.assign({ t:'invChest', op, chestId: currentChest.id }, extra || {})));
+    } catch {}
+}
 // Depósito vai pro baú atualmente aberto
 function depositItem(key, qty){
     const bag = bagOf(); if (!bag) return;
     const have = player.inv[key] || 0;
     if (!have) return;
-    const n = Math.min(have, qty || 1);
+    const isAll = qty === 'all';
+    const n = isAll ? have : Math.min(have, qty || 1);
     player.inv[key] = have - n;
     if (player.inv[key] <= 0) delete player.inv[key];
     bag[key] = (bag[key] || 0) + n;
     renderChest();
     invSignature = null;
+    sendChestOp('deposit', { itemKey:key, qty: isAll ? 'all' : n });
 }
 // Retirada sai do baú ATUALMENTE aberto
 function withdrawItem(key, qty){
     const bag = bagOf(); if (!bag) return;
     const have = bag[key] || 0;
     if (!have) return;
-    const n = Math.min(have, qty || 1);
+    const isAll = qty === 'all';
+    const n = isAll ? have : Math.min(have, qty || 1);
     bag[key] = have - n;
     if (bag[key] <= 0) delete bag[key];
     player.inv[key] = (player.inv[key] || 0) + n;
     renderChest();
     invSignature = null;
+    sendChestOp('withdraw', { itemKey:key, qty: isAll ? 'all' : n });
 }
 function depositAllGold(){
     const bag = bagOf(); if (!bag) return;
@@ -4201,6 +4219,7 @@ function depositAllGold(){
     bag._GOLD = (bag._GOLD || 0) + player.gold;
     player.gold = 0;
     renderChest();
+    sendChestOp('depositGold');
 }
 function withdrawAllGold(){
     const bag = bagOf(); if (!bag) return;
@@ -4209,6 +4228,7 @@ function withdrawAllGold(){
     player.gold += total;
     delete bag._GOLD;
     renderChest();
+    sendChestOp('withdrawGold');
 }
 // Guardar tudo — vai pro baú atualmente aberto
 function depositAll(){
@@ -4227,6 +4247,7 @@ function depositAll(){
     renderChest();
     invSignature = null;
     log(`<span class="log-sys">Guardou ${moved} itens em ${currentChest.name}.</span>`);
+    sendChestOp('depositAll');
 }
 // Pegar tudo — só do baú aberto
 function withdrawAll(){
@@ -4243,6 +4264,7 @@ function withdrawAll(){
     renderChest();
     invSignature = null;
     log(`<span class="log-sys">Retirou ${moved} itens de ${currentChest.name}.</span>`);
+    sendChestOp('withdrawAll');
 }
 
 function renderChest(){
@@ -4761,8 +4783,8 @@ function throwSpear(){
         log(`<span class="log-dmg">${crit?'★ ':''}${wItem.name} arremessada: -${dmg} em ${m.name}</span>`);
         gainSkillXp('Distância', 1);
         if (serverAuthMobs && ws && ws.readyState === 1){
-            // server aplica dano e broadcasta mobUpdate / mobDead
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit }));
+            // server aplica dano + consome a lança equipada (throwSpear:true)
+            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit, throwSpear:true }));
         } else {
             m.hp = Math.max(0, m.hp - dmg);
             if (m.hp === 0) killMonster(m);
@@ -4777,7 +4799,8 @@ function throwSpear(){
         arrow: true,
         life: 0, duration: Math.max(120, dist * 32),
     });
-    // Consome a lança equipada; auto-equipa outra do inv se houver
+    // N3 fase 2: server consome a lança (throwSpear no attackMob acima) + re-equip server-side.
+    // Cliente faz mutação otimista; invUpdate do server reconcilia.
     const wasKey = wKey;
     player.equipped.weapon = null;
     player.weapon = null;
@@ -4849,6 +4872,8 @@ function doAttack(m){
             return;
         }
         const arrow = ITEMS[arrowKey];
+        // N3 fase 2: server consome a flecha (ammoKey no payload de attackMob abaixo).
+        // Mantém decremento local otimista — invUpdate do server reconcilia.
         player.inv[arrowKey]--;
         if (player.inv[arrowKey] <= 0) delete player.inv[arrowKey];
         invSignature = null;
@@ -4879,7 +4904,7 @@ function doAttack(m){
         // DoT procs (veneno/sangra/fogo do weapon +N)
         const procsR = rollWeaponStatusOnMob(wItem, m);
         if (serverAuthMobs && ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR }));
+            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
             player.target = m.id; m.aggro = true;
         } else {
             m.hp = Math.max(0, m.hp - dmgR);
@@ -5181,6 +5206,33 @@ function handleMP(msg){
             monsters.length = 0;
             applyMobsSnapshot(msg.mobs);
         }
+        // N3 fase 2: snapshot inicial de groundDrops autoritativos
+        if (Array.isArray(msg.groundDrops)){
+            // Limpa locais e popula com server (server vira fonte de verdade)
+            groundItems.length = 0;
+            for (const d of msg.groundDrops){
+                if (!ITEMS[d.type] && d.type !== 'GOLD') continue;
+                groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty });
+            }
+        }
+    } else if (msg.t === 'groundSpawn'){
+        // Novos drops aparecem (mob morto por outro player, etc)
+        if (Array.isArray(msg.drops)){
+            for (const d of msg.drops){
+                if (!ITEMS[d.type] && d.type !== 'GOLD') continue;
+                if (groundItems.find(g => g.id === d.id)) continue;
+                groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty });
+            }
+        }
+    } else if (msg.t === 'groundRemove'){
+        // Drops pegos por alguém (ou despawn por TTL)
+        const ids = Array.isArray(msg.ids) ? msg.ids : (msg.id ? [msg.id] : []);
+        if (ids.length){
+            const setIds = new Set(ids);
+            for (let i = groundItems.length - 1; i >= 0; i--){
+                if (setIds.has(groundItems[i].id)) groundItems.splice(i, 1);
+            }
+        }
     } else if (msg.t === 'join'){
         remotePlayers[msg.player.id] = msg.player;
         log(`<span class="log-sys">${escapeHtml(msg.player.name)} entrou!</span>`);
@@ -5256,6 +5308,40 @@ function handleMP(msg){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
+        // N3 fase 2: equipped também é autoritativo
+        if (msg.equipped && typeof msg.equipped === 'object'){
+            // Merge: server pode mandar slots null (desequipou). Não sobrescreve cosmetic
+            // se server não tem (cliente legado pode ter trail/cape local que server desconhece).
+            const prevWeapon = player.equipped.weapon;
+            for (const slot of Object.keys(msg.equipped)){
+                player.equipped[slot] = msg.equipped[slot];
+            }
+            if (player.equipped.weapon !== prevWeapon){
+                player.weapon = player.equipped.weapon || null;
+                if (typeof buildSkillList === 'function') buildSkillList();
+            }
+        }
+        // Feedback opcional de equip op (rejeitada por server)
+        if (msg.equipOp && !msg.equipOp.ok){
+            log('<span class="log-sys">Servidor rejeitou a operação de equip.</span>');
+        }
+        // N3 fase 2: pickup do chão — feedback (som + log).
+        // Server já enviou inv/gold atualizados acima; groundRemove veio separado e limpou local.
+        if (msg.pickup && Array.isArray(msg.pickup.ids) && msg.pickup.ids.length){
+            if (typeof sndPickup === 'function') sndPickup();
+            if (msg.pickup.gold > 0){
+                log(`<span class="log-xp">+${msg.pickup.gold} ouro (${player.gold})</span>`);
+            }
+        }
+        // N3 fase 2: chests autoritativos
+        if (msg.chests && typeof msg.chests === 'object'){
+            for (const cid of ['b1','b2','b3','b4']){
+                if (msg.chests[cid] && typeof msg.chests[cid] === 'object'){
+                    player.chests[cid] = msg.chests[cid];
+                }
+            }
+            if (typeof renderChest === 'function' && currentChest) renderChest();
+        }
         // Bênção: resolve promise pendente
         if (msg.bencao && _blessingPromise){
             clearTimeout(_blessingPromise.timeoutId);
@@ -5519,7 +5605,7 @@ function handleMP(msg){
         if (def){
             const fakeMob = { id: msg.mobId, type: msg.mobType, name: def.name, x: msg.x, y: msg.y, xpReward: msg.xp };
             // dispara o "ganhar XP" + drops, mas pula o splice (server já removeu via mobDead)
-            mobKilledByServer(fakeMob, msg.loot || null);
+            mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null);
         }
     } else if (msg.t === 'mobMissing'){
         // mob que tentei atacar já morreu/sumiu
@@ -5590,14 +5676,24 @@ function applyMobsSnapshot(list){
 }
 
 // Quando o server confirma que MATEI um mob: dispara loot + xp localmente
-function mobKilledByServer(m, serverLoot){
+function mobKilledByServer(m, serverLoot, serverDrops){
     statsRecordMobKill(m.type, MTYPE[m.type] && MTYPE[m.type].unique);
     notifyMobKilledForQuests(m.type);
     sndKill();
-    // Hardening Nível 2: server agora gera loot autoritativamente.
-    // Se serverLoot veio (array de {type, qty}), spawnamos aqui no chão.
-    // Caso contrário (cliente conectado em server velho), fallback pra tabela local.
-    if (Array.isArray(serverLoot)){
+    // N3 fase 2: server agora também atribui IDs autoritativos aos drops (msg.drops).
+    // Cliente preserva esses IDs pra mandar de volta no groundPickup.
+    if (Array.isArray(serverDrops) && serverDrops.length){
+        for (const d of serverDrops){
+            if (d.type !== 'GOLD' && !ITEMS[d.type]){
+                console.warn('[loot] item desconhecido descartado:', d.type);
+                continue;
+            }
+            // Evita duplicata se groundSpawn chegou primeiro (no nosso fluxo, mobKill é direto, sem race)
+            if (groundItems.find(g => g.id === d.id)) continue;
+            groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty | 0 || 1 });
+        }
+    } else if (Array.isArray(serverLoot)){
+        // Compat com server antigo (Hardening N2): só tem {type, qty}; gera id local
         for (const item of serverLoot){
             if (!item || !item.type) continue;
             if (!ITEMS[item.type]){
@@ -7098,7 +7194,8 @@ async function pkDeathBy(killerId, killerName){
 function pkKilledSomeone(msg){
     // msg = { victimId, victimName, victimHadSelos, goldGain, dropHighlander }
     if (player.stats) player.stats.pkKills = (player.stats.pkKills || 0) + 1;
-    player.gold += msg.goldGain;
+    // N3 fase 2: server já creditou gold via invUpdate (pvpGain). Não soma local pra evitar dupla contagem.
+    // Mantém só o log.
     log(`<span class="log-up">⚔ Você matou ${escapeHtml(msg.victimName)}! +${msg.goldGain}g</span>`);
     // Se eu havia sido morto por essa pessoa recentemente, é vingança → recupera skills
     const prevKill = player.lastKilledBy;
@@ -7120,21 +7217,17 @@ function pkKilledSomeone(msg){
         player.pzLockUntil = Date.now() + PVP_PZ_LOCK_MS;
         log(`<span class="log-die">⚠ PZ bloqueada por 5 min (selo ${player.selos})!</span>`);
     }
-    // Drop do Coração se a vítima era Highlander
+    // Drop do Coração se a vítima era Highlander (N3 fase 2: server credita via invUpdate)
     if (msg.dropHighlander){
-        player.inv.CORACAO_HL = (player.inv.CORACAO_HL || 0) + 1;
         log(`<span class="log-up">💎 Ganhou um Coração do Highlander!</span>`);
-        invSignature = null;
     }
-    // Drop de item ao matar um ghost (corpo desconectado)
+    // Drop de item ao matar um ghost — server credita via invUpdate; só log/sfx aqui
     if (msg.ghost && msg.droppedItem){
         // Se for item upgrade que ainda não está em ITEMS (outro player forjou), recria
         const tier = getUpgradeTier(msg.droppedItem);
         if (tier.plus > 0 && !ITEMS[msg.droppedItem]) ensureUpgradeItem(tier.base, tier.plus);
         if (ITEMS[msg.droppedItem]){
-            player.inv[msg.droppedItem] = (player.inv[msg.droppedItem] || 0) + 1;
             log(`<span class="log-up">💀 Saqueou: ${escapeHtml(ITEMS[msg.droppedItem].name)}</span>`);
-            invSignature = null;
         }
     }
     checkAchievements();
@@ -9709,13 +9802,27 @@ function handleMovement(dt){
 
 // ─── Itens: pickup automático no raio 1 ──────────────────────────────────────
 function pickupAt(x, y){
+    // N3 fase 2: se conectado ao server, envia ids pro server processar.
+    // Server retorna invUpdate + groundRemove (que limpa o local).
+    // Atualizações visuais (log/som) acontecem em invUpdate.pickup handler.
+    if (ws && ws.readyState === 1 && serverAuthMobs){
+        const ids = [];
+        for (const it of groundItems){
+            if (Math.abs(it.x - x) > 1 || Math.abs(it.y - y) > 1) continue;
+            // Só envia ids server-side (g123). Ids locais (number) são de single-player offline.
+            if (typeof it.id === 'string' && it.id[0] === 'g') ids.push(it.id);
+        }
+        if (ids.length){
+            try { ws.send(JSON.stringify({ t:'groundPickup', ids })); } catch {}
+        }
+        return;
+    }
+    // Single-player offline: aplica direto local (como antes)
     let pickedAny = false;
     for (let i = groundItems.length-1; i >= 0; i--){
         const it = groundItems[i];
         if (Math.abs(it.x - x) > 1 || Math.abs(it.y - y) > 1) continue;
         const def = ITEMS[it.type];
-        // Guard: item desconhecido (server novo droppou item que cliente ainda não conhece
-        // — janela de deploy assíncrono). Descarta silenciosamente em vez de crashar.
         if (!def){
             console.warn('[pickup] item desconhecido descartado:', it.type);
             groundItems.splice(i, 1);
