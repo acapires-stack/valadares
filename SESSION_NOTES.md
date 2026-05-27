@@ -39,10 +39,18 @@
 - Cortes definidos preservados em TREE, WATER, CAVE_WALL (intencional)
 - Cada tile pinta seu lado da fronteira → transição simétrica de 6px
 
+### 🚶‍♂️ Wandering de mobs fora de combate (server-side)
+- `tickAI` antes só movia com target — mobs sem aggro ficavam congelados (visualmente esquisito)
+- Agora vagam: cooldown 1.8× speed, 25% chance por tentativa, anti-frenético
+- `spawnX/spawnY` salvos no spawn; volta pra casa se `distHome > 6` (65% prob)
+- Bosses (`unique`) NÃO vagam — continuam guardando o spot por design
+- Fallback automático pra mobs antigos sem `spawnX` no `state.json`
+
 ### 🐛 Conhecidos / observações
 - Pollen pode parecer ruidoso pra alguns gostos — chance baixável de 8% → 4% se necessário
 - Iluminação só ativa do entardecer (~17h+) em diante; manhã/dia totalmente limpos
 - Tochas e outros players sempre emitem luz mesmo de dia (só visível quando overlay tá ativo)
+- Taxa de wander: ~1 tile a cada 2-4s por mob (ajustável via `0.25` chance)
 
 ---
 
