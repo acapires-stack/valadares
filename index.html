@@ -1196,6 +1196,7 @@
         <div class="s-section minimap-section">
             <div class="s-label">Mapa <span id="posMini" style="float:right;color:#888;font-weight:400">—</span></div>
             <canvas id="minimap" width="140" height="140"></canvas>
+            <div style="margin-top:4px;font-family:monospace;font-size:10px;color:#aaa;text-align:center" id="gameClock">—</div>
         </div>
 
         <div class="s-section">
@@ -1807,6 +1808,47 @@ function inSafeZone(x, y){
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 canvas.width = TS*VP_W; canvas.height = TS*VP_H;
+
+// ===== Iluminação dinâmica + ciclo dia/noite =====
+const lightCanvas = document.createElement('canvas');
+lightCanvas.width = canvas.width; lightCanvas.height = canvas.height;
+const lightCtx = lightCanvas.getContext('2d');
+const DAY_LENGTH_MS = 6 * 60 * 1000;   // 1 dia in-game = 6 min real
+let gameTime = 8 * (DAY_LENGTH_MS / 24); // começa às 8h
+// keyframes: [hora, darkness, tintR, tintG, tintB, tintA]
+const DAY_KEYFRAMES = [
+    [0,  0.55,  40,  55, 130, 0.12],   // 00:00 noite plena
+    [5,  0.45,  90,  70, 140, 0.14],   // 05:00 madrugada
+    [7,  0.10, 255, 170, 110, 0.18],   // 07:00 amanhecer
+    [12, 0.00, 255, 250, 220, 0.04],   // 12:00 meio-dia
+    [17, 0.05, 255, 200, 140, 0.10],   // 17:00 tarde dourada
+    [19, 0.20, 220, 110, 150, 0.22],   // 19:00 entardecer
+    [21, 0.45, 110,  80, 150, 0.16],   // 21:00 anoitecer
+    [24, 0.55,  40,  55, 130, 0.12],   // 24:00 = 00:00 (loop)
+];
+function _lerp(a,b,t){ return a + (b-a) * t; }
+function getDayPhase(){
+    const phase = (gameTime % DAY_LENGTH_MS) / DAY_LENGTH_MS;
+    const hour = phase * 24;
+    let i = 0;
+    while (i < DAY_KEYFRAMES.length - 1 && DAY_KEYFRAMES[i+1][0] <= hour) i++;
+    const k0 = DAY_KEYFRAMES[i], k1 = DAY_KEYFRAMES[i+1] || DAY_KEYFRAMES[DAY_KEYFRAMES.length-1];
+    const span = (k1[0] - k0[0]) || 1;
+    const t = Math.max(0, Math.min(1, (hour - k0[0]) / span));
+    return {
+        hour,
+        darkness: _lerp(k0[1], k1[1], t),
+        tintR: Math.round(_lerp(k0[2], k1[2], t)),
+        tintG: Math.round(_lerp(k0[3], k1[3], t)),
+        tintB: Math.round(_lerp(k0[4], k1[4], t)),
+        tintA: _lerp(k0[5], k1[5], t),
+    };
+}
+function fmtGameHour(hour){
+    const h = Math.floor(hour);
+    const m = Math.floor((hour - h) * 60);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MUNDO (mapa procedural)
@@ -6105,6 +6147,18 @@ function drawMinimap(){
     // posição no label
     const pm = document.getElementById('posMini');
     if (pm) pm.textContent = `${player.x},${player.y}`;
+    // relógio in-game
+    const gc = document.getElementById('gameClock');
+    if (gc){
+        const d = getDayPhase();
+        let icon = '☀';
+        if (d.hour < 5 || d.hour >= 21) icon = '🌙';
+        else if (d.hour < 7) icon = '🌅';
+        else if (d.hour < 17) icon = '☀';
+        else if (d.hour < 19) icon = '🌇';
+        else icon = '🌆';
+        gc.textContent = `${icon} ${fmtGameHour(d.hour)}`;
+    }
 }
 
 function pkDeathBy(killerId, killerName){
@@ -7906,6 +7960,74 @@ function tickProjectiles(dt){
         p.y = p.startY + (p.endY - p.startY) * t;
         if (t >= 1) projectiles.splice(i, 1);
     }
+}
+
+// ===== Iluminação dinâmica + tint do ciclo dia/noite =====
+function drawDayNightTint(day){
+    if (day.tintA < 0.02) return;
+    ctx.save();
+    ctx.fillStyle = `rgba(${day.tintR},${day.tintG},${day.tintB},${day.tintA})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+}
+function _carve(cx, cy, radius, intensity){
+    const g = lightCtx.createRadialGradient(cx, cy, Math.max(2, radius*0.08), cx, cy, radius);
+    g.addColorStop(0,    `rgba(0,0,0,${intensity})`);
+    g.addColorStop(0.55, `rgba(0,0,0,${intensity*0.55})`);
+    g.addColorStop(1,    'rgba(0,0,0,0)');
+    lightCtx.fillStyle = g;
+    lightCtx.fillRect(cx-radius, cy-radius, radius*2, radius*2);
+}
+function drawLighting(cam, day){
+    const px0 = Math.floor(player.x), py0 = Math.floor(player.y);
+    const playerInCave = inCave(px0, py0);
+    // caverna: sempre escura; fora dela, segue ciclo dia/noite
+    let darkness = day.darkness;
+    let darkCol = `rgba(8,10,30,1)`;
+    if (playerInCave){
+        darkness = Math.max(0.78, day.darkness);
+        darkCol = `rgba(10,8,18,1)`;
+    } else if (darkness < 0.04){
+        return;  // dia claro fora de caverna: pula tudo (perf)
+    }
+    const W = canvas.width, H = canvas.height;
+    lightCtx.globalCompositeOperation = 'source-over';
+    lightCtx.globalAlpha = darkness;
+    lightCtx.fillStyle = darkCol;
+    lightCtx.fillRect(0, 0, W, H);
+    lightCtx.globalAlpha = 1;
+    lightCtx.globalCompositeOperation = 'destination-out';
+    // luz do player
+    const ppx = (player.renderX - cam.x) * TS + TS/2;
+    const ppy = (player.renderY - cam.y) * TS + TS/2;
+    const pr = playerInCave ? 4.5*TS : 6*TS;
+    _carve(ppx, ppy, pr, 1);
+    // tochas da PZ (sempre acesas, com flicker)
+    for (const t of TORCHES){
+        if (t.x < cam.x-3 || t.x >= cam.x+VP_W+3 || t.y < cam.y-3 || t.y >= cam.y+VP_H+3) continue;
+        const tx = (t.x - cam.x) * TS + TS/2;
+        const ty = (t.y - cam.y) * TS + TS/2;
+        const flick = Math.sin(waterT*3 + t.x + t.y) * 6;
+        _carve(tx, ty, 4.5*TS + flick, 1);
+    }
+    // projéteis emitem pequena luz (warm pros vermelhos/laranjas, fria pros frios)
+    for (const p of projectiles){
+        const x = (p.x - cam.x) * TS + TS/2;
+        const y = (p.y - cam.y) * TS + TS/2;
+        _carve(x, y, 2.2*TS, 0.95);
+    }
+    // outros players: cada um irradia também (luz "vela")
+    for (const id in remotePlayers){
+        const rp = remotePlayers[id];
+        if (rp.x < cam.x-3 || rp.x >= cam.x+VP_W+3 || rp.y < cam.y-3 || rp.y >= cam.y+VP_H+3) continue;
+        const rx = (rp.renderX != null ? rp.renderX : rp.x);
+        const ry = (rp.renderY != null ? rp.renderY : rp.y);
+        const x = (rx - cam.x) * TS + TS/2;
+        const y = (ry - cam.y) * TS + TS/2;
+        _carve(x, y, playerInCave ? 3.5*TS : 5*TS, 0.95);
+    }
+    lightCtx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(lightCanvas, 0, 0);
 }
 
 function tickTrails(dt){
@@ -10299,6 +10421,12 @@ function loop(ts){
     drawProjectiles(cam);
     drawAuras(cam);
     drawParticles(cam);
+
+    // Ciclo dia/noite + iluminação dinâmica
+    gameTime += dt;
+    const dayState = getDayPhase();
+    drawDayNightTint(dayState);
+    drawLighting(cam, dayState);
 
     // floating texts
     for (let i=floatTexts.length-1; i>=0; i--){
