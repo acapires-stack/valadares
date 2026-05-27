@@ -20,9 +20,33 @@ cosméticos novos · attackVfx broadcast.
 - MercadoPago Checkout Pro com PIX + Cartão. HTTP server compartilhado com WS,
   endpoints /api/packages, /api/pix/create, /webhook/mp. 4 pacotes de gold em produção.
 
-**Pendente N3 fase 2 (próxima sessão):**
-- Equip/Unequip · Chest deposit/withdraw · Pickup do chão · Munição consumida ·
-  Bloquear writes do inv no saveUpload.
+## 🆕 Adicionado em 27/05/2026 (sessão N3 fase 2)
+
+**Hardening N3 fase 2 — todas as 5 ops migradas pro server:**
+- **Equip/Unequip** server-side (`invEquip`/`invUnequip`): valida posse + conflito
+  2H↔offhand. Server broadcasta `pstats.equipped` pros outros verem o visual.
+- **Chest** server-side (`invChest`): 6 ops (deposit/withdraw/depositGold/withdrawGold/
+  depositAll/withdrawAll). Valida adjacência ao baú (CHEST_POS 47-53 × 48-52).
+  `p.chests` agora é autoritativo, hidratado de acc.save no join.
+- **Pickup do chão** server-side (`groundPickup`): server mantém `groundDrops` Map com
+  ids únicos (`g123`). Mob death gera ids autoritativos, broadcast `groundSpawn` pra
+  todos, `groundRemove` ao pegar. TTL de despawn = 5min. Cliente legacy single-player
+  ainda usa lógica local (sem `serverAuthMobs`).
+- **Munição/lança** server-side: `attackMob` aceita `ammoKey` (decrementa flecha) e
+  `throwSpear:true` (consome lança equipada + re-equipa do inv se houver outra).
+- **Lockdown parcial saveUpload + playerSync**: server hidrata `p.inv/equipped/gold/chests`
+  do save no join e a cada saveUpload. PvP gold + CORACAO_HL drop agora são
+  authoritative no server (transferência no `pkDeath`). Lockdown FULL (bloquear writes
+  do cliente) fica pra fase 3, depende de migrar quest/event rewards pro server.
+
+**Electron build em produção:** `cd valadares/electron && npm run build` gera
+`Valadares-Setup-1.0.0.exe` (NSIS) + portable em `electron/dist/`. Publish config
+aponta pra GitHub Releases (owner: acapires-stack).
+
+**Pendente fase 3 (lockdown total — próxima janela):**
+- Migrar quest rewards pro server (validação de stage completion + grant authoritative)
+- Migrar daily event rewards (Chuva de Ouro / Cerco / Sabedoria) pro server
+- Aí sim: bloquear writes de inv/gold do cliente no saveUpload e playerSync.
 
 ---
 

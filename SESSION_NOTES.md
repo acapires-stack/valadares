@@ -1,5 +1,62 @@
 # Notas de Sessão
 
+## 📅 Sessão 27/05/2026 (N3 fase 2 + Electron build)
+
+Foco: fechar as 5 ops pendentes do Hardening N3 fase 2 + buildar o Electron desktop.
+
+### 🛡 Hardening N3 fase 2 — completo
+
+**1. Equip/Unequip server-side**
+- Mensagens novas: `invEquip { itemKey }` e `invUnequip { slot }`
+- Server (`SLOT_OF_KIND` espelhado) valida posse, resolve conflito 2H↔offhand, mexe `p.inv` e `p.equipped`
+- Resposta: `invUpdate { inv, gold, equipped, equipOp:{ ok, slot, itemKey } }` + broadcast `pstats` pros outros players verem o visual atualizado
+- Cliente faz mutação otimista pra UI snappy; server reconcilia via invUpdate
+
+**2. Chest deposit/withdraw server-side**
+- Mensagem: `invChest { op, chestId, itemKey?, qty? }` com 6 ops:
+  deposit · withdraw · depositGold · withdrawGold · depositAll · withdrawAll
+- Server valida adjacência ao baú (CHEST_POS hardcoded mesma posição do cliente)
+- `p.chests = { b1:{}, b2:{}, b3:{}, b4:{} }` agora é autoritativo, hidratado de `acc.save.chests` no join
+- Resposta: `invUpdate { inv, chests, chestOp, moved/goldMoved/depositAll/withdrawAll }`
+
+**3. Pickup do chão server-side**
+- Server mantém `groundDrops` Map: `id → { id, x, y, type, qty, spawnedAt }`
+- IDs server-side (prefixo `g`) atribuídos em `mobKill`. Broadcast `groundSpawn` pra TODOS verem drops dos outros (antes só o killer via)
+- Mensagem: `groundPickup { ids: [...] }`. Server valida chebyshev ≤1 do drop, transfere pra `p.inv` ou `p.gold` (tipo `GOLD`)
+- Broadcast `groundRemove { ids }` pra todos limparem o chão
+- Auto-despawn de 5min via `tickGroundDespawn` (intervalo 30s)
+- Cliente single-player offline (sem `serverAuthMobs`) continua usando lógica local
+
+**4. Munição/lança server-side**
+- `attackMob` aceita 2 flags novas:
+  - `ammoKey`: server valida `ITEM_META[ammoKey].kind === 'ammo'` + `hasInv(p, ammoKey, 1)`, decrementa; se cliente mentir, rejeita o ataque
+  - `throwSpear:true`: server consome `p.equipped.weapon` (valida `throwable`) e re-equipa do inv se houver outra lança
+- Cliente faz mutação otimista; invUpdate reconcilia
+
+**5. Lockdown parcial saveUpload + PvP gold authoritative**
+- `saveUpload`: server agora SYNC `p.inv/equipped/gold/chests` ← `data.X` antes de salvar (mantém server-side em paridade com mutações client-side que ainda existem — quest rewards, daily events)
+- `pkDeath` agora transfere gold authoritativo (vítima.gold -= n; killer.gold += n) + drop de CORACAO_HL via `incInv`. Cliente removeu a soma local (server credita via invUpdate)
+- `pvpAttack` (ghost kill) também credita gold + droppedItem via `incInv` server-side
+- Lockdown FULL (bloquear writes do cliente) fica pra fase 3 — depende de migrar quest/event rewards pro server. Hoje ainda preserva `playerSync.inv/gold` aceitos pra cobrir essas mutações client-side.
+
+### 💻 Electron build
+
+- `cd valadares/electron && npm run build` rodado
+- Sucesso parcial: `dist/win-unpacked/Valadares.exe` (188MB, com Chromium) gerado e funcional
+- **NSIS installer falhou**: `winCodeSign-*.7z` não consegue extrair symlinks no Windows sem Developer Mode (erro "O cliente não tem o privilégio necessário"). Para rodar o build completo:
+  - Habilitar Windows Developer Mode (Settings → Privacy & security → For developers → ON), OU
+  - Rodar terminal como admin
+- Workaround temporário: zipar a pasta `win-unpacked/` ou distribuir só o `.exe` portable
+- Auto-update via electron-updater já configurado (publish: github, owner: acapires-stack) — só funciona depois que houver release publicada
+
+### 📋 Pendente fase 3 (próxima sessão)
+
+- Quest rewards server-side (NPC chain stages → server valida + grant)
+- Daily event rewards server-side (Chuva de Ouro / Cerco / Sabedoria — server aplica)
+- AÍ SIM bloquear `playerSync.inv/gold` e `saveUpload.{inv,gold,equipped,chests}` (server vira fonte única)
+
+---
+
 ## 📅 Sessão 27/05/2026 (noite) — Pacote massivo: features novas + N3 + Electron + MercadoPago
 
 > Sessão muito grande dividida em 3 blocos. ~22 commits, várias features
