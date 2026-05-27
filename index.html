@@ -1706,6 +1706,7 @@ const NPCS = [
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
     { id:'cacadora',  name:'Caçadora de Drakes', pos:{x:76,y:78}, body:'#3a5a3a', hat:'#80aa40', action:'chain', chain:'drake' },
     { id:'mineiro',   name:'Mineiro Perdido',  pos:{x:66,y:90}, body:'#5a3a18', hat:'#9a9a9a', action:'chain', chain:'mina'   },
+    { id:'crepusculo',name:'Madame Crepúsculo',pos:{x:28,y:75}, body:'#3a204a', hat:'#7040aa', action:'chain', chain:'crepusculo' },
     // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
     { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
 ];
@@ -2743,6 +2744,8 @@ const ITEMS = {
     TRAIL_GELO:   { name:'Rastro Glacial',  color:'#80d0ff', kind:'cosmetic', trail:'#80d0ff', desc:'Deixa um rastro azul cintilante.' },
     PART_FOGO:    { name:'Faíscas de Fogo', color:'#ff5020', kind:'cosmetic', particles:'#ff5020', desc:'Solta faíscas laranjas ao atacar.' },
     PART_TROVAO:  { name:'Faíscas de Trovão', color:'#aacdff', kind:'cosmetic', particles:'#aacdff', desc:'Solta faíscas elétricas ao atacar.' },
+    AURA_VIDENTE: { name:'Aura do Vidente',  color:'#60c8ff', kind:'cosmetic', aura:'#60c8ff', nameColor:'#a8d8ff', desc:'Aura azul-ciano pulsante. Recompensa de Madame Crepúsculo.' },
+    CAPA_CETICO:  { name:'Capa do Cético',   color:'#e8e8c0', kind:'cosmetic', cape:'#e8e8c0', desc:'Capa branca-creme. Recompensa de Madame Crepúsculo.' },
     GOLD:     { name:'Ouro',           color:'#ffcc40', kind:'gold' },
     SILK:     { name:'Seda',           color:'#d0d0e0', kind:'mat' },
     // armas — hand: '1h' permite escudo, '2h' bloqueia. base=ataque, def=bloqueio da arma.
@@ -4623,7 +4626,9 @@ function playerCritChance(){
     return base + (mults ? mults.crit : 0);
 }
 function playerDodgeChance(){
-    return Math.min(0.25, 0.02 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006);
+    const skillBased = 0.02 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;
+    const perma = player.permaBuffs?.dodgeBonus || 0;   // ex: Aura do Vidente +5%
+    return Math.min(0.30, skillBased + perma);
 }
 
 function findArrow(){
@@ -5771,6 +5776,32 @@ const QUEST_CHAINS = {
             { id:'mn3', name:'O Golem Rei', desc:'Mate o Golem Rei pra abrir caminho.',
               kind:'mob', type:'GOLEM_REI', count:1,
               reward:{ gold:1500, item:{PEDRA_GOLEM:10}, xp:{Clava:250} } },
+        ],
+    },
+    crepusculo: {
+        npc:'crepusculo', name:'O Espelho do Destino',
+        stages: [
+            { id:'cp1', name:'Os Reflexos da Aurora',
+              desc:'Madame Crepúsculo pede provas de coragem básica: mate 25 Cobras pra abrir o ritual.',
+              kind:'mob', type:'SNAKE', count:25, reward:{ gold:150, xp:{Espada:80} } },
+            { id:'cp2', name:'Cristais do Inverno',
+              desc:'Traga 5 Escamas de Drake e 3 Pedras do Golem — o ritual exige sangue antigo.',
+              kind:'multiItem', items:{ ESCAMA:5, PEDRA_GOLEM:3 },
+              reward:{ gold:400, xp:{Magia:120} } },
+            { id:'cp3', name:'O Olho do Predador',
+              desc:'Prove sua visão: mate 3 Drakes (não o Ancião).',
+              kind:'mob', type:'DRAKE', count:3,
+              reward:{ gold:600, xp:{Distância:200}, item:{POTION_MP:5} } },
+            { id:'cp4', name:'A Visão Final',
+              desc:'O espelho desperta. Madame Crepúsculo oferece duas verdades — só uma pode ser aceita.',
+              kind:'choice',
+              choices: [
+                  { label:'Aceitar a Visão — Aura do Vidente + 5% esquiva permanente',
+                    reward:{ item:{AURA_VIDENTE:1}, permaBuff:{dodgeBonus:0.05}, gold:500 } },
+                  { label:'Recusar a Visão — Capa do Cético + 3000g',
+                    reward:{ item:{CAPA_CETICO:1}, gold:3000 } },
+              ],
+            },
         ],
     },
     vendedor: {
