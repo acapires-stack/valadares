@@ -194,6 +194,25 @@ const RECIPES = [
     { out:'COROA_VENDEDOR', in:{ ELMO_DRACO:1, CORACAO_HL:1, ESCAMA:3, CHIFRE:2 } },
 ];
 
+// Shop (Mercador em 52,49) — espelho de SHOP_BUY do cliente
+const SHOP_BUY = [
+    { item:'POTION',    price:50 },
+    { item:'POTION',    price:450,  qty:10 },
+    { item:'POTION',    price:1000, qty:25 },
+    { item:'POTION_MP', price:60 },
+    { item:'POTION_MP', price:540,  qty:10 },
+    { item:'POTION_MP', price:1200, qty:25 },
+    { item:'FLECHA',    price:5  },
+    { item:'FLECHA_PERF', price:18 },
+    { item:'CHEESE',    price:8  },
+    { item:'HAM',       price:30 },
+    { item:'BOTAS',     price:120 },
+    { item:'COURO',     price:180 },
+    { item:'BENCAO_FENIX', price:15000 },
+    { item:'BENCAO_FENIX', price:65000,  qty:5 },
+    { item:'BENCAO_FENIX', price:120000, qty:10 },
+];
+
 // Forja
 const UPGRADE_MAX       = 5;
 const UPGRADE_FAIL      = [0, 0.20, 0.35, 0.50, 0.65, 0.80];
@@ -2074,6 +2093,43 @@ wss.on('connection', (ws) => {
             // Cosmético de partícula ao atacar — propaga pros outros renderizarem
             const color = typeof msg.color === 'string' ? msg.color.slice(0, 12) : null;
             if (color) broadcast(id, { t:'attackVfx', id, color });
+            return;
+        }
+
+        // ─── N3: Shop buy/sell server-side ───────────────────────────────
+        if (msg.t === 'invShop') {
+            const op = msg.op;
+            // Mercador em (52,49). Player tem que estar adjacente (chebyshev ≤1).
+            if (Math.max(Math.abs(p.x - 52), Math.abs(p.y - 49)) > 1){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se do Mercador.' }); return;
+            }
+            if (op === 'buy'){
+                const offer = SHOP_BUY[msg.idx | 0];
+                if (!offer){ sendTo(id, { t:'serverMsg', level:'warn', text:'Oferta inválida.' }); return; }
+                if ((p.gold || 0) < offer.price){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem ouro (${offer.price}g).` }); return; }
+                p.gold -= offer.price;
+                incInv(p, offer.item, offer.qty || 1);
+                sendInvUpdate(p, { shop:{ op:'buy', item: offer.item, qty: offer.qty || 1, price: offer.price } });
+                return;
+            }
+            if (op === 'sell'){
+                const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+                if (!itemKey) return;
+                // Permite vender items upgrade _PLUS_N — preço base do tier base
+                const tier = getUpgradeTier(itemKey);
+                if (!ITEM_META[tier.base]){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item inválido.' }); return; }
+                const have = (p.inv && p.inv[itemKey]) || 0;
+                if (have <= 0) return;
+                let qty = 1;
+                if (msg.qtyStr === 'all') qty = have;
+                else qty = Math.max(1, Math.min(have, msg.qty | 0 || 1));
+                const unit = sellPriceFor(tier.base);
+                const total = unit * qty;
+                incInv(p, itemKey, -qty);
+                p.gold = (p.gold || 0) + total;
+                sendInvUpdate(p, { shop:{ op:'sell', item: itemKey, qty, total } });
+                return;
+            }
             return;
         }
 

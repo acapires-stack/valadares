@@ -5252,6 +5252,18 @@ function handleMP(msg){
             log(`<span class="log-xp">Fabricou ${out ? out.name : msg.craft.out} (-${msg.craft.cost}g)</span>`);
             if (typeof renderCraft === 'function') renderCraft();
         }
+        // Shop: feedback
+        if (msg.shop){
+            const item = ITEMS[msg.shop.item];
+            const name = item ? item.name : msg.shop.item;
+            if (msg.shop.op === 'buy'){
+                log(`<span class="log-up">+${msg.shop.qty} ${name} (-${msg.shop.price}g)</span>`);
+            } else if (msg.shop.op === 'sell'){
+                log(`<span class="log-sys">Vendeu ${msg.shop.qty}× ${name} (+${msg.shop.total}g)</span>`);
+                if (typeof sndPickup === 'function') sndPickup();
+            }
+            if (typeof renderShop === 'function') renderShop();
+        }
         // invSignature=null força re-render na próxima frame
     } else if (msg.t === 'partyUpdate'){
         if (msg.deleted){
@@ -6354,6 +6366,7 @@ const SHOP_BUY = [
 ];
 // idx é o index em SHOP_BUY (suporta múltiplas ofertas pro mesmo item com qty/label)
 function buyFromShop(idx){
+    // N3: shop é autoritativo no server
     const i = parseInt(idx, 10);
     const offer = SHOP_BUY[i];
     if (!offer) return;
@@ -6361,12 +6374,11 @@ function buyFromShop(idx){
         log(`<span class="log-sys">Sem ouro suficiente (${offer.price}g).</span>`);
         return;
     }
-    const qty = offer.qty || 1;
-    player.gold -= offer.price;
-    player.inv[offer.item] = (player.inv[offer.item] || 0) + qty;
-    invSignature = null;
-    log(`<span class="log-up">+${qty} ${ITEMS[offer.item].name} (-${offer.price}g)</span>`);
-    renderShop();
+    if (!ws || ws.readyState !== 1){
+        log('<span class="log-sys">Sem conexão com o servidor.</span>');
+        return;
+    }
+    ws.send(JSON.stringify({ t:'invShop', op:'buy', idx: i }));
 }
 // Preço unitário de venda (helper compartilhado com o render do shop)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6586,21 +6598,18 @@ function sellPriceFor(itemKey){
     return 1;
 }
 function sellToShop(itemKey, qtyStr){
+    // N3: shop é autoritativo no server
     const have = player.inv[itemKey] || 0;
     if (have <= 0) return;
-    const def = ITEMS[itemKey];
+    if (!ws || ws.readyState !== 1){
+        log('<span class="log-sys">Sem conexão com o servidor.</span>');
+        return;
+    }
     let qty = 1;
     if (qtyStr === 'all') qty = have;
     else if (qtyStr) qty = Math.max(1, Math.min(have, parseInt(qtyStr, 10) || 1));
-    const unit = sellPriceFor(itemKey);
-    const total = unit * qty;
-    player.inv[itemKey] = have - qty;
-    if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
-    player.gold += total;
-    invSignature = null;
-    log(`<span class="log-sys">Vendeu ${qty}× ${def.name} (+${total}g)</span>`);
-    sndPickup();   // som curto de transação
-    renderShop();
+    ws.send(JSON.stringify({ t:'invShop', op:'sell', itemKey, qty, qtyStr: qtyStr === 'all' ? 'all' : null }));
+    return;
 }
 
 // ─── Status Effects (poison/stun/bleed) ─────────────────────────────────────
