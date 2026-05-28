@@ -4239,7 +4239,8 @@ wss.on('connection', (ws) => {
             if (!isBotTarget && tgt.ws.readyState === 1){
                 tgt.ws.send(JSON.stringify({ t:'pvpHit', from:id, fromName:p.name, amount, actual }));
             }
-            broadcast(id, { t:'float', id:msg.targetId, text:`-${actual}`, color:'#ff3030', big:true });
+            // broadcast(null) inclui o atacante — antes ele não via o float do dano que dava
+            broadcast(null, { t:'float', id:msg.targetId, text:`-${actual}`, color:'#ff3030', big:true });
             // Detecção morte do bot 007
             if (isBotTarget && tgt.hp === 0){
                 killImpostorBot(p);
@@ -4500,6 +4501,7 @@ wss.on('connection', (ws) => {
             const SPELLS_META = {
                 FIREBALL: { manaCost: 18 },
                 HEAL:     { manaCost: 12, healBase: 30 },
+                HEAL_GRUPO: { manaCost: 60, healBase: 25, groupRange: 8 },
                 RAIO:     { manaCost: 10 },
                 EXORI:    { manaCost: 25 },
                 TAUNT:    { manaCost: 8 },
@@ -4518,9 +4520,31 @@ wss.on('connection', (ws) => {
                 return;
             }
             p.mp = Math.max(0, (p.mp ?? 0) - sp.manaCost);
-            // Cura aplica heal
+            // Cura em grupo — alcança membros da party em raio groupRange (chebyshev).
+            // Cura cada um (inclusive o caster), broadcast pstats por player curado.
             let healedAmount = 0;
-            if (sp.healBase){
+            let groupHealedCount = 0;
+            if (sp.groupRange){
+                const party = findPartyOfPlayer(p.name);
+                if (!party){
+                    if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'spellResult', ok:false, reason:'no_party', spellKey }));
+                    return;
+                }
+                const magiaSk = (p.skills && p.skills.Magia && p.skills.Magia.val) || 10;
+                const baseAmount = sp.healBase + Math.floor(magiaSk / 2);
+                for (const member of partyMembersOnline(party)){
+                    if (chebyshev(member.x, member.y, p.x, p.y) > sp.groupRange) continue;
+                    const mxHp = member.maxHp || 100;
+                    if ((member.hp ?? 0) >= mxHp) continue;
+                    const amt = Math.min(baseAmount + Math.floor(Math.random()*4) - 1, mxHp - (member.hp ?? 0));
+                    if (amt <= 0) continue;
+                    member.hp = Math.min(mxHp, (member.hp ?? 0) + amt);
+                    if (member.id === p.id) healedAmount = amt;
+                    broadcastPstatsAll(member);
+                    broadcast(null, { t:'float', id: member.id, text:`+${amt}`, color:'#aaffaa', big:false });
+                    groupHealedCount++;
+                }
+            } else if (sp.healBase){
                 const magiaSk = (p.skills && p.skills.Magia && p.skills.Magia.val) || 10;
                 const amount = sp.healBase + Math.floor(magiaSk / 2) + Math.floor(Math.random()*4) - 1;
                 const maxHp = p.maxHp || 100;
@@ -4529,13 +4553,14 @@ wss.on('connection', (ws) => {
                     p.hp = Math.min(maxHp, (p.hp ?? 0) + healedAmount);
                 }
             }
-            broadcastPstatsAll(p);
+            if (!sp.groupRange) broadcastPstatsAll(p);
+            // Bot 007 ataca melee se for um dos membros heal — não precisa pstats extra
             // XP de Magia (compat — cliente continua enviando hits)
             const hits = Math.max(1, Math.min(5, msg.hits | 0 || 1));
             gainSkillXpServer(p, 'Magia', hits);
             sendSkillsOnly(p, 'spellCast');
             if (sp.healBase && p.ws.readyState === 1){
-                p.ws.send(JSON.stringify({ t:'spellResult', ok:true, spellKey, healed: healedAmount }));
+                p.ws.send(JSON.stringify({ t:'spellResult', ok:true, spellKey, healed: healedAmount, groupHealedCount }));
             }
             return;
         }

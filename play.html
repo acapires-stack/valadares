@@ -5871,12 +5871,7 @@ function handleMP(msg){
         showPartyInvite(msg.fromName, msg.expiresIn);
     } else if (msg.t === 'partyShareKill'){
         // Server já creditou skill XP autoritative (sendSkillsOnly antes/junto).
-        // Cliente só exibe float + marca achievement flag.
-        const skill = msg.skill || 'Punho';
-        if (player.skills[skill] && msg.xp > 0){
-            addFloat(player.x, player.y, `+${msg.xp}xp (party)`, '#a8e0ff', false, -34);
-        }
-        // Marca flag pra achievement "Companheiro"
+        // Cliente só marca achievement flag — sem float (poluía em hunt em grupo).
         if (!player.flags) player.flags = {};
         if (!player.flags.firstPartyShare){
             player.flags.firstPartyShare = true;
@@ -9619,6 +9614,15 @@ const SPELLS = {
         switchCost: 300,
         desc: 'Recupera HP. Pode ser usada na PZ.',
     },
+    HEAL_GRUPO: {
+        name: 'Cura em Grupo',
+        manaCost: 60, cooldown: 6000,
+        heal: 25,
+        groupRange: 8,
+        color: '#80ffaa', glow: '#c0ffd0',
+        switchCost: 800,
+        desc: 'Cura todos membros da party em raio 8 tiles. Mana alta, cooldown 6s.',
+    },
     RAIO: {
         name: 'Raio Místico',
         manaCost: 15, cooldown: 1100,
@@ -9773,6 +9777,26 @@ function castSpell(spellKey){
         log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(sp.buff.duration/1000)}s</span>`);
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
         gainMagiaXp(spellKey, 2);
+        return;
+    }
+
+    // ─── CURA EM GRUPO (party AoE) ──────────────────────────────
+    // Server faz heal authoritative de TODOS os membros (incluso o caster).
+    // Cliente só dispara visual + envia spellCast.
+    if (sp.groupRange){
+        if (!player._party){
+            log('<span class="log-sys">Você não está em party.</span>'); return;
+        }
+        player.mp -= sp.manaCost;
+        spellCooldowns[spellKey] = sp.cooldown;
+        sndSpell();
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.groupRange * TS });
+        auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
+        addFloat(player.x, player.y, `✦ ${sp.name}`, sp.glow, true, -10);
+        log(`<span class="log-xp">${sp.name}: curando party em raio ${sp.groupRange}…</span>`);
+        if (ws && ws.readyState === 1){
+            try { ws.send(JSON.stringify({ t:'spellCast', spellKey, hits: 1 })); } catch {}
+        }
         return;
     }
 
