@@ -1,0 +1,15 @@
+node_modules
+server/node_modules
+.git
+.gitignore
+electron/
+play.html
+index.html
+*.md
+*.html
+.dockerignore
+Dockerfile
+nixpacks.toml
+.vercel/
+state.json
+accounts.json
