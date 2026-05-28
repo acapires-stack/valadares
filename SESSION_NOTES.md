@@ -1,5 +1,138 @@
 # Notas de Sessão
 
+## 📅 Sessão 27→28/05/2026 (madrugada — sessão maratona)
+
+**Sessão histórica de ~7 horas** com 20+ commits. Fechou Hardening N3 fase 3
+inteira, lançou suporte mobile, season system, talent tree, todas as fontes
+de XP server-side e setup completo de SEO. Domínio próprio em propagação.
+
+### 🎯 Estado do projeto pós-sessão
+
+- ✅ **Anti-cheat 100%**: gold, inv, equipped, chests, skills — TUDO server-side
+- ✅ **Mobile playable**: touch controls + responsivo (10× audiência potencial)
+- ✅ **Retenção mensal**: season + leaderboard com Coroa de Temporada
+- ✅ **Build variety**: talent tree (6 talentos passivos)
+- ✅ **SEO base**: Search Console verificado + sitemap submetido + indexação solicitada
+- 🕐 **Domínio próprio**: `ws.valadares.app.br` configurado (propagando DNS)
+
+### 📦 Commits da sessão (em ordem)
+
+| # | Commit | Feature |
+|---|---|---|
+| 1 | `b98e4c3` | HMAC do webhook MercadoPago (anti-forge) |
+| 2 | `0ba06ca` | Tabs CHAT/COMBATE invertidas + NPC Banqueiro de gold |
+| 3 | `2755088` | Email do comprador no checkout MP |
+| 4 | `ce340c6` | N3 fase 3 — ondas 1+2 (quest reward + daily quest server-side) |
+| 5 | `94aa000` | N3 fase 3 — ondas 3+4 (daily events + Highlander Hunt) |
+| 6 | `147bcd5` | N3 fase 3 — onda 5 (lockdown saveUpload/playerSync) |
+| 7 | `701dcf7` | nixpacks.toml + NPCs espaçados (1 tile entre cada) |
+| 8 | `7c140cd` | SESSION_NOTES (este arquivo) |
+| 9 | `6141d5f` | **Dockerfile** pra bypass do Railpack quebrado do Railway |
+| 10 | `0125ff3` | Fix bug: cosméticos não equipam (lista equippable + slot paper-doll) |
+| 11 | `4abadc2` | **Mobile / touch controls** + viewport + ROADMAP_v2.md |
+| 12 | `cc59d43` | Landing destaca mobile (hero + features + steps) |
+| 13 | `1476268` | **M3 Season + Leaderboard mensal** + Coroa de Temporada |
+| 14 | `d9da8ce` | **M5 Talent tree** (6 passivos server-side) |
+| 15 | `e33bca7` | **T1 Mob kill XP server-side** (último cheat fechado) |
+| 16 | `5e861bc` | **T3 LOCKDOWN COMPLETO** — skills 100% server-side |
+| 17 | `13fba9d` | SEO: robots.txt + sitemap.xml + meta tags + schema.org |
+| 18 | `4992543` | Google Search Console — meta tag de verificação |
+
+### ⚠️ INFRA — Atenção a estes pontos
+
+1. **Dockerfile substituiu Railpack/Nixpacks** no Railway.
+   Se mexer no build do servidor, edita o `Dockerfile` na raiz (não o
+   `nixpacks.toml` que ficou só como fallback).
+
+2. **Meta tag de verificação do Google** no `<head>` do `index.html`:
+   ```html
+   <meta name="google-site-verification" content="VsqFjI2-u1YIfcgyI-mDR0GuSLyFVtrJvaS2VAjIBa8">
+   ```
+   **NÃO REMOVER** ou perde acesso ao Search Console.
+
+3. **Lockdown total** no saveUpload: cliente envia `data.skills/inv/gold/
+   equipped/chests` mas server **ignora**. Toda mutação dessas grandezas só
+   acontece via handlers server-side (~15 handlers).
+
+4. **3 referências hardcoded** ao Railway antigo que precisam virar `ws.valadares.app.br` quando DNS propagar:
+   - `play.html:5197` — `PRODUCTION_WS_URL`
+   - `play.html:6178` — fallback HTTP base
+   - `server/server.js:22` — `MP_BASE_URL` (webhook MP)
+
+### 🌐 DOMÍNIO `ws.valadares.app.br`
+
+**Status atual (01:43 BRT 28/05):** salvos no Registro.br, em propagação interna.
+
+DNS records no Registro.br:
+| Tipo | Nome | Valor |
+|---|---|---|
+| CNAME | `ws` | `y42t76d8.up.railway.app.` |
+| TXT | `_railway-verify.ws` | `railway-verify=08431d58149682988b0c3e2e7d8fd29417f8378733514484f649ae95d3d63f` |
+
+Pra confirmar amanhã se propagou:
+```powershell
+nslookup ws.valadares.app.br a.auto.dns.br
+nslookup -type=TXT _railway-verify.ws.valadares.app.br a.auto.dns.br
+```
+Se ambos responderem, Railway vai detectar em <30min e ficar **Active** 🔒.
+
+### 🔍 SEO — Google Search Console
+
+- Propriedade: `https://valadares.app.br/` (Prefixo do URL)
+- Verificação: meta tag HTML ✅
+- Sitemap: `sitemap.xml` enviado ✅
+- Indexação solicitada: `/` e `/jogar` ✅
+- Linha do tempo: 1-3 dias indexação inicial · 1-2 semanas em buscas específicas
+
+### 📋 PENDENTE pra próximas sessões
+
+#### Curto prazo (1-2 sessões)
+- [ ] **Atualizar URL** pra `wss://ws.valadares.app.br` (3 pontos no código) — quando DNS propagar
+- [ ] **og:image** — criar JPG 1200x630 promo pra preview social
+- [ ] **T4 Spawn Caçadores HL server-side** (~60min) — Hunt em MP visualmente broken
+- [ ] **T2 Regen HP/MP server-side** (~60min) — completa a dívida técnica
+
+#### Médio prazo (ROADMAP_v2.md)
+- [ ] **M4 Dungeons instanciadas** (2-3 sessões) — endgame fresco
+- [ ] **M6 Gold sinks** (~60min cada) — cassino, tinturaria, pet cosmético
+- [ ] **M7 Arena PvP 1v1/3v3** (2 sessões)
+- [ ] **M8 Auction house** (2 sessões)
+
+#### Conteúdo / marketing
+- [ ] **Backlinks**: Reddit, Discord, Twitter, post de gameplay
+- [ ] **Itch.io page** linkando pra `valadares.app.br`
+- [ ] **Adicionar Website link** no repo GitHub (`acapires-stack/valadares`)
+
+### 🧪 Coisas a TESTAR amanhã (depois do deploy de tudo)
+
+1. **Login no jogo** — confirmar que tabs CHAT/COMBATE estão invertidas
+2. **NPC Banqueiro** em (52,50) — clica e abre loja de gold MP
+3. **Cosmético equipável** — equipa Capa do Cético/Aura via inv
+4. **Tecla K** abre modal de Talentos — comprar um talent
+5. **Tecla L** → aba TEMPORADA — ver leaderboard mensal
+6. **Quest reward** — completar uma daily ou simples, ver gold creditado pelo server
+7. **Mobile** — abrir `valadares.app.br/jogar` no celular, testar joystick + botões
+8. **Cheat test** (F12 → Console): `player.skills.Espada.val = 200` — matar um mob → server reescreve pro valor real
+
+### 🔐 Estado de segurança final
+
+| Vetor | Status |
+|---|---|
+| Forjar gold via F12 | ❌ Server lockdown |
+| Forjar inv via F12 | ❌ Server lockdown |
+| Forjar equipped/chests via F12 | ❌ Server lockdown |
+| Forjar skills via F12 | ❌ Server lockdown (T3 completo) |
+| Forjar quest reward | ❌ Server validation |
+| Forjar webhook MP | ❌ HMAC validation |
+| Dobrar gold de Chuva de Ouro | ❌ Bug fix |
+| Cheat XP de mob kill | ❌ T1 server-side |
+| Cheat XP de magia | ❌ Server handler `spellCast` |
+| Cheat XP de treino | ❌ Server handler `trainAttempt` |
+
+**Praticamente nada relevante pra progressão é editável no F12 mais.**
+
+---
+
 ## 📅 Sessão 27/05/2026 (noite N3 fase 3 + QoL)
 
 Sessão grande: fechou **fase 3 do Hardening** (lockdown total de gold/inv server-side), além de várias melhorias de QoL e segurança.
