@@ -2661,8 +2661,9 @@ function drawGroundItem(it, px, py){
     // sombra
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.beginPath(); ctx.ellipse(cx, cy+8, 8, 3, 0, 0, Math.PI*2); ctx.fill();
-    // brilho pulsante
-    const glow = 8 + Math.sin(itemPulse + it.id) * 3;
+    // brilho pulsante (it.id pode ser string 'g123' do server ou number local — extrai num)
+    const idNum = typeof it.id === 'number' ? it.id : (parseInt(String(it.id).replace(/\D/g, ''), 10) || 0);
+    const glow = 8 + Math.sin(itemPulse + idNum) * 3;
     const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, glow);
     g.addColorStop(0, def.color);
     g.addColorStop(0.6, def.color+'88');
