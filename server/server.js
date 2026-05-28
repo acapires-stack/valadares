@@ -1522,6 +1522,17 @@ function tickAI(){
         if (td <= 1){
             if (now - m.lastAttackAt >= ATTACK_CD_MS){
                 m.lastAttackAt = now;
+                // Grace period: primeiros 10s após connect player é imune (dano=0).
+                // Protege contra death durante reconnect (deploy do server, rede oscilando).
+                // Mob continua tickando AI normalmente — só não aplica dano.
+                const graceLeft = 10000 - (now - (target.connectedAt || 0));
+                if (graceLeft > 0){
+                    // Anima ataque do mob (cliente vê o swing) mas sem dano
+                    if (target.ws && target.ws.readyState === 1){
+                        try { target.ws.send(JSON.stringify({ t:'mobHit', mobId: m.id, amount: 0, actual: 0, immune: true })); } catch {}
+                    }
+                    continue;
+                }
                 // T2: dano aplicado server-side com defesa percentual (espelha cliente).
                 // Cliente recebe mobHit pra FX + recebe pstats com hp novo.
                 const def = totalDefenseServer(target);
@@ -2542,6 +2553,13 @@ function tickImpostorBot(){
     // Atacar player adjacente
     if (target && bestD <= 1 && now - impostorBot._lastAttackAt > 900){
         impostorBot._lastAttackAt = now;
+        // Grace: 007 não bate em alvo recém-conectado (10s)
+        if (now - (target.connectedAt || 0) < 10000){
+            if (target.ws && target.ws.readyState === 1){
+                try { target.ws.send(JSON.stringify({ t:'pvpHit', from: impostorBot.id, fromName: BOT_NAME, amount: 0, actual: 0, immune: true })); } catch {}
+            }
+            return;
+        }
         const def = totalDefenseServer(target);
         const reduction = def > 0 ? def / (def + 30) : 0;
         const actual = Math.max(1, Math.round(BOT_DAMAGE * (1 - reduction)));

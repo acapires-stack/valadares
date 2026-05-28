@@ -753,48 +753,78 @@
         }
         #loadingOverlay .reconnect-title   { color: #ffd060; text-shadow: 0 0 14px rgba(255,200,60,0.5); }
 
-        /* Overlay de reconexão */
+        /* Overlay de reconexão — modo discreto por padrão (chip canto), vira
+           fullscreen vermelho só se demorar muito (>15s) via classe .grave */
         #reconnectOverlay {
-            position: fixed; inset: 0;
-            background: rgba(20,8,8,0.78);
+            position: fixed; top: 12px; right: 12px;
             display: none;
-            align-items: center; justify-content: center;
             z-index: 500;
+            pointer-events: none;
+        }
+        #reconnectOverlay.grave {
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(20,8,8,0.78);
+            display: flex !important;
+            align-items: center; justify-content: center;
             backdrop-filter: blur(3px);
+            pointer-events: auto;
         }
         .reconnect-box {
             background: linear-gradient(180deg, #2a1010 0%, #150505 100%);
+            border: 1px solid #6a3030;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+            padding: 8px 14px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Consolas', monospace;
+        }
+        #reconnectOverlay.grave .reconnect-box {
             border: 2px solid #cc3030;
             box-shadow: 0 0 80px rgba(204,48,48,0.45), 0 8px 30px rgba(0,0,0,0.8);
             padding: 32px 48px;
             text-align: center;
-            border-radius: 4px;
             min-width: 380px;
+            display: block;
         }
         .reconnect-spinner {
-            font-size: 48px;
+            font-size: 16px;
             color: #ff8060;
             animation: spin 2s linear infinite;
             display: inline-block;
+        }
+        #reconnectOverlay.grave .reconnect-spinner {
+            font-size: 48px;
             text-shadow: 0 0 20px rgba(255,128,96,0.6);
         }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .reconnect-title {
             color: #ff8060;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+        #reconnectOverlay.grave .reconnect-title {
             font-family: 'Cinzel', Georgia, serif;
             font-size: 22px;
             letter-spacing: 6px;
             font-weight: 700;
             margin: 14px 0 8px;
             text-shadow: 0 0 14px rgba(255,128,96,0.5);
+            display: block;
         }
-        .reconnect-desc {
+        .reconnect-desc, .reconnect-hint { display: none; }
+        #reconnectOverlay.grave .reconnect-desc {
+            display: block;
             color: #d4cba8;
             font-size: 13px;
             margin-bottom: 4px;
             letter-spacing: 0.5px;
         }
-        .reconnect-hint {
+        #reconnectOverlay.grave .reconnect-hint {
+            display: block;
             color: #998040;
             font-size: 10.5px;
             letter-spacing: 1px;
@@ -6270,10 +6300,23 @@ function scheduleReconnect(){
     }, delay);
 }
 
+let _reconnectGraveTimer = null;
 function showReconnectOverlay(show){
     const el = document.getElementById('reconnectOverlay');
     if (!el) return;
-    el.style.display = show ? 'flex' : 'none';
+    if (show){
+        el.style.display = 'flex';
+        // Após 15s de tentativa, escalona pra modo "grave" (fullscreen vermelho).
+        // Reconexões rápidas (<15s) ficam só com o chip discreto no canto.
+        if (_reconnectGraveTimer) clearTimeout(_reconnectGraveTimer);
+        _reconnectGraveTimer = setTimeout(() => {
+            if (el.style.display !== 'none') el.classList.add('grave');
+        }, 15000);
+    } else {
+        el.style.display = 'none';
+        el.classList.remove('grave');
+        if (_reconnectGraveTimer){ clearTimeout(_reconnectGraveTimer); _reconnectGraveTimer = null; }
+    }
 }
 
 // Anti-exploit: jogador estava em modo online (server-auth) e a conexão caiu?
