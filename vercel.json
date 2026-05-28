@@ -1,4 +1,12 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "valadares-xi.vercel.app" }],
+      "destination": "https://valadares.app.br/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/jogar", "destination": "/play.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
