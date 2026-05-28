@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/jogar", "destination": "/play.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)\\.html",
@@ -8,6 +11,12 @@
     },
     {
       "source": "/",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/jogar",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]

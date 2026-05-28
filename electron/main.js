@@ -14,7 +14,7 @@ try {
     console.warn('[updater] electron-updater não disponível em dev.');
 }
 
-const SITE_URL = 'https://valadares-xi.vercel.app';
+const SITE_URL = 'https://valadares.app.br/jogar';
 
 const IS_DEV = !app.isPackaged;
 
