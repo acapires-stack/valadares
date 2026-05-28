@@ -191,6 +191,10 @@
             <input id="actText" placeholder="mensagem" maxlength="200">
             <button onclick="doSay()">enviar</button>
         </div>
+        <div class="action-row">
+            <label>eventos</label>
+            <button onclick="doSpawn007()">spawn 007 agora</button>
+        </div>
         <div id="actResult" style="margin-top:10px;font-size:11px;color:#888;min-height:20px"></div>
     </section>
 
@@ -373,6 +377,19 @@ async function doSay(){
         const data = await res.json();
         setResult('Broadcast: ' + JSON.stringify(data));
         document.getElementById('actText').value = '';
+    } catch (e){ setResult('Erro: ' + e.message); }
+}
+async function doSpawn007(){
+    if (!confirm('Spawnar Agente 007 agora?')) return;
+    try {
+        const res = await fetch(apiBase() + '/api/admin/action?token=' + encodeURIComponent(token), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind: 'spawn007' }),
+        });
+        const data = await res.json();
+        setResult('007: ' + JSON.stringify(data));
+        refreshNow();
     } catch (e){ setResult('Erro: ' + e.message); }
 }
 function setResult(msg){

@@ -245,6 +245,10 @@ async function handleHttpRequest(req, res){
                 }
                 return httpJson(res, 200, { ok: kicked, target });
             }
+            if (kind === 'spawn007'){
+                spawnImpostorBot();
+                return httpJson(res, 200, { ok: !!impostorBot, alive: !!impostorBot });
+            }
             return httpJson(res, 400, { error:'unknown_kind' });
         } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
     }
@@ -502,6 +506,8 @@ const ITEM_META = {
     POTION_MP:{ kind:'potion', manaheal:50 },
     CARNE_LAGARTO: { kind:'food', heal:35 },
     BENCAO_FENIX:  { kind:'blessing' },
+    // Bênção temporária — entregue só pela morte do 007. Some 24h depois.
+    BENCAO_FENIX_TEMP: { kind:'blessing', tempTtlMs: 24 * 3600 * 1000 },
     // mats
     SILK:{kind:'mat'}, ASA_MORCEGO:{kind:'mat'}, OSSO:{kind:'mat'}, CHIFRE:{kind:'mat'},
     ESCAMA:{kind:'mat'}, GARRA:{kind:'mat'}, PEDRA_GOLEM:{kind:'mat'}, ESSENCIA:{kind:'mat'},
@@ -2442,6 +2448,161 @@ setInterval(tickAI, TICK_AI_MS);
 setInterval(broadcastMobs, SNAPSHOT_MS);
 setInterval(tickRespawns, 1000);
 
+// ─── Bot 007 — caça ao impostor ────────────────────────────────────────
+// Player virtual no Map de players. Anda random, ataca players adjacentes,
+// HP alto pra exercitar combate. Recompensa pra quem matar: 5k gold +
+// Bênção da Fênix temporária (24h). Spawn a cada 1h.
+const BOT_NAME = '007';
+const BOT_HP_MAX = 12000;
+const BOT_DAMAGE = 90;
+const BOT_DEFENSE = 60;
+const BOT_DURATION_MS = 5 * 60 * 1000;
+const BOT_SPAWN_INTERVAL_MS = 60 * 60 * 1000;
+const BOT_REWARD_GOLD = 5000;
+const BOT_BENCAO_TTL_MS = 24 * 3600 * 1000;
+const BOT_NULL_WS = { readyState: 3, send: () => {} };
+let impostorBot = null;
+
+function spawnImpostorBot(){
+    if (impostorBot) return;
+    let x, y, tries = 0;
+    do {
+        x = 8 + Math.floor(Math.random() * (M_W - 16));
+        y = 8 + Math.floor(Math.random() * (M_H - 16));
+        tries++;
+    } while ((inSafe(x, y) || !canWalk(x, y)) && tries < 200);
+    if (tries >= 200){ console.warn('[007] não achou pos walkable'); return; }
+    const id = nextId++;
+    impostorBot = {
+        id, name: BOT_NAME,
+        x, y, dir:'down',
+        hp: BOT_HP_MAX, maxHp: BOT_HP_MAX, mp:0, maxMp:0,
+        gold:0, inv:{}, equipped:{ weapon:'SABRE', armor:'ARMADURA', cape:null }, chests:{},
+        cosmetic:null, badges:['007'], skills:{}, talents:{}, permaBuffs:{},
+        ws: BOT_NULL_WS,
+        _isBot: true,
+        pvp: true,
+        spawnedAt: Date.now(),
+        _lastMoveAt: 0, _lastAttackAt: 0,
+        connectedAt: Date.now(),
+    };
+    players.set(id, impostorBot);
+    counters.connections_total++;
+    broadcast(null, { t:'join', player: {
+        id, name: BOT_NAME, x, y, dir:'down', pvp:true,
+        hp: BOT_HP_MAX, maxHp: BOT_HP_MAX,
+        equipped: impostorBot.equipped, cosmetic:null, badges:['007'],
+        guild: null,
+    }});
+    broadcastMsg('event', `⚡ O Agente 007 surgiu em Valadares (${x},${y})! Recompensa: ${BOT_REWARD_GOLD}g + Bênção da Fênix (24h) pra quem derrotar!`);
+    recordError({ kind:'bot_spawn', player: BOT_NAME, msg:`spawn em (${x},${y})`, meta:{ id, hp: BOT_HP_MAX } });
+    console.log(`[007] spawn id=${id} em (${x},${y})`);
+}
+
+function tickImpostorBot(){
+    if (!impostorBot) return;
+    if (impostorBot.hp <= 0){ despawnImpostorBot('killed'); return; }
+    const now = Date.now();
+    if (now - impostorBot.spawnedAt > BOT_DURATION_MS){ despawnImpostorBot('timeout'); return; }
+    // Persegue player mais próximo se algum tiver em raio 8; senão move random
+    let target = null, bestD = 999;
+    for (const pp of players.values()){
+        if (pp._isBot || pp.disconnected || (pp.hp ?? 100) <= 0) continue;
+        const d = chebyshev(pp.x, pp.y, impostorBot.x, impostorBot.y);
+        if (d < bestD){ bestD = d; target = pp; }
+    }
+    if (now - impostorBot._lastMoveAt > 700){
+        impostorBot._lastMoveAt = now;
+        let dx = 0, dy = 0;
+        if (target && bestD <= 12 && bestD > 1){
+            dx = Math.sign(target.x - impostorBot.x);
+            dy = Math.sign(target.y - impostorBot.y);
+            if (dx !== 0 && dy !== 0){ if (Math.random() < 0.5) dx = 0; else dy = 0; }
+        } else {
+            const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+            [dx, dy] = dirs[Math.floor(Math.random()*4)];
+        }
+        const nx = impostorBot.x + dx, ny = impostorBot.y + dy;
+        if ((dx || dy) && canWalk(nx, ny) && !inSafe(nx, ny)){
+            // Não pisa em cima de outro player
+            let blocked = false;
+            for (const pp of players.values()){
+                if (pp.id === impostorBot.id) continue;
+                if (pp.x === nx && pp.y === ny){ blocked = true; break; }
+            }
+            if (!blocked){
+                impostorBot.x = nx; impostorBot.y = ny;
+                if (dy < 0) impostorBot.dir = 'up';
+                else if (dy > 0) impostorBot.dir = 'down';
+                else if (dx < 0) impostorBot.dir = 'left';
+                else impostorBot.dir = 'right';
+            }
+        }
+    }
+    // Atacar player adjacente
+    if (target && bestD <= 1 && now - impostorBot._lastAttackAt > 900){
+        impostorBot._lastAttackAt = now;
+        const def = totalDefenseServer(target);
+        const reduction = def > 0 ? def / (def + 30) : 0;
+        const actual = Math.max(1, Math.round(BOT_DAMAGE * (1 - reduction)));
+        target.hp = Math.max(0, (target.hp || 100) - actual);
+        broadcastPstatsAll(target);
+        broadcast(null, { t:'float', id: target.id, text:`-${actual}`, color:'#ff3030', big:true });
+        if (target.ws && target.ws.readyState === 1){
+            try { target.ws.send(JSON.stringify({ t:'pvpHit', from: impostorBot.id, fromName: BOT_NAME, amount: BOT_DAMAGE, actual })); } catch {}
+        }
+        if (target.hp === 0){
+            broadcastMsg('warn', `💀 O Agente 007 derrotou ${target.name}!`);
+        }
+    }
+}
+
+function killImpostorBot(killer){
+    if (!impostorBot) return;
+    killer.gold = (killer.gold || 0) + BOT_REWARD_GOLD;
+    if (typeof syncGoldRank === 'function') syncGoldRank(killer.name, killer.gold);
+    incInv(killer, 'BENCAO_FENIX_TEMP', 1);
+    // Marca expiry pra cleanup futuro
+    killer._bencaoTempExpiry = (killer._bencaoTempExpiry || []);
+    killer._bencaoTempExpiry.push(Date.now() + BOT_BENCAO_TTL_MS);
+    sendInvUpdate(killer, { goldDelta:{ amount: BOT_REWARD_GOLD, reason:'bot_007' }, bot007Kill:true });
+    broadcastMsg('event', `⚡ ${killer.name} DERROTOU o Agente 007! +${BOT_REWARD_GOLD}g + Bênção 24h.`);
+    recordError({ kind:'bot_kill', player: killer.name, msg:'killed 007', meta:{ killerId: killer.id } });
+    despawnImpostorBot('killed', killer.name);
+}
+
+function despawnImpostorBot(reason, byName){
+    if (!impostorBot) return;
+    const id = impostorBot.id;
+    players.delete(id);
+    impostorBot = null;
+    broadcast(null, { t:'leave', id });
+    if (reason === 'timeout'){
+        broadcastMsg('info', `O Agente 007 desapareceu. Ninguém conseguiu detê-lo a tempo.`);
+    }
+    console.log(`[007] despawn (${reason}${byName?' por '+byName:''})`);
+}
+
+// Cleanup de bênções temp expiradas (1 tick/min). Remove do inv quando expira.
+function tickBencaoTempCleanup(){
+    const now = Date.now();
+    for (const pp of players.values()){
+        if (pp._isBot || !pp._bencaoTempExpiry || !pp._bencaoTempExpiry.length) continue;
+        const before = pp._bencaoTempExpiry.length;
+        pp._bencaoTempExpiry = pp._bencaoTempExpiry.filter(ts => ts > now);
+        const expired = before - pp._bencaoTempExpiry.length;
+        if (expired > 0 && pp.inv && pp.inv.BENCAO_FENIX_TEMP){
+            pp.inv.BENCAO_FENIX_TEMP = Math.max(0, pp.inv.BENCAO_FENIX_TEMP - expired);
+            if (pp.inv.BENCAO_FENIX_TEMP <= 0) delete pp.inv.BENCAO_FENIX_TEMP;
+            sendInvUpdate(pp, { bencaoExpired: expired });
+        }
+    }
+}
+
+setInterval(tickImpostorBot, 250);
+setInterval(spawnImpostorBot, BOT_SPAWN_INTERVAL_MS);
+setInterval(tickBencaoTempCleanup, 60 * 1000);
+
 // Resolve a morte de um mob (extração da lógica do attackMob handler) —
 // reutilizado pra mortes por DoT (veneno/sangra/fogo).
 function handleMobDeath(m, killerId){
@@ -4012,7 +4173,9 @@ wss.on('connection', (ws) => {
             if (!tgt) return;
             // Duelo consensual: permite ataque mesmo sem PvP toggle, se for o oponente
             const inDuel = p.duel && p.duel.opponentId === tgt.id && tgt.duel && tgt.duel.opponentId === id;
-            if (!inDuel){
+            // Bot 007 — qualquer player pode atacar sem precisar de PvP toggle
+            const isBotTarget = !!tgt._isBot;
+            if (!inDuel && !isBotTarget){
                 if (!p.pvp) return;
                 if (!tgt.pvp && !tgt.disconnected) return;   // se vivo, precisa estar com PvP
             }
@@ -4060,17 +4223,27 @@ wss.on('connection', (ws) => {
             // Fase 5: dano de PvP aplicado server-side com defesa percentual
             // (espelha cliente). pvpHit ainda é mandado pra FX/log/pkDeathBy
             // detection, mas com `actual` pra cliente NÃO aplicar local.
-            const def = totalDefenseServer(tgt);
+            // Bot 007 — defesa fixa, sem buffs aleatórios. E NÃO chama broadcastPstatsAll
+            // (bot não tem ws e a função tenta enviar pros outros — usa broadcast direto)
+            const def = isBotTarget ? BOT_DEFENSE : totalDefenseServer(tgt);
             const reduction = def > 0 ? def / (def + 30) : 0;
             const actual = Math.max(1, Math.round(amount * (1 - reduction)));
             if ((tgt.hp ?? 100) > 0){
                 tgt.hp = Math.max(0, (tgt.hp ?? 100) - actual);
-                broadcastPstatsAll(tgt);
+                if (isBotTarget){
+                    broadcast(null, { t:'pstats', id: tgt.id, hp: tgt.hp, maxHp: tgt.maxHp, mp: 0, maxMp: 0, cosmetic: null, equipped: tgt.equipped, badges: tgt.badges || [] });
+                } else {
+                    broadcastPstatsAll(tgt);
+                }
             }
-            if (tgt.ws.readyState === 1){
+            if (!isBotTarget && tgt.ws.readyState === 1){
                 tgt.ws.send(JSON.stringify({ t:'pvpHit', from:id, fromName:p.name, amount, actual }));
             }
             broadcast(id, { t:'float', id:msg.targetId, text:`-${actual}`, color:'#ff3030', big:true });
+            // Detecção morte do bot 007
+            if (isBotTarget && tgt.hp === 0){
+                killImpostorBot(p);
+            }
             return;
         }
 
@@ -4979,6 +5152,11 @@ wss.on('connection', (ws) => {
                         return;
                     }
                     sendTo(id, { t:'serverMsg', level:'info', text:`Conta ${res.name} removida${res.kicked ? ' (estava online — desconectado)' : ''}.` });
+                    return;
+                }
+                if (cmd === '/spawn007' || cmd === '/spawnimpostor'){
+                    spawnImpostorBot();
+                    sendTo(id, { t:'serverMsg', level:'info', text: impostorBot ? '007 spawnado.' : 'Falhou ao spawnar 007 (já existe ou sem pos walkable).' });
                     return;
                 }
                 if (cmd === '/checkuser'){
