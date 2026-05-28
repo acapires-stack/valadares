@@ -456,6 +456,121 @@ const RECIPES = [
     { out:'COROA_VENDEDOR', in:{ ELMO_DRACO:1, CORACAO_HL:1, ESCAMA:3, CHIFRE:2 } },
 ];
 
+// ─── QUESTS (N3 fase 3) ──────────────────────────────────────────────────
+// Espelhadas do cliente (play.html). Só os campos que o server precisa pra validar
+// turn-in e calcular reward: kind, type/items/count, reward, choices.
+const QUESTS = [
+    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:10 }, reward:{ gold:50,  xp:{Punho:100} } },
+    { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80,  xp:{Espada:100} } },
+    { id:'q_seda',   goal:{ kind:'item', type:'SILK',      count:5  }, reward:{ gold:200 } },
+    { id:'q_orcs',   goal:{ kind:'mob',  type:'ORC',       count:3  }, reward:{ gold:300, xp:{Espada:50,Machado:50,Clava:50} } },
+    { id:'q_lider',  goal:{ kind:'mob',  type:'ORC_LIDER', count:1  }, reward:{ gold:500 } },
+];
+const QUESTS_BY_ID = Object.fromEntries(QUESTS.map(q => [q.id, q]));
+
+const QUEST_CHAINS = {
+    cripta: {
+        npc:'eremita',
+        stages: [
+            { id:'cr1', kind:'visit',     reward:{ gold:80,  xp:{Magia:50} } },
+            { id:'cr2', kind:'item',      type:'OSSO',     count:8,  reward:{ gold:200, xp:{Magia:80} } },
+            { id:'cr3', kind:'mob',       type:'SKELETON', count:10, reward:{ gold:400, xp:{Magia:150}, item:{OSSO:5} } },
+            { id:'cr4', kind:'mob',       type:'MINOTAUR', count:1,  reward:{ gold:800, xp:{Magia:200}, item:{POTION_MP:5}, flag:'flag_vendedor_revealed' } },
+        ],
+    },
+    forja: {
+        npc:'ferreiro',
+        stages: [
+            { id:'fj1', kind:'multiItem', items:{ PEDRA_GOLEM:5, CHIFRE:5 }, reward:{ gold:300 } },
+            { id:'fj2', kind:'item',      type:'SILK',  count:10, reward:{ gold:250 } },
+            { id:'fj3', kind:'mob',       type:'GOLEM', count:5,  reward:{ gold:600, item:{MACHADO_MINO:1}, xp:{Machado:200} } },
+        ],
+    },
+    drake: {
+        npc:'cacadora',
+        stages: [
+            { id:'dr1', kind:'mob',  type:'DRAKE',       count:5, reward:{ gold:400,  xp:{'Distância':150} } },
+            { id:'dr2', kind:'item', type:'ESCAMA',      count:8, reward:{ gold:600,  xp:{'Distância':120} } },
+            { id:'dr3', kind:'mob',  type:'DRAKE_LIDER', count:1, reward:{ gold:1500, item:{ELMO_DRACO:1, CORACAO_HL:1}, xp:{'Distância':300} } },
+        ],
+    },
+    mina: {
+        npc:'mineiro',
+        stages: [
+            { id:'mn1', kind:'multiItem', items:{ HAM:3, POTION:3 }, reward:{ gold:200, xp:{Punho:50} } },
+            { id:'mn2', kind:'mob',  type:'BAT',       count:10, reward:{ gold:300,  xp:{'Distância':100} } },
+            { id:'mn3', kind:'mob',  type:'GOLEM_REI', count:1,  reward:{ gold:1500, item:{PEDRA_GOLEM:10}, xp:{Clava:250} } },
+        ],
+    },
+    vohrim: {
+        npc:'vohrim',
+        stages: [
+            { id:'vh1', kind:'multiItem', items:{ SILK:5, OSSO:3 }, reward:{ gold:500, xp:{Magia:50} } },
+            { id:'vh2', kind:'mob',   type:'SPIDER',     count:5, reward:{ gold:600, xp:{Espada:80} } },
+            { id:'vh3', kind:'visit', reward:{ gold:800, xp:{'Distância':80} } },
+            { id:'vh4', kind:'item',  type:'CORACAO_HL', count:1, reward:{ gold:200 } },
+            { id:'vh5', kind:'choice', choices: [
+                { reward:{ item:{COROA_SOMBRIA:1}, gold:5000, flag:'flag_vohrim_traitor' } },
+                { reward:{ item:{MANTO_JUSTO:1},  gold:8000, xp:{Espada:100,Magia:100,Escudo:100}, flag:'flag_vohrim_exposed' } },
+            ]},
+        ],
+    },
+    crepusculo: {
+        npc:'crepusculo',
+        stages: [
+            { id:'cp1', kind:'mob',       type:'SNAKE', count:25, reward:{ gold:150, xp:{Espada:80} } },
+            { id:'cp2', kind:'multiItem', items:{ ESCAMA:5, PEDRA_GOLEM:3 }, reward:{ gold:400, xp:{Magia:120} } },
+            { id:'cp3', kind:'mob',       type:'DRAKE', count:3, reward:{ gold:600, xp:{'Distância':200}, item:{POTION_MP:5} } },
+            { id:'cp4', kind:'choice', choices: [
+                { reward:{ item:{AURA_VIDENTE:1}, permaBuff:{dodgeBonus:0.05}, gold:500 } },
+                { reward:{ item:{CAPA_CETICO:1}, gold:3000 } },
+            ]},
+        ],
+    },
+    vendedor: {
+        npc:'vendedor',
+        stages: [
+            { id:'vd1', kind:'item', type:'CORACAO_HL', count:2, reward:{ gold:0 } },
+            { id:'vd2', kind:'choice', choices: [
+                { reward:{ item:{COROA_VENDEDOR:1}, gold:500 } },
+                { reward:{ permaBuff:{xpBonus:0.05}, gold:2000, flag:'flag_vendedor_killed' } },
+            ]},
+        ],
+    },
+};
+
+// Daily quests — pool espelhado do cliente. Server valida (kind, type, count) bate
+// com alguma entry do pool e usa a reward DA TABELA (não do save) pra impedir
+// adulteração via F12 (player.quests.daily.list[N].reward.gold = 99999).
+const DAILY_POOL = [
+    { kind:'mob',  type:'RAT',        count:25, gold:200,  xp:{Punho:80} },
+    { kind:'mob',  type:'SNAKE',      count:15, gold:250,  xp:{Espada:80} },
+    { kind:'mob',  type:'SPIDER',     count:12, gold:300,  xp:{'Distância':60} },
+    { kind:'mob',  type:'WOLF',       count:10, gold:450,  xp:{Machado:100} },
+    { kind:'mob',  type:'ORC',        count:8,  gold:600,  xp:{Espada:80, Machado:80} },
+    { kind:'mob',  type:'SKELETON',   count:10, gold:500,  xp:{Clava:100} },
+    { kind:'mob',  type:'BAT',        count:15, gold:400,  xp:{'Distância':80} },
+    { kind:'mob',  type:'TROLL',      count:6,  gold:700,  xp:{Machado:120} },
+    { kind:'mob',  type:'LIZARD',     count:8,  gold:500,  xp:{'Distância':90} },
+    { kind:'mob',  type:'SCORPION',   count:6,  gold:600,  xp:{'Distância':100} },
+    { kind:'mob',  type:'DRAKE',      count:4,  gold:900,  xp:{Espada:120, Magia:60} },
+    { kind:'mob',  type:'GOLEM',      count:4,  gold:900,  xp:{Clava:120} },
+    { kind:'mob',  type:'MINOTAUR',   count:3,  gold:1000, xp:{Machado:150} },
+    { kind:'mob',  type:'ORC_LIDER',  count:1,  gold:1200, xp:{Espada:150, Machado:150} },
+    { kind:'mob',  type:'DRAKE_LIDER',count:1,  gold:1800, xp:{Espada:200, Magia:200} },
+    { kind:'mob',  type:'GOLEM_REI',  count:1,  gold:1800, xp:{Clava:200} },
+    { kind:'item', type:'SILK',         count:10, gold:300 },
+    { kind:'item', type:'OSSO',         count:15, gold:400 },
+    { kind:'item', type:'CHIFRE',       count:6,  gold:600 },
+    { kind:'item', type:'GARRA',        count:8,  gold:500 },
+    { kind:'item', type:'ESCAMA',       count:5,  gold:800 },
+    { kind:'item', type:'PEDRA_GOLEM',  count:5,  gold:800 },
+    { kind:'item', type:'ASA_MORCEGO',  count:10, gold:400 },
+];
+function findDailyPoolEntry(kind, type, count){
+    return DAILY_POOL.find(d => d.kind === kind && d.type === type && d.count === count) || null;
+}
+
 // Shop (Mercador em 52,49) — espelho de SHOP_BUY do cliente
 const SHOP_BUY = [
     { item:'POTION',    price:50 },
@@ -508,6 +623,59 @@ function sendInvUpdate(p, extra){
     const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null };
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
+}
+
+// XP de skill server-side (espelha gainSkillXp do cliente).
+// Aplica permaBuff.xpBonus e nivela (sk.val++, xpNext *= 1.15).
+function gainSkillXpServer(p, name, amount){
+    if (!p.skills) p.skills = {};
+    const sk = p.skills[name]; if (!sk) return;
+    let amt = amount | 0;
+    const bonus = p.permaBuffs?.xpBonus || 0;
+    if (bonus > 0) amt = Math.round(amt * (1 + bonus));
+    sk.xp = (sk.xp || 0) + amt;
+    while (sk.xp >= (sk.xpNext || 50)){
+        sk.xp -= sk.xpNext;
+        sk.val = (sk.val || 10) + 1;
+        sk.xpNext = Math.floor((sk.xpNext || 50) * 1.15);
+    }
+}
+
+// Aplica uma reward de quest (espelha applyReward do cliente).
+// Retorna delta {gold, items{}, xp{}, flag, permaBuffs{}} pro cliente exibir floats.
+function applyQuestReward(p, reward){
+    const delta = { gold:0, items:{}, xp:{}, flag:null, permaBuffs:{} };
+    if (!reward) return delta;
+    if (reward.gold){ p.gold = (p.gold || 0) + reward.gold; delta.gold = reward.gold; }
+    if (reward.xp){
+        for (const [s, v] of Object.entries(reward.xp)){
+            gainSkillXpServer(p, s, v);
+            delta.xp[s] = v;
+        }
+    }
+    if (reward.item){
+        for (const [k, n] of Object.entries(reward.item)){
+            incInv(p, k, n);
+            delta.items[k] = n;
+        }
+    }
+    if (reward.flag){
+        p.flags = p.flags || {};
+        p.flags[reward.flag] = true;
+        delta.flag = reward.flag;
+    }
+    if (reward.permaBuff){
+        p.permaBuffs = p.permaBuffs || {};
+        for (const [k, v] of Object.entries(reward.permaBuff)){
+            p.permaBuffs[k] = (p.permaBuffs[k] || 0) + v;
+            delta.permaBuffs[k] = v;
+        }
+    }
+    return delta;
+}
+
+function isAdjacentTo(p, npc){
+    return npc && Math.max(Math.abs(p.x - npc.x), Math.abs(p.y - npc.y)) <= 1;
 }
 
 // Slot derivado do tipo de item (espelha SLOT_OF_KIND do cliente)
@@ -655,14 +823,27 @@ const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 
 // Posições dos NPCs (espelhadas do cliente). Mob não ataca player adjacente a NPC (mini-PZ raio 2).
 // Mantém aqui no server porque cliente é dono dos NPCs (não precisa sincronizar tudo).
+// Também usado pelo questTurnIn pra validar adjacência no momento da entrega.
+const QUEST_NPCS = {
+    atendente:  { x:52, y:51 },
+    eremita:    { x:22, y:22 },
+    ferreiro:   { x:78, y:22 },
+    cacadora:   { x:76, y:78 },
+    mineiro:    { x:66, y:90 },
+    crepusculo: { x:28, y:75 },
+    vohrim:     { x:15, y:50 },
+    vendedor:   { x:75, y:20 },
+};
 const NPC_POSITIONS = [
     { x:52, y:49 },  // mercador
-    { x:52, y:51 },  // atendente
-    { x:22, y:22 },  // eremita
-    { x:78, y:22 },  // ferreiro
-    { x:76, y:78 },  // caçadora
-    { x:66, y:90 },  // mineiro
-    { x:75, y:20 },  // vendedor (hidden, mas dá proteção mesmo assim)
+    QUEST_NPCS.atendente,
+    QUEST_NPCS.eremita,
+    QUEST_NPCS.ferreiro,
+    QUEST_NPCS.cacadora,
+    QUEST_NPCS.mineiro,
+    QUEST_NPCS.crepusculo,
+    QUEST_NPCS.vohrim,
+    QUEST_NPCS.vendedor,
 ];
 const NPC_PROTECT_RADIUS = 1;   // 3×3 ao redor do NPC (suficiente pra ler modal)
 const NPC_PROTECT_COMBAT_GRACE_MS = 2000;   // ao atacar, perde proteção por 2s
@@ -2347,6 +2528,19 @@ wss.on('connection', (ws) => {
                     }
                 }
             }
+            // N3 fase 3: quest state também passa server-side. Cliente continua a fonte
+            // até lockdown total; aqui só sincroniza pra o handler questTurnIn validar.
+            if (data.skills && typeof data.skills === 'object') p.skills = data.skills;
+            if (data.quests && typeof data.quests === 'object'){
+                p.quests = {
+                    active: (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {},
+                    completed: Array.isArray(data.quests.completed) ? data.quests.completed.slice(0, 200) : [],
+                    daily: (data.quests.daily && typeof data.quests.daily === 'object') ? data.quests.daily : null,
+                };
+            }
+            if (data.questFlags && typeof data.questFlags === 'object') p.questFlags = data.questFlags;
+            if (data.flags && typeof data.flags === 'object') p.flags = data.flags;
+            if (data.permaBuffs && typeof data.permaBuffs === 'object') p.permaBuffs = data.permaBuffs;
             setPlayerSave(p.authedName, data);
             return;
         }
@@ -2380,6 +2574,18 @@ wss.on('connection', (ws) => {
                     }
                 }
                 if (typeof acc.save.gold === 'number') p.gold = acc.save.gold;
+                // N3 fase 3: quest state pro server validar turn-ins
+                if (acc.save.skills && typeof acc.save.skills === 'object') p.skills = acc.save.skills;
+                if (acc.save.quests && typeof acc.save.quests === 'object'){
+                    p.quests = {
+                        active: (acc.save.quests.active && typeof acc.save.quests.active === 'object') ? acc.save.quests.active : {},
+                        completed: Array.isArray(acc.save.quests.completed) ? acc.save.quests.completed.slice(0, 200) : [],
+                        daily: (acc.save.quests.daily && typeof acc.save.quests.daily === 'object') ? acc.save.quests.daily : null,
+                    };
+                }
+                if (acc.save.questFlags && typeof acc.save.questFlags === 'object') p.questFlags = acc.save.questFlags;
+                if (acc.save.flags && typeof acc.save.flags === 'object') p.flags = acc.save.flags;
+                if (acc.save.permaBuffs && typeof acc.save.permaBuffs === 'object') p.permaBuffs = acc.save.permaBuffs;
             } else {
                 if (msg.equipped && typeof msg.equipped === 'object') p.equipped = { ...p.equipped, ...msg.equipped };
             }
@@ -2836,6 +3042,118 @@ wss.on('connection', (ws) => {
                 broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
             }
             return;
+        }
+
+        // ─── N3 fase 3: Quest turn-in server-side ──────────────────────────
+        // Cliente envia { t:'questTurnIn', kind:'simple'|'chain', questId?, chainId?, stageId?, choiceId? }
+        // Server valida (adjacência ao NPC, items, anti-replay) e aplica reward authoritative.
+        // Falha = { t:'questResult', ok:false, reason } pra UI; sucesso reconcilia via invUpdate.
+        if (msg.t === 'questTurnIn') {
+            const reject = (reason) => {
+                if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'questResult', ok:false, reason }));
+            };
+            // Anti-spam: 1 op a cada 400ms
+            const now = Date.now();
+            p._lastQuestAt = p._lastQuestAt || 0;
+            if (now - p._lastQuestAt < 400) return reject('rate_limit');
+            p._lastQuestAt = now;
+
+            const kind = msg.kind;
+            if (kind === 'daily'){
+                // Cliente envia { kind:'daily', dailyId }. Server lê a entry do save do player
+                // (cliente é a fonte da lista do dia), valida no pool, usa reward DA TABELA.
+                if (!isAdjacentTo(p, QUEST_NPCS.atendente)) return reject('not_at_npc');
+                p.quests = p.quests || { active:{}, completed:[] };
+                const daily = p.quests.daily || { list:[], claimed:[] };
+                const dailyId = String(msg.dailyId || '');
+                const entry = (daily.list || []).find(q => q && q.id === dailyId);
+                if (!entry || !entry.goal) return reject('unknown_quest');
+                if ((daily.claimed || []).includes(dailyId)) return reject('already_done');
+                const pool = findDailyPoolEntry(entry.goal.kind, entry.goal.type, entry.goal.count);
+                if (!pool) return reject('bad_daily');   // cliente forjou entry fake
+                // valida items se kind='item'
+                if (pool.kind === 'item' && !hasInv(p, pool.type, pool.count)) return reject('no_items');
+                if (pool.kind === 'item') incInv(p, pool.type, -pool.count);
+                daily.claimed = daily.claimed || [];
+                daily.claimed.push(dailyId);
+                p.quests.daily = daily;
+                const reward = { gold: pool.gold, xp: pool.xp || {} };
+                const delta = applyQuestReward(p, reward);
+                sendInvUpdate(p, {
+                    questResult:{ ok:true, kind:'daily', questId:dailyId, delta },
+                    skills: p.skills, quests: p.quests,
+                });
+                return;
+            }
+            if (kind === 'simple'){
+                const q = QUESTS_BY_ID[String(msg.questId || '')];
+                if (!q) return reject('unknown_quest');
+                if (!isAdjacentTo(p, QUEST_NPCS.atendente)) return reject('not_at_npc');
+                p.quests = p.quests || { active:{}, completed:[] };
+                p.quests.active = p.quests.active || {};
+                p.quests.completed = p.quests.completed || [];
+                if (!p.quests.active[q.id]) return reject('not_active');
+                if (p.quests.completed.includes(q.id)) return reject('already_done');
+                // valida items se a goal pede coleta
+                if (q.goal.kind === 'item' && !hasInv(p, q.goal.type, q.goal.count)) return reject('no_items');
+                // consome items + marca completa
+                if (q.goal.kind === 'item') incInv(p, q.goal.type, -q.goal.count);
+                delete p.quests.active[q.id];
+                p.quests.completed.push(q.id);
+                const delta = applyQuestReward(p, q.reward);
+                sendInvUpdate(p, {
+                    questResult:{ ok:true, kind:'simple', questId:q.id, delta },
+                    skills: p.skills, quests: p.quests,
+                    flags: p.flags || null, permaBuffs: p.permaBuffs || null,
+                });
+                return;
+            }
+            if (kind === 'chain'){
+                const chain = QUEST_CHAINS[String(msg.chainId || '')];
+                if (!chain) return reject('unknown_chain');
+                const npc = QUEST_NPCS[chain.npc];
+                if (!isAdjacentTo(p, npc)) return reject('not_at_npc');
+                const stage = chain.stages.find(s => s.id === String(msg.stageId || ''));
+                if (!stage) return reject('unknown_stage');
+                p.questFlags = p.questFlags || {};
+                p.questFlags[msg.chainId] = p.questFlags[msg.chainId] || {};
+                const progress = p.questFlags[msg.chainId];
+                if (progress[stage.id]) return reject('stage_done');
+                // pre-stages: tudo antes do atual precisa estar completo
+                for (const prev of chain.stages){
+                    if (prev.id === stage.id) break;
+                    if (!progress[prev.id]) return reject('prev_stage_pending');
+                }
+                // valida items
+                if (stage.kind === 'item' && !hasInv(p, stage.type, stage.count)) return reject('no_items');
+                if (stage.kind === 'multiItem'){
+                    for (const [k, n] of Object.entries(stage.items)){
+                        if (!hasInv(p, k, n)) return reject('no_items');
+                    }
+                }
+                // resolve reward (choice pega de stage.choices[choiceId].reward)
+                let reward = stage.reward;
+                if (stage.kind === 'choice'){
+                    const ci = msg.choiceId | 0;
+                    if (!Array.isArray(stage.choices) || !stage.choices[ci]) return reject('bad_choice');
+                    reward = stage.choices[ci].reward;
+                }
+                // consome items
+                if (stage.kind === 'item') incInv(p, stage.type, -stage.count);
+                if (stage.kind === 'multiItem'){
+                    for (const [k, n] of Object.entries(stage.items)) incInv(p, k, -n);
+                }
+                // marca completo
+                progress[stage.id] = true;
+                const delta = applyQuestReward(p, reward);
+                sendInvUpdate(p, {
+                    questResult:{ ok:true, kind:'chain', chainId:msg.chainId, stageId:stage.id, choiceId: msg.choiceId ?? null, delta },
+                    skills: p.skills, questFlags: p.questFlags,
+                    flags: p.flags || null, permaBuffs: p.permaBuffs || null,
+                });
+                return;
+            }
+            return reject('bad_kind');
         }
 
         // ATAQUE A MOB (#10 validado)

@@ -5418,7 +5418,53 @@ function handleMP(msg){
             }
             if (typeof renderShop === 'function') renderShop();
         }
+        // N3 fase 3: quest state autoritativo
+        if (msg.skills && typeof msg.skills === 'object') player.skills = msg.skills;
+        if (msg.quests && typeof msg.quests === 'object'){
+            player.quests.active    = msg.quests.active    || {};
+            player.quests.completed = msg.quests.completed || [];
+        }
+        if (msg.questFlags && typeof msg.questFlags === 'object') player.questFlags = msg.questFlags;
+        if (msg.flags && typeof msg.flags === 'object') player.flags = msg.flags;
+        if (msg.permaBuffs && typeof msg.permaBuffs === 'object') player.permaBuffs = msg.permaBuffs;
+        // Quest reward feedback (gold/xp/items/permaBuffs/flag) via float + log
+        if (msg.questResult && msg.questResult.ok){
+            const d = msg.questResult.delta || {};
+            if (d.gold)  log(`<span class="log-up">+${d.gold}g</span>`);
+            if (d.items) for (const [k, n] of Object.entries(d.items)){
+                const it = ITEMS[k];
+                log(`<span class="log-up">+${n}× ${it ? it.name : k}</span>`);
+            }
+            if (d.flag) log('<span class="log-sys">⚡ Algo mudou no mundo…</span>');
+            if (d.permaBuffs) for (const [k, v] of Object.entries(d.permaBuffs)){
+                log(`<span class="log-up">💎 Buff permanente: ${k} +${(v*100).toFixed(0)}%</span>`);
+            }
+            if (typeof recomputeStats === 'function') recomputeStats();
+            if (typeof renderQuests === 'function') renderQuests();
+            const chainNpc = msg.questResult.chainId && (window.NPCS || []).find(n => n.chain === msg.questResult.chainId);
+            if (chainNpc && typeof renderChainDialog === 'function') renderChainDialog(chainNpc);
+            saveState();
+        }
         // invSignature=null força re-render na próxima frame
+    } else if (msg.t === 'questResult'){
+        // Server rejeitou turn-in. Mostra motivo amigável.
+        const reasons = {
+            rate_limit:'Calma — espere um momento.',
+            unknown_quest:'Quest desconhecida.',
+            unknown_chain:'Cadeia desconhecida.',
+            unknown_stage:'Etapa inválida.',
+            not_at_npc:'Aproxime-se do NPC certo pra entregar.',
+            not_active:'Quest não está ativa.',
+            already_done:'Quest já entregue.',
+            stage_done:'Etapa já concluída.',
+            prev_stage_pending:'Conclua a etapa anterior primeiro.',
+            no_items:'Faltam itens pra entregar.',
+            bad_choice:'Escolha inválida.',
+            bad_kind:'Tipo de quest inválido.',
+            bad_daily:'Recompensa não bate com a tabela diária.',
+        };
+        const text = reasons[msg.reason] || 'Servidor rejeitou a entrega.';
+        log(`<span class="log-sys">⚠ ${text}</span>`);
     } else if (msg.t === 'partyUpdate'){
         if (msg.deleted){
             player._party = null;
@@ -6356,7 +6402,13 @@ function startStage(chainId, stage){
     saveState();
 }
 function completeStage(chainId, stage){
-    // Consome items se for item/multiItem
+    // N3 fase 3: online → server valida + aplica reward. Cliente só dispara intent.
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id })); } catch {}
+        log(`<span class="log-sys">Entregando: ${stage.name}…</span>`);
+        return;
+    }
+    // Offline fallback (single-player)
     if (stage.kind === 'item'){
         const have = player.inv[stage.type] || 0;
         const take = Math.min(have, stage.count);
@@ -6523,6 +6575,13 @@ function isDailyClaimed(id){
 function claimDaily(id){
     const q = questByIdAny(id);
     if (!q || !q.daily || isDailyClaimed(id) || !dailyComplete(id)) return false;
+    // N3 fase 3: online → server autoritativo
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'daily', dailyId:id })); } catch {}
+        log(`<span class="log-sys">Recebendo recompensa: ${q.name}…</span>`);
+        return true;
+    }
+    // Offline fallback
     if (q.goal.kind === 'item'){
         const have = player.inv[q.goal.type] || 0;
         const take = Math.min(have, q.goal.count);
@@ -6562,7 +6621,13 @@ function acceptQuest(id){
 function turnInQuest(id){
     const q = questById(id);
     if (!q || !questIsActive(id) || !questComplete(id)) return false;
-    // consome items se for kind item
+    // N3 fase 3: online → server é a autoridade. Cliente só envia intent + espera invUpdate.
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'simple', questId:id })); } catch {}
+        log(`<span class="log-sys">Entregando: ${q.name}…</span>`);
+        return true;
+    }
+    // Offline fallback (single-player): aplica local como antes.
     if (q.goal.kind === 'item'){
         const have = player.inv[q.goal.type] || 0;
         const take = Math.min(have, q.goal.count);
@@ -8569,6 +8634,13 @@ document.addEventListener('click', e => {
         const idx = parseInt(idxStr, 10);
         const stage = currentChainStage(chainId);
         if (stage && stage.kind === 'choice' && stage.choices[idx]){
+            // N3 fase 3: online → server valida + aplica. Cliente só dispara intent.
+            if (ws && ws.readyState === 1 && _wsAuthed){
+                try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id, choiceId: idx })); } catch {}
+                log(`<span class="log-sys">Decidindo: ${stage.choices[idx].label}…</span>`);
+                return;
+            }
+            // Offline fallback
             applyReward(stage.choices[idx].reward, chainId);
             player.questFlags[chainId] = player.questFlags[chainId] || {};
             player.questFlags[chainId][stage.id] = true;
