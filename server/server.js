@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 
@@ -19,6 +20,10 @@ let mpPreference = null;
 let mpPayment = null;
 const MP_TOKEN = process.env.MP_ACCESS_TOKEN || '';
 const MP_BASE_URL = process.env.MP_BASE_URL || `https://valadares-production.up.railway.app`;
+// Secret do webhook MP — configurado no painel MP em "Webhooks → Configurar notificações → Segredo".
+// Quando setado, valida x-signature de toda chamada em /webhook/mp (HMAC-SHA256). Sem secret = sem validação (modo dev/compat).
+const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || '';
+let _mpSecretWarned = false;
 if (MP_TOKEN){
     try {
         const mercadopago = require('mercadopago');
@@ -77,7 +82,7 @@ async function handleHttpRequest(req, res){
     if (req.method === 'POST' && req.url.startsWith('/webhook/mp')){
         try {
             const body = await readBody(req);
-            return handleMpWebhook(body, req.url, res);
+            return handleMpWebhook(body, req, res);
         } catch (e){ return httpJson(res, 200, { received:true }); }   // sempre 200 pro MP não re-tentar infinito
     }
     return httpJson(res, 404, { error:'not_found' });
@@ -137,7 +142,53 @@ async function handleCreatePix(body, res){
     }
 }
 
-async function handleMpWebhook(body, urlPath, res){
+// Valida assinatura HMAC do webhook MP.
+// Manifest: `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (data.id vem da query string da URL, lowercase).
+// Header x-signature formato: `ts=TIMESTAMP,v1=HEX_HASH`. Retorna { ok, reason }.
+function validateMpSignature(req){
+    if (!MP_WEBHOOK_SECRET){
+        if (!_mpSecretWarned){
+            console.warn('[mp] MP_WEBHOOK_SECRET não configurado — webhook aceita qualquer POST (modo compat).');
+            _mpSecretWarned = true;
+        }
+        return { ok:true, reason:'no_secret' };
+    }
+    const sig = req.headers['x-signature'];
+    const reqId = req.headers['x-request-id'];
+    if (!sig || !reqId){ return { ok:false, reason:'missing_headers' }; }
+    // Parse "ts=...,v1=..."
+    let ts = '', v1 = '';
+    for (const part of String(sig).split(',')){
+        const [k, ...rest] = part.trim().split('=');
+        const v = rest.join('=');
+        if (k === 'ts') ts = v;
+        else if (k === 'v1') v1 = v;
+    }
+    if (!ts || !v1){ return { ok:false, reason:'bad_signature_format' }; }
+    // data.id vem na query string. URL já é relativa (`/webhook/mp?data.id=123&type=payment`).
+    let dataId = '';
+    try {
+        const u = new URL(req.url, 'http://x');
+        dataId = u.searchParams.get('data.id') || '';
+    } catch(_){}
+    if (!dataId){ return { ok:false, reason:'missing_data_id' }; }
+    const manifest = `id:${dataId.toLowerCase()};request-id:${reqId};ts:${ts};`;
+    const expected = crypto.createHmac('sha256', MP_WEBHOOK_SECRET).update(manifest).digest('hex');
+    // timingSafeEqual exige Buffers do mesmo tamanho
+    const a = Buffer.from(expected, 'utf8');
+    const b = Buffer.from(v1, 'utf8');
+    if (a.length !== b.length){ return { ok:false, reason:'hash_mismatch' }; }
+    if (!crypto.timingSafeEqual(a, b)){ return { ok:false, reason:'hash_mismatch' }; }
+    return { ok:true };
+}
+
+async function handleMpWebhook(body, req, res){
+    // Validação HMAC antes de qualquer coisa. Se falhar, responde 200 (não vaza info) mas pula processamento.
+    const v = validateMpSignature(req);
+    if (!v.ok){
+        console.warn(`[mp] webhook REJEITADO (${v.reason}) — url=${req.url} from=${req.socket.remoteAddress}`);
+        return httpJson(res, 200, { received:true });
+    }
     // MP manda 2 formatos: { topic, id, resource } (IPN antigo) ou { type:'payment', data:{id} } (Webhooks v2)
     const paymentId = String(body?.data?.id || body?.id || '');
     if (!paymentId || !mpPayment){ return httpJson(res, 200, { received:true }); }
@@ -1333,7 +1384,7 @@ function loadStateFromDisk(){
 // Auth: cliente manda `pwHash` (hash leve da senha). Server aplica sha256(salt+hash)
 // e armazena. Save do player vive aqui, sobrevive a troca de PC / limpeza de
 // browser. localStorage do cliente fica como cache/offline-fallback.
-const crypto = require('crypto');
+// crypto já é importado no topo do arquivo.
 const ACCOUNTS_FILE = process.env.ACCOUNTS_FILE_PATH
     || (process.env.STATE_FILE_PATH
         ? path.join(path.dirname(process.env.STATE_FILE_PATH), 'accounts.json')
