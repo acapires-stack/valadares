@@ -1,6 +1,6 @@
 {
   "name": "valadares-desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Valadares - cliente desktop (Electron wrapper do site oficial)",
   "main": "main.js",
   "author": "alcione",
