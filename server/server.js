@@ -2470,7 +2470,7 @@ function spawnImpostorBot(){
         x = 8 + Math.floor(Math.random() * (M_W - 16));
         y = 8 + Math.floor(Math.random() * (M_H - 16));
         tries++;
-    } while ((inSafe(x, y) || !canWalk(x, y)) && tries < 200);
+    } while ((inSafe(x, y) || !isWalkable(x, y)) && tries < 200);
     if (tries >= 200){ console.warn('[007] não achou pos walkable'); return; }
     const id = nextId++;
     impostorBot = {
@@ -2523,7 +2523,7 @@ function tickImpostorBot(){
             [dx, dy] = dirs[Math.floor(Math.random()*4)];
         }
         const nx = impostorBot.x + dx, ny = impostorBot.y + dy;
-        if ((dx || dy) && canWalk(nx, ny) && !inSafe(nx, ny)){
+        if ((dx || dy) && isWalkable(nx, ny) && !inSafe(nx, ny)){
             // Não pisa em cima de outro player
             let blocked = false;
             for (const pp of players.values()){
