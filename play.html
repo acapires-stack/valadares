@@ -2,6 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#06060c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Valadares</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1144,9 +1148,126 @@
             background: #1a1408; color: #5a4818; border-color: #2a2010;
             cursor: not-allowed;
         }
+
+        /* ────────────────────────────────────────────────────────────────
+           MOBILE / TOUCH CONTROLS
+           Controles touch visíveis só quando body.touch (detecção JS).
+           Layout responsivo: <900px reorganiza pra coluna + sidebars
+           colapsáveis via hamburguer.
+           ──────────────────────────────────────────────────────────────── */
+        #touchControls { display: none; }
+        body.touch #touchControls {
+            display: block;
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 150;
+        }
+        /* Joystick virtual (esquerda) */
+        #vjoy {
+            position: fixed;
+            left: 16px; bottom: 16px;
+            width: 130px; height: 130px;
+            background: radial-gradient(circle, rgba(58,45,16,0.55) 0%, rgba(20,16,8,0.35) 70%);
+            border: 2px solid rgba(168,128,64,0.4);
+            border-radius: 50%;
+            pointer-events: auto;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #vjoyKnob {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 56px; height: 56px;
+            margin-left: -28px; margin-top: -28px;
+            background: radial-gradient(circle, #d4a850 10%, #6a4a18 80%);
+            border: 2px solid #2a1a08;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+            transition: transform 0.05s;
+        }
+        /* Botões de ação (direita) */
+        .tbtn {
+            position: fixed;
+            background: radial-gradient(circle, rgba(168,128,64,0.7) 0%, rgba(58,40,16,0.6) 80%);
+            border: 2px solid rgba(232,200,140,0.5);
+            color: #fff8e0;
+            font-weight: bold;
+            font-family: inherit;
+            border-radius: 50%;
+            pointer-events: auto;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; line-height: 1;
+        }
+        .tbtn:active { transform: scale(0.92); background: radial-gradient(circle, #d4a850 0%, #8a5818 80%); }
+        #tbtnAttack { right: 16px; bottom: 30px; width: 84px; height: 84px; font-size: 22px; }
+        #tbtnMagic  { right: 110px; bottom: 88px; width: 56px; height: 56px; font-size: 14px; }
+        #tbtnSpear  { right: 50px; bottom: 130px; width: 50px; height: 50px; font-size: 13px; }
+        #tbtnEat    { right: 16px; bottom: 130px; width: 50px; height: 50px; font-size: 14px; }
+        /* Hamburguer (topo) e sidebars colapsáveis em mobile */
+        #mobileMenu {
+            display: none;
+            position: fixed;
+            top: 10px; right: 10px;
+            width: 44px; height: 44px;
+            background: rgba(58,45,16,0.85);
+            border: 2px solid #a88040;
+            color: #ffd060;
+            font-size: 22px;
+            border-radius: 4px;
+            z-index: 160;
+            cursor: pointer;
+            pointer-events: auto;
+            display: none;
+        }
+        body.touch #mobileMenu { display: flex; align-items: center; justify-content: center; }
+        body.touch.menu-open #leftSidebar,
+        body.touch.menu-open #rightSidebar,
+        body.touch.menu-open #invSidebar { display: flex !important; }
+        body.touch #leftSidebar,
+        body.touch #rightSidebar,
+        body.touch #invSidebar { display: none; }
+
+        /* Responsivo (telas pequenas) — força layout em coluna, canvas full-width */
+        @media (max-width: 900px) {
+            body { padding: 0; }
+            h1 { display: none; }
+            #gameWrapper {
+                flex-direction: column;
+                gap: 0; padding: 0;
+                max-width: 100vw;
+                box-shadow: none;
+                border-radius: 0;
+            }
+            #gameContainer { width: 100vw; }
+            #gameContainer canvas { width: 100vw !important; height: auto !important; aspect-ratio: 720/528; max-height: 70vh; }
+            .sidebar { max-width: 100vw; box-sizing: border-box; }
+            #chatPanel { width: 100vw !important; max-width: 100vw; }
+            /* modais ocupam quase a tela toda no mobile */
+            .chest-box { max-width: 95vw !important; max-height: 88vh; }
+        }
+        /* iPhone safe-area (notch / dynamic island) */
+        body.touch {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
     </style>
 </head>
 <body>
+
+<!-- Touch controls — só aparecem quando body.touch (detecção JS) -->
+<div id="touchControls">
+    <div id="vjoy"><div id="vjoyKnob"></div></div>
+    <button class="tbtn" id="tbtnAttack" type="button">⚔<br>ATK</button>
+    <button class="tbtn" id="tbtnMagic"  type="button">✦<br>MAG</button>
+    <button class="tbtn" id="tbtnSpear"  type="button">↗<br>LCA</button>
+    <button class="tbtn" id="tbtnEat"    type="button">🍖</button>
+</div>
+<button id="mobileMenu" type="button" title="Menu">≡</button>
 
 <!-- LOGIN -->
 <div id="login">
@@ -11951,6 +12072,117 @@ function loop(ts){
     updateSidebar();
     requestAnimationFrame(loop);
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// MOBILE / TOUCH CONTROLS
+// Detecta dispositivo touch; ativa joystick virtual + botões de ação que
+// "simulam" teclas (escrevem em `keys[]`) ou chamam as funções direto.
+// ───────────────────────────────────────────────────────────────────────────
+(function setupTouchControls(){
+    const isTouchDevice = ('ontouchstart' in window)
+        || (navigator.maxTouchPoints > 0)
+        || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    if (!isTouchDevice) return;
+    document.body.classList.add('touch');
+
+    // Evita zoom por double-tap e long-press menu
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('contextmenu', e => {
+        // Permite contextmenu em campos input — bloqueia no canvas/jogo
+        if (e.target.closest('input, textarea')) return;
+        e.preventDefault();
+    });
+
+    // ─── Joystick virtual ───
+    const vjoy = document.getElementById('vjoy');
+    const knob = document.getElementById('vjoyKnob');
+    const MOVE_KEYS = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+    let activeId = null;
+    let centerX = 0, centerY = 0;
+    const RADIUS = 50;     // raio máximo do drag
+    const DEADZONE = 14;   // raio sem input
+    function clearMoveKeys(){ for (const k of MOVE_KEYS) keys[k] = false; }
+    function setMoveFromVector(dx, dy){
+        const d = Math.hypot(dx, dy);
+        if (d < DEADZONE){ clearMoveKeys(); return; }
+        // Quantiza em 8 direções (45°) — joga 'pressionando' as setas correspondentes
+        const ang = Math.atan2(dy, dx);
+        const oct = Math.round(ang / (Math.PI / 4));
+        clearMoveKeys();
+        // Mapeamento oct → setas (oct: 0=L, 1=DL, 2=D, ... -2=U, -1=UL)
+        if ([-1, 0, 1].includes(oct)) keys['ArrowRight'] = true;
+        if ([1, 2, 3].includes(oct))  keys['ArrowDown']  = true;
+        if (oct === 4 || oct === -4 || oct === 3 || oct === -3) keys['ArrowLeft'] = true;
+        if ([-3, -2, -1].includes(oct)) keys['ArrowUp'] = true;
+    }
+    function joyStart(e){
+        const t = e.changedTouches ? e.changedTouches[0] : e;
+        activeId = e.changedTouches ? t.identifier : 'mouse';
+        const r = vjoy.getBoundingClientRect();
+        centerX = r.left + r.width / 2;
+        centerY = r.top + r.height / 2;
+        joyMove(e);
+        e.preventDefault();
+    }
+    function joyMove(e){
+        if (activeId === null) return;
+        const touches = e.changedTouches || [e];
+        let t = null;
+        for (const x of touches){ if (activeId === 'mouse' || x.identifier === activeId){ t = x; break; } }
+        if (!t) return;
+        let dx = t.clientX - centerX;
+        let dy = t.clientY - centerY;
+        const d = Math.hypot(dx, dy);
+        if (d > RADIUS){ dx = dx * RADIUS / d; dy = dy * RADIUS / d; }
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        setMoveFromVector(dx, dy);
+        e.preventDefault();
+    }
+    function joyEnd(e){
+        const touches = e.changedTouches || [e];
+        for (const x of touches){
+            if (activeId === 'mouse' || x.identifier === activeId){
+                activeId = null;
+                knob.style.transform = '';
+                clearMoveKeys();
+                break;
+            }
+        }
+    }
+    vjoy.addEventListener('touchstart', joyStart, { passive: false });
+    vjoy.addEventListener('touchmove',  joyMove,  { passive: false });
+    vjoy.addEventListener('touchend',   joyEnd);
+    vjoy.addEventListener('touchcancel', joyEnd);
+
+    // ─── Botões de ação ───
+    function bindBtn(id, onPress, onRelease){
+        const el = document.getElementById(id);
+        if (!el) return;
+        const start = e => { e.preventDefault(); ensureAudio?.(); onPress && onPress(); };
+        const end   = e => { e.preventDefault(); onRelease && onRelease(); };
+        el.addEventListener('touchstart', start, { passive: false });
+        el.addEventListener('touchend',   end,   { passive: false });
+        el.addEventListener('mousedown',  start);
+        el.addEventListener('mouseup',    end);
+    }
+    bindBtn('tbtnAttack',
+        () => { attackPressed = true; engage(); },
+        () => { attackPressed = false; });
+    bindBtn('tbtnMagic', () => {
+        if (!player.activeSpell) log('<span class="log-sys">Vá ao altar (tecla M) e compre uma magia.</span>');
+        else castSpell(player.activeSpell);
+    });
+    bindBtn('tbtnSpear', () => throwSpear());
+    bindBtn('tbtnEat',   () => eatBestFood());
+
+    // ─── Hamburguer: mostra/esconde sidebars no mobile ───
+    const menuBtn = document.getElementById('mobileMenu');
+    if (menuBtn){
+        menuBtn.addEventListener('click', () => {
+            document.body.classList.toggle('menu-open');
+        });
+    }
+})();
 </script>
 </body>
 </html>
