@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Pra Search Console
+Sitemap: https://valadares.app.br/sitemap.xml
