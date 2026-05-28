@@ -829,7 +829,7 @@ const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 // Mantém aqui no server porque cliente é dono dos NPCs (não precisa sincronizar tudo).
 // Também usado pelo questTurnIn pra validar adjacência no momento da entrega.
 const QUEST_NPCS = {
-    atendente:  { x:52, y:51 },
+    atendente:  { x:52, y:52 },   // espaçada da Mercador/Banqueiro (1 tile entre cada)
     eremita:    { x:22, y:22 },
     ferreiro:   { x:78, y:22 },
     cacadora:   { x:76, y:78 },
@@ -839,7 +839,8 @@ const QUEST_NPCS = {
     vendedor:   { x:75, y:20 },
 };
 const NPC_POSITIONS = [
-    { x:52, y:49 },  // mercador
+    { x:52, y:48 },  // mercador
+    { x:52, y:50 },  // banqueiro
     QUEST_NPCS.atendente,
     QUEST_NPCS.eremita,
     QUEST_NPCS.ferreiro,

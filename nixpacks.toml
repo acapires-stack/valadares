@@ -1,0 +1,15 @@
+# Build explícito do Railway via nixpacks.
+# Server é Node puro (ws + http + mercadopago SDK) — sem libs nativas extras.
+# Define provider e evita aptPkgs implícitos que estavam quebrando o build com
+# "secret ID missing for '' environment variable" (libatomic1 / nixpacks plugin).
+providers = ['node']
+
+[phases.setup]
+nixPkgs = ['nodejs_18']
+aptPkgs = []
+
+[phases.install]
+cmds = ['npm install --omit=dev --no-audit --no-fund']
+
+[start]
+cmd = 'node server/server.js'
