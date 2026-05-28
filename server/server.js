@@ -3376,6 +3376,16 @@ wss.on('connection', (ws) => {
                     if (TALENT_DEFS[tid] && data.talents[tid]) p.talents[tid] = true;
                 }
             }
+            // Server é autoritativo em maxHp/maxMp/hp/mp (lockdown N3 fase 5).
+            // Cliente às vezes envia undefined (race conditions entre devices) — força
+            // os valores do server pra não persistir lixo no acc.save.
+            if (typeof p.maxHp === 'number' && isFinite(p.maxHp)) data.maxHp = p.maxHp;
+            if (typeof p.maxMp === 'number' && isFinite(p.maxMp)) data.maxMp = p.maxMp;
+            if (typeof p.hp === 'number' && isFinite(p.hp))       data.hp    = p.hp;
+            if (typeof p.mp === 'number' && isFinite(p.mp))       data.mp    = p.mp;
+            // Pos também — cliente pode mandar NaN/undefined
+            if (typeof p.x === 'number' && isFinite(p.x)) data.x = p.x;
+            if (typeof p.y === 'number' && isFinite(p.y)) data.y = p.y;
             setPlayerSave(p.authedName, data);
             return;
         }
