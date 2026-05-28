@@ -56,7 +56,8 @@
     "publish": {
       "provider": "github",
       "owner": "acapires-stack",
-      "repo": "valadares"
+      "repo": "valadares",
+      "releaseType": "release"
     }
   }
 }
