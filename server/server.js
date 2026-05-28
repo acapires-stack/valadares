@@ -86,7 +86,9 @@ async function handleHttpRequest(req, res){
                     const token = generateResetToken();
                     acc.resetToken = { token, expiresAt: now + RESET_TOKEN_TTL_MS, requestedAt: now };
                     queueSaveAccounts();
-                    const resetUrl = `${SITE_BASE_URL}/reset?token=${token}`;
+                    // Usa ?t= (não ?token=) pra evitar corrupção do `=` em transit
+                    // de email (quoted-printable encoders trocam por replacement char).
+                    const resetUrl = `${SITE_BASE_URL}/reset?t=${token}`;
                     const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#222"><h2 style="color:#8b2020">Valadares — Recuperação de senha</h2><p>Olá <b>${acc.name}</b>,</p><p>Recebemos uma solicitação pra redefinir a senha da sua conta. Clica no link abaixo nos próximos 60 minutos:</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#d4a847;color:#0a0805;text-decoration:none;border-radius:4px;font-weight:600">Redefinir senha</a></p><p style="color:#666;font-size:13px">Se não funcionar, copie: <br><code>${resetUrl}</code></p><p style="color:#666;font-size:13px">Se você não pediu, ignore — sua senha continua a mesma.</p></div>`;
                     sendEmail(acc.email, 'Valadares — Redefinir sua senha', html).then(r => {
                         if (!r.ok) console.error(`[reset http] email pra ${acc.email} falhou:`, r.error);
@@ -3167,7 +3169,7 @@ wss.on('connection', (ws) => {
             const token = generateResetToken();
             acc.resetToken = { token, expiresAt: now + RESET_TOKEN_TTL_MS, requestedAt: now };
             queueSaveAccounts();
-            const resetUrl = `${SITE_BASE_URL}/reset?token=${token}`;
+            const resetUrl = `${SITE_BASE_URL}/reset?t=${token}`;
             const html = `
                 <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#222">
                     <h2 style="color:#8b2020">Valadares — Recuperação de senha</h2>

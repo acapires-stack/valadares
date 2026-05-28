@@ -142,7 +142,9 @@ const SERVER_HTTP_BASE = 'https://ws.valadares.app.br';
 
 // Token vem da query string
 const params = new URLSearchParams(location.search);
-const token = (params.get('token') || '').trim();
+// Aceita ?t= (formato novo, evita corrupção de `=` em encoders quoted-printable
+// de email) e ?token= (legacy, emails enviados antes da mudança).
+const token = (params.get('t') || params.get('token') || '').trim();
 const statusEl = document.getElementById('status');
 const subEl = document.getElementById('sub');
 const formEl = document.getElementById('resetForm');
