@@ -507,36 +507,27 @@
         }
         .inv-item.equippable { background: #0a0a12; cursor: pointer; }
         .inv-item.equippable:hover { border-color: #8a6020; background: #1a1410; transform: translateX(2px); }
-        .inv-cat-group { margin-top: 10px; }
+        .inv-cat-group { margin-top: 8px; }
         .inv-cat-group:first-child { margin-top: 0; }
         .inv-cat-head {
-            color: #d4b870; font-size: 10px; letter-spacing: 3px;
-            text-transform: uppercase; font-weight: 700;
-            padding: 9px 8px 6px 8px;
-            border-top: 1px solid #3a2d10;
-            border-bottom: 1px solid #3a2d10;
-            background: linear-gradient(90deg, rgba(58,45,16,0.5) 0%, rgba(40,30,10,0.25) 50%, rgba(58,45,16,0.5) 100%);
+            color: #8a7438; font-size: 9px; letter-spacing: 2.5px;
+            text-transform: uppercase; font-weight: 600;
+            padding: 2px 2px 4px 2px; margin-bottom: 2px;
             display: flex; justify-content: space-between; align-items: center;
-            text-shadow: 0 0 6px rgba(220,180,90,0.25);
             cursor: pointer;
             user-select: none;
-            transition: background 0.15s;
         }
-        .inv-cat-head:hover { background: linear-gradient(90deg, rgba(80,60,20,0.6) 0%, rgba(58,45,16,0.4) 50%, rgba(80,60,20,0.6) 100%); }
+        .inv-cat-head:hover { color: #c8a050; }
         .inv-cat-arrow {
             display: inline-block;
-            color: #a08038; font-size: 8px;
-            margin-right: 4px;
-            transition: transform 0.15s;
-            transform: rotate(0deg);
+            color: #5a4818; font-size: 7px;
+            margin-right: 5px;
+            transition: transform 0.12s;
         }
         .inv-cat-group.collapsed .inv-cat-arrow { transform: rotate(-90deg); }
         .inv-cat-group.collapsed .inv-cat-body { display: none; }
         .inv-cat-count {
-            color: #ffd060; font-size: 10px; font-weight: 600;
-            background: #0a0805; padding: 2px 8px; border-radius: 2px;
-            border: 1px solid #3a2d10;
-            min-width: 14px; text-align: center;
+            color: #5a4818; font-size: 9px; font-weight: 500;
         }
         .inv-icon {
             display: inline-block;
