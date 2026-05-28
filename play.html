@@ -784,7 +784,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #forgotPwdModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #forgotPwdModal, #partyInviteModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1566,6 +1566,22 @@
     </div>
 </div>
 
+<div id="partyInviteModal" style="display:none">
+    <div class="chest-box" style="min-width:340px;max-width:420px;text-align:center">
+        <div class="chest-title">👥 CONVITE PRA PARTY</div>
+        <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
+            <span id="partyInviteName" style="color:#ffd060;font-weight:bold">—</span>
+            <br>te convidou pra formar party.
+            <div style="margin-top:6px;color:#888;font-size:11px">Membros próximos ganham 60% do XP de mob.</div>
+            <div id="partyInviteCountdown" style="margin-top:10px;color:#888;font-size:11px">expira em 60s</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;padding:8px 14px 14px">
+            <button class="craft-btn" id="partyInviteAccept" style="background:#1a3a18;border-color:#3a6a30;color:#9dd07d">✓ ACEITAR</button>
+            <button class="craft-btn" id="partyInviteReject" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d">✗ RECUSAR</button>
+        </div>
+    </div>
+</div>
+
 <div id="goldShopModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:600px">
         <div class="chest-title">💰 LOJA DE OURO</div>
@@ -1912,8 +1928,8 @@ const ALTAR_POS = { x: 50, y: 48 };
 function atAltar(){
     return Math.max(Math.abs(player.x - ALTAR_POS.x), Math.abs(player.y - ALTAR_POS.y)) <= 1;
 }
-// Boneco de treino (canto da PZ, lado oposto ao altar)
-const DUMMY_POS = { x: 49, y: 51 };
+// Boneco de treino (1 tile abaixo do Crupiê)
+const DUMMY_POS = { x: 48, y: 51 };
 function atDummy(){
     return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
 }
@@ -5253,16 +5269,10 @@ function tickRegen(dt){
             }
         }
     }
-    // Pot de mana: buff que adiciona mp/seg até acabar a vida
+    // Pot de mana: UI-only countdown. MP é aplicado pelo server (tickPlayerRegen) e chega
+    // via broadcastPstatsAll, então o cliente NÃO soma local pra evitar conflito com lockdown.
     if (player.manaBuff && player.manaBuff.life > 0){
         player.manaBuff.life -= dt;
-        // acumula fração de mp ao longo dos frames pra não perder em dt < 1seg
-        player.manaBuff.acc = (player.manaBuff.acc || 0) + (player.manaBuff.mpPerSec * dt / 1000);
-        if (player.manaBuff.acc >= 1 && player.mp < player.maxMp){
-            const gain = Math.floor(player.manaBuff.acc);
-            player.mp = Math.min(player.maxMp, player.mp + gain);
-            player.manaBuff.acc -= gain;
-        }
         if (player.manaBuff.life <= 0) player.manaBuff = null;
     }
 }
@@ -5636,18 +5646,19 @@ function handleMP(msg){
                 }
             }
         }
-        // Consume (food/potion): aplica efeito ao receber confirmação
+        // Consume (food/potion): HP é instant (server aplicou + broadcastPstatsAll); MP é
+        // regen-over-time via manaBuff (server tickPlayerRegen aplica). Aqui só UI snappy.
         if (msg.consume && msg.consume.ok){
             const def = ITEMS[msg.consume.key];
             const name = def ? def.name : msg.consume.key;
-            if (msg.consume.heal > 0){
-                const healed = Math.min(msg.consume.heal, player.maxHp - player.hp);
-                player.hp = Math.min(player.maxHp, player.hp + msg.consume.heal);
+            const healed = msg.consume.healed | 0;
+            if (healed > 0){
+                player.hp = Math.min(player.maxHp, player.hp + healed);
                 addFloat(player.x, player.y, `+${healed}`, '#66cc66', false, 0);
                 log(`<span class="log-xp">Comeu ${name} (+${healed} HP)</span>`);
             }
-            if (msg.consume.manaheal > 0){
-                const lifeMs = 10000, mpPerSec = 8;
+            if (msg.consume.manaBuff){
+                const { mpPerSec, lifeMs } = msg.consume.manaBuff;
                 player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs };
                 addFloat(player.x, player.y, `+${mpPerSec}/s por ${lifeMs/1000}s`, '#5599ff', false, -14);
                 log(`<span class="log-xp">Bebeu ${name} — regen ${mpPerSec} mp/s por ${lifeMs/1000}s</span>`);
@@ -5787,6 +5798,8 @@ function handleMP(msg){
             player._party = { id: msg.partyId, leader: msg.leader, members: Array.isArray(msg.members) ? msg.members.slice(0, 4) : [] };
         }
         renderPartyWidget();
+    } else if (msg.t === 'partyInvite'){
+        showPartyInvite(msg.fromName, msg.expiresIn);
     } else if (msg.t === 'partyShareKill'){
         // Server já creditou skill XP autoritative (sendSkillsOnly antes/junto).
         // Cliente só exibe float + marca achievement flag.
@@ -6533,7 +6546,7 @@ function renderPartyWidget(){
         const nameCol = isMe ? '#ffd060' : '#a8e0ff';
         return `<div style="font-size:11px;color:${nameCol};display:flex;justify-content:space-between"><span>${tag}${n}</span><span style="color:#9dd07d;font-size:10px">${hpStr}</span></div>`;
     }).join('');
-    el.innerHTML = lines + `<div style="font-size:9px;color:#888;margin-top:4px">/party leave</div>`;
+    el.innerHTML = lines + `<button onclick="partyLeave()" style="margin-top:6px;width:100%;background:#3a1818;border:1px solid #6a2a2a;color:#d07d7d;font-family:'Consolas',monospace;font-size:10px;padding:3px 0;cursor:pointer">Sair da party</button>`;
 }
 window.renderPartyWidget = renderPartyWidget;
 setInterval(() => { if (player._party) renderPartyWidget(); }, 1500);
@@ -7838,6 +7851,55 @@ function quickWhisper(name){
 }
 window.quickWhisper = quickWhisper;
 
+function partyInvite(name){
+    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Party só online.</span>'); return; }
+    if (!name || name === player.name) return;
+    ws.send(JSON.stringify({ t:'chat', text: `/party invite ${name}` }));
+}
+window.partyInvite = partyInvite;
+function partyAccept(){
+    if (!ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ t:'chat', text: '/party accept' }));
+}
+window.partyAccept = partyAccept;
+function partyLeave(){
+    if (!ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ t:'chat', text: '/party leave' }));
+}
+window.partyLeave = partyLeave;
+function partyKick(name){
+    if (!ws || ws.readyState !== 1 || !name) return;
+    ws.send(JSON.stringify({ t:'chat', text: `/party kick ${name}` }));
+}
+window.partyKick = partyKick;
+
+let _partyInviteTimer = null;
+let _partyInviteCountdownId = null;
+function closePartyInvite(){
+    const m = document.getElementById('partyInviteModal');
+    if (m) m.style.display = 'none';
+    if (_partyInviteTimer){ clearTimeout(_partyInviteTimer); _partyInviteTimer = null; }
+    if (_partyInviteCountdownId){ clearInterval(_partyInviteCountdownId); _partyInviteCountdownId = null; }
+}
+function showPartyInvite(fromName, expiresMs){
+    closePartyInvite();
+    const totalSec = Math.max(5, Math.floor((expiresMs || 60000) / 1000));
+    document.getElementById('partyInviteName').textContent = fromName;
+    document.getElementById('partyInviteModal').style.display = 'flex';
+    let remaining = totalSec;
+    const cd = document.getElementById('partyInviteCountdown');
+    cd.textContent = `expira em ${remaining}s`;
+    _partyInviteCountdownId = setInterval(() => {
+        remaining--;
+        if (remaining > 0) cd.textContent = `expira em ${remaining}s`;
+        else closePartyInvite();
+    }, 1000);
+    _partyInviteTimer = setTimeout(closePartyInvite, totalSec * 1000 + 500);
+    document.getElementById('partyInviteAccept').onclick = () => { partyAccept(); closePartyInvite(); };
+    document.getElementById('partyInviteReject').onclick = () => { closePartyInvite(); };
+}
+window.showPartyInvite = showPartyInvite;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SIDEBAR / UI
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8989,6 +9051,27 @@ function showPlayerMenu(rp, screenX, screenY){
     else if (!otherInSafe) tradeHint = 'ele fora da PZ';
     else if (d > 3)        tradeHint = `${d}sqm — aproxime-se`;
     else                   tradeHint = '';
+    // Party: cliente só sabe da própria party; server valida o resto.
+    const myParty = player._party || null;
+    const rpInMyParty = !!(myParty && myParty.members.some(n => n.toLowerCase() === rp.name.toLowerCase()));
+    const iAmLeader = !!(myParty && myParty.leader === player.name);
+    const partyFull = !!(myParty && myParty.members.length >= 4);
+    let partyAction = 'invite';  // invite | kick | leave-mate | disabled
+    let partyLabel  = '👥 Convidar pra party';
+    let partyHint   = '';
+    let partyOn     = true;
+    if (rpInMyParty){
+        // Se eu sou líder, posso dar kick. Senão, só info.
+        if (iAmLeader){
+            partyAction = 'kick'; partyLabel = '👥 Remover da party';
+        } else {
+            partyAction = 'disabled'; partyLabel = '👥 Já está na sua party'; partyOn = false;
+        }
+    } else if (myParty && !iAmLeader){
+        partyAction = 'disabled'; partyLabel = '👥 Convidar (só líder)'; partyHint = 'só o líder'; partyOn = false;
+    } else if (myParty && partyFull){
+        partyAction = 'disabled'; partyLabel = '👥 Party cheia (4/4)'; partyHint = 'cheia'; partyOn = false;
+    }
     const menu = document.createElement('div');
     menu.id = 'playerCtxMenu';
     menu.style.cssText = `
@@ -9006,6 +9089,9 @@ function showPlayerMenu(rp, screenX, screenY){
         <div class="pcm-item" data-action="msg" style="padding:6px 12px;color:#c8a050;cursor:pointer">
             ✉ Whisper
         </div>
+        <div class="pcm-item" data-action="party" data-party-action="${partyAction}" style="padding:6px 12px;color:${partyOn?'#c8a050':'#5a4828'};cursor:${partyOn?'pointer':'help'}" title="${partyHint}">
+            ${partyLabel}${partyHint ? `<span style="color:#888;font-size:10px;float:right">${partyHint}</span>` : ''}
+        </div>
     `;
     document.body.appendChild(menu);
     menu.querySelectorAll('.pcm-item').forEach(it => {
@@ -9017,6 +9103,10 @@ function showPlayerMenu(rp, screenX, screenY){
                 startTradeFlow(rp.name);
             } else if (action === 'msg'){
                 quickWhisper(rp.name);
+            } else if (action === 'party'){
+                const pa = it.dataset.partyAction;
+                if (pa === 'invite')      partyInvite(rp.name);
+                else if (pa === 'kick')   partyKick(rp.name);
             }
         });
         it.addEventListener('mouseenter', () => { it.style.background = '#2a1d0c'; });
@@ -11345,11 +11435,98 @@ function renderAdminPanel(){
             <button class="chest-qty-btn" onclick="adminApplyGold()">aplicar</button>
         </div>
         <button class="chest-btn" style="margin-top:6px" onclick="adminFullHeal()">⚕ HP + MP cheios</button>
-        <div style="color:#998040;font-size:10px;margin:10px 0 4px 0;letter-spacing:0.5px">SNAPSHOT PRÉ-MORTE</div>
+
+        <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">COMUNICADOS</div>
+        <div style="display:flex;gap:4px;align-items:center;margin:3px 0;font-size:11px">
+            <select id="admBroadcastLevel" style="background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;font-size:11px">
+                <option value="say">📣 say</option>
+                <option value="event">⚡ event</option>
+                <option value="warn">⚠ warn</option>
+                <option value="info">ℹ info</option>
+                <option value="motd">📜 motd</option>
+            </select>
+            <input type="text" id="admBroadcastText" placeholder="mensagem…" maxlength="200"
+                   style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:3px 6px;font-family:Consolas,monospace;font-size:11px">
+            <button class="chest-qty-btn" onclick="adminBroadcast()">enviar</button>
+        </div>
+
+        <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">BOSSES</div>
+        <div style="display:flex;gap:4px;align-items:center;margin:3px 0;font-size:11px">
+            <select id="admBossType" style="background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;font-size:11px">
+                <option value="ORC_LIDER">ORC_LIDER</option>
+                <option value="DRAKE_LIDER">DRAKE_LIDER</option>
+                <option value="GOLEM_REI">GOLEM_REI</option>
+            </select>
+            <input type="number" id="admBossLv" min="1" max="10" value="1" placeholder="Lv"
+                   style="width:50px;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;text-align:center">
+            <button class="chest-qty-btn" onclick="adminSetBoss()">setboss</button>
+            <button class="chest-qty-btn" onclick="adminRespawnBoss()">respawn</button>
+        </div>
+
+        <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">MEGABOSS</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin:3px 0">
+            <button class="chest-qty-btn" onclick="adminMegaBoss('status')">status</button>
+            <button class="chest-qty-btn" onclick="adminMegaBoss('spawn')">spawn</button>
+            <button class="chest-qty-btn" onclick="adminMegaBoss('reset')">reset</button>
+        </div>
+
+        <div style="color:#cc4040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">EXCLUIR CONTA</div>
+        <div style="display:flex;gap:4px;align-items:center;margin:3px 0;font-size:11px">
+            <input type="text" id="admDelUserName" placeholder="nome da conta" maxlength="14"
+                   style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:3px 6px;font-family:Consolas,monospace;font-size:11px">
+            <button class="chest-qty-btn" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d" onclick="adminDeleteUser()">excluir</button>
+        </div>
+        <div style="color:#888;font-size:9px;padding:0 2px">⚠ apaga conta + save + kicka se online (irreversível).</div>
+
+        <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">SNAPSHOT PRÉ-MORTE</div>
         <div style="color:#666;font-size:10px;padding:2px 6px">Capturado automaticamente antes de processar cada morte: ${snapAge}</div>
         <button class="chest-btn" ${_preDeathSnapshot ? '' : 'disabled'} onclick="adminRestoreSnapshot()">↺ Restaurar último snapshot</button>
     `;
 }
+
+// Helpers: cada botão admin manda o comando equivalente via chat (server valida isAdmin).
+function _adminSendChat(text){
+    if (!player.isAdmin){ log('<span class="log-sys">Só admin.</span>'); return; }
+    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Sem conexão.</span>'); return; }
+    ws.send(JSON.stringify({ t:'chat', text }));
+}
+function adminBroadcast(){
+    const lv = document.getElementById('admBroadcastLevel').value;
+    const txtEl = document.getElementById('admBroadcastText');
+    const txt = (txtEl.value || '').trim();
+    if (!txt){ log('<span class="log-sys">Mensagem vazia.</span>'); return; }
+    _adminSendChat(`/${lv} ${txt}`);
+    txtEl.value = '';
+}
+function adminSetBoss(){
+    const type = document.getElementById('admBossType').value;
+    const lv = Math.max(1, Math.min(10, parseInt(document.getElementById('admBossLv').value, 10) || 1));
+    _adminSendChat(`/setboss ${type} ${lv}`);
+}
+function adminRespawnBoss(){
+    const type = document.getElementById('admBossType').value;
+    _adminSendChat(`/respawnboss ${type}`);
+}
+function adminMegaBoss(sub){
+    _adminSendChat(`/megaboss ${sub}`);
+}
+function adminDeleteUser(){
+    const nameEl = document.getElementById('admDelUserName');
+    const name = (nameEl.value || '').trim();
+    if (!name){ log('<span class="log-sys">Digite o nome da conta.</span>'); return; }
+    if (name.toLowerCase() === (player.name || '').toLowerCase()){
+        log('<span class="log-sys">Não dá pra excluir a si mesmo.</span>');
+        return;
+    }
+    if (!confirm(`Excluir a conta "${name}" PERMANENTEMENTE? (apaga save + kicka se online)`)) return;
+    _adminSendChat(`/deluser ${name}`);
+    nameEl.value = '';
+}
+window.adminBroadcast = adminBroadcast;
+window.adminSetBoss = adminSetBoss;
+window.adminRespawnBoss = adminRespawnBoss;
+window.adminMegaBoss = adminMegaBoss;
+window.adminDeleteUser = adminDeleteUser;
 function adminApplySkill(name){
     if (!player.isAdmin) return;
     const input = document.getElementById('admSk_' + name);

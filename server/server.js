@@ -2091,6 +2091,33 @@ function verifyAccount(name, clientHash){
     if (!a) return false;
     return a.pwHash === hashPwServer(clientHash);
 }
+// Admin: remove conta + kicka player online + persiste. Retorna info pro caller.
+function deleteUserAccount(rawName){
+    const nameLower = String(rawName || '').toLowerCase().trim();
+    if (!nameLower) return { ok:false, reason:'empty' };
+    const a = accounts.get(nameLower);
+    if (!a) return { ok:false, reason:'not_found' };
+    // Tira do índice de email
+    if (a.email) emailToAccount.delete(a.email.toLowerCase());
+    accounts.delete(nameLower);
+    // Kicka player online (se houver) e remove do Map
+    let kicked = false;
+    for (const [pid, pp] of Array.from(players.entries())){
+        if (pp.name && pp.name.toLowerCase() === nameLower){
+            try {
+                if (pp.ws && pp.ws.readyState === 1){
+                    pp.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:'Sua conta foi removida pelo admin.' }));
+                    pp.ws.close(4001, 'account_deleted');
+                }
+            } catch {}
+            players.delete(pid);
+            kicked = true;
+        }
+    }
+    queueSaveAccounts();
+    console.log(`[admin] conta removida: ${nameLower} (online=${kicked})`);
+    return { ok:true, name:a.name, kicked };
+}
 
 // ─── Fase 5.5: Email + recuperação de senha ────────────────────────────────
 // Email armazenado em lowercase. Único por conta (Map auxiliar emailToAccount).
@@ -2399,6 +2426,21 @@ function tickPlayerRegen(){
             p.mp = Math.min(maxMp, p.mp + mpGain);
             p._regenMpAt = now;
             changed = true;
+        }
+        // ManaBuff (POTION_MP): 8mp/s autoritativo enquanto ativo.
+        if (p.manaBuff && maxMp > 0){
+            if (now >= p.manaBuff.until){
+                p.manaBuff = null;
+                changed = true;
+            } else if (p.mp < maxMp){
+                const elapsed = now - (p.manaBuff.lastTickAt || now);
+                if (elapsed >= 250){   // tick ~4× por segundo
+                    const gain = Math.max(1, Math.floor(elapsed * p.manaBuff.mpPerSec / 1000));
+                    p.mp = Math.min(maxMp, p.mp + gain);
+                    p.manaBuff.lastTickAt = now;
+                    changed = true;
+                }
+            }
         }
         if (changed) broadcastPstatsAll(p);
     }
@@ -2831,6 +2873,7 @@ function handlePartyCommand(p, text){
         }
         partyInvites.set(target.name.toLowerCase(), { partyId: party.id, fromId: id, fromName: p.name, expiresAt: Date.now() + PARTY_INVITE_TIMEOUT_MS });
         sendTo(target.id, { t:'serverMsg', level:'event', text:`👥 ${p.name} te convidou pra party. Use /party accept` });
+        sendTo(target.id, { t:'partyInvite', fromName: p.name, expiresIn: PARTY_INVITE_TIMEOUT_MS });
         sendTo(id, { t:'serverMsg', level:'info', text:`Convite enviado pra ${target.name} (60s).` });
         return;
     }
@@ -3419,7 +3462,26 @@ wss.on('connection', (ws) => {
                 return;
             }
             incInv(p, key, -1);
-            sendInvUpdate(p, { consume:{ ok:true, key, heal: meta.heal || 0, manaheal: meta.manaheal || 0 } });
+            // HP/food: aplicação instant + autoritativa (lockdown N3 ignora hp do client).
+            // MP/potion: regen-over-time (8mp/s × 10s) autoritativo via p.manaBuff —
+            // tickPlayerRegen aplica o ganho. Não pode empilhar com manaBuff já ativo.
+            const maxHp = p.maxHp || 100;
+            const maxMp = p.maxMp || 0;
+            let healed = 0, manaBuffApplied = false;
+            if (meta.heal && (p.hp ?? 0) < maxHp){
+                healed = Math.min(meta.heal, maxHp - (p.hp ?? 0));
+                p.hp = Math.min(maxHp, (p.hp ?? 0) + meta.heal);
+            }
+            if (meta.manaheal && maxMp > 0){
+                const now = Date.now();
+                const active = p.manaBuff && p.manaBuff.until > now;
+                if (!active){
+                    p.manaBuff = { mpPerSec: 8, until: now + 10000, lastTickAt: now };
+                    manaBuffApplied = true;
+                }
+            }
+            sendInvUpdate(p, { consume:{ ok:true, key, heal: meta.heal || 0, manaheal: meta.manaheal || 0, healed, manaBuff: manaBuffApplied ? { mpPerSec:8, lifeMs:10000 } : null } });
+            if (healed > 0) broadcastPstatsAll(p);
             return;
         }
 
@@ -4001,7 +4063,7 @@ wss.on('connection', (ws) => {
             if (now - p._lastTrainAt < 1500) return reject('too_fast');
             p._lastTrainAt = now;
             // Adjacência: Magia treina no Altar, demais skills no Boneco
-            const DUMMY = { x:49, y:51 };
+            const DUMMY = { x:48, y:51 };
             const ALTAR = { x:50, y:48 };
             const target = skill === 'Magia' ? ALTAR : DUMMY;
             if (Math.max(Math.abs(p.x - target.x), Math.abs(p.y - target.y)) > 1){
@@ -4669,7 +4731,21 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME' });
+                    return;
+                }
+                if (cmd === '/deluser'){
+                    if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /deluser NOME' }); return; }
+                    if (arg.toLowerCase() === p.name.toLowerCase()){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:'Não dá pra excluir a si mesmo via comando.' });
+                        return;
+                    }
+                    const res = deleteUserAccount(arg);
+                    if (!res.ok){
+                        sendTo(id, { t:'serverMsg', level:'warn', text: res.reason === 'not_found' ? `Conta "${arg}" não existe.` : 'Falha ao remover.' });
+                        return;
+                    }
+                    sendTo(id, { t:'serverMsg', level:'info', text:`Conta ${res.name} removida${res.kicked ? ' (estava online — desconectado)' : ''}.` });
                     return;
                 }
                 if (cmd === '/setboss'){
