@@ -1,5 +1,57 @@
 # Notas de Sessão
 
+## 📅 Sessão 27/05/2026 (noite N3 fase 3 + QoL)
+
+Sessão grande: fechou **fase 3 do Hardening** (lockdown total de gold/inv server-side), além de várias melhorias de QoL e segurança.
+
+### 🛡 Hardening N3 fase 3 — completo
+
+**Onda 1 — Quest reward server-side** (`questTurnIn`)
+- 5 quests simples (q_ratos, q_cobras, q_seda, q_orcs, q_lider)
+- 7 chains × 25 stages (cripta, forja, drake, mina, vohrim, crepusculo, vendedor) — kinds item, multiItem, mob, visit, choice
+- Validações: adjacência ao NPC, items requeridos, anti-replay (`quests.completed` / `questFlags[chainId][stageId]`), pre-stages, choiceId existe, rate limit 400ms
+- Hidratação no join: server carrega `skills/quests/questFlags/flags/permaBuffs` do save
+
+**Onda 2 — Daily quests server-side**
+- Server tem `DAILY_POOL` espelhado — reward vem da TABELA, não do save
+- Cliente forjar `gold:99999` na entry vira no-op (server usa o pool)
+- Anti-replay via `quests.daily.claimed`
+
+**Onda 3 — Daily events server-side**
+- **Bug fix crítico**: Chuva de Ouro dobrava o gold (server creditava E cliente somava no `eventReward`). Agora server credita via `invUpdate.goldDelta(reason='gold_rain')`; cliente só feedback visual.
+- Bênção da Sabedoria aplica +50% XP também em quest reward server-side (gainSkillXpServer)
+
+**Onda 4 — Highlander Hunt server-side**
+- Cliente NÃO mais credita `player.gold` direto quando mata os 3 caçadores. Online → `hlHuntClaim` → server gera bonus (200-450g) + cooldown 5min. Offline → fallback local (single-player).
+
+**Onda 5 — Lockdown total**
+- `saveUpload` e `playerSync` IGNORAM `gold/inv/equipped/chests` do cliente
+- Toda mutação passa por handlers server-side: questTurnIn, attackMob (loot), shop, craft, forja, invEquip, invChest, groundPickup, invConsume, invUseBlessing, hlHuntClaim, webhook MP
+- Validado e2e: cliente forjou gold:99999 + ESPADA_ETERNA + COROA_VALADARES → tudo descartado pelo server
+
+### 💳 MercadoPago — segurança + UX
+
+- **HMAC do webhook**: novo `MP_WEBHOOK_SECRET` (env Railway) valida `x-signature` de toda chamada em `/webhook/mp`. Cliente falsa request → REJEITADO. Sem secret = modo dev/compat.
+- **Email do comprador no checkout**: campo `email` no modal `goldShopModal`, validação cliente + server (regex), persistido em `player.email` (próxima compra vem pré-preenchida). Server passa `payer.email` na preferência MP — Checkout Pro pré-preenche + comprador recebe recibo no email real.
+
+### 🎨 QoL
+
+- **Tabs invertidas**: chat panel agora abre com `CHAT` ativa (era COMBATE). Ordem visual também trocada.
+- **NPC Banqueiro de gold**: novo NPC dourado entre Mercador e Atendente. Interagir abre `goldShopModal` (loja MercadoPago) — antes só `/loja` no chat achava.
+- **NPCs espaçados**: Mercador/Banqueiro/Atendente em (52,48)/(52,50)/(52,52) com 1 tile vazio entre cada (estavam colados em 49/50/51).
+
+### 🐛 Build do Railway
+
+- `nixpacks.toml` explícito (provider=node, sem aptPkgs) — build estava falhando com `secret ID missing for "" environment variable / install apt packages: libatomic1`.
+
+### 📦 Commits da sessão
+
+`b98e4c3` HMAC · `0ba06ca` tabs+Banqueiro · `2755088` email checkout ·
+`ce340c6` N3 ondas 1+2 · `94aa000` N3 ondas 3+4 · `147bcd5` N3 onda 5 (lockdown) ·
+`701dcf7` nixpacks + NPCs espaçados.
+
+---
+
 ## 📅 Sessão 27/05/2026 (N3 fase 2 + Electron build)
 
 Foco: fechar as 5 ops pendentes do Hardening N3 fase 2 + buildar o Electron desktop.
