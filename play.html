@@ -6430,6 +6430,32 @@ const SERVER_HTTP_BASE = (() => {
     }
     return 'https://ws.valadares.app.br';
 })();
+
+// ─── Observabilidade: reporta erros JS pro server ────────────────────────
+let _lastErrorReportAt = 0;
+function reportClientError(msg, stack){
+    const now = Date.now();
+    if (now - _lastErrorReportAt < 1000) return;   // rate limit local 1/s
+    _lastErrorReportAt = now;
+    const body = {
+        player: (typeof player === 'object' && player.name) ? player.name : null,
+        msg: String(msg || '').slice(0, 500),
+        stack: stack ? String(stack).slice(0, 2000) : null,
+        url: location.href,
+    };
+    fetch(SERVER_HTTP_BASE + '/api/error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    }).catch(() => {});   // silent — não pode crashar se reporter falhar
+}
+window.addEventListener('error', (e) => {
+    reportClientError(e.message || 'error', (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`);
+});
+window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    reportClientError('unhandled: ' + (r && r.message || String(r)), r && r.stack || null);
+});
 let _goldPackages = null;
 async function openGoldShop(){
     closeAllModals();

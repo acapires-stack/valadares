@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Valadares — Admin</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 0; min-height: 100vh;
+        background: #0a0805; color: #d4b870;
+        font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
+    }
+    header {
+        background: linear-gradient(180deg, #1a160e 0%, #0a0805 100%);
+        border-bottom: 1px solid #3a2d10;
+        padding: 12px 20px;
+        display: flex; align-items: center; justify-content: space-between;
+        position: sticky; top: 0; z-index: 100;
+    }
+    h1 {
+        margin: 0; font-family: 'Cinzel', serif;
+        font-size: 16px; letter-spacing: 4px; color: #ffd060;
+        font-weight: 600;
+    }
+    .badge { font-size: 10px; color: #888; margin-left: 12px; }
+    .badge.live { color: #74d176; }
+    button, input {
+        background: #1a1408; border: 1px solid #3a2d10; color: #d4b870;
+        padding: 6px 10px; font-family: inherit; font-size: 12px;
+        border-radius: 2px; cursor: pointer;
+    }
+    button:hover { background: #2a1d0c; color: #ffd060; }
+    button.danger { background: #2a0808; border-color: #5a1818; color: #d07d7d; }
+    button.danger:hover { background: #3a1010; }
+    main {
+        max-width: 1280px; margin: 0 auto; padding: 20px;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+    section {
+        background: rgba(20, 16, 8, 0.4);
+        border: 1px solid #2a1f10;
+        border-radius: 2px;
+        padding: 14px;
+    }
+    section h2 {
+        margin: 0 0 12px 0; font-size: 11px; letter-spacing: 2px;
+        color: #8a7438; text-transform: uppercase; font-weight: 600;
+        border-bottom: 1px solid #2a1f10; padding-bottom: 8px;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .count {
+        color: #ffd060; background: #0a0805;
+        padding: 2px 8px; border-radius: 2px; font-size: 11px;
+    }
+    /* ONLINE */
+    .player-card {
+        background: rgba(40, 30, 12, 0.3); padding: 8px 10px;
+        margin-bottom: 6px; border-left: 2px solid #4a3818;
+        display: grid; grid-template-columns: 1fr auto auto auto;
+        gap: 10px; align-items: center;
+    }
+    .player-card.admin { border-left-color: #ffd060; }
+    .player-name { color: #e0c060; font-weight: 600; }
+    .player-name.admin::before { content:'👑 '; }
+    .player-stat { color: #aaa; font-size: 11px; }
+    .player-actions { display: flex; gap: 4px; }
+    .player-actions button { padding: 3px 8px; font-size: 10px; }
+    /* ERRORS */
+    .error-row {
+        padding: 8px 10px; border-bottom: 1px solid #1a1408;
+        font-size: 11px;
+    }
+    .error-row:hover { background: rgba(40, 30, 12, 0.2); }
+    .error-kind {
+        display: inline-block; padding: 1px 6px;
+        background: #2a1d0c; color: #c8a050;
+        border-radius: 2px; font-size: 9px; letter-spacing: 1px;
+        text-transform: uppercase; margin-right: 6px;
+    }
+    .error-kind.js_error { background: #3a1818; color: #d07d7d; }
+    .error-kind.ws_error { background: #2a2818; color: #d0c060; }
+    .error-kind.ws_close { background: #181830; color: #80a0d0; }
+    .error-row .ts { color: #555; font-size: 10px; margin-right: 6px; }
+    .error-row .player { color: #ffd060; margin-right: 6px; }
+    .error-row .msg { color: #aaa; }
+    .error-row .stack {
+        display: none; margin-top: 4px; padding: 6px 8px;
+        background: #050402; border-left: 2px solid #3a2d10;
+        white-space: pre-wrap; font-size: 10px; color: #888;
+        max-height: 200px; overflow-y: auto;
+    }
+    .error-row.expanded .stack { display: block; }
+    .error-row .toggle { cursor: pointer; user-select: none; color: #555; }
+    .error-row .toggle:hover { color: #ffd060; }
+    /* METRICS */
+    .metrics {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+        margin-bottom: 12px;
+    }
+    .metric {
+        background: rgba(40, 30, 12, 0.3); padding: 8px;
+        border: 1px solid #2a1f10; text-align: center;
+    }
+    .metric .label {
+        color: #8a7438; font-size: 9px; letter-spacing: 1.5px;
+        text-transform: uppercase; margin-bottom: 4px;
+    }
+    .metric .value { color: #ffd060; font-size: 18px; font-weight: 600; }
+    .metric .value.warn { color: #d0c060; }
+    .metric .value.bad { color: #d07d7d; }
+    /* ACTIONS */
+    .action-row {
+        display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+    }
+    .action-row label { color: #8a7438; font-size: 10px; min-width: 70px; text-transform: uppercase; letter-spacing: 1px; }
+    .action-row input, .action-row select { flex: 1; }
+    /* LOGIN */
+    #loginBox {
+        max-width: 400px; margin: 80px auto; padding: 30px;
+        background: rgba(20, 16, 8, 0.6); border: 1px solid #3a2d10;
+        text-align: center;
+    }
+    #loginBox h2 { color: #ffd060; font-family: 'Cinzel', serif; letter-spacing: 3px; margin: 0 0 20px 0; }
+    #loginBox input { width: 100%; padding: 10px; margin-bottom: 10px; font-family: monospace; font-size: 11px; }
+    #loginBox button { width: 100%; padding: 10px; background: #3a2d10; color: #ffd060; font-weight: 600; }
+    .empty { color: #555; font-style: italic; text-align: center; padding: 16px; font-size: 11px; }
+    @media (max-width: 900px){
+        main { grid-template-columns: 1fr; }
+        .metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>
+</head>
+<body>
+<div id="loginBox" style="display:none">
+    <h2>⚜ VALADARES ADMIN ⚜</h2>
+    <input id="loginToken" type="password" placeholder="Token de admin">
+    <button onclick="doLogin()">Entrar</button>
+    <div id="loginMsg" style="color:#d07d7d;font-size:11px;margin-top:10px"></div>
+</div>
+
+<header style="display:none" id="appHeader">
+    <h1>⚜ VALADARES ADMIN
+        <span class="badge" id="liveBadge">— offline</span>
+    </h1>
+    <div>
+        <button onclick="refreshNow()">↻ atualizar</button>
+        <button onclick="doLogout()" class="danger">sair</button>
+    </div>
+</header>
+
+<main id="app" style="display:none">
+    <section style="grid-column: 1 / -1">
+        <h2>Métricas <span class="count" id="uptimeBadge">— uptime</span></h2>
+        <div class="metrics">
+            <div class="metric"><div class="label">Online agora</div><div class="value" id="mOnline">—</div></div>
+            <div class="metric"><div class="label">Conexões total</div><div class="value" id="mConns">—</div></div>
+            <div class="metric"><div class="label">Erros (5min)</div><div class="value" id="mErrs5">—</div></div>
+            <div class="metric"><div class="label">WS closes 1006</div><div class="value" id="mC1006">—</div></div>
+            <div class="metric"><div class="label">WS closes 1001</div><div class="value" id="mC1001">—</div></div>
+            <div class="metric"><div class="label">WS closes 1005</div><div class="value" id="mC1005">—</div></div>
+            <div class="metric"><div class="label">Contas</div><div class="value" id="mAccts">—</div></div>
+            <div class="metric"><div class="label">Mobs vivos</div><div class="value" id="mMobs">—</div></div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Players online <span class="count" id="onlineCount">0</span></h2>
+        <div id="onlineList"><div class="empty">carregando…</div></div>
+    </section>
+
+    <section>
+        <h2>Ações</h2>
+        <div class="action-row">
+            <label>player</label>
+            <input id="actTarget" placeholder="nome">
+            <button onclick="doAction('check')">check</button>
+            <button onclick="doAction('reset')">reset</button>
+            <button onclick="doAction('kick')">kick</button>
+            <button class="danger" onclick="doAction('delete')">delete</button>
+        </div>
+        <div class="action-row">
+            <label>broadcast</label>
+            <select id="actLevel">
+                <option value="admin">say (vermelho)</option>
+                <option value="event">event (dourado)</option>
+                <option value="warn">warn (amarelo)</option>
+                <option value="info">info (azul)</option>
+            </select>
+            <input id="actText" placeholder="mensagem" maxlength="200">
+            <button onclick="doSay()">enviar</button>
+        </div>
+        <div id="actResult" style="margin-top:10px;font-size:11px;color:#888;min-height:20px"></div>
+    </section>
+
+    <section style="grid-column: 1 / -1">
+        <h2>Últimos erros <span class="count" id="errCount">0</span></h2>
+        <div id="errorsList"><div class="empty">carregando…</div></div>
+    </section>
+</main>
+
+<script>
+const TOKEN_KEY = 'valadares:admin:token';
+let token = localStorage.getItem(TOKEN_KEY) || '';
+let pollTimer = null;
+
+function init(){
+    if (token){
+        showApp();
+        refreshNow();
+        pollTimer = setInterval(refreshNow, 5000);
+    } else {
+        showLogin();
+    }
+}
+function showLogin(){
+    document.getElementById('loginBox').style.display = '';
+    document.getElementById('appHeader').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+}
+function showApp(){
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('appHeader').style.display = '';
+    document.getElementById('app').style.display = '';
+}
+async function doLogin(){
+    const t = document.getElementById('loginToken').value.trim();
+    if (!t) return;
+    // Testa o token batendo num endpoint protegido
+    try {
+        const res = await fetch(apiBase() + '/api/admin/state?token=' + encodeURIComponent(t));
+        if (res.status === 401){
+            document.getElementById('loginMsg').textContent = 'Token inválido.';
+            return;
+        }
+        if (!res.ok){
+            document.getElementById('loginMsg').textContent = 'Server retornou ' + res.status;
+            return;
+        }
+        token = t;
+        localStorage.setItem(TOKEN_KEY, t);
+        init();
+    } catch (e){
+        document.getElementById('loginMsg').textContent = 'Erro de rede: ' + e.message;
+    }
+}
+function doLogout(){
+    token = '';
+    localStorage.removeItem(TOKEN_KEY);
+    if (pollTimer) clearInterval(pollTimer);
+    showLogin();
+}
+function apiBase(){
+    // Deriva: se admin.html está no Vercel (valadares.app.br/admin), aponta pra ws.valadares.app.br.
+    // Em dev local pode override via ?api=
+    const qp = new URL(location.href).searchParams.get('api');
+    if (qp) return qp;
+    return 'https://ws.valadares.app.br';
+}
+async function refreshNow(){
+    try {
+        const res = await fetch(apiBase() + '/api/admin/state?token=' + encodeURIComponent(token));
+        if (res.status === 401){ doLogout(); return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        renderState(data);
+        document.getElementById('liveBadge').textContent = '— live (' + new Date().toLocaleTimeString('pt-BR') + ')';
+        document.getElementById('liveBadge').className = 'badge live';
+    } catch (e){
+        document.getElementById('liveBadge').textContent = '— erro: ' + e.message;
+        document.getElementById('liveBadge').className = 'badge';
+    }
+}
+function fmtUptime(s){
+    if (s < 60) return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'min ' + (s%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'min';
+}
+function fmtAgo(ts){
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'min';
+    if (s < 86400) return Math.floor(s/3600) + 'h';
+    return Math.floor(s/86400) + 'd';
+}
+function esc(s){
+    return String(s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+}
+function renderState(d){
+    // Métricas
+    document.getElementById('uptimeBadge').textContent = 'uptime ' + fmtUptime(d.uptime_s);
+    document.getElementById('mOnline').textContent = d.online.length;
+    document.getElementById('mConns').textContent = d.counters.connections_total;
+    const e5 = d.counters.errors_5min || 0;
+    const e5El = document.getElementById('mErrs5');
+    e5El.textContent = e5;
+    e5El.className = 'value ' + (e5 > 20 ? 'bad' : e5 > 5 ? 'warn' : '');
+    document.getElementById('mC1006').textContent = d.counters.ws_closes['1006'] || 0;
+    document.getElementById('mC1001').textContent = d.counters.ws_closes['1001'] || 0;
+    document.getElementById('mC1005').textContent = d.counters.ws_closes['1005'] || 0;
+    document.getElementById('mAccts').textContent = d.counters.total_accounts;
+    document.getElementById('mMobs').textContent = d.counters.state_mobs;
+    // Online
+    document.getElementById('onlineCount').textContent = d.online.length;
+    const onlineEl = document.getElementById('onlineList');
+    if (!d.online.length){
+        onlineEl.innerHTML = '<div class="empty">ninguém online</div>';
+    } else {
+        onlineEl.innerHTML = d.online.map(p => `
+            <div class="player-card ${p.isAdmin ? 'admin' : ''}">
+                <div>
+                    <div class="player-name ${p.isAdmin ? 'admin' : ''}">${esc(p.name)}</div>
+                    <div class="player-stat">pos (${p.x},${p.y}) · ${p.hp}/${p.maxHp} HP · ${p.gold||0}g</div>
+                </div>
+                <div class="player-stat">há ${fmtAgo(p.connectedAt || Date.now())}</div>
+                <div class="player-actions">
+                    <button onclick="quickAction('reset','${esc(p.name)}')">reset</button>
+                    <button onclick="quickAction('kick','${esc(p.name)}')">kick</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    // Errors
+    document.getElementById('errCount').textContent = d.errors.length;
+    const errEl = document.getElementById('errorsList');
+    if (!d.errors.length){
+        errEl.innerHTML = '<div class="empty">sem erros recentes 🎉</div>';
+    } else {
+        errEl.innerHTML = d.errors.map((e,i) => {
+            const hasStack = !!e.stack;
+            return `<div class="error-row" id="err-${i}">
+                <span class="ts">${fmtAgo(e.ts)} atrás</span>
+                <span class="error-kind ${esc(e.kind)}">${esc(e.kind)}</span>
+                ${e.player ? `<span class="player">${esc(e.player)}</span>` : ''}
+                <span class="msg">${esc(e.msg)}</span>
+                ${hasStack ? `<span class="toggle" onclick="document.getElementById('err-${i}').classList.toggle('expanded')">[…]</span><div class="stack">${esc(e.stack)}</div>` : ''}
+            </div>`;
+        }).join('');
+    }
+}
+async function doAction(kind){
+    const target = document.getElementById('actTarget').value.trim();
+    if (!target) return setResult('Digite o nome do player.');
+    if (kind === 'delete' && !confirm(`Excluir conta "${target}" PERMANENTEMENTE?`)) return;
+    if (kind === 'reset' && !confirm(`Resetar posição/HP de "${target}"?`)) return;
+    try {
+        const res = await fetch(apiBase() + '/api/admin/action?token=' + encodeURIComponent(token), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind, target }),
+        });
+        const data = await res.json();
+        setResult(JSON.stringify(data, null, 2));
+        refreshNow();
+    } catch (e){ setResult('Erro: ' + e.message); }
+}
+async function quickAction(kind, target){
+    if (!confirm(`${kind} "${target}"?`)) return;
+    document.getElementById('actTarget').value = target;
+    await doAction(kind);
+}
+async function doSay(){
+    const text = document.getElementById('actText').value.trim();
+    const level = document.getElementById('actLevel').value;
+    if (!text) return setResult('Digite a mensagem.');
+    try {
+        const res = await fetch(apiBase() + '/api/admin/action?token=' + encodeURIComponent(token), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind: 'say', text, level }),
+        });
+        const data = await res.json();
+        setResult('Broadcast: ' + JSON.stringify(data));
+        document.getElementById('actText').value = '';
+    } catch (e){ setResult('Erro: ' + e.message); }
+}
+function setResult(msg){
+    document.getElementById('actResult').textContent = msg;
+}
+document.getElementById('loginToken').addEventListener('keypress', e => {
+    if (e.key === 'Enter') doLogin();
+});
+init();
+</script>
+</body>
+</html>

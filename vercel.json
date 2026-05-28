@@ -4,7 +4,8 @@
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/ranking", "destination": "/ranking.html" },
-    { "source": "/reset", "destination": "/reset.html" }
+    { "source": "/reset", "destination": "/reset.html" },
+    { "source": "/admin", "destination": "/admin.html" }
   ],
   "headers": [
     {

@@ -8,6 +8,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
+// Token de admin pro painel web (env var). Sem isso, /api/admin/* rejeita 401.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+if (!ADMIN_TOKEN) console.warn('[admin] ADMIN_TOKEN não configurado — painel web desabilitado');
 
 // HTTP server compartilhado com WS upgrade + endpoints REST (webhook MP, criar PIX, health)
 const httpServer = http.createServer((req, res) => handleHttpRequest(req, res));
@@ -50,6 +53,7 @@ const GOLD_PACKAGES = {
 const mpPayments = new Map();
 
 // ─── HTTP handlers ──────────────────────────────────────────────────────
+const _errorRateMap = new Map();   // ip → lastErrorAt (anti-flood do /api/error)
 function httpJson(res, status, body){
     res.writeHead(status, {
         'Content-Type': 'application/json',
@@ -148,6 +152,101 @@ async function handleHttpRequest(req, res){
             const body = await readBody(req);
             return handleMpWebhook(body, req, res);
         } catch (e){ return httpJson(res, 200, { received:true }); }   // sempre 200 pro MP não re-tentar infinito
+    }
+    // ─── Observabilidade ──────────────────────────────────────────────────
+    // POST /api/error — cliente reporta erro JS. Sem auth (qualquer um pode reportar
+    // o próprio erro), rate-limited por IP em memória pra evitar flood.
+    if (req.method === 'POST' && req.url === '/api/error'){
+        try {
+            const body = await readBody(req);
+            const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+            // Rate limit: 1 erro/segundo por IP. Dropa silenciosamente se floodar.
+            const now = Date.now();
+            _errorRateMap.set(ip, (_errorRateMap.get(ip) || 0));
+            if (_errorRateMap.get(ip) > now - 1000) return httpJson(res, 200, { ok:true, dropped:true });
+            _errorRateMap.set(ip, now);
+            recordError({
+                kind: 'js_error',
+                player: body.player || null,
+                msg: body.msg || '',
+                stack: body.stack || null,
+                meta: { url: body.url, userAgent: (req.headers['user-agent'] || '').slice(0, 200) },
+            });
+            return httpJson(res, 200, { ok:true });
+        } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
+    }
+    // GET /api/admin/state?token=X — snapshot pro painel admin web
+    if (req.method === 'GET' && req.url.startsWith('/api/admin/state')){
+        const url = new URL(req.url, 'http://localhost');
+        const token = url.searchParams.get('token') || req.headers['x-admin-token'] || '';
+        if (!ADMIN_TOKEN || token !== ADMIN_TOKEN) return httpJson(res, 401, { error:'unauthorized' });
+        const onlineList = [];
+        for (const p of players.values()){
+            if (p.disconnected || !p.name || p.name === 'Anônimo') continue;
+            onlineList.push({
+                id: p.id,
+                name: p.name,
+                isAdmin: isAdmin(p.name),
+                x: p.x, y: p.y,
+                hp: p.hp, maxHp: p.maxHp,
+                mp: p.mp, maxMp: p.maxMp,
+                gold: p.gold || 0,
+                connectedAt: p.connectedAt || null,
+            });
+        }
+        return httpJson(res, 200, {
+            now: Date.now(),
+            uptime_s: Math.floor((Date.now() - counters.started_at) / 1000),
+            online: onlineList,
+            errors: errors.slice(-100).reverse(),   // últimos 100, mais recente primeiro
+            counters: {
+                connections_total: counters.connections_total,
+                ws_closes: counters.ws_closes,
+                errors_5min: errorsRecent5min(),
+                total_accounts: accounts.size,
+                state_mobs: monsters.size,
+            },
+        });
+    }
+    // POST /api/admin/action?token=X — comandos admin via web (reset, kick, say, etc)
+    if (req.method === 'POST' && req.url.startsWith('/api/admin/action')){
+        const url = new URL(req.url, 'http://localhost');
+        const token = url.searchParams.get('token') || req.headers['x-admin-token'] || '';
+        if (!ADMIN_TOKEN || token !== ADMIN_TOKEN) return httpJson(res, 401, { error:'unauthorized' });
+        try {
+            const body = await readBody(req);
+            const kind = String(body.kind || '');
+            if (kind === 'reset'){
+                const r = adminResetUser(body.target || '');
+                return httpJson(res, 200, r);
+            }
+            if (kind === 'check'){
+                const info = adminCheckUser(body.target || '');
+                return httpJson(res, 200, info ? { ok:true, info } : { ok:false, reason:'not_found' });
+            }
+            if (kind === 'delete'){
+                const r = deleteUserAccount(body.target || '');
+                return httpJson(res, 200, r);
+            }
+            if (kind === 'say'){
+                const text = String(body.text || '').slice(0, 200);
+                const level = String(body.level || 'admin');
+                if (text) broadcastMsg(level, text);
+                return httpJson(res, 200, { ok:true });
+            }
+            if (kind === 'kick'){
+                const target = String(body.target || '').toLowerCase();
+                let kicked = false;
+                for (const pp of players.values()){
+                    if (pp.name && pp.name.toLowerCase() === target && pp.ws && pp.ws.readyState === 1){
+                        try { pp.ws.close(4003, 'admin_kick'); } catch {}
+                        kicked = true;
+                    }
+                }
+                return httpJson(res, 200, { ok: kicked, target });
+            }
+            return httpJson(res, 400, { error:'unknown_kind' });
+        } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
     }
     return httpJson(res, 404, { error:'not_found' });
 }
@@ -2286,6 +2385,53 @@ function loadAccountsFromDisk(){
 }
 loadAccountsFromDisk();
 
+// ─── Observabilidade: errors ring + counters ──────────────────────────────
+// Anel circular dos últimos N erros (FIFO). Persiste no Volume pra sobreviver
+// a restart. Inclui: erros JS do cliente, [ws:close] do server, warnings de
+// sanitizeSave, bug reports do botão in-game (futuro).
+const ERRORS_FILE = (process.env.STATE_FILE_PATH
+    ? path.join(path.dirname(process.env.STATE_FILE_PATH), 'errors.json')
+    : path.join(__dirname, 'errors.json'));
+const ERRORS_CAP = 200;
+const errors = [];   // { ts, kind, player, msg, stack?, meta? }
+const counters = {
+    connections_total: 0,
+    ws_closes: {},   // { '1006': N, '1001': N, ... }
+    started_at: Date.now(),
+};
+let _errorsSaveTimer = null;
+function recordError(entry){
+    const safe = {
+        ts: Date.now(),
+        kind: String(entry.kind || 'unknown').slice(0, 32),
+        player: entry.player ? String(entry.player).slice(0, 32) : null,
+        msg: entry.msg ? String(entry.msg).slice(0, 500) : '',
+        stack: entry.stack ? String(entry.stack).slice(0, 2000) : null,
+        meta: entry.meta || null,
+    };
+    errors.push(safe);
+    if (errors.length > ERRORS_CAP) errors.splice(0, errors.length - ERRORS_CAP);
+    if (_errorsSaveTimer) return;
+    _errorsSaveTimer = setTimeout(() => {
+        _errorsSaveTimer = null;
+        try { fs.writeFileSync(ERRORS_FILE, JSON.stringify({ v:1, errors }), 'utf8'); }
+        catch(e){ console.error('[errors] erro ao salvar:', e.message); }
+    }, 3000);
+}
+function loadErrorsFromDisk(){
+    if (!fs.existsSync(ERRORS_FILE)) return;
+    try {
+        const d = JSON.parse(fs.readFileSync(ERRORS_FILE, 'utf8'));
+        if (d && Array.isArray(d.errors)) errors.push(...d.errors.slice(-ERRORS_CAP));
+        console.log(`[errors] ${errors.length} entradas carregadas de disco`);
+    } catch(e){ console.error('[errors] erro ao carregar:', e.message); }
+}
+loadErrorsFromDisk();
+function errorsRecent5min(){
+    const cutoff = Date.now() - 5*60*1000;
+    return errors.filter(e => e.ts > cutoff).length;
+}
+
 // Inicia mundo
 let lastResetDay = new Date().toDateString();
 if (!loadStateFromDisk()) spawnInitial();
@@ -3190,8 +3336,9 @@ function removeGhostsByName(name, exceptId){
 // ─── Conexões ───────────────────────────────────────────────────────────────
 wss.on('connection', (ws) => {
     const id = nextId++;
-    const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', hp:100, maxHp:100 };
+    const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', hp:100, maxHp:100, connectedAt: Date.now() };
     players.set(id, p);
+    counters.connections_total++;
     console.log(`[+] ${id} conectou (${players.size} online)`);
 
     ws.on('message', (raw) => {
@@ -4935,10 +5082,16 @@ wss.on('connection', (ws) => {
 
     ws.on('error', (err) => {
         console.warn(`[ws:err] id=${id} name=${p.name || '?'} code=${err.code || '?'} msg=${err.message || err}`);
+        recordError({ kind:'ws_error', player: p.name || null, msg: err.message || String(err), meta: { code: err.code || null, id } });
     });
     ws.on('close', (code, reasonBuf) => {
         const reason = reasonBuf ? reasonBuf.toString().slice(0, 100) : '';
         console.log(`[ws:close] id=${id} name=${p.name || '?'} code=${code} reason=${reason || '(empty)'}`);
+        counters.ws_closes[String(code)] = (counters.ws_closes[String(code)] || 0) + 1;
+        // 1000/1001 são closes limpos — não geram entry de erro (poluiria log)
+        if (code !== 1000 && code !== 1001){
+            recordError({ kind:'ws_close', player: p.name || null, msg: `code=${code} reason=${reason || '(empty)'}`, meta: { code, id } });
+        }
         // Duelo ativo: abandonar conta como derrota (oponente leva o pot)
         if (p.duel){
             const opp = players.get(p.duel.opponentId);
