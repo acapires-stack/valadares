@@ -2016,6 +2016,15 @@ function sanitizeSave(data, ownerName){
             if (data[k] !== orig) log(k, orig, data[k]);
         }
     }
+    // Posição — NaN/fora-do-mapa quebra render do sprite (player invisível). Força (50,50)
+    // se inválido. Sintoma observado: amigo entra no mobile + PC e save sincronizou ruim.
+    for (const k of ['x', 'y']){
+        if (k in data){
+            const orig = data[k];
+            const v = (typeof orig === 'number' && isFinite(orig) && orig >= 1 && orig <= 98) ? Math.floor(orig) : 50;
+            if (v !== orig){ log(`pos.${k}`, orig, v); data[k] = v; }
+        }
+    }
     // permaBuffs — xpBonus pode dar XP infinito permanente se adulterado
     if (data.permaBuffs && typeof data.permaBuffs === 'object'){
         for (const k of Object.keys(data.permaBuffs)){
@@ -2090,6 +2099,64 @@ function verifyAccount(name, clientHash){
     const a = getAccount(name);
     if (!a) return false;
     return a.pwHash === hashPwServer(clientHash);
+}
+// Admin: lê estado salvo + online de um player. Retorna null se conta não existe.
+function adminCheckUser(rawName){
+    const nameLower = String(rawName || '').toLowerCase().trim();
+    if (!nameLower) return null;
+    const a = accounts.get(nameLower);
+    if (!a) return null;
+    let online = null;
+    for (const pp of players.values()){
+        if (pp.name && pp.name.toLowerCase() === nameLower){
+            online = { x:pp.x, y:pp.y, hp:pp.hp, maxHp:pp.maxHp, mp:pp.mp, maxMp:pp.maxMp, gold:pp.gold };
+            break;
+        }
+    }
+    const s = a.save || {};
+    return {
+        name: a.name,
+        email: a.email || null,
+        createdAt: a.createdAt || 0,
+        savedAt: a.savedAt || 0,
+        save: { x:s.x, y:s.y, hp:s.hp, maxHp:s.maxHp, mp:s.mp, maxMp:s.maxMp, gold:s.gold },
+        online,
+    };
+}
+// Admin: reseta pos/hp do player. Corrige sprite invisível por save bichado.
+function adminResetUser(rawName){
+    const nameLower = String(rawName || '').toLowerCase().trim();
+    if (!nameLower) return { ok:false, reason:'empty' };
+    const a = accounts.get(nameLower);
+    if (!a) return { ok:false, reason:'not_found' };
+    a.save = a.save || {};
+    a.save.x = 50; a.save.y = 50;
+    // Restaura hp/mp pra topo do cap conhecido (se inválido)
+    const mxH = (typeof a.save.maxHp === 'number' && a.save.maxHp > 0) ? a.save.maxHp : 100;
+    const mxM = (typeof a.save.maxMp === 'number' && a.save.maxMp >= 0) ? a.save.maxMp : 0;
+    a.save.maxHp = mxH; a.save.maxMp = mxM;
+    a.save.hp = mxH; a.save.mp = mxM;
+    a.savedAt = Date.now();
+    // Se online, aplica imediato + força client a redesenhar
+    let online = false;
+    for (const pp of players.values()){
+        if (pp.name && pp.name.toLowerCase() === nameLower){
+            pp.x = 50; pp.y = 50;
+            pp.hp = mxH; pp.maxHp = mxH;
+            pp.mp = mxM; pp.maxMp = mxM;
+            online = true;
+            if (pp.ws.readyState === 1){
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:'Admin resetou sua posição. Recarregando…' }));
+                broadcastPstatsAll(pp);
+                // Força o client teleportar (server manda pstats + cliente recarrega)
+                pp.ws.send(JSON.stringify({ t:'forceTeleport', x:50, y:50 }));
+            }
+            break;
+        }
+    }
+    queueSaveAccounts();
+    console.log(`[admin] reset user: ${nameLower} (online=${online})`);
+    return { ok:true, name:a.name, online };
 }
 // Admin: remove conta + kicka player online + persiste. Retorna info pro caller.
 function deleteUserAccount(rawName){
@@ -4731,7 +4798,7 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME' });
                     return;
                 }
                 if (cmd === '/deluser'){
@@ -4746,6 +4813,25 @@ wss.on('connection', (ws) => {
                         return;
                     }
                     sendTo(id, { t:'serverMsg', level:'info', text:`Conta ${res.name} removida${res.kicked ? ' (estava online — desconectado)' : ''}.` });
+                    return;
+                }
+                if (cmd === '/checkuser'){
+                    if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /checkuser NOME' }); return; }
+                    const info = adminCheckUser(arg);
+                    if (!info){ sendTo(id, { t:'serverMsg', level:'warn', text:`Conta "${arg}" não existe.` }); return; }
+                    const s = info.save;
+                    const o = info.online;
+                    sendTo(id, { t:'serverMsg', level:'info', text:`${info.name} ${o?'[online]':'[offline]'} · save: pos=(${s.x},${s.y}) hp=${s.hp}/${s.maxHp} mp=${s.mp}/${s.maxMp} gold=${s.gold}${o?` · live: pos=(${o.x},${o.y}) hp=${o.hp}/${o.maxHp}`:''}` });
+                    return;
+                }
+                if (cmd === '/resetuser'){
+                    if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /resetuser NOME' }); return; }
+                    const res = adminResetUser(arg);
+                    if (!res.ok){
+                        sendTo(id, { t:'serverMsg', level:'warn', text: res.reason === 'not_found' ? `Conta "${arg}" não existe.` : 'Falha.' });
+                        return;
+                    }
+                    sendTo(id, { t:'serverMsg', level:'info', text:`Player ${res.name} resetado para (50,50)${res.online ? ' (online — aplicado imediato)' : ' (offline — próximo login pega)'}` });
                     return;
                 }
                 if (cmd === '/setboss'){
