@@ -1612,6 +1612,18 @@
     </div>
 </div>
 
+<div id="talentsModal" style="display:none">
+    <div class="chest-box" style="min-width:560px;max-width:640px">
+        <div class="chest-title">⚜ TALENTOS</div>
+        <div id="talentsSummary" style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px"></div>
+        <div id="talentsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
+        <div class="chest-hint" style="margin-top:10px">
+            1 ponto a cada 10 níveis totais de skill &nbsp;|&nbsp; talentos são permanentes &nbsp;|&nbsp; <kbd>K</kbd> ou <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeTalents()">×</button>
+    </div>
+</div>
+
 <div id="achievementsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
         <div class="chest-title">🏆 CONQUISTAS</div>
@@ -1777,7 +1789,7 @@
 </div>
 
 <div id="controls">
-    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>N</kbd> amigos &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
+    <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>K</kbd> talentos &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>N</kbd> amigos &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
 </div>
 
 <script>
@@ -3763,6 +3775,7 @@ const player = {
     gold: 0,
     email: '',                // email pro recibo do MP — preenchido na 1ª compra
     seasonsWon: [],           // ['2026-05', '2026-06', ...] — temporadas em que foi #1
+    talents: {},              // { t_crit:true, t_hp:true, ... } — talents comprados
     shieldDefense: 0,   // derivado da skill Escudo
     hurtTimer: 0,       // tempo restante (ms) do tingimento vermelho ao apanhar
     activeSpell: null,        // começa sem magia — precisa comprar no altar
@@ -4140,7 +4153,8 @@ function recomputeStats(){
     const s = player.skills;
     const sumSkills = Object.values(s).reduce((a,sk) => a + sk.val, 0);
     const above = Math.max(0, sumSkills - 60);
-    const newMaxHp = 100 + above;
+    const hpExtra = (player.permaBuffs?.hpBonus || 0);   // talent t_hp
+    const newMaxHp = 100 + above + hpExtra;
     const newMaxMp = 100 + Math.floor(above / 2);
     const dHp = newMaxHp - player.maxHp;
     const dMp = newMaxMp - player.maxMp;
@@ -4455,7 +4469,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -4864,7 +4878,8 @@ function playerCritChance(){
     const sk = player.skills[w.skill];
     const base = Math.min(0.30, 0.04 + Math.max(0, sk.val - 10) * 0.004);
     const mults = (player.pvp || player.selos > 0) ? pvpMults() : null;
-    return base + (mults ? mults.crit : 0);
+    const perma = player.permaBuffs?.critBonus || 0;   // talent t_crit
+    return base + (mults ? mults.crit : 0) + perma;
 }
 function playerDodgeChance(){
     const skillBased = 0.02 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;
@@ -5123,13 +5138,14 @@ function tickRegen(dt){
     const pzMp = inPz ? 3 : 1;
     const hpInterval = 4000 / (m.regenHp * pzHp);
     const mpInterval = 2000 / (m.regenMp * pzMp);
+    const talentRegen = player.permaBuffs?.regenBonus || 0;   // talent t_regen
     if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
-        const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0);
+        const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0) + talentRegen;
         player.hp = Math.min(player.maxHp, player.hp + heal);
         player.hpRegenTimer = 0;
     }
     if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
-        const mpGain = inPz ? 2 : 1;
+        const mpGain = (inPz ? 2 : 1) + talentRegen;
         player.mp = Math.min(player.maxMp, player.mp + mpGain);
         player.mpRegenTimer = 0;
     }
@@ -5584,6 +5600,19 @@ function handleMP(msg){
             if (typeof renderQuests === 'function') renderQuests();
             const chainNpc = msg.questResult.chainId && (window.NPCS || []).find(n => n.chain === msg.questResult.chainId);
             if (chainNpc && typeof renderChainDialog === 'function') renderChainDialog(chainNpc);
+            saveState();
+        }
+        // M5: Talent comprado — server enviou talents + permaBuffs atualizados
+        if (msg.talents && typeof msg.talents === 'object') player.talents = msg.talents;
+        if (msg.talentResult && msg.talentResult.ok){
+            const def = TALENT_DEFS_CLIENT[msg.talentResult.talentId];
+            if (def){
+                log(`<span class="log-up">⚜ ${def.name} adquirido! (${def.desc})</span>`);
+                if (typeof sndLevelUp === 'function') sndLevelUp();
+                addFloat(player.x, player.y, '⚜ ' + def.name, '#ffd060', true, -20);
+            }
+            if (typeof recomputeStats === 'function') recomputeStats();
+            if (document.getElementById('talentsModal')?.style.display === 'flex') renderTalents();
             saveState();
         }
         // Season reward — campeão do mês recebe Coroa de Temporada (server hand-off online)
@@ -8920,6 +8949,10 @@ document.addEventListener('keydown', e => {
         const m = document.getElementById('rankingModal');
         if (m && m.style.display !== 'none') closeRanking(); else openRanking();
     }
+    if (e.key==='k' || e.key==='K'){
+        const m = document.getElementById('talentsModal');
+        if (m && m.style.display !== 'none') closeTalents(); else openTalents();
+    }
     if (e.key==='n' || e.key==='N'){
         const m = document.getElementById('friendsModal');
         if (m && m.style.display !== 'none') closeFriends(); else openFriends();
@@ -10805,6 +10838,96 @@ function closeRanking(){
     document.getElementById('rankingModal').style.display = 'none';
 }
 
+// ─── Modal de Talents (M5) ───────────────────────────────────────────────
+// Espelho do TALENT_DEFS do server. Cliente renderiza UI; toda compra passa
+// por talentAlloc no server (autoritativo). Bônus aplicam via permaBuffs.
+const TALENT_DEFS_CLIENT = {
+    t_crit:  { name:'Olho de Águia',         desc:'+5% chance crítica',         icon:'🎯', cat:'Ofensivo' },
+    t_dodge: { name:'Reflexos Felinos',      desc:'+5% chance de esquiva',      icon:'💨', cat:'Defensivo' },
+    t_hp:    { name:'Constituição',          desc:'+30 HP máximo',              icon:'❤', cat:'Defensivo' },
+    t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills', icon:'📚', cat:'Utilidade' },
+    t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen', icon:'✚', cat:'Defensivo' },
+    t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob',  icon:'💰', cat:'Utilidade' },
+};
+function totalLevelsAbove10(){
+    if (!player.skills) return 0;
+    let sum = 0;
+    for (const sk of Object.values(player.skills)) sum += Math.max(0, (sk.val || 10) - 10);
+    return sum;
+}
+function talentPointsEarned(){ return Math.floor(totalLevelsAbove10() / 10); }
+function talentPointsUsed(){
+    if (!player.talents) return 0;
+    return Object.keys(player.talents).filter(id => player.talents[id] && TALENT_DEFS_CLIENT[id]).length;
+}
+function talentPointsAvailable(){ return Math.max(0, talentPointsEarned() - talentPointsUsed()); }
+function openTalents(){
+    closeAllModals();
+    document.getElementById('talentsModal').style.display = 'flex';
+    renderTalents();
+}
+function closeTalents(){
+    document.getElementById('talentsModal').style.display = 'none';
+}
+function renderTalents(){
+    const summary = document.getElementById('talentsSummary');
+    const list = document.getElementById('talentsList');
+    const earned = talentPointsEarned();
+    const used = talentPointsUsed();
+    const avail = earned - used;
+    const totalLv = totalLevelsAbove10();
+    summary.innerHTML = `
+        <div style="font-size:18px;color:#ffd060;font-weight:bold">${avail} ponto${avail===1?'':'s'} disponível${avail===1?'':'eis'}</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">${used}/${earned} usados · ${totalLv} níveis totais (próximo ponto em ${10 - (totalLv % 10)} levels)</div>`;
+    const byCat = { Ofensivo:[], Defensivo:[], Utilidade:[] };
+    for (const [id, def] of Object.entries(TALENT_DEFS_CLIENT)){
+        byCat[def.cat].push({ id, def });
+    }
+    list.innerHTML = Object.entries(byCat).map(([cat, talents]) => `
+        <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:10px 4px 4px 4px;border-bottom:1px solid #1a1408;margin-top:6px">${cat.toUpperCase()}</div>
+        ${talents.map(({id, def}) => {
+            const owned = !!(player.talents && player.talents[id]);
+            const canBuy = !owned && avail > 0;
+            const btn = owned
+                ? `<span style="color:#74d176;font-size:11px;font-weight:700">✓ ADQUIRIDO</span>`
+                : canBuy
+                    ? `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px" onclick="buyTalent('${id}')">comprar (1 pt)</button>`
+                    : `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px;opacity:0.4;cursor:not-allowed" disabled>sem pontos</button>`;
+            return `
+                <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid #1a1408;${owned ? 'background:#0a1a0a' : ''}">
+                    <span style="font-size:22px;width:32px;text-align:center">${def.icon}</span>
+                    <div style="flex:1">
+                        <div style="color:${owned ? '#74d176' : '#ffd060'};font-weight:600;font-size:13px">${def.name}</div>
+                        <div style="color:#888;font-size:11px;margin-top:2px">${def.desc}</div>
+                    </div>
+                    ${btn}
+                </div>`;
+        }).join('')}`).join('');
+}
+function buyTalent(id){
+    if (!TALENT_DEFS_CLIENT[id]) return;
+    if (player.talents && player.talents[id]){ log('<span class="log-sys">Talento já adquirido.</span>'); return; }
+    if (talentPointsAvailable() < 1){ log('<span class="log-sys">Sem pontos disponíveis.</span>'); return; }
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'talentAlloc', talentId:id })); } catch {}
+        log(`<span class="log-sys">Adquirindo ${TALENT_DEFS_CLIENT[id].name}…</span>`);
+    } else {
+        // Offline fallback (single-player)
+        player.talents = player.talents || {};
+        player.talents[id] = true;
+        player.permaBuffs = player.permaBuffs || {};
+        const buffMap = { t_crit:['critBonus',0.05], t_dodge:['dodgeBonus',0.05], t_hp:['hpBonus',30], t_xp:['xpBonus',0.10], t_regen:['regenBonus',1], t_loot:['lootBonus',0.15] };
+        const [k, v] = buffMap[id] || [];
+        if (k) player.permaBuffs[k] = (player.permaBuffs[k] || 0) + v;
+        if (typeof recomputeStats === 'function') recomputeStats();
+        renderTalents();
+        saveState();
+    }
+}
+window.openTalents = openTalents;
+window.closeTalents = closeTalents;
+window.buyTalent = buyTalent;
+
 // ─── Modal de Guild (membros + leader + online) ──────────────────────────
 function openGuildModal(info){
     closeAllModals();
@@ -11437,6 +11560,7 @@ function saveState(){
         duelWins: player.duelWins || 0,
         email: String(player.email || '').slice(0, 120),
         seasonsWon: Array.isArray(player.seasonsWon) ? player.seasonsWon.slice(0, 24) : [],
+        talents: player.talents || {},
         savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
@@ -11564,6 +11688,10 @@ function applySaveData(d){
         if (typeof d.duelWins === 'number') player.duelWins = d.duelWins; else player.duelWins = 0;
         if (typeof d.email === 'string') player.email = d.email.slice(0, 120); else player.email = '';
         if (Array.isArray(d.seasonsWon)) player.seasonsWon = d.seasonsWon.slice(0, 24); else player.seasonsWon = [];
+        if (d.talents && typeof d.talents === 'object'){
+            player.talents = {};
+            for (const tid of Object.keys(d.talents)) if (d.talents[tid]) player.talents[tid] = true;
+        } else { player.talents = {}; }
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }

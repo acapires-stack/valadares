@@ -1518,6 +1518,37 @@ function seasonCombinedScore(r){
     if (!r) return 0;
     return (r.mobKills || 0) + (r.pkKills || 0) * 5 + (r.bossKills || 0) * 20;
 }
+// ─── Talents (M5) ──────────────────────────────────────────────────────────
+// Talents são single-rank passivos que aplicam permaBuffs ao serem comprados.
+// 1 ponto a cada 10 levels totais (sum of skill.val - 10 across all skills).
+// Server é autoritativo: handler talentAlloc valida pontos + aplica permaBuff.
+const TALENT_DEFS = {
+    t_crit:  { name:'Olho de Águia',         desc:'+5% chance crítica',         buff:{ critBonus:  0.05 } },
+    t_dodge: { name:'Reflexos Felinos',      desc:'+5% chance de esquiva',      buff:{ dodgeBonus: 0.05 } },
+    t_hp:    { name:'Constituição',          desc:'+30 HP máximo',              buff:{ hpBonus:    30   } },
+    t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills', buff:{ xpBonus:    0.10 } },
+    t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen', buff:{ regenBonus: 1    } },
+    t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob',  buff:{ lootBonus:  0.15 } },
+};
+function totalLevelsAbove10(p){
+    if (!p.skills) return 0;
+    let sum = 0;
+    for (const sk of Object.values(p.skills)){
+        sum += Math.max(0, (sk.val || 10) - 10);
+    }
+    return sum;
+}
+function talentPointsEarned(p){ return Math.floor(totalLevelsAbove10(p) / 10); }
+function talentPointsUsed(p){
+    if (!p.talents) return 0;
+    let n = 0;
+    for (const id of Object.keys(p.talents)){
+        if (p.talents[id] && TALENT_DEFS[id]) n++;
+    }
+    return n;
+}
+function talentPointsAvailable(p){ return Math.max(0, talentPointsEarned(p) - talentPointsUsed(p)); }
+
 // Helpers de bump duplo (ranking all-time + season). Sempre usar em vez de
 // mexer direto em r.mobKills/pkKills/bossKills/gold pra manter os dois em sync.
 function bumpMobKill(name, isBoss){
@@ -2666,6 +2697,16 @@ wss.on('connection', (ws) => {
             if (data.questFlags && typeof data.questFlags === 'object') p.questFlags = data.questFlags;
             if (data.flags && typeof data.flags === 'object') p.flags = data.flags;
             if (data.permaBuffs && typeof data.permaBuffs === 'object') p.permaBuffs = data.permaBuffs;
+            // M5: talents hidratam aqui APENAS se ainda não temos no server.
+            // Como talents agora viram permaBuffs ao serem alocados via handler,
+            // se o save do cliente trouxer talents que o server desconhece, ainda
+            // confiamos pra compat — server lockdown FULL fica pra fase futura.
+            if (data.talents && typeof data.talents === 'object'){
+                p.talents = p.talents || {};
+                for (const tid of Object.keys(data.talents)){
+                    if (TALENT_DEFS[tid] && data.talents[tid]) p.talents[tid] = true;
+                }
+            }
             setPlayerSave(p.authedName, data);
             return;
         }
@@ -2711,6 +2752,12 @@ wss.on('connection', (ws) => {
                 if (acc.save.questFlags && typeof acc.save.questFlags === 'object') p.questFlags = acc.save.questFlags;
                 if (acc.save.flags && typeof acc.save.flags === 'object') p.flags = acc.save.flags;
                 if (acc.save.permaBuffs && typeof acc.save.permaBuffs === 'object') p.permaBuffs = acc.save.permaBuffs;
+                if (acc.save.talents && typeof acc.save.talents === 'object'){
+                    p.talents = {};
+                    for (const tid of Object.keys(acc.save.talents)){
+                        if (TALENT_DEFS[tid] && acc.save.talents[tid]) p.talents[tid] = true;
+                    }
+                }
             } else {
                 if (msg.equipped && typeof msg.equipped === 'object') p.equipped = { ...p.equipped, ...msg.equipped };
             }
@@ -3295,6 +3342,33 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── M5: Talent allocation server-side ─────────────────────────────
+        // Cliente envia { t:'talentAlloc', talentId }. Server valida que existe
+        // ponto disponível (earned-used > 0), aplica permaBuff e devolve estado.
+        if (msg.t === 'talentAlloc') {
+            const reject = (reason) => {
+                if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'talentResult', ok:false, reason }));
+            };
+            const tid = String(msg.talentId || '');
+            const def = TALENT_DEFS[tid];
+            if (!def) return reject('unknown_talent');
+            p.talents = p.talents || {};
+            if (p.talents[tid]) return reject('already_owned');
+            if (talentPointsAvailable(p) < 1) return reject('no_points');
+            // Aplica permaBuff
+            p.permaBuffs = p.permaBuffs || {};
+            for (const [k, v] of Object.entries(def.buff)){
+                p.permaBuffs[k] = (p.permaBuffs[k] || 0) + v;
+            }
+            p.talents[tid] = true;
+            sendInvUpdate(p, {
+                talentResult:{ ok:true, talentId: tid },
+                talents: p.talents,
+                permaBuffs: p.permaBuffs,
+            });
+            return;
+        }
+
         // ATAQUE A MOB (#10 validado)
         if (msg.t === 'attackMob') {
             const m = monsters.get(msg.monsterId);
@@ -3394,6 +3468,15 @@ wss.on('connection', (ws) => {
                 // Loot autoritativo: server roda LOOT e mantém drops no chão.
                 // Cada item ganha id server-side; broadcast spawn pra TODOS verem.
                 const loot = rollLoot(m.type);
+                // M5 talent t_loot: +15% gold de drops. Aplica antes do spawn.
+                const lootBonus = p.permaBuffs?.lootBonus || 0;
+                if (lootBonus > 0){
+                    for (const it of loot){
+                        if (it && it.type === 'GOLD' && it.qty > 0){
+                            it.qty = Math.max(1, Math.round(it.qty * (1 + lootBonus)));
+                        }
+                    }
+                }
                 const spawnedDrops = [];
                 for (const it of loot){
                     if (!it || !it.type) continue;
