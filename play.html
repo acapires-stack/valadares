@@ -5194,7 +5194,7 @@ let _eventXpMul = 1.0;
 let _dailyEvent = null;   // { id, name, emoji, desc, until }
 
 // Servidor WebSocket em produção (Railway)
-const PRODUCTION_WS_URL = 'wss://valadares-production.up.railway.app';
+const PRODUCTION_WS_URL = 'wss://ws.valadares.app.br';
 
 // Determina a URL do server WS. Ordem de prioridade:
 //  1. ?ws=wss://...  na query string
@@ -6175,7 +6175,7 @@ const SERVER_HTTP_BASE = (() => {
     if (typeof WS_URL === 'string'){
         return WS_URL.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
     }
-    return 'https://valadares-production.up.railway.app';
+    return 'https://ws.valadares.app.br';
 })();
 let _goldPackages = null;
 async function openGoldShop(){

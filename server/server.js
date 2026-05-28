@@ -19,7 +19,7 @@ let mpClient = null;
 let mpPreference = null;
 let mpPayment = null;
 const MP_TOKEN = process.env.MP_ACCESS_TOKEN || '';
-const MP_BASE_URL = process.env.MP_BASE_URL || `https://valadares-production.up.railway.app`;
+const MP_BASE_URL = process.env.MP_BASE_URL || `https://ws.valadares.app.br`;
 // Secret do webhook MP — configurado no painel MP em "Webhooks → Configurar notificações → Segredo".
 // Quando setado, valida x-signature de toda chamada em /webhook/mp (HMAC-SHA256). Sem secret = sem validação (modo dev/compat).
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || '';
