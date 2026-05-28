@@ -10598,7 +10598,9 @@ function handleMovement(dt){
     if (!walkable(map[ny][nx])) return;
     if (monsterAt(nx,ny)) return;
     if (npcOnTile(nx,ny)) return;  // não passa por cima de NPC
-    if (remotePlayerOnTile(nx,ny)) return;  // não atravessa outro player/bot — PvP precisa de barreira física
+    // Colisão player↔player só FORA da PZ. Na PZ podem se atravessar (movimentação livre
+    // ao redor de NPCs/baús/altar). No mapa aberto bloqueia pra PvP ter barreira física.
+    if (!inSafeZone(nx,ny) && remotePlayerOnTile(nx,ny)) return;
     // animação: guarda posição anterior antes de pular pro tile novo
     player.prevX = player.x; player.prevY = player.y;
     player.x = nx; player.y = ny;
