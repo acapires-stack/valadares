@@ -3938,6 +3938,9 @@ function damagePlayer(amount, source, attacker){
 
 // Centraliza as regras de status: cada mob tem chance/efeito ao bater
 function rollAttackerStatus(mobType){
+    // Fase 5: server roda applyAttackerStatus em tickAI mob attack. Cliente
+    // recebe playerDot/playerStun pra setar UI. Aqui no-op online.
+    if (typeof serverAuthMobs !== 'undefined' && serverAuthMobs && _wsAuthed) return;
     if (!mobType) return;
     switch (mobType){
         case 'SPIDER':   if (Math.random() < 0.15) applyPoison(2, 4, 3000, 'Aranha');           break;
@@ -5767,17 +5770,59 @@ function handleMP(msg){
             log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
         }
         saveState();
+    } else if (msg.t === 'playerDot'){
+        // Fase 5: server iniciou DoT no player local — UI espelha pra renderizar
+        // ícones de status (☠/🩸/🔥). dmg/ticks são autoritativos no server.
+        if (msg.type === 'poison'){
+            player.poison = { dmgPerTick: 0, ticksLeft: 999, intervalMs: 99999, nextTickAt: Infinity, source: msg.source || '?' };
+            log(`<span class="log-dmg">☠ Envenenado por ${escapeHtml(msg.source || '?')}!</span>`);
+            addFloat(player.x, player.y, 'VENENO', '#74d176', false, -28);
+        } else if (msg.type === 'bleed'){
+            player.bleed = { dmgPerTick: 0, ticksLeft: 999, intervalMs: 99999, nextTickAt: Infinity, source: msg.source || '?' };
+            log(`<span class="log-dmg">🩸 Sangrando por ${escapeHtml(msg.source || '?')}!</span>`);
+            addFloat(player.x, player.y, 'SANGRA', '#cc3030', false, -28);
+        }
+    } else if (msg.t === 'playerDotEnd'){
+        if (msg.type === 'poison'){
+            player.poison = null;
+            log(`<span class="log-sys">Veneno passou.</span>`);
+        } else if (msg.type === 'bleed'){
+            player.bleed = null;
+            log(`<span class="log-sys">Sangramento parou.</span>`);
+        }
+    } else if (msg.t === 'playerStun'){
+        const dur = msg.durationMs | 0;
+        const endAt = Date.now() + dur;
+        if (!player.stun || player.stun.endAt < endAt){
+            player.stun = { endAt };
+            log(`<span class="log-dmg">⚡ Atordoado por ${escapeHtml(msg.source || '?')}! (${(dur/1000).toFixed(1)}s)</span>`);
+            addFloat(player.x, player.y, 'STUN', '#ffaa20', true, -28);
+        }
+    } else if (msg.t === 'playerFloat'){
+        // Float sobre um player (DoT tick, etc) — vindo de server tickPlayerDots
+        if (msg.id === myWsId){
+            addFloat(player.x, player.y, msg.text, msg.color || '#aaa', false);
+        } else {
+            const rp = remotePlayers[msg.id];
+            if (rp) addFloat(rp.x, rp.y, msg.text, msg.color || '#aaa', false);
+        }
     } else if (msg.t === 'pvpHit'){
-        const amount = msg.amount;
-        const defT = totalDefense();
-        const reduction = defT > 0 ? defT / (defT + 30) : 0;
-        const actual = Math.max(1, Math.round(amount * (1 - reduction)));
-        player.hp = Math.max(0, player.hp - actual);
+        // Fase 5: server aplica dmg server-side (msg.actual). Cliente só anima.
+        // Fallback pra cálculo local em clients velhos.
+        let actual;
+        if (typeof msg.actual === 'number'){
+            actual = msg.actual;
+        } else {
+            const defT = totalDefense();
+            const reduction = defT > 0 ? defT / (defT + 30) : 0;
+            actual = Math.max(1, Math.round((msg.amount | 0) * (1 - reduction)));
+            player.hp = Math.max(0, player.hp - actual);
+        }
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         player.hurtTimer = 300;
         log(`<span class="log-dmg">⚠ ${escapeHtml(msg.fromName)} (PvP): ${actual} dano</span>`);
-        if (player.hp === 0){
-            // PK death — reporta ao servidor pra dar selo/coração ao killer
+        // pkDeath é disparado via pstats com hp=0 (handler self). Fallback legacy:
+        if (msg.actual == null && player.hp === 0){
             pkDeathBy(msg.from, msg.fromName);
         }
     } else if (msg.t === 'pkKill'){
@@ -7259,37 +7304,41 @@ function isStunned(){
 }
 function tickStatusEffects(){
     if (_isUpdating) return;   // janela de auto-update — pausa ticks de DoT
-    const now = Date.now();
-    // Poison
-    if (player.poison){
-        if (now >= player.poison.nextTickAt){
-            const dmg = player.poison.dmgPerTick;
-            player.hp = Math.max(0, player.hp - dmg);
-            addFloat(player.x, player.y, `-${dmg}`, '#74d176', false);
-            player.poison.ticksLeft--;
-            if (player.poison.ticksLeft <= 0){
-                player.poison = null;
-                log(`<span class="log-sys">Veneno passou.</span>`);
-            } else {
-                player.poison.nextTickAt = now + player.poison.intervalMs;
+    // Fase 5: server tickPlayerDots aplica dmg autoritativo + manda playerFloat.
+    // Cliente só limpa UI quando server manda playerDotEnd. Stun ainda local
+    // (server seta player.stun via playerStun; isStunned auto-expira).
+    const serverDots = (typeof serverAuthMobs !== 'undefined' && serverAuthMobs) && _wsAuthed;
+    if (!serverDots){
+        const now = Date.now();
+        if (player.poison){
+            if (now >= player.poison.nextTickAt){
+                const dmg = player.poison.dmgPerTick;
+                player.hp = Math.max(0, player.hp - dmg);
+                addFloat(player.x, player.y, `-${dmg}`, '#74d176', false);
+                player.poison.ticksLeft--;
+                if (player.poison.ticksLeft <= 0){
+                    player.poison = null;
+                    log(`<span class="log-sys">Veneno passou.</span>`);
+                } else {
+                    player.poison.nextTickAt = now + player.poison.intervalMs;
+                }
+                if (player.hp === 0) playerDie();
             }
-            if (player.hp === 0) playerDie();
         }
-    }
-    // Bleed
-    if (player.bleed){
-        if (now >= player.bleed.nextTickAt){
-            const dmg = player.bleed.dmgPerTick;
-            player.hp = Math.max(0, player.hp - dmg);
-            addFloat(player.x, player.y, `-${dmg}`, '#cc3030', false);
-            player.bleed.ticksLeft--;
-            if (player.bleed.ticksLeft <= 0){
-                player.bleed = null;
-                log(`<span class="log-sys">Sangramento parou.</span>`);
-            } else {
-                player.bleed.nextTickAt = now + player.bleed.intervalMs;
+        if (player.bleed){
+            if (now >= player.bleed.nextTickAt){
+                const dmg = player.bleed.dmgPerTick;
+                player.hp = Math.max(0, player.hp - dmg);
+                addFloat(player.x, player.y, `-${dmg}`, '#cc3030', false);
+                player.bleed.ticksLeft--;
+                if (player.bleed.ticksLeft <= 0){
+                    player.bleed = null;
+                    log(`<span class="log-sys">Sangramento parou.</span>`);
+                } else {
+                    player.bleed.nextTickAt = now + player.bleed.intervalMs;
+                }
+                if (player.hp === 0) playerDie();
             }
-            if (player.hp === 0) playerDie();
         }
     }
     // Stun: auto-expira em isStunned()

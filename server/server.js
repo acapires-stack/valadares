@@ -643,11 +643,39 @@ function gainSkillXpServer(p, name, amount){
         amt = Math.round(amt * 1.5);
     }
     sk.xp = (sk.xp || 0) + amt;
+    let leveled = false;
     while (sk.xp >= (sk.xpNext || 50)){
         sk.xp -= sk.xpNext;
         sk.val = (sk.val || 10) + 1;
         sk.xpNext = Math.floor((sk.xpNext || 50) * 1.15);
+        leveled = true;
     }
+    if (leveled) recomputeMaxStatsServer(p);
+}
+
+// Fase 5: recalcula maxHp/maxMp baseado em soma de skills + talent hpBonus.
+// Espelha recomputeStats do cliente (linha 4196+). Ajusta p.hp/p.mp pra
+// receber o boost quando maxHp/maxMp aumentar; clampa quando diminuir.
+function recomputeMaxStatsServer(p){
+    if (!p.skills) return;
+    let sumSkills = 0;
+    for (const k of Object.keys(p.skills)){
+        sumSkills += (p.skills[k]?.val || 0);
+    }
+    const above = Math.max(0, sumSkills - 60);
+    const hpExtra = (p.permaBuffs?.hpBonus) || 0;
+    const newMaxHp = 100 + above + hpExtra;
+    const newMaxMp = 100 + Math.floor(above / 2);
+    const oldMaxHp = p.maxHp || 100;
+    const oldMaxMp = p.maxMp || 100;
+    const dHp = newMaxHp - oldMaxHp;
+    const dMp = newMaxMp - oldMaxMp;
+    if (dHp > 0) p.hp = (p.hp ?? oldMaxHp) + dHp;
+    if (dMp > 0) p.mp = (p.mp ?? oldMaxMp) + dMp;
+    if (dHp < 0) p.hp = Math.min(p.hp ?? newMaxHp, newMaxHp);
+    if (dMp < 0) p.mp = Math.min(p.mp ?? newMaxMp, newMaxMp);
+    p.maxHp = newMaxHp;
+    p.maxMp = newMaxMp;
 }
 
 // Aplica uma reward de quest (espelha applyReward do cliente).
@@ -1333,6 +1361,9 @@ function tickAI(){
                 if ((target.hp ?? 100) > 0){
                     target.hp = Math.max(0, (target.hp ?? 100) - actual);
                     broadcastPstatsAll(target);
+                    // Fase 5: DoT/stun authoritative no server (rollAttackerStatus
+                    // do cliente fica como no-op quando online).
+                    applyAttackerStatus(target, m.type);
                 }
                 if (target.ws.readyState === 1){
                     target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual }));
@@ -2235,6 +2266,103 @@ function tickPlayerRegen(){
 }
 setInterval(tickPlayerRegen, 500);
 
+// ─── Fase 5 N3: DoTs em players (poison/bleed) + stun server-side ──────────
+// Espelha ATTACKER_STATUS do cliente. tickAI chama applyAttackerStatus(target,
+// mobType) após aplicar dmg direto. tickPlayerDots roda 1×1s, drena hp e
+// broadcasta pstats + float. Stun é só duração (cliente respeita pra input).
+const ATTACKER_STATUS = {
+    SPIDER:   { dot:[{ type:'poison', chance:0.15, dmg:2, ticks:4, intervalMs:3000, label:'Aranha' }] },
+    SCORPION: { dot:[{ type:'poison', chance:0.30, dmg:3, ticks:5, intervalMs:3000, label:'Escorpião' }] },
+    LIZARD:   { dot:[{ type:'bleed',  chance:0.20, dmg:1, ticks:6, intervalMs:2000, label:'Lagarto' }] },
+    TROLL:    { stun:[{ chance:0.10, durationMs:1500, label:'Troll' }] },
+    MINOTAUR: { stun:[{ chance:0.25, durationMs:2000, label:'Minotauro' }] },
+    SENHOR_VALADARES: {
+        stun:[{ chance:0.45, durationMs:2500, label:'Senhor de Valadares' }],
+        dot: [{ type:'bleed', chance:0.60, dmg:6, ticks:6, intervalMs:2000, label:'Senhor de Valadares' }],
+    },
+};
+function applyAttackerStatus(target, mobType){
+    const entry = ATTACKER_STATUS[mobType];
+    if (!entry || !target) return;
+    if (entry.dot){
+        for (const d of entry.dot){
+            if (Math.random() >= d.chance) continue;
+            target.dots = target.dots || [];
+            const totalNew = d.dmg * d.ticks;
+            const existing = target.dots.find(x => x.type === d.type);
+            const totalOld = existing ? existing.dmg * existing.ticksLeft : 0;
+            if (totalNew >= totalOld){
+                if (existing){
+                    existing.dmg = d.dmg;
+                    existing.ticksLeft = d.ticks;
+                    existing.intervalMs = d.intervalMs;
+                    existing.nextTickAt = Date.now() + d.intervalMs;
+                } else {
+                    target.dots.push({
+                        type: d.type, dmg: d.dmg, ticksLeft: d.ticks,
+                        intervalMs: d.intervalMs, nextTickAt: Date.now() + d.intervalMs,
+                    });
+                }
+                if (target.ws && target.ws.readyState === 1){
+                    target.ws.send(JSON.stringify({ t:'playerDot', type:d.type, source:d.label }));
+                }
+            }
+        }
+    }
+    if (entry.stun){
+        for (const s of entry.stun){
+            if (Math.random() >= s.chance) continue;
+            const endAt = Date.now() + s.durationMs;
+            if (!target._stunnedUntil || target._stunnedUntil < endAt){
+                target._stunnedUntil = endAt;
+                if (target.ws && target.ws.readyState === 1){
+                    target.ws.send(JSON.stringify({ t:'playerStun', durationMs:s.durationMs, source:s.label }));
+                }
+            }
+        }
+    }
+}
+const PLAYER_DOT_COLORS = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
+function tickPlayerDots(){
+    const now = Date.now();
+    for (const p of players.values()){
+        if (!p.dots || !p.dots.length) continue;
+        if (!p.ws || p.ws.readyState !== 1) continue;
+        if ((p.hp ?? 100) <= 0){ p.dots.length = 0; continue; }
+        let hpChanged = false;
+        for (let i = p.dots.length - 1; i >= 0; i--){
+            const d = p.dots[i];
+            if (now < d.nextTickAt) continue;
+            const dmg = d.dmg;
+            p.hp = Math.max(0, p.hp - dmg);
+            hpChanged = true;
+            // float no próprio player (server manda playerFloat)
+            for (const other of players.values()){
+                if (other.ws.readyState !== 1) continue;
+                other.ws.send(JSON.stringify({
+                    t:'playerFloat', id:p.id, text:`-${dmg}`,
+                    color: PLAYER_DOT_COLORS[d.type] || '#aaa',
+                }));
+            }
+            d.ticksLeft--;
+            if (d.ticksLeft <= 0){
+                p.dots.splice(i, 1);
+                if (p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({ t:'playerDotEnd', type:d.type }));
+                }
+            } else {
+                d.nextTickAt = now + d.intervalMs;
+            }
+            if (p.hp === 0){
+                p.dots.length = 0;
+                break;
+            }
+        }
+        if (hpChanged) broadcastPstatsAll(p);
+    }
+}
+setInterval(tickPlayerDots, 1000);
+
 // ─── Evento semanal: O Arauto (sábado 20h-22h BRT) ─────────────────────────
 const EVENT_BOSS_TYPE = 'ARAUTO';
 const EVENT_BOSS_POS = { x: 50, y: 65 };
@@ -2971,6 +3099,19 @@ wss.on('connection', (ws) => {
             if (Array.isArray(msg.badges)){
                 p.badges = msg.badges.filter(s => typeof s === 'string' && s.length < 32).slice(0, 2);
             }
+            // Fase 5: maxHp/maxMp autoritativos no server — recalcula baseado em
+            // skills + talent hpBonus. Cliente fica com valor server via pstats.
+            // Inicializa hp/mp do save (cliente envia no join) só na primeira vez.
+            if (p.maxHp == null && typeof msg.maxHp === 'number') p.maxHp = msg.maxHp;
+            if (p.maxMp == null && typeof msg.maxMp === 'number') p.maxMp = msg.maxMp;
+            if (p.hp == null && typeof msg.hp === 'number') p.hp = msg.hp;
+            if (p.mp == null && typeof msg.mp === 'number') p.mp = msg.mp;
+            recomputeMaxStatsServer(p);
+            // Garante hp/mp dentro do novo cap (se save tava com cap maior)
+            if (typeof p.hp === 'number') p.hp = Math.min(p.hp, p.maxHp);
+            if (typeof p.mp === 'number') p.mp = Math.min(p.mp, p.maxMp);
+            if (p.hp == null) p.hp = p.maxHp;
+            if (p.mp == null) p.mp = p.maxMp;
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
             // (race condition de reconexões rápidas, ou WS órfão antes do join).
             removeGhostsByName(p.name, id);
@@ -3397,11 +3538,20 @@ wss.on('connection', (ws) => {
                 }
                 return;
             }
-            // Vivo: encaminha pro cliente alvo aplicar dano local
-            if (tgt.ws.readyState === 1){
-                tgt.ws.send(JSON.stringify({ t:'pvpHit', from:id, fromName:p.name, amount }));
+            // Fase 5: dano de PvP aplicado server-side com defesa percentual
+            // (espelha cliente). pvpHit ainda é mandado pra FX/log/pkDeathBy
+            // detection, mas com `actual` pra cliente NÃO aplicar local.
+            const def = totalDefenseServer(tgt);
+            const reduction = def > 0 ? def / (def + 30) : 0;
+            const actual = Math.max(1, Math.round(amount * (1 - reduction)));
+            if ((tgt.hp ?? 100) > 0){
+                tgt.hp = Math.max(0, (tgt.hp ?? 100) - actual);
+                broadcastPstatsAll(tgt);
             }
-            broadcast(id, { t:'float', id:msg.targetId, text:`-${amount}`, color:'#ff3030', big:true });
+            if (tgt.ws.readyState === 1){
+                tgt.ws.send(JSON.stringify({ t:'pvpHit', from:id, fromName:p.name, amount, actual }));
+            }
+            broadcast(id, { t:'float', id:msg.targetId, text:`-${actual}`, color:'#ff3030', big:true });
             return;
         }
 
@@ -3411,16 +3561,12 @@ wss.on('connection', (ws) => {
             // Gold/inv/equipped só mudam via handlers server-side (questTurnIn, attackMob,
             // shop, craft, forja, invEquip, invChest, groundPickup, etc). Cliente continua
             // enviando esses campos (compat), mas server descarta silenciosamente.
-            // T2: hp/mp ainda aceitos (DoTs, magia Cura, PvP ainda mutações client-side
-            // pendentes). maxHp/maxMp aceitos pra recalc por equip (lockdown fica pra
-            // fase 5 N3 quando todos os sources migrarem). Regen server-side e dano
-            // de mob server-side aplicam direto em p.hp e broadcastam via pstats —
-            // forjar player.hp pra ESCAPAR de dano é zerado no próximo tick (~500ms).
+            // Fase 5 LOCKDOWN: msg.hp/mp/maxHp/maxMp todos ignorados. Mutações vêm de
+            // tickPlayerRegen, tickAI mob attack, tickPlayerDots, pvpAttack handler,
+            // spellCast handler, invConsume, invUseBlessing, talentAlloc (hpBonus),
+            // gainSkillXpServer (level up → recomputeMaxStats), playerDeath flow.
+            // Server vira fonte única — F12 player.hp=99999 não passa.
             let statsChanged = false;
-            if (typeof msg.hp === 'number' && isFinite(msg.hp)) { p.hp = msg.hp; statsChanged = true; }
-            if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) { p.maxHp = msg.maxHp; statsChanged = true; }
-            if (typeof msg.mp === 'number' && isFinite(msg.mp)) { p.mp = msg.mp; statsChanged = true; }
-            if (typeof msg.maxMp === 'number' && isFinite(msg.maxMp)) { p.maxMp = msg.maxMp; statsChanged = true; }
             // Cosmético: propaga pros outros (string ou null, máx 32 chars)
             if ('cosmetic' in msg){
                 const cos = (typeof msg.cosmetic === 'string' && msg.cosmetic.length < 32) ? msg.cosmetic : null;
@@ -3437,7 +3583,6 @@ wss.on('connection', (ws) => {
             }
             return;
         }
-
         // ─── N3 fase 3: Quest turn-in server-side ──────────────────────────
         // Cliente envia { t:'questTurnIn', kind:'simple'|'chain', questId?, chainId?, stageId?, choiceId? }
         // Server valida (adjacência ao NPC, items, anti-replay) e aplica reward authoritative.
@@ -3658,17 +3803,48 @@ wss.on('connection', (ws) => {
         // Server clampa hits, valida spellKey, aplica XP. Sem migrar mp/cooldown:
         // cliente continua dono dessa lógica (já tem cap natural via custos).
         if (msg.t === 'spellCast') {
-            const VALID_SPELLS = ['FIREBALL','HEAL','RAIO','EXORI','TAUNT','FURY'];
+            // Fase 5: server aplica manaCost + heal authoritative pra magia Cura.
+            // Outras magias só têm manaCost (dmg é processado em attackMob/aoe).
+            const SPELLS_META = {
+                FIREBALL: { manaCost: 18 },
+                HEAL:     { manaCost: 12, healBase: 30 },
+                RAIO:     { manaCost: 10 },
+                EXORI:    { manaCost: 25 },
+                TAUNT:    { manaCost: 8 },
+                FURY:     { manaCost: 20 },
+            };
             const spellKey = String(msg.spellKey || '');
-            if (!VALID_SPELLS.includes(spellKey)) return;
-            // Rate limit: 600ms entre casts (menor cooldown do cliente é ~1100ms)
+            const sp = SPELLS_META[spellKey];
+            if (!sp) return;
             const now = Date.now();
             p._lastSpellAt = p._lastSpellAt || 0;
             if (now - p._lastSpellAt < 600) return;
             p._lastSpellAt = now;
+            // Mana check + aplicar custo
+            if ((p.mp ?? 0) < sp.manaCost){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'spellResult', ok:false, reason:'low_mana', spellKey }));
+                return;
+            }
+            p.mp = Math.max(0, (p.mp ?? 0) - sp.manaCost);
+            // Cura aplica heal
+            let healedAmount = 0;
+            if (sp.healBase){
+                const magiaSk = (p.skills && p.skills.Magia && p.skills.Magia.val) || 10;
+                const amount = sp.healBase + Math.floor(magiaSk / 2) + Math.floor(Math.random()*4) - 1;
+                const maxHp = p.maxHp || 100;
+                healedAmount = Math.min(Math.max(1, amount), maxHp - (p.hp ?? 0));
+                if (healedAmount > 0){
+                    p.hp = Math.min(maxHp, (p.hp ?? 0) + healedAmount);
+                }
+            }
+            broadcastPstatsAll(p);
+            // XP de Magia (compat — cliente continua enviando hits)
             const hits = Math.max(1, Math.min(5, msg.hits | 0 || 1));
             gainSkillXpServer(p, 'Magia', hits);
             sendSkillsOnly(p, 'spellCast');
+            if (sp.healBase && p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({ t:'spellResult', ok:true, spellKey, healed: healedAmount }));
+            }
             return;
         }
 
@@ -3691,6 +3867,11 @@ wss.on('connection', (ws) => {
                 p.permaBuffs[k] = (p.permaBuffs[k] || 0) + v;
             }
             p.talents[tid] = true;
+            // Fase 5: hpBonus (Constituição) altera maxHp — recalcula server-side.
+            if (def.buff && typeof def.buff.hpBonus === 'number'){
+                recomputeMaxStatsServer(p);
+                broadcastPstatsAll(p);
+            }
             sendInvUpdate(p, {
                 talentResult:{ ok:true, talentId: tid },
                 talents: p.talents,
