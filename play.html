@@ -5362,11 +5362,19 @@ function connectMP(){
         // ~60s sem dados na direção cliente→server. Mandamos {t:'ping'} a cada 25s
         // garantidamente, mesmo que o player esteja parado.
         if (_heartbeatTimer) clearInterval(_heartbeatTimer);
+        _lastServerMsgAt = Date.now();
         _heartbeatTimer = setInterval(() => {
             if (ws && ws.readyState === 1){
                 try { ws.send(JSON.stringify({ t:'ping' })); } catch {}
             }
-        }, 25000);
+            // Watchdog: server manda broadcastMobs a cada 250ms, pong em <100ms ao ping
+            // do heartbeat. Se >10s sem nenhuma mensagem, WS está zumbi (TCP morreu mas
+            // socket não detectou). Força close pra disparar scheduleReconnect.
+            if (ws && ws.readyState === 1 && Date.now() - _lastServerMsgAt > 10000){
+                log('<span class="log-sys">Conexão zumbi detectada — reconectando…</span>');
+                try { ws.close(4002, 'stale'); } catch {}
+            }
+        }, 4000);
         if (player.target && player.targetType === 'monster'){
             player.target = null;
         }
@@ -5415,6 +5423,7 @@ function connectMP(){
         if (mpWasConnected) scheduleReconnect();
     };
     ws.onmessage = (e) => {
+        _lastServerMsgAt = Date.now();   // watchdog: marca atividade do server
         try {
             const msg = JSON.parse(e.data);
             handleMP(msg);
@@ -6222,6 +6231,7 @@ let _reconnectTimer = null;
 let _reconnectAttempt = 0;
 let _overlayDelayTimer = null;  // atraso de 3s antes de mostrar overlay "RECONECTANDO"
 let _heartbeatTimer = null;     // ping app-level cliente→server pra evitar idle timeout de proxy
+let _lastServerMsgAt = 0;       // timestamp da última msg recebida — watchdog de WS zumbi
 
 function scheduleReconnect(){
     if (_reconnectTimer) return;
