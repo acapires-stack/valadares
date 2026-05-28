@@ -626,13 +626,17 @@ function sendInvUpdate(p, extra){
 }
 
 // XP de skill server-side (espelha gainSkillXp do cliente).
-// Aplica permaBuff.xpBonus e nivela (sk.val++, xpNext *= 1.15).
+// Aplica permaBuff.xpBonus, evento Bênção da Sabedoria (+50%) e nivela.
 function gainSkillXpServer(p, name, amount){
     if (!p.skills) p.skills = {};
     const sk = p.skills[name]; if (!sk) return;
     let amt = amount | 0;
     const bonus = p.permaBuffs?.xpBonus || 0;
     if (bonus > 0) amt = Math.round(amt * (1 + bonus));
+    // Evento diário Sabedoria — +50% xp durante a janela ativa.
+    if (typeof dailyEventState !== 'undefined' && dailyEventState.isActive && dailyEventState.type?.id === 'wisdom'){
+        amt = Math.round(amt * 1.5);
+    }
     sk.xp = (sk.xp || 0) + amt;
     while (sk.xp >= (sk.xpNext || 50)){
         sk.xp -= sk.xpNext;
@@ -1995,15 +1999,15 @@ function applyDailyEventTick(){
     const t = dailyEventState.type;
     if (!t) return;
     if (t.id === 'gold_rain'){
-        // Dá 30-60g pra todos online (não fantasmas)
+        // Dá 30-60g pra todos online (não fantasmas). N3 fase 3: server é fonte única —
+        // antes cliente ALSO somava amount localmente (bug: dobrava o gold). Agora envia
+        // via invUpdate.goldDelta com reason='gold_rain'; cliente só exibe feedback.
         for (const p of players.values()){
             if (p.disconnected) continue;
             const amount = 30 + Math.floor(Math.random() * 31);
             p.gold = (p.gold || 0) + amount;
             const r = ensureRanking(p.name); if (r) r.gold = p.gold;
-            if (p.ws.readyState === 1){
-                p.ws.send(JSON.stringify({ t:'eventReward', kind:'gold', amount }));
-            }
+            sendInvUpdate(p, { goldDelta:{ amount, reason:'gold_rain' } });
         }
     } else if (t.id === 'siege'){
         // Spawna 3-4 mobs random no anel ao redor do centro (raio 12-25)
@@ -3154,6 +3158,29 @@ wss.on('connection', (ws) => {
                 return;
             }
             return reject('bad_kind');
+        }
+
+        // ─── N3 fase 3: Highlander Hunt reward claim ───────────────────────
+        // Cliente envia { t:'hlHuntClaim' } quando detecta os 3 hunters mortos.
+        // Server gera o bonus (200-450g), aplica cooldown e credita via goldDelta.
+        // Sistema de spawn/tracking dos hunters fica client-side por enquanto —
+        // server só fecha o vetor de creditação direta de gold.
+        if (msg.t === 'hlHuntClaim') {
+            const COOLDOWN_MS = 5 * 60 * 1000;
+            const now = Date.now();
+            p._lastHlHuntClaim = p._lastHlHuntClaim || 0;
+            if (now - p._lastHlHuntClaim < COOLDOWN_MS){
+                if (p.ws && p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({ t:'hlHuntResult', ok:false, reason:'cooldown', retryAt: p._lastHlHuntClaim + COOLDOWN_MS }));
+                }
+                return;
+            }
+            p._lastHlHuntClaim = now;
+            const amount = 200 + Math.floor(Math.random() * 250);
+            p.gold = (p.gold || 0) + amount;
+            const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            sendInvUpdate(p, { goldDelta:{ amount, reason:'hl_hunt' } });
+            return;
         }
 
         // ATAQUE A MOB (#10 validado)

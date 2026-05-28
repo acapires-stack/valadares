@@ -3214,11 +3214,17 @@ function tickHighlanderHunt(dt){
         if (!monsters.some(m => m.hunter && m.hp > 0)){
             hlHuntActive = false;
             hlHuntTimer = 0;
-            const bonus = HL_HUNT_REWARD();
-            player.gold += bonus;
-            const gEl = document.getElementById('goldVal');
-            if (gEl) gEl.textContent = player.gold + ' g';
-            log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${bonus}g</span>`);
+            // N3 fase 3: server é fonte do bonus (cooldown 5min, anti-replay).
+            if (ws && ws.readyState === 1 && _wsAuthed){
+                try { ws.send(JSON.stringify({ t:'hlHuntClaim' })); } catch {}
+                log('<span class="log-up">🏆 Caçadores eliminados! Solicitando recompensa…</span>');
+            } else {
+                const bonus = HL_HUNT_REWARD();
+                player.gold += bonus;
+                const gEl = document.getElementById('goldVal');
+                if (gEl) gEl.textContent = player.gold + ' g';
+                log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${bonus}g</span>`);
+            }
         }
     } else {
         hlHuntTimer += dt;
@@ -5303,9 +5309,10 @@ function handleMP(msg){
         }
         renderDailyEventWidget();
     } else if (msg.t === 'eventReward'){
-        // Chuva de Ouro: gold do server (já aplicado lá; replica localmente pra UI)
+        // Legacy: server antigo enviava { kind:'gold', amount } e cliente somava.
+        // Nova versão usa invUpdate.goldDelta (reason:'gold_rain') como fonte única.
+        // Mantém o handler só pra retro-compat: apenas feedback visual, NÃO soma gold.
         if (msg.kind === 'gold' && typeof msg.amount === 'number'){
-            player.gold = (player.gold || 0) + msg.amount;
             addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
             log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
         }
@@ -5353,15 +5360,25 @@ function handleMP(msg){
             _blessingPromise.resolve(!!msg.bencao.applied);
             _blessingPromise = null;
         }
-        // Gold delta (creditado via PIX MercadoPago)
+        // Gold delta autoritativo do server (PIX, daily event, etc).
+        // O msg.gold canônico já foi aplicado acima — aqui é só feedback visual.
         if (msg.goldDelta && msg.goldDelta.amount > 0){
-            log(`<span class="log-up">💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados (${msg.goldDelta.reason || 'sistema'})!</span>`);
-            if (typeof sndLevelUp === 'function') sndLevelUp();
-            addFloat(player.x, player.y, `+${msg.goldDelta.amount}g`, '#ffcc40', true, -20);
-            if (typeof showServerToast === 'function') showServerToast('event', `💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados!`);
-            // Fecha modal de loja se aberto
-            const m = document.getElementById('goldShopModal');
-            if (m && m.style.display === 'flex') closeGoldShop();
+            const reason = msg.goldDelta.reason || 'sistema';
+            if (reason === 'gold_rain'){
+                log(`<span class="log-up">💰 Chuva de Ouro: +${msg.goldDelta.amount}g</span>`);
+                addFloat(player.x, player.y, '+' + msg.goldDelta.amount + 'g', '#ffcc40', false, -28);
+                // Sem som de level up e sem toast (acontece a cada 30s, ia poluir)
+            } else {
+                log(`<span class="log-up">💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados (${reason})!</span>`);
+                if (typeof sndLevelUp === 'function') sndLevelUp();
+                addFloat(player.x, player.y, `+${msg.goldDelta.amount}g`, '#ffcc40', true, -20);
+                if (typeof showServerToast === 'function') showServerToast('event', `💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados!`);
+                // Fecha modal de loja se aberto (PIX confirmou)
+                if (reason === 'pix'){
+                    const m = document.getElementById('goldShopModal');
+                    if (m && m.style.display === 'flex') closeGoldShop();
+                }
+            }
         }
         // Consume (food/potion): aplica efeito ao receber confirmação
         if (msg.consume && msg.consume.ok){
@@ -5446,6 +5463,11 @@ function handleMP(msg){
             saveState();
         }
         // invSignature=null força re-render na próxima frame
+    } else if (msg.t === 'hlHuntResult'){
+        if (!msg.ok && msg.reason === 'cooldown'){
+            const min = Math.ceil(((msg.retryAt || 0) - Date.now()) / 60000);
+            log(`<span class="log-sys">⏳ Recompensa da caçada em cooldown (${min}min)</span>`);
+        }
     } else if (msg.t === 'questResult'){
         // Server rejeitou turn-in. Mostra motivo amigável.
         const reasons = {
