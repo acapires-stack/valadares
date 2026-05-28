@@ -3472,6 +3472,15 @@ wss.on('connection', (ws) => {
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
             sendInvUpdate(p, { chests: p.chests, reason:'join' });
+            // Sincroniza estado da party: cliente pode ter widget stale se perdeu
+            // partyUpdate enquanto offline. Garante que após (re)conexão o widget bate
+            // com o server (ou some, se ele não está mais em party).
+            const myParty = findPartyOfPlayer(p.name);
+            if (myParty){
+                ws.send(JSON.stringify({ t:'partyUpdate', partyId: myParty.id, leader: myParty.leader, members: myParty.members }));
+            } else {
+                ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
+            }
             broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });

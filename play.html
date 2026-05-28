@@ -7878,12 +7878,15 @@ function partyInvite(name){
 }
 window.partyInvite = partyInvite;
 function partyAccept(){
-    if (!ws || ws.readyState !== 1) return;
+    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Sem conexão — convite não pode ser aceito.</span>'); return; }
     ws.send(JSON.stringify({ t:'chat', text: '/party accept' }));
 }
 window.partyAccept = partyAccept;
 function partyLeave(){
-    if (!ws || ws.readyState !== 1) return;
+    if (!ws || ws.readyState !== 1){
+        log('<span class="log-sys">Sem conexão com o servidor — não dá pra sair da party agora.</span>');
+        return;
+    }
     ws.send(JSON.stringify({ t:'chat', text: '/party leave' }));
 }
 window.partyLeave = partyLeave;
