@@ -3814,6 +3814,17 @@ function updateMonster(m, dt){
 function monsterAt(x,y){
     return monsters.find(m => m.hp>0 && m.x===x && m.y===y);
 }
+// Outro player (ou bot) ocupando tile — bloqueia movimento (PvP precisa que
+// players não se atravessem; antes era atravessável e PvP virava perseguição
+// fantasma).
+function remotePlayerOnTile(x,y){
+    for (const id in remotePlayers){
+        const rp = remotePlayers[id];
+        if (rp.ghost) continue;   // corpo body-stays não bloqueia
+        if (rp.x === x && rp.y === y) return rp;
+    }
+    return null;
+}
 
 // ─── DoT em monstros (veneno/sangra/fogo proc de armas +N) ─────────────────
 const DOT_INTERVAL_MS = 3000;
@@ -10587,6 +10598,7 @@ function handleMovement(dt){
     if (!walkable(map[ny][nx])) return;
     if (monsterAt(nx,ny)) return;
     if (npcOnTile(nx,ny)) return;  // não passa por cima de NPC
+    if (remotePlayerOnTile(nx,ny)) return;  // não atravessa outro player/bot — PvP precisa de barreira física
     // animação: guarda posição anterior antes de pular pro tile novo
     player.prevX = player.x; player.prevY = player.y;
     player.x = nx; player.y = ny;
