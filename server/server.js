@@ -2522,17 +2522,14 @@ wss.on('connection', (ws) => {
             // com cliente que pode ter mutado via quest/event/cosmético que ainda é client-side).
             // Lockdown FULL é pra próxima fase (depende de migrar quest rewards pro server).
             ensurePlayerInvSlots(p);
-            if (data.inv && typeof data.inv === 'object') p.inv = { ...data.inv };
-            if (data.equipped && typeof data.equipped === 'object') p.equipped = { ...p.equipped, ...data.equipped };
-            if (typeof data.gold === 'number') p.gold = data.gold;
-            if (data.chests && typeof data.chests === 'object'){
-                for (const cid of ['b1','b2','b3','b4']){
-                    if (data.chests[cid] && typeof data.chests[cid] === 'object'){
-                        p.chests[cid] = { ...data.chests[cid] };
-                    }
-                }
-            }
-            // N3 fase 3: quest state também passa server-side. Cliente continua a fonte
+            // N3 fase 3 LOCKDOWN: server é fonte única de inv/gold/equipped/chests.
+            // saveUpload do cliente NÃO sobrescreve mais esses campos — toda mutação
+            // dessas grandezas precisa passar pelos handlers server-side (questTurnIn,
+            // invEquip, invChest, attackMob, shop, craft, forja, etc).
+            // Cliente continua enviando-os no save (compat), mas server descarta. Se
+            // houver divergência (ex: save local mais novo que p.*), o próximo
+            // sendInvUpdate ressincroniza o cliente.
+            // Quest state segue aceito (XP de mob kill ainda é client-side). Cliente continua a fonte
             // até lockdown total; aqui só sincroniza pra o handler questTurnIn validar.
             if (data.skills && typeof data.skills === 'object') p.skills = data.skills;
             if (data.quests && typeof data.quests === 'object'){
@@ -3013,14 +3010,10 @@ wss.on('connection', (ws) => {
 
         // Cliente envia snapshot de gold/inv/stats pra body stays + visibility
         if (msg.t === 'playerSync') {
-            // N3 fase 2: ainda aceita inv/gold do cliente pra cobrir quest/event rewards
-            // que continuam client-side. Lockdown FULL será fase 3.
-            if (typeof msg.gold === 'number'){
-                p.gold = msg.gold;
-                const r = ensureRanking(p.name);
-                if (r) r.gold = msg.gold;
-            }
-            if (msg.inv && typeof msg.inv === 'object') p.inv = msg.inv;
+            // N3 fase 3 LOCKDOWN: ignora msg.gold, msg.inv e msg.equipped do cliente.
+            // Gold/inv/equipped só mudam via handlers server-side (questTurnIn, attackMob,
+            // shop, craft, forja, invEquip, invChest, groundPickup, etc). Cliente continua
+            // enviando esses campos (compat), mas server descarta silenciosamente.
             let statsChanged = false;
             if (typeof msg.hp === 'number' && isFinite(msg.hp)) { p.hp = msg.hp; statsChanged = true; }
             if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) { p.maxHp = msg.maxHp; statsChanged = true; }
@@ -3030,11 +3023,6 @@ wss.on('connection', (ws) => {
             if ('cosmetic' in msg){
                 const cos = (typeof msg.cosmetic === 'string' && msg.cosmetic.length < 32) ? msg.cosmetic : null;
                 if (cos !== p.cosmetic){ p.cosmetic = cos; statsChanged = true; }
-            }
-            // Equipped: cliente pode ter mutado cosmetic (continua client-side); aceita.
-            if (msg.equipped && typeof msg.equipped === 'object'){
-                p.equipped = msg.equipped;
-                statsChanged = true;
             }
             // Badges de conquista: até 2 strings curtas
             if (Array.isArray(msg.badges)){
