@@ -3887,7 +3887,7 @@ function damagePlayer(amount, source, attacker){
     }
     if (Math.random() < playerDodgeChance()){
         log(`<span class="log-sys">Você esquivou de ${source}.</span>`);
-        gainSkillXp('Escudo', 1);
+        gainSkillXpLocal('Escudo', 1);
         return;
     }
     const crit = attacker && Math.random() < (attacker.crit || 0);
@@ -3905,8 +3905,8 @@ function damagePlayer(amount, source, attacker){
     recordReplay('hit', `${crit?'★ ':''}${source}: -${actual}`, crit ? '#ff6020' : '#ff3030');
     const dt = blocked > 0 ? ` (${blocked} bloq · ${Math.round(reduction*100)}%)` : '';
     log(`<span class="log-dmg">⚠ ${crit?'★ ':''}${source}: ${actual}${dt}</span>`);
-    // Skill Escudo só treina se realmente está usando um
-    if (hasShield()) gainSkillXp('Escudo', 1);
+    // Skill Escudo só treina se realmente está usando um (server credita em MP)
+    if (hasShield()) gainSkillXpLocal('Escudo', 1);
     // Status effects do atacante
     rollAttackerStatus(attacker ? attacker.type : null);
     if (player.hp === 0) playerDie();
@@ -3930,6 +3930,23 @@ function rollAttackerStatus(mobType){
 }
 
 // Ganho de XP em skill genérico — sobe nível e recalcula stats
+// T3: wrapper que aplica XP só em modo offline. Em MP, o server credita
+// autoritative via handlers (attackMob, mobHit, spellCast, trainAttempt,
+// partyShareKill, questTurnIn) e envia skills via invUpdate. Use em
+// TODAS as fontes que têm equivalente server-side; gainSkillXp direto
+// fica reservado pra recv handlers (msg.skills) e fallback explícito.
+function gainSkillXpLocal(name, amount){
+    if (ws && ws.readyState === 1 && _wsAuthed) return;
+    gainSkillXp(name, amount);
+}
+// Magia: server credita via handler spellCast com clamp hits[1..5].
+function gainMagiaXp(spellKey, hits){
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'spellCast', spellKey, hits })); } catch {}
+    } else {
+        gainSkillXp('Magia', hits);
+    }
+}
 function gainSkillXp(name, amount){
     const sk = player.skills[name];
     if (!sk) return;
@@ -4922,7 +4939,7 @@ function throwSpear(){
     // Esquiva
     if (Math.random() < m.dodge){
         log(`<span class="log-sys">${m.name} desviou da lança.</span>`);
-        gainSkillXp('Distância', 1);
+        gainSkillXpLocal('Distância', 1);
     } else {
         const sk = player.skills['Distância'];
         let dmg = wItem.throwDmg + Math.floor(sk.val/3) + Math.floor(Math.random()*5) - 2;
@@ -4931,7 +4948,7 @@ function throwSpear(){
         if (crit) dmg *= 2;
         addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#cce0a0', crit, crit ? -10 : 0);
         log(`<span class="log-dmg">${crit?'★ ':''}${wItem.name} arremessada: -${dmg} em ${m.name}</span>`);
-        gainSkillXp('Distância', 1);
+        gainSkillXpLocal('Distância', 1);
         if (serverAuthMobs && ws && ws.readyState === 1){
             // server aplica dano + consome a lança equipada (throwSpear:true)
             ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit, throwSpear:true }));
@@ -5029,7 +5046,7 @@ function doAttack(m){
         invSignature = null;
         if (Math.random() < m.dodge){
             log(`<span class="log-sys">${m.name} esquivou da flecha.</span>`);
-            gainSkillXp('Distância', 1);
+            gainSkillXpLocal('Distância', 1);
             player.attackTimer = effectiveAttackDelay();
             return;
         }
@@ -5049,7 +5066,7 @@ function doAttack(m){
             arrow: true,
             life: 0, duration: Math.max(100, dist * 28),
         });
-        gainSkillXp('Distância', 1);
+        gainSkillXpLocal('Distância', 1);
         player.attackTimer = effectiveAttackDelay();
         // DoT procs (veneno/sangra/fogo do weapon +N)
         const procsR = rollWeaponStatusOnMob(wItem, m);
@@ -5079,7 +5096,7 @@ function doAttack(m){
     // Monstro esquivou?
     if (Math.random() < m.dodge){
         log(`<span class="log-sys">${m.name} esquivou.</span>`);
-        gainSkillXp(w.skill, 1);
+        gainSkillXpLocal(w.skill, 1);
         player.attackTimer = effectiveAttackDelay();
         return;
     }
@@ -5091,9 +5108,9 @@ function doAttack(m){
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
     if (crit) sndCrit(); else sndHit();
     log(`<span class="log-dmg">${crit?'★ ':''}${w.skill}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
-    gainSkillXp(w.skill, 1);
+    gainSkillXpLocal(w.skill, 1);
     if (player.equipped.offhand && ITEMS[player.equipped.offhand].kind === 'offhand'){
-        gainSkillXp('Escudo', 1);
+        gainSkillXpLocal('Escudo', 1);
     }
     player.attackTimer = effectiveAttackDelay();
     // DoT procs do weapon equipado (veneno/sangra/fogo)
@@ -5658,11 +5675,10 @@ function handleMP(msg){
         }
         renderPartyWidget();
     } else if (msg.t === 'partyShareKill'){
-        // Recebe XP por kill de colega de party — aplica na arma equipada
-        const wKey = player.equipped?.weapon;
-        const skill = wKey ? ITEMS[wKey]?.skill : 'Punho';
-        if (skill && player.skills[skill] && msg.xp > 0){
-            gainSkillXp(skill, msg.xp);
+        // Server já creditou skill XP autoritative (sendSkillsOnly antes/junto).
+        // Cliente só exibe float + marca achievement flag.
+        const skill = msg.skill || 'Punho';
+        if (player.skills[skill] && msg.xp > 0){
             addFloat(player.x, player.y, `+${msg.xp}xp (party)`, '#a8e0ff', false, -34);
         }
         // Marca flag pra achievement "Companheiro"
@@ -9253,7 +9269,7 @@ function castSpell(spellKey){
             });
         }
         log(`<span class="log-dmg">${sp.name}: ${hits} alvo(s) atingido(s)</span>`);
-        if (hits > 0) gainSkillXp('Magia', hits);
+        if (hits > 0) gainMagiaXp(spellKey, hits);
         return;
     }
 
@@ -9276,7 +9292,7 @@ function castSpell(spellKey){
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.tauntRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
         log(`<span class="log-sys">${sp.name}: provocou ${count} mob(s)</span>`);
-        gainSkillXp('Magia', Math.max(1, count));
+        gainMagiaXp(spellKey, Math.max(1, count));
         return;
     }
 
@@ -9295,7 +9311,7 @@ function castSpell(spellKey){
         addFloat(player.x, player.y, `★ ${sp.name}`, sp.glow, true, -10);
         log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(sp.buff.duration/1000)}s</span>`);
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
-        gainSkillXp('Magia', 2);
+        gainMagiaXp(spellKey, 2);
         return;
     }
 
@@ -9313,7 +9329,7 @@ function castSpell(spellKey){
         addFloat(player.x, player.y, `+${healed}`, sp.glow, true);
         log(`<span class="log-xp">${sp.name}: +${healed} HP</span>`);
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 500 });
-        gainSkillXp('Magia', 1);
+        gainMagiaXp(spellKey, 1);
         return;
     }
 
@@ -9349,7 +9365,7 @@ function castSpell(spellKey){
         beam: sp.projType === 'beam',
         life: 0, duration: sp.projType === 'beam' ? Math.max(80, dist * 18) : Math.max(120, dist * 35),
     });
-    gainSkillXp('Magia', 1);
+    gainMagiaXp(spellKey, 1);
     if (m.hp === 0) killMonster(m);
 }
 
@@ -9999,7 +10015,7 @@ function pvpAttackPlayer(targetId){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
     }
     log(`<span class="log-dmg">${crit?'★ ':''}PvP: -${dmg} em ${escapeHtml(tgt.name)}</span>`);
-    gainSkillXp(w.skill, 1);
+    gainSkillXpLocal(w.skill, 1);
     player.attackTimer = effectiveAttackDelay();
 }
 window.pvpAttackPlayer = pvpAttackPlayer;
@@ -10024,10 +10040,16 @@ function tickTraining(dt){
     const now = performance.now();
     if (now - training.lastTick >= TRAINING_TIME){
         if (player.gold < training.cost){ stopTraining('acabou o ouro'); return; }
-        player.gold -= training.cost;
-        const xp = trainingXpPerSession(training.skill);
-        gainSkillXp(training.skill, xp);
-        addFloat(DUMMY_POS.x, DUMMY_POS.y, `+${xp} ${training.skill}`, '#ffcc40');
+        // T3: server credita XP + debita gold (handler trainAttempt) em modo MP.
+        // Offline: aplica direto local como antes.
+        if (ws && ws.readyState === 1 && _wsAuthed){
+            try { ws.send(JSON.stringify({ t:'trainAttempt', skill: training.skill })); } catch {}
+        } else {
+            player.gold -= training.cost;
+            const xp = trainingXpPerSession(training.skill);
+            gainSkillXp(training.skill, xp);
+        }
+        addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${training.skill}`, '#ffcc40');
         training.remaining--;
         training.lastTick = now;
         if (training.remaining <= 0) stopTraining('completo');

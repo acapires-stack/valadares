@@ -624,6 +624,11 @@ function sendInvUpdate(p, extra){
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
 }
+// Versão leve pra atualizações frequentes (ex: XP por hit, +1 toda vez que ataca/apanha)
+function sendSkillsOnly(p, reason){
+    if (!p || p.ws.readyState !== 1) return;
+    p.ws.send(JSON.stringify({ t:'invUpdate', skills: p.skills || {}, reason: reason || 'skillsTick' }));
+}
 
 // XP de skill server-side (espelha gainSkillXp do cliente).
 // Aplica permaBuff.xpBonus, evento Bênção da Sabedoria (+50%) e nivela.
@@ -722,6 +727,18 @@ function ensurePlayerInvSlots(p){
     if (!p.equipped) p.equipped = { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null };
     if (!p.chests)  p.chests  = { b1:{}, b2:{}, b3:{}, b4:{} };
     if (typeof p.gold !== 'number') p.gold = 0;
+    // T3: skills agora são server-fonte. Inicializa defaults (val 10) se save não trouxe.
+    if (!p.skills){
+        p.skills = {
+            'Punho':     { val:10, xp:0, xpNext:50 },
+            'Espada':    { val:10, xp:0, xpNext:50 },
+            'Machado':   { val:10, xp:0, xpNext:50 },
+            'Clava':     { val:10, xp:0, xpNext:50 },
+            'Distância': { val:10, xp:0, xpNext:50 },
+            'Escudo':    { val:10, xp:0, xpNext:50 },
+            'Magia':     { val:10, xp:0, xpNext:50 },
+        };
+    }
 }
 
 // ─── LOOT tables (espelho do cliente) ─────────────────────────────────────
@@ -1299,6 +1316,11 @@ function tickAI(){
                 if (target.ws.readyState === 1){
                     target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg }));
                 }
+                // T3: XP de Escudo se player tem escudo equipado (ganha XP apanhando)
+                if (hasShieldEquipped(target)){
+                    gainSkillXpServer(target, 'Escudo', 1);
+                    sendSkillsOnly(target, 'shieldHit');
+                }
             }
             continue;
         }
@@ -1540,6 +1562,12 @@ function weaponSkillOf(p){
     if (!w) return 'Punho';
     const base = String(w).replace(/_PLUS_\d+$/, '');
     return WEAPON_SKILL[base] || 'Punho';
+}
+function hasShieldEquipped(p){
+    const o = p.equipped?.offhand;
+    if (!o) return false;
+    const base = String(o).replace(/_PLUS_\d+$/, '');
+    return ITEM_META[base]?.kind === 'offhand';
 }
 
 // ─── Talents (M5) ──────────────────────────────────────────────────────────
@@ -2477,10 +2505,13 @@ function sharePartyKill(killer, mob){
     const shareXp = Math.max(1, Math.round((mob.xp || 0) * PARTY_XP_FRACTION));
     for (const pp of partyMembersOnline(party)){
         if (pp.name === killer.name) continue;
-        // Só os membros no raio do mob recebem XP (incentiva ficar perto)
         if (chebyshev(pp.x, pp.y, mob.x, mob.y) > PARTY_SHARE_RADIUS) continue;
         if (pp.ws.readyState !== 1) continue;
-        pp.ws.send(JSON.stringify({ t:'partyShareKill', mobType: mob.type, xp: shareXp, fromName: killer.name }));
+        // T3: XP authoritative na skill da arma equipada do membro
+        const skill = weaponSkillOf(pp);
+        gainSkillXpServer(pp, skill, shareXp);
+        pp.ws.send(JSON.stringify({ t:'partyShareKill', mobType: mob.type, xp: shareXp, skill, fromName: killer.name }));
+        sendSkillsOnly(pp, 'partyShare');
     }
 }
 
@@ -2720,11 +2751,11 @@ wss.on('connection', (ws) => {
             // Cliente continua enviando-os no save (compat), mas server descarta. Se
             // houver divergência (ex: save local mais novo que p.*), o próximo
             // sendInvUpdate ressincroniza o cliente.
-            // Quest state e skills seguem aceitos do save. Mob kill XP agora é server
-            // (T1), mas treino/party share/distância/escudo ainda creditam client-side.
-            // Lockdown total de skills (T3) requer migrar essas fontes pro server primeiro.
-            // SAVE_CAPS.skill=200 já clampa eventual abuso.
-            if (data.skills && typeof data.skills === 'object') p.skills = data.skills;
+            // T3 LOCKDOWN de skills: server agora é fonte única. Todas as 7 fontes de XP
+            // (mob kill, hit melee, distância, escudo apanha, party share, treino, magia)
+            // passam por handlers server-side autoritativos. saveUpload IGNORA data.skills
+            // — cliente continua enviando no save por compat, mas server descarta.
+            // Em divergência, próximo invUpdate corrige.
             if (data.quests && typeof data.quests === 'object'){
                 p.quests = {
                     active: (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {},
@@ -3174,6 +3205,10 @@ wss.on('connection', (ws) => {
             }
             if (chebyshev(p.x, p.y, tgt.x, tgt.y) > (msg.range || 1)) return;
             const amount = Math.max(1, msg.amount | 0);
+            // T3: XP de skill por hit PvP (autoritativo)
+            const isRanged = (msg.range || 1) > 1;
+            gainSkillXpServer(p, isRanged ? 'Distância' : weaponSkillOf(p), 1);
+            sendSkillsOnly(p, 'pvpAttack');
             // Se ghost: server processa o dano local (cliente não está)
             if (tgt.disconnected){
                 tgt.hp = Math.max(0, (tgt.hp ?? 100) - amount);
@@ -3380,6 +3415,62 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── T3: Treino no boneco / altar server-side ──────────────────────
+        // Cliente envia { t:'trainAttempt', skill }. Server valida adjacência,
+        // gold + aplica XP autoritative. Rate-limit 1500ms entre tentativas
+        // (TRAINING_TIME no cliente é 2000ms — margem).
+        if (msg.t === 'trainAttempt') {
+            const reject = (reason) => {
+                if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'trainResult', ok:false, reason }));
+            };
+            const skill = String(msg.skill || '');
+            if (!p.skills || !p.skills[skill]) return reject('unknown_skill');
+            // Rate limit
+            const now = Date.now();
+            p._lastTrainAt = p._lastTrainAt || 0;
+            if (now - p._lastTrainAt < 1500) return reject('too_fast');
+            p._lastTrainAt = now;
+            // Adjacência: Magia treina no Altar, demais skills no Boneco
+            const DUMMY = { x:49, y:51 };
+            const ALTAR = { x:50, y:48 };
+            const target = skill === 'Magia' ? ALTAR : DUMMY;
+            if (Math.max(Math.abs(p.x - target.x), Math.abs(p.y - target.y)) > 1){
+                return reject(skill === 'Magia' ? 'not_at_altar' : 'not_at_dummy');
+            }
+            const sk = p.skills[skill];
+            const cost = Math.max(5, (sk.val || 10) * 2);
+            if ((p.gold || 0) < cost) return reject('no_gold');
+            p.gold -= cost;
+            syncGoldRank(p.name, p.gold);
+            const xp = Math.max(1, Math.floor((sk.xpNext || 50) / 60));
+            gainSkillXpServer(p, skill, xp);
+            sendInvUpdate(p, {
+                trainResult:{ ok:true, skill, xp, cost },
+                skills: p.skills,
+                reason:'train',
+            });
+            return;
+        }
+
+        // ─── T3: Cast de magia server-side (creditar XP de Magia) ──────────
+        // Cliente envia { t:'spellCast', spellKey, hits } pós-cast local.
+        // Server clampa hits, valida spellKey, aplica XP. Sem migrar mp/cooldown:
+        // cliente continua dono dessa lógica (já tem cap natural via custos).
+        if (msg.t === 'spellCast') {
+            const VALID_SPELLS = ['FIREBALL','HEAL','RAIO','EXORI','TAUNT','FURY'];
+            const spellKey = String(msg.spellKey || '');
+            if (!VALID_SPELLS.includes(spellKey)) return;
+            // Rate limit: 600ms entre casts (menor cooldown do cliente é ~1100ms)
+            const now = Date.now();
+            p._lastSpellAt = p._lastSpellAt || 0;
+            if (now - p._lastSpellAt < 600) return;
+            p._lastSpellAt = now;
+            const hits = Math.max(1, Math.min(5, msg.hits | 0 || 1));
+            gainSkillXpServer(p, 'Magia', hits);
+            sendSkillsOnly(p, 'spellCast');
+            return;
+        }
+
         // ─── M5: Talent allocation server-side ─────────────────────────────
         // Cliente envia { t:'talentAlloc', talentId }. Server valida que existe
         // ponto disponível (earned-used > 0), aplica permaBuff e devolve estado.
@@ -3454,6 +3545,13 @@ wss.on('connection', (ws) => {
             const cap = (MTYPE[m.type]?.hp || 50) + 50;  // teto generoso
             const dmg = Math.max(1, Math.min(msg.amount | 0, cap));
             m.hp = Math.max(0, m.hp - dmg);
+            // T1/T3: XP de skill por hit (não só por kill).
+            // - Melee (range≤1, sem ammo, sem spear): +1 na skill da arma
+            // - Distância (range>1 OU ammo OU throwSpear): +1 em Distância
+            const isRanged = range > 1 || typeof msg.ammoKey === 'string' || !!msg.throwSpear;
+            gainSkillXpServer(p, isRanged ? 'Distância' : weaponSkillOf(p), 1);
+            // Skills atualizadas — só envia se não vai morrer (mobKill abaixo envia skills no payload)
+            if (m.hp > 0) sendSkillsOnly(p, 'attackHit');
             // DoT procs (veneno/sangra/fogo de armas +N) — cliente enviou no msg.dots
             if (Array.isArray(msg.dots) && msg.dots.length){
                 m.dots = m.dots || [];
