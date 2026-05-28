@@ -88,15 +88,32 @@ async function handleHttpRequest(req, res){
     return httpJson(res, 404, { error:'not_found' });
 }
 
+// Valida email — regex bem permissiva, alinhada com a do cliente.
+function _isValidEmail(s){
+    s = String(s || '').trim();
+    if (s.length < 5 || s.length > 120) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 async function handleCreatePix(body, res){
     if (!mpPreference){
         return httpJson(res, 503, { error:'mp_not_configured' });
     }
     const playerName = String(body.playerName || '').trim().substring(0, 14);
     const packageId  = String(body.packageId || '');
+    const email      = String(body.email || '').trim().substring(0, 120);
     if (!playerName){ return httpJson(res, 400, { error:'missing_player' }); }
     if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
+    if (!_isValidEmail(email)){ return httpJson(res, 400, { error:'invalid_email' }); }
     const pkg = GOLD_PACKAGES[packageId];
+    // Persiste email no save da conta — próxima compra desse player vem pré-preenchida
+    try {
+        const acc = typeof getAccount === 'function' ? getAccount(playerName) : null;
+        if (acc && acc.save && acc.save.email !== email){
+            acc.save.email = email;
+            if (typeof flushAccounts === 'function') flushAccounts();
+        }
+    } catch (e){ /* não bloqueia compra se o save falhar */ }
     // Checkout Pro (Preference API) — abre página do MP onde o player paga via PIX.
     // Mais robusto que Payment API: não exige homologação da conta.
     try {
@@ -110,6 +127,7 @@ async function handleCreatePix(body, res){
                     currency_id: 'BRL',
                     unit_price: pkg.priceCents / 100,
                 }],
+                payer: { email },
                 payment_methods: {
                     // PIX + cartão de crédito + cartão de débito habilitados.
                     // Exclui só boleto (ticket) — demora 1-3 dias úteis e atrasa o crédito de gold.
@@ -120,7 +138,7 @@ async function handleCreatePix(body, res){
                 },
                 notification_url: `${MP_BASE_URL}/webhook/mp`,
                 external_reference: `${playerName}|${packageId}`,
-                metadata: { playerName, packageId, gold: pkg.gold },
+                metadata: { playerName, packageId, gold: pkg.gold, email },
                 back_urls: {
                     success: `https://valadares-xi.vercel.app/?pix=success`,
                     failure: `https://valadares-xi.vercel.app/?pix=failure`,
@@ -1520,6 +1538,12 @@ function sanitizeSave(data, ownerName){
                 for (const k of keys.slice(limit)) delete data[field][k];
             }
         }
+    }
+    // Email — clampa em 120 chars, força string (evita injeção de objeto)
+    if ('email' in data){
+        const orig = data.email;
+        const v = typeof orig === 'string' ? orig.trim().slice(0, 120) : '';
+        if (v !== orig){ log('email', typeof orig === 'string' ? `${orig.length}c` : typeof orig, `${v.length}c`); data.email = v; }
     }
     return data;
 }

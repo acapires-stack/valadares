@@ -3632,6 +3632,7 @@ const player = {
     // 4 baús independentes (b1..b4) — cada um aceita qualquer coisa
     chests: { b1:{}, b2:{}, b3:{}, b4:{} },
     gold: 0,
+    email: '',                // email pro recibo do MP — preenchido na 1ª compra
     shieldDefense: 0,   // derivado da skill Escudo
     hurtTimer: 0,       // tempo restante (ms) do tingimento vermelho ao apanhar
     activeSpell: null,        // começa sem magia — precisa comprar no altar
@@ -5949,7 +5950,15 @@ window.closeGoldShop = closeGoldShop;
 function renderGoldShop(){
     const el = document.getElementById('goldShopList');
     if (!_goldPackages){ el.innerHTML = '<div>Carregando…</div>'; return; }
-    el.innerHTML = Object.entries(_goldPackages).map(([id, pkg]) => `
+    const savedEmail = String(player.email || '').replace(/"/g, '&quot;');
+    const emailRow = `
+        <div style="grid-column:1/-1;margin-bottom:8px">
+            <label style="display:block;color:#c8a050;font-size:11px;margin-bottom:4px">Email pro recibo do Mercado Pago:</label>
+            <input id="goldShopEmail" type="email" value="${savedEmail}" placeholder="seu@email.com"
+                style="width:100%;padding:8px 10px;background:#0a0805;border:1px solid #3a2d10;color:#e8d8a0;font-family:inherit;font-size:13px;border-radius:3px;box-sizing:border-box">
+            <div id="goldShopEmailErr" style="color:#ff7050;font-size:10px;margin-top:3px;min-height:12px"></div>
+        </div>`;
+    el.innerHTML = emailRow + Object.entries(_goldPackages).map(([id, pkg]) => `
         <div style="background:#1a1208;border:1px solid #3a2d10;padding:12px;text-align:center;border-radius:3px">
             <div style="font-size:18px;color:#ffcc40;font-weight:bold">${pkg.title}</div>
             <div style="font-size:22px;color:#74d176;margin:6px 0">R$ ${(pkg.priceCents/100).toFixed(2)}</div>
@@ -5959,15 +5968,33 @@ function renderGoldShop(){
     `).join('');
 }
 
+// Validação leve de email (server faz a final). Aceita: algo@dominio.tld
+function _validEmail(s){
+    s = String(s || '').trim();
+    if (s.length < 5 || s.length > 120) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 async function buyGoldPackage(packageId){
     const checkout = document.getElementById('goldShopCheckout');
+    const emailInput = document.getElementById('goldShopEmail');
+    const emailErr   = document.getElementById('goldShopEmailErr');
+    const email = String(emailInput?.value || '').trim();
+    if (!_validEmail(email)){
+        if (emailErr) emailErr.textContent = 'Digite um email válido pro recibo (ex: voce@gmail.com)';
+        emailInput?.focus();
+        return;
+    }
+    if (emailErr) emailErr.textContent = '';
+    player.email = email;
+    if (typeof saveState === 'function') saveState();
     checkout.style.display = '';
     checkout.innerHTML = `<div style="color:#c8a050">Gerando cobrança…</div>`;
     try {
         const res = await fetch(SERVER_HTTP_BASE + '/api/pix/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ playerName: player.name, packageId }),
+            body: JSON.stringify({ playerName: player.name, packageId, email }),
         });
         const data = await res.json();
         if (data.error){
@@ -11146,6 +11173,7 @@ function saveState(){
         achievements: Array.isArray(player.achievements) ? player.achievements.slice(0, 100) : [],
         equippedBadges: Array.isArray(player.equippedBadges) ? player.equippedBadges.slice(0, 2) : [],
         duelWins: player.duelWins || 0,
+        email: String(player.email || '').slice(0, 120),
         savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
@@ -11271,6 +11299,7 @@ function applySaveData(d){
         if (Array.isArray(d.equippedBadges)) player.equippedBadges = d.equippedBadges.slice(0, 2);
         else player.equippedBadges = [];
         if (typeof d.duelWins === 'number') player.duelWins = d.duelWins; else player.duelWins = 0;
+        if (typeof d.email === 'string') player.email = d.email.slice(0, 120); else player.email = '';
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
