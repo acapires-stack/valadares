@@ -1267,14 +1267,26 @@ function tickAI(){
     const now = Date.now();
     for (const m of monsters.values()){
         if (m.hp <= 0) continue;
-        // procura player mais próximo em aggro range (ignora PZ e mini-PZ de NPC)
+        // Hunter (caçador HL): target hardcoded no player que triggou. Ignora aggro range,
+        // PZ e mini-PZ — persegue pelo mapa inteiro até o target sair do jogo ou morrer.
         let target = null, td = Infinity;
-        for (const p of players.values()){
-            if ((p.hp ?? 100) <= 0) continue;
-            if (inSafe(p.x, p.y)) continue;
-            if (playerNearNpc(p)) continue;   // mini-PZ ao redor de NPCs
-            const d = chebyshev(m.x, m.y, p.x, p.y);
-            if (d <= m.aggro && d < td){ target = p; td = d; }
+        if (m.hunter && m.huntTargetId != null){
+            const tp = players.get(m.huntTargetId);
+            if (tp && (tp.hp ?? 100) > 0){
+                target = tp;
+                td = chebyshev(m.x, m.y, tp.x, tp.y);
+            }
+            // se target inválido (logoff/morte), fallback pro aggro normal abaixo
+        }
+        if (!target){
+            // procura player mais próximo em aggro range (ignora PZ e mini-PZ de NPC)
+            for (const p of players.values()){
+                if ((p.hp ?? 100) <= 0) continue;
+                if (inSafe(p.x, p.y)) continue;
+                if (playerNearNpc(p)) continue;   // mini-PZ ao redor de NPCs
+                const d = chebyshev(m.x, m.y, p.x, p.y);
+                if (d <= m.aggro && d < td){ target = p; td = d; }
+            }
         }
         // Sem target: wandering leve (não vale pra bosses/unique — eles ficam no spot)
         if (!target){
@@ -1364,6 +1376,7 @@ function snapshotMobs(){
     return Array.from(monsters.values()).map(m => ({
         id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir, hp:m.hp, maxHp:m.maxHp, unique:!!m.unique,
         level: m.level || 1,
+        hunter: m.hunter ? 1 : undefined,
         dots: (m.dots && m.dots.length) ? m.dots.map(d => ({ type:d.type })) : undefined,
     }));
 }
@@ -2025,6 +2038,25 @@ function handleMobDeath(m, killerId){
             console.log(`[boss] ${m.type} morto (Lv${cur}) por DoT/killer=${killerId} → próximo Lv${next}`);
             saveStateToDisk();
             checkMegaBossSpawn();
+        }
+    }
+    // Hunter HL: se foi o último caçador do target, credita bonus
+    if (m.hunter && m.huntTargetId != null){
+        const tp = players.get(m.huntTargetId);
+        if (tp){
+            const stillAlive = Array.from(monsters.values()).some(x =>
+                x.id !== m.id && x.hunter && x.huntTargetId === tp.id && x.hp > 0);
+            if (!stillAlive){
+                const COOLDOWN_MS = 5 * 60 * 1000;
+                tp._lastHlHuntClaim = Date.now();
+                const amount = 200 + Math.floor(Math.random() * 250);
+                tp.gold = (tp.gold || 0) + amount;
+                syncGoldRank(tp.name, tp.gold);
+                sendInvUpdate(tp, { goldDelta:{ amount, reason:'hl_hunt' } });
+                if (tp.ws && tp.ws.readyState === 1){
+                    tp.ws.send(JSON.stringify({ t:'hlHuntResult', ok:true, amount, retryAt: tp._lastHlHuntClaim + COOLDOWN_MS }));
+                }
+            }
         }
     }
     monsters.delete(m.id);
@@ -3392,12 +3424,14 @@ wss.on('connection', (ws) => {
             return reject('bad_kind');
         }
 
-        // ─── N3 fase 3: Highlander Hunt reward claim ───────────────────────
-        // Cliente envia { t:'hlHuntClaim' } quando detecta os 3 hunters mortos.
-        // Server gera o bonus (200-450g), aplica cooldown e credita via goldDelta.
-        // Sistema de spawn/tracking dos hunters fica client-side por enquanto —
-        // server só fecha o vetor de creditação direta de gold.
-        if (msg.t === 'hlHuntClaim') {
+        // ─── T4: Highlander Hunt server-side spawn + claim ─────────────────
+        // Cliente envia { t:'hlHuntTrigger' } quando timer de 3min vence após virar
+        // Highlander. Server spawna 3 CACADOR hunters perto do player, autoritativos
+        // (visíveis pra todos via mobs snapshot/batch). Crédito é automático quando
+        // o último cair em handleMobDeath. Compat: legacy hlHuntClaim vira no-op
+        // pra clients antigos (server passa a creditar via mob kill, não claim).
+        if (msg.t === 'hlHuntClaim') return;
+        if (msg.t === 'hlHuntTrigger') {
             const COOLDOWN_MS = 5 * 60 * 1000;
             const now = Date.now();
             p._lastHlHuntClaim = p._lastHlHuntClaim || 0;
@@ -3407,11 +3441,52 @@ wss.on('connection', (ws) => {
                 }
                 return;
             }
-            p._lastHlHuntClaim = now;
-            const amount = 200 + Math.floor(Math.random() * 250);
-            p.gold = (p.gold || 0) + amount;
-            syncGoldRank(p.name, p.gold);
-            sendInvUpdate(p, { goldDelta:{ amount, reason:'hl_hunt' } });
+            // Anti-replay: se já tem hunters ativos pra esse player, ignora trigger
+            const already = Array.from(monsters.values()).some(x => x.hunter && x.huntTargetId === p.id && x.hp > 0);
+            if (already){
+                if (p.ws && p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({ t:'hlHuntResult', ok:false, reason:'already_active' }));
+                }
+                return;
+            }
+            // Spawn 3 hunters num raio 8-12 ao redor do player (4 cantos mapeados,
+            // mantém o feel "vêm de longe", mas em positions walkable).
+            const corners = [
+                { x:5, y:5 }, { x:M_W-6, y:5 }, { x:5, y:M_H-6 }, { x:M_W-6, y:M_H-6 },
+            ];
+            // Embaralha pra variedade
+            for (let i = corners.length - 1; i > 0; i--){
+                const j = Math.floor(Math.random() * (i+1));
+                [corners[i], corners[j]] = [corners[j], corners[i]];
+            }
+            let spawned = 0;
+            for (const c of corners){
+                if (spawned >= 3) break;
+                for (let tries = 0; tries < 40; tries++){
+                    const x = c.x + Math.floor(Math.random()*6) - 3;
+                    const y = c.y + Math.floor(Math.random()*6) - 3;
+                    if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
+                    if (!isWalkable(x, y)) continue;
+                    if (inSafe(x, y) || inCave(x, y)) continue;
+                    if (mobAt(x, y) || playerAt(x, y)) continue;
+                    const mob = spawnMob('CACADOR', x, y);
+                    if (mob){
+                        mob.hunter = true;
+                        mob.huntTargetId = p.id;
+                        mob.aggro = 999;
+                        spawned++;
+                    }
+                    break;
+                }
+            }
+            if (spawned < 1){
+                if (p.ws && p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({ t:'hlHuntResult', ok:false, reason:'no_spawn' }));
+                }
+                return;
+            }
+            broadcastMobs();   // empurra snapshot pros clientes verem na hora
+            console.log(`[hl_hunt] ${spawned} caçadores spawnados pra ${p.name}`);
             return;
         }
 

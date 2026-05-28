@@ -3355,26 +3355,35 @@ function spawnHighlanderHunters(){
 
 function tickHighlanderHunt(dt){
     if (!player.highlander){ hlHuntActive = false; hlHuntTimer = 0; return; }
+    // T4: online → server controla spawn + tracking + crédito. Cliente só dispara
+    // o trigger uma vez quando o timer vence; server responde com mobs no snapshot
+    // e com 'hlHuntResult' (ok:true) ao último kill.
+    if (serverAuthMobs){
+        if (hlHuntActive) return;          // hunters já estão vivos no mapa (server-side)
+        hlHuntTimer += dt;
+        if (hlHuntTimer >= HL_HUNT_DELAY_MS){
+            hlHuntActive = true;            // evita re-trigger antes do server responder
+            hlHuntTimer = 0;
+            if (ws && ws.readyState === 1 && _wsAuthed){
+                try { ws.send(JSON.stringify({ t:'hlHuntTrigger' })); } catch {}
+                log('<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>');
+            }
+        }
+        return;
+    }
+    // Offline / single-player: lógica local (spawn + checagem de mortes + bonus)
     if (hlHuntActive){
-        // hunters: sempre aggro e wander pro player
         for (const m of monsters){
             if (m.hunter && m.hp > 0){ m.wanderX = player.x; m.wanderY = player.y; m.aggro = true; }
         }
-        // checka se todos os hunters morreram
         if (!monsters.some(m => m.hunter && m.hp > 0)){
             hlHuntActive = false;
             hlHuntTimer = 0;
-            // N3 fase 3: server é fonte do bonus (cooldown 5min, anti-replay).
-            if (ws && ws.readyState === 1 && _wsAuthed){
-                try { ws.send(JSON.stringify({ t:'hlHuntClaim' })); } catch {}
-                log('<span class="log-up">🏆 Caçadores eliminados! Solicitando recompensa…</span>');
-            } else {
-                const bonus = HL_HUNT_REWARD();
-                player.gold += bonus;
-                const gEl = document.getElementById('goldVal');
-                if (gEl) gEl.textContent = player.gold + ' g';
-                log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${bonus}g</span>`);
-            }
+            const bonus = HL_HUNT_REWARD();
+            player.gold += bonus;
+            const gEl = document.getElementById('goldVal');
+            if (gEl) gEl.textContent = player.gold + ' g';
+            log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${bonus}g</span>`);
         }
     } else {
         hlHuntTimer += dt;
@@ -5659,9 +5668,23 @@ function handleMP(msg){
         }
         // invSignature=null força re-render na próxima frame
     } else if (msg.t === 'hlHuntResult'){
-        if (!msg.ok && msg.reason === 'cooldown'){
+        if (msg.ok){
+            // T4: server confirma último hunter morto + bonus creditado via goldDelta.
+            // Aqui só fecha o estado local pra o timer voltar a contar.
+            hlHuntActive = false;
+            hlHuntTimer = 0;
+            log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${msg.amount}g</span>`);
+        } else if (msg.reason === 'cooldown'){
             const min = Math.ceil(((msg.retryAt || 0) - Date.now()) / 60000);
             log(`<span class="log-sys">⏳ Recompensa da caçada em cooldown (${min}min)</span>`);
+            hlHuntActive = false;   // libera p/ próximo ciclo (mesmo no cooldown, evita travar)
+        } else if (msg.reason === 'already_active' || msg.reason === 'no_spawn'){
+            // já tem hunters vivos no server, ou server falhou em spawnar — sincroniza estado
+            hlHuntActive = (msg.reason === 'already_active');
+            if (msg.reason === 'no_spawn'){
+                hlHuntTimer = 0;
+                log(`<span class="log-sys">⚠ Server não achou onde spawnar caçadores — tentando de novo em ${Math.floor(HL_HUNT_DELAY_MS/60000)}min</span>`);
+            }
         }
     } else if (msg.t === 'questResult'){
         // Server rejeitou turn-in. Mostra motivo amigável.
@@ -5933,6 +5956,9 @@ function applyMobsSnapshot(list){
             }
             m.hp = srv.hp; m.maxHp = srv.maxHp;
         }
+        // Hunter HL: server marca CACADOR triggados via hlHuntTrigger — cor laranja
+        // no minimap (linha 7409 lê m.hunter) e aggro permanente sobre o triggerer.
+        if (srv.hunter){ m.hunter = true; m.aggro = true; }
         // DoTs ativos vêm como [{type}] na snapshot — guarda só pra renderizar ícone
         m.dots = Array.isArray(srv.dots) ? srv.dots : null;
     }
