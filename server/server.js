@@ -243,7 +243,7 @@ function creditGoldToPlayer(playerName, gold, paymentId){
         if (p.disconnected) continue;
         if (p.name.toLowerCase() === playerName.toLowerCase()){
             p.gold = (p.gold || 0) + gold;
-            const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            syncGoldRank(p.name, p.gold);
             // goldDelta no invUpdate já dispara toast + log + float + som no cliente.
             // Não duplicar com serverMsg aqui.
             sendInvUpdate(p, { goldDelta:{ amount: gold, reason:'pix', paymentId } });
@@ -1487,13 +1487,128 @@ setInterval(() => {
 }, 30000);
 
 // ─── Ranking público (acumula por nome do player) ──────────────────────────
-const rankings = new Map();   // name → { mobKills, pkKills, bossKills, gold }
+const rankings = new Map();   // name → { mobKills, pkKills, bossKills, gold } — all-time
 function ensureRanking(name){
     if (!name) return null;
     let r = rankings.get(name);
     if (!r){ r = { mobKills:0, pkKills:0, bossKills:0, gold:0 }; rankings.set(name, r); }
+    // Garantir entry paralelo na season ranking (criada lazy junto)
+    ensureSeasonRanking(name);
     return r;
 }
+
+// ─── Season ranking (mensal, reset dia 1 às 00:00 BRT) ─────────────────────
+// id formato: 'YYYY-MM'. Em BRT (Paranaguá/PR = UTC-3, sem DST atual).
+function currentSeasonId(){
+    const now = new Date(Date.now() - 3 * 60 * 60 * 1000);   // shift pra BRT
+    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+const seasonState = {
+    id: currentSeasonId(),
+    ranking: new Map(),     // name → mesmo shape de rankings (zera no rollover)
+    archive: [],            // [{ id, top: [{name, mobs, pvp, bosses, total}], champion, closedAt }]
+};
+function ensureSeasonRanking(name){
+    if (!name) return null;
+    let r = seasonState.ranking.get(name);
+    if (!r){ r = { mobKills:0, pkKills:0, bossKills:0, gold:0 }; seasonState.ranking.set(name, r); }
+    return r;
+}
+function seasonCombinedScore(r){
+    if (!r) return 0;
+    return (r.mobKills || 0) + (r.pkKills || 0) * 5 + (r.bossKills || 0) * 20;
+}
+// Helpers de bump duplo (ranking all-time + season). Sempre usar em vez de
+// mexer direto em r.mobKills/pkKills/bossKills/gold pra manter os dois em sync.
+function bumpMobKill(name, isBoss){
+    const r = ensureRanking(name); if (!r) return;
+    const sr = ensureSeasonRanking(name);
+    r.mobKills = (r.mobKills || 0) + 1;
+    sr.mobKills = (sr.mobKills || 0) + 1;
+    if (isBoss){
+        r.bossKills = (r.bossKills || 0) + 1;
+        sr.bossKills = (sr.bossKills || 0) + 1;
+    }
+}
+function bumpPkKill(name){
+    const r = ensureRanking(name); if (!r) return;
+    const sr = ensureSeasonRanking(name);
+    r.pkKills = (r.pkKills || 0) + 1;
+    sr.pkKills = (sr.pkKills || 0) + 1;
+}
+function syncGoldRank(name, gold){
+    const r = ensureRanking(name); if (!r) return;
+    const sr = ensureSeasonRanking(name);
+    r.gold = gold;
+    sr.gold = gold;
+}
+function topSeason(limit){
+    return Array.from(seasonState.ranking.entries())
+        .map(([name, r]) => ({
+            name,
+            mobs:   r.mobKills  || 0,
+            pvp:    r.pkKills   || 0,
+            bosses: r.bossKills || 0,
+            gold:   r.gold      || 0,
+            total:  seasonCombinedScore(r),
+        }))
+        .filter(e => e.total > 0)
+        .sort((a,b) => b.total - a.total)
+        .slice(0, limit);
+}
+function checkSeasonRollover(){
+    const newId = currentSeasonId();
+    if (newId === seasonState.id) return;
+    // Mudou o mês — encerra a season anterior, abre nova.
+    const closedId = seasonState.id;
+    const top10 = topSeason(10);
+    const champion = top10[0]?.name || null;
+    seasonState.archive.unshift({
+        id: closedId,
+        top: top10,
+        champion,
+        closedAt: Date.now(),
+    });
+    if (seasonState.archive.length > 12) seasonState.archive.length = 12;
+    // Concede Coroa de Temporada ao campeão (online ou via acc.save)
+    if (champion){
+        const winnerKey = `COROA_TEMPORADA`;
+        let onlinePlayer = null;
+        for (const p of players.values()){
+            if (!p.disconnected && p.name && p.name.toLowerCase() === champion.toLowerCase()){
+                onlinePlayer = p; break;
+            }
+        }
+        if (onlinePlayer){
+            incInv(onlinePlayer, winnerKey, 1);
+            onlinePlayer.seasonsWon = Array.isArray(onlinePlayer.seasonsWon) ? onlinePlayer.seasonsWon : [];
+            if (!onlinePlayer.seasonsWon.includes(closedId)) onlinePlayer.seasonsWon.push(closedId);
+            sendInvUpdate(onlinePlayer, { seasonReward:{ id: closedId } });
+        } else {
+            // Offline — credita no save
+            try {
+                const acc = getAccount(champion);
+                if (acc && acc.save){
+                    acc.save.inv = acc.save.inv || {};
+                    acc.save.inv[winnerKey] = (acc.save.inv[winnerKey] || 0) + 1;
+                    acc.save.seasonsWon = Array.isArray(acc.save.seasonsWon) ? acc.save.seasonsWon : [];
+                    if (!acc.save.seasonsWon.includes(closedId)) acc.save.seasonsWon.push(closedId);
+                    if (typeof flushAccounts === 'function') flushAccounts();
+                }
+            } catch(e){ console.warn('[season] erro ao creditar offline:', e.message); }
+        }
+        broadcast(null, { t:'serverMsg', level:'event', text:`🏆 Temporada ${closedId} encerrada! Campeão: ${champion}` });
+    } else {
+        broadcast(null, { t:'serverMsg', level:'info', text:`🏆 Temporada ${closedId} encerrada (sem campeão).` });
+    }
+    // Reset
+    seasonState.id = newId;
+    seasonState.ranking = new Map();
+    // Persist imediato pra não perder em crash
+    if (typeof saveStateToDisk === 'function') saveStateToDisk();
+    console.log(`[season] rollover ${closedId} → ${newId}, champion=${champion || '(nenhum)'}`);
+}
+setInterval(checkSeasonRollover, 60 * 1000);   // checa a cada minuto
 function topGuildRanking(limit){
     // Agrega stats por guild somando os rankings de cada membro.
     // total = mobs + pvp*5 + bosses*20 (PvP e bosses pesam mais)
@@ -1531,6 +1646,11 @@ function saveStateToDisk(){
         bossDeath: Array.from(bossDeath.entries()),
         megaBoss: { spawnedAt: megaBoss.spawnedAt, lastResolvedAt: megaBoss.lastResolvedAt },
         rankings: Array.from(rankings.entries()),
+        season: {
+            id: seasonState.id,
+            ranking: Array.from(seasonState.ranking.entries()),
+            archive: seasonState.archive,
+        },
         guilds: Array.from(guilds.values()),
         monsters: Array.from(monsters.values()).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
@@ -1559,6 +1679,17 @@ function loadStateFromDisk(){
         }
         if (Array.isArray(d.rankings)){
             for (const [name, r] of d.rankings) rankings.set(name, r);
+        }
+        // Season: restaura id/ranking/archive. Se o id salvo ≠ atual, o rollover
+        // vai disparar no próximo checkSeasonRollover() (intervalo de 60s).
+        if (d.season && typeof d.season === 'object'){
+            if (typeof d.season.id === 'string') seasonState.id = d.season.id;
+            if (Array.isArray(d.season.ranking)){
+                seasonState.ranking = new Map(d.season.ranking);
+            }
+            if (Array.isArray(d.season.archive)){
+                seasonState.archive = d.season.archive.slice(0, 12);
+            }
         }
         if (Array.isArray(d.guilds)){
             for (const g of d.guilds) if (g && g.name) guilds.set(g.name, g);
@@ -1821,11 +1952,7 @@ function handleMobDeath(m, killerId){
     }
     broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
     if (killer){
-        const r = ensureRanking(killer.name);
-        if (r){
-            r.mobKills = (r.mobKills || 0) + 1;
-            if (m.unique) r.bossKills = (r.bossKills || 0) + 1;
-        }
+        bumpMobKill(killer.name, !!m.unique);
         sharePartyKill(killer, m);
     }
 }
@@ -2007,7 +2134,7 @@ function applyDailyEventTick(){
             if (p.disconnected) continue;
             const amount = 30 + Math.floor(Math.random() * 31);
             p.gold = (p.gold || 0) + amount;
-            const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            syncGoldRank(p.name, p.gold);
             sendInvUpdate(p, { goldDelta:{ amount, reason:'gold_rain' } });
         }
     } else if (t.id === 'siege'){
@@ -2085,16 +2212,12 @@ function endDuel(winner, loser, draw){
     } else {
         winner.gold = (winner.gold || 0) + amount * 2;
     }
+    syncGoldRank(winner.name, winner.gold);
+    syncGoldRank(loser.name,  loser.gold);
     const rW = ensureRanking(winner.name);
     const rL = ensureRanking(loser.name);
-    if (rW){
-        rW.gold = winner.gold;
-        if (!draw){ rW.duelWins = (rW.duelWins || 0) + 1; }
-    }
-    if (rL){
-        rL.gold = loser.gold;
-        if (!draw){ rL.duelLosses = (rL.duelLosses || 0) + 1; }
-    }
+    if (rW && !draw){ rW.duelWins = (rW.duelWins || 0) + 1; }
+    if (rL && !draw){ rL.duelLosses = (rL.duelLosses || 0) + 1; }
     sendTo(winner.id, { t:'duelEnd', winner:true,  draw:!!draw, amount, opponentName: loser.name,  gold: winner.gold });
     sendTo(loser.id,  { t:'duelEnd', winner:false, draw:!!draw, amount, opponentName: winner.name, gold: loser.gold });
     if (draw){
@@ -2831,7 +2954,7 @@ wss.on('connection', (ws) => {
                 if (d.type === 'GOLD'){
                     p.gold = (p.gold | 0) + (d.qty | 0);
                     pickedGold += d.qty;
-                    const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                    syncGoldRank(p.name, p.gold);
                 } else {
                     incInv(p, d.type, d.qty | 0 || 1);
                 }
@@ -2902,7 +3025,7 @@ wss.on('connection', (ws) => {
                 if (gold <= 0) return;
                 p.gold = 0;
                 bag._GOLD = (bag._GOLD || 0) + gold;
-                const r = ensureRanking(p.name); if (r) r.gold = 0;
+                syncGoldRank(p.name, 0);
                 replyChests({ goldMoved:{ amount: gold, dir:'in' } });
                 return;
             }
@@ -2911,7 +3034,7 @@ wss.on('connection', (ws) => {
                 if (gold <= 0) return;
                 delete bag._GOLD;
                 p.gold = (p.gold | 0) + gold;
-                const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                syncGoldRank(p.name, p.gold);
                 cleanBagAfter();
                 replyChests({ goldMoved:{ amount: gold, dir:'out' } });
                 return;
@@ -2929,7 +3052,7 @@ wss.on('connection', (ws) => {
                     goldMoved = p.gold;
                     bag._GOLD = (bag._GOLD || 0) + p.gold;
                     p.gold = 0;
-                    const r = ensureRanking(p.name); if (r) r.gold = 0;
+                    syncGoldRank(p.name, 0);
                 }
                 replyChests({ depositAll:{ moved, goldMoved } });
                 return;
@@ -2944,7 +3067,7 @@ wss.on('connection', (ws) => {
                 const gold = bag._GOLD || 0;
                 if (gold){
                     p.gold = (p.gold | 0) + gold;
-                    const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                    syncGoldRank(p.name, p.gold);
                 }
                 p.chests[cid] = {};
                 replyChests({ withdrawAll:{ moved, gold } });
@@ -2986,7 +3109,7 @@ wss.on('connection', (ws) => {
                     // N3 fase 2: credita gold + item authoritativos no killer (cliente já não soma local)
                     if (goldDrop > 0){
                         p.gold = (p.gold | 0) + goldDrop;
-                        const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+                        syncGoldRank(p.name, p.gold);
                     }
                     if (droppedItem){
                         incInv(p, droppedItem, 1);
@@ -3167,7 +3290,7 @@ wss.on('connection', (ws) => {
             p._lastHlHuntClaim = now;
             const amount = 200 + Math.floor(Math.random() * 250);
             p.gold = (p.gold || 0) + amount;
-            const r = ensureRanking(p.name); if (r) r.gold = p.gold;
+            syncGoldRank(p.name, p.gold);
             sendInvUpdate(p, { goldDelta:{ amount, reason:'hl_hunt' } });
             return;
         }
@@ -3282,12 +3405,8 @@ wss.on('connection', (ws) => {
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
                 broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level });
                 if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops });
-                // Ranking: incrementa mobKills (e bossKills se for unique)
-                const r = ensureRanking(p.name);
-                if (r){
-                    r.mobKills = (r.mobKills || 0) + 1;
-                    if (m.unique) r.bossKills = (r.bossKills || 0) + 1;
-                }
+                // Ranking: incrementa mobKills (e bossKills se for unique) — all-time + season
+                bumpMobKill(p.name, !!m.unique);
                 sharePartyKill(p, m);
             }
             return;
@@ -3306,10 +3425,10 @@ wss.on('connection', (ws) => {
             const actualGain = Math.min(requestedGain, p.gold | 0);
             if (actualGain > 0){
                 p.gold -= actualGain;
-                const rv = ensureRanking(p.name); if (rv) rv.gold = p.gold;
+                syncGoldRank(p.name, p.gold);
                 if (killer){
                     killer.gold = (killer.gold | 0) + actualGain;
-                    const rk = ensureRanking(killer.name); if (rk) rk.gold = killer.gold;
+                    syncGoldRank(killer.name, killer.gold);
                 }
             }
             // Highlander drop: vítima perde CORACAO_HL (se tinha) e killer ganha 1
@@ -3329,11 +3448,8 @@ wss.on('connection', (ws) => {
                 }));
             }
             broadcastMsg('warn', `⚔ ${killer?killer.name:'?'} matou ${p.name}` + (msg.dropHighlander?' (Highlander caiu!)':''));
-            // Ranking: incrementa pkKills do killer
-            if (killer){
-                const r = ensureRanking(killer.name);
-                if (r) r.pkKills = (r.pkKills || 0) + 1;
-            }
+            // Ranking: incrementa pkKills do killer (all-time + season)
+            if (killer) bumpPkKill(killer.name);
             return;
         }
 
@@ -3409,6 +3525,11 @@ wss.on('connection', (ws) => {
                 bosses: topRanking('bossKills', limit),
                 gold:   topRanking('gold',      limit),
                 guilds: topGuildRanking(limit),
+                season: {
+                    id: seasonState.id,
+                    top: topSeason(limit),
+                    archive: seasonState.archive.slice(0, 12),
+                },
             });
             return;
         }

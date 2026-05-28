@@ -1639,7 +1639,8 @@
     <div class="chest-box" style="min-width:520px;max-width:580px">
         <div class="chest-title">🏆 RANKING</div>
         <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;flex-wrap:wrap">
-            <button class="train-tab active" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
+            <button class="train-tab active" data-rank-tab="season" onclick="switchRankingTab('season')">🏆 TEMPORADA</button>
+            <button class="train-tab" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
             <button class="train-tab" data-rank-tab="pvp" onclick="switchRankingTab('pvp')">PvP</button>
             <button class="train-tab" data-rank-tab="bosses" onclick="switchRankingTab('bosses')">BOSSES</button>
             <button class="train-tab" data-rank-tab="gold" onclick="switchRankingTab('gold')">GOLD</button>
@@ -2881,6 +2882,7 @@ const ITEMS = {
     POTION_MP:{ name:'Poção de mana',  color:'#4080ff', manaheal:50, kind:'potion' },
     BENCAO_FENIX: { name:'Bênção da Fênix', color:'#ffaa30', kind:'blessing', desc:'Salva você da próxima morte. Consumida automaticamente.' },
     // Cosméticos — equipáveis num slot único, só visual, sem stats
+    COROA_TEMPORADA: { name:'Coroa de Temporada', color:'#ffd700', kind:'cosmetic', crown:'#ffd700', aura:'#ffe060', nameColor:'#ffe060', desc:'Concedida ao #1 do leaderboard mensal. Tooltip mostra quais temporadas você venceu.' },
     CAPA_REAL:    { name:'Capa Real',       color:'#ffd040', kind:'cosmetic', cape:'#ffd040', desc:'Capa dourada atrás do boneco.' },
     CAPA_SOMBRA:  { name:'Capa das Sombras', color:'#202028', kind:'cosmetic', cape:'#1a1a22', desc:'Capa preta. Visual sombrio.' },
     AURA_FOGO:    { name:'Aura de Fogo',    color:'#ff4020', kind:'cosmetic', aura:'#ff4020', desc:'Anel pulsante laranja ao redor.' },
@@ -3760,6 +3762,7 @@ const player = {
     chests: { b1:{}, b2:{}, b3:{}, b4:{} },
     gold: 0,
     email: '',                // email pro recibo do MP — preenchido na 1ª compra
+    seasonsWon: [],           // ['2026-05', '2026-06', ...] — temporadas em que foi #1
     shieldDefense: 0,   // derivado da skill Escudo
     hurtTimer: 0,       // tempo restante (ms) do tingimento vermelho ao apanhar
     activeSpell: null,        // começa sem magia — precisa comprar no altar
@@ -5581,6 +5584,16 @@ function handleMP(msg){
             if (typeof renderQuests === 'function') renderQuests();
             const chainNpc = msg.questResult.chainId && (window.NPCS || []).find(n => n.chain === msg.questResult.chainId);
             if (chainNpc && typeof renderChainDialog === 'function') renderChainDialog(chainNpc);
+            saveState();
+        }
+        // Season reward — campeão do mês recebe Coroa de Temporada (server hand-off online)
+        if (msg.seasonReward && msg.seasonReward.id){
+            const id = String(msg.seasonReward.id);
+            player.seasonsWon = Array.isArray(player.seasonsWon) ? player.seasonsWon : [];
+            if (!player.seasonsWon.includes(id)) player.seasonsWon.push(id);
+            log(`<span class="log-up">🏆 VOCÊ É O CAMPEÃO DA TEMPORADA ${id}! +1× Coroa de Temporada</span>`);
+            if (typeof showServerToast === 'function') showServerToast('event', `🏆 Campeão da temporada ${id}!`, null, 10000);
+            if (typeof sndLevelUp === 'function') sndLevelUp();
             saveState();
         }
         // invSignature=null força re-render na próxima frame
@@ -10775,7 +10788,7 @@ window.whisperTo = whisperTo;
 
 // ─── RANKING público ────────────────────────────────────────────────────────
 let _rankingCache = null;
-let _rankingTab = 'mobs';
+let _rankingTab = 'season';
 function openRanking(){
     closeAllModals();
     document.getElementById('rankingModal').style.display = 'flex';
@@ -10838,13 +10851,47 @@ function renderRankingBody(){
         el.innerHTML = '<div style="color:#666;text-align:center;padding:40px">carregando…</div>';
         return;
     }
+    const colorMedal = i => i === 0 ? '#ffd040' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#5a4818';
+    // Aba TEMPORADA — top do mês corrente + estimativa de tempo até rollover
+    if (_rankingTab === 'season'){
+        const season = _rankingCache.season || { id:'?', top:[], archive:[] };
+        const top = season.top || [];
+        // Calcula data do próximo rollover (1º dia do mês seguinte 00:00 BRT)
+        const now = new Date(Date.now() - 3 * 3600 * 1000);
+        const nextRoll = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1) + 3 * 3600 * 1000;
+        const daysLeft = Math.max(0, Math.ceil((nextRoll - Date.now()) / 86400000));
+        const champion = season.archive && season.archive[0];
+        const champLine = champion
+            ? `<div style="text-align:center;padding:6px 8px;font-size:11px;color:#a8e0ff;background:#0a1418;border-bottom:1px solid #1a2840">🏆 Campeão de ${escapeHtml(champion.id)}: <b style="color:#ffd060">${escapeHtml(champion.champion || '?')}</b></div>`
+            : '';
+        const header = `
+            <div style="color:#ffd060;font-size:12px;letter-spacing:1.5px;padding:8px;text-align:center;background:#1a1408;border-bottom:1px solid #3a2d10">
+                🏆 TEMPORADA ${escapeHtml(season.id)} · termina em ${daysLeft} dia${daysLeft===1?'':'s'}
+                <div style="font-size:9px;color:#888;letter-spacing:1px;margin-top:2px">pontos = mobs + pvp×5 + bosses×20 · #1 ganha Coroa</div>
+            </div>${champLine}`;
+        if (!top.length){
+            el.innerHTML = header + `<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ainda ninguém pontuou esta temporada. Bora caçar!</div>`;
+            return;
+        }
+        el.innerHTML = header + top.map((e, i) => `
+            <div style="padding:6px 10px;border-bottom:1px solid #1a1408;${e.name === player.name ? 'background:#1a1a08' : ''}">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
+                    <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ' <span style="color:#888;font-size:10px">(você)</span>' : ''}</span>
+                    <span style="color:#ffcc40;font-family:Consolas,monospace;min-width:60px;text-align:right;font-weight:700">${e.total}</span>
+                </div>
+                <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:#7a6520;margin-left:34px">
+                    <span>🐺 ${e.mobs}</span><span>☠ ${e.pvp}</span><span>👑 ${e.bosses}</span>
+                </div>
+            </div>`).join('');
+        return;
+    }
     const list = _rankingCache[_rankingTab] || [];
     const labels = { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds' };
     if (!list.length){
         el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ninguém com ${labels[_rankingTab]} ainda.</div>`;
         return;
     }
-    const colorMedal = i => i === 0 ? '#ffd040' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#5a4818';
     // Aba GUILDS tem layout diferente — mostra total agregado + breakdown
     if (_rankingTab === 'guilds'){
         el.innerHTML = `
@@ -11389,6 +11436,7 @@ function saveState(){
         equippedBadges: Array.isArray(player.equippedBadges) ? player.equippedBadges.slice(0, 2) : [],
         duelWins: player.duelWins || 0,
         email: String(player.email || '').slice(0, 120),
+        seasonsWon: Array.isArray(player.seasonsWon) ? player.seasonsWon.slice(0, 24) : [],
         savedAt: Date.now(),
         // visited como array regular pra JSON
         visited: player.visited ? Array.from(player.visited) : null,
@@ -11515,6 +11563,7 @@ function applySaveData(d){
         else player.equippedBadges = [];
         if (typeof d.duelWins === 'number') player.duelWins = d.duelWins; else player.duelWins = 0;
         if (typeof d.email === 'string') player.email = d.email.slice(0, 120); else player.email = '';
+        if (Array.isArray(d.seasonsWon)) player.seasonsWon = d.seasonsWon.slice(0, 24); else player.seasonsWon = [];
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
         }
