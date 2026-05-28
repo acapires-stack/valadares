@@ -190,6 +190,16 @@
             border-bottom: 1px solid #2a200a;
             padding: 0 4px;
         }
+        /* Permite copiar texto do log de combate / chat (body tem user-select:none global) */
+        #log, #chatMessages {
+            user-select: text;
+            -webkit-user-select: text;
+            cursor: text;
+        }
+        #log *, #chatMessages * {
+            user-select: text;
+            -webkit-user-select: text;
+        }
         .chat-tab {
             padding: 6px 14px;
             font-size: 9px;
