@@ -29,13 +29,23 @@
 
 ## 🥇 Backlog priorizado
 
-### 🔴 P0 — Verificações rápidas no início da próxima sessão
-- Confirmar que pots curam em prod (food + POTION_HP + POTION_MP) — fix lockdown
-- Testar convite de party via botão direito + modal aceitar
-- Testar menu admin (COMUNICADOS / BOSSES / MEGABOSS / GERENCIAR PLAYER / EXCLUIR CONTA)
-- Validar boneco de treino em (48,51) — 1 tile abaixo do Crupiê
+### 🔴 P0 — RISCOS CRÍTICOS (atacar ANTES de feature nova)
+
+**Auditoria 28/05 detectou 5 vulnerabilidades sérias. Detalhes em `SESSION_NOTES.md`.**
+
+1. **server.js:3823-3824** handler `pos` aceita `hp/maxHp` cliente — bypassa lockdown N3 (fix: deletar 2 linhas)
+2. **`process.on('uncaughtException')` faltando** — throw em tickAI derruba server inteiro (fix: handler global + try/catch nos ticks)
+3. **`ws.on('message')` sem try/catch geral** — handler ruim mata processo (fix: envelopa em try que chama recordError)
+4. **`pvpAttack` aceita amount/range cliente sem cap** — one-shot via F12 (fix: cap 2×weapon base + range max 8)
+5. **`pvpAttack` sem rate limit** — 100 hits/s + XP infinito (fix: `_lastPvpAt` cooldown 400ms)
+
+**Após esses 5:** mover ADMIN_TOKEN pra header (X-Admin-Token), allowlist permaBuffs/flags no save, detectar pkDeath autônomo no server.
+
+### 🟢 P0.5 — Verificações de smoke test antes de feature
+
 - Verificar webhook MP credita 1× só na próxima venda PIX aprovada (log Railway: `[mp] gold creditado online: NOME +N`)
 - Validar T4 Caçadores HL em MP (highlander → 3min → outro player vê em laranja)
+- Confirmar bot 007 spawnando a cada 1h automático
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
