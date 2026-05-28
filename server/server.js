@@ -4520,28 +4520,26 @@ wss.on('connection', (ws) => {
                 return;
             }
             p.mp = Math.max(0, (p.mp ?? 0) - sp.manaCost);
-            // Cura em grupo — alcança membros da party em raio groupRange (chebyshev).
-            // Cura cada um (inclusive o caster), broadcast pstats por player curado.
+            // Cura em grupo — AoE de heal, alcança QUALQUER player em raio groupRange
+            // (não precisa party). Cura o caster + outros players. Skipa bots e ghosts.
             let healedAmount = 0;
             let groupHealedCount = 0;
             if (sp.groupRange){
-                const party = findPartyOfPlayer(p.name);
-                if (!party){
-                    if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'spellResult', ok:false, reason:'no_party', spellKey }));
-                    return;
-                }
                 const magiaSk = (p.skills && p.skills.Magia && p.skills.Magia.val) || 10;
                 const baseAmount = sp.healBase + Math.floor(magiaSk / 2);
-                for (const member of partyMembersOnline(party)){
-                    if (chebyshev(member.x, member.y, p.x, p.y) > sp.groupRange) continue;
-                    const mxHp = member.maxHp || 100;
-                    if ((member.hp ?? 0) >= mxHp) continue;
-                    const amt = Math.min(baseAmount + Math.floor(Math.random()*4) - 1, mxHp - (member.hp ?? 0));
+                for (const target of players.values()){
+                    if (target._isBot) continue;
+                    if (target.disconnected) continue;
+                    if ((target.hp ?? 0) <= 0) continue;
+                    if (chebyshev(target.x, target.y, p.x, p.y) > sp.groupRange) continue;
+                    const mxHp = target.maxHp || 100;
+                    if ((target.hp ?? 0) >= mxHp) continue;
+                    const amt = Math.min(baseAmount + Math.floor(Math.random()*4) - 1, mxHp - (target.hp ?? 0));
                     if (amt <= 0) continue;
-                    member.hp = Math.min(mxHp, (member.hp ?? 0) + amt);
-                    if (member.id === p.id) healedAmount = amt;
-                    broadcastPstatsAll(member);
-                    broadcast(null, { t:'float', id: member.id, text:`+${amt}`, color:'#aaffaa', big:false });
+                    target.hp = Math.min(mxHp, (target.hp ?? 0) + amt);
+                    if (target.id === p.id) healedAmount = amt;
+                    broadcastPstatsAll(target);
+                    broadcast(null, { t:'float', id: target.id, text:`+${amt}`, color:'#aaffaa', big:false });
                     groupHealedCount++;
                 }
             } else if (sp.healBase){
