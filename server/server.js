@@ -1518,6 +1518,30 @@ function seasonCombinedScore(r){
     if (!r) return 0;
     return (r.mobKills || 0) + (r.pkKills || 0) * 5 + (r.bossKills || 0) * 20;
 }
+// ─── Weapon → Skill map (T1) ───────────────────────────────────────────────
+// Espelha o campo `skill` do ITEMS do cliente. Server usa pra creditar XP
+// authoritative ao matar mob (sem confiar no que o cliente passa).
+const WEAPON_SKILL = {
+    // Espada
+    ADAGA:'Espada', ADAGA_DUPLA:'Espada', ESPADA:'Espada', ESPADA_DRACO:'Espada',
+    ESPADA_ETERNA:'Espada', ESPADA_HL:'Espada', ESPADA_LONGA:'Espada', ESPADA_OSSO:'Espada', SABRE:'Espada',
+    // Distância (arcos + lanças arremessáveis)
+    ARCO:'Distância', ARCO_CACA:'Distância', BESTA:'Distância',
+    LANCA:'Distância', LANCA_LONGA:'Distância',
+    // Clava
+    BORDAO:'Clava', CLAVA:'Clava', MACA:'Clava', MACA_GIGANTE:'Clava',
+    MARRETA:'Clava', MARTELO:'Clava', MARTELO_GOLEM:'Clava', PORRETE:'Clava',
+    // Machado
+    MACHADO:'Machado', MACHADO_MINO:'Machado',
+};
+function weaponSkillOf(p){
+    // Strip sufixo _PLUS_N (forja) — ESPADA_HL_PLUS_2 → ESPADA_HL
+    const w = p.equipped?.weapon;
+    if (!w) return 'Punho';
+    const base = String(w).replace(/_PLUS_\d+$/, '');
+    return WEAPON_SKILL[base] || 'Punho';
+}
+
 // ─── Talents (M5) ──────────────────────────────────────────────────────────
 // Talents são single-rank passivos que aplicam permaBuffs ao serem comprados.
 // 1 ponto a cada 10 levels totais (sum of skill.val - 10 across all skills).
@@ -1978,8 +2002,20 @@ function handleMobDeath(m, killerId){
     monsters.delete(m.id);
     const killer = players.get(killerId);
     const loot = rollLoot(m.type);
+    // T1: XP authoritative na skill da arma equipada do killer
+    let xpGained = 0, skillUsed = null;
+    if (killer){
+        skillUsed = weaponSkillOf(killer);
+        gainSkillXpServer(killer, skillUsed, m.xp || 1);
+        xpGained = m.xp || 1;
+    }
     if (killer && killer.ws.readyState === 1){
-        killer.ws.send(JSON.stringify({ t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot }));
+        killer.ws.send(JSON.stringify({
+            t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot,
+            skill: skillUsed, xpGained,
+        }));
+        // Envia skills atualizadas (autoritativo)
+        sendInvUpdate(killer, { skills: killer.skills, reason:'mobKill' });
     }
     broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
     if (killer){
@@ -2684,8 +2720,10 @@ wss.on('connection', (ws) => {
             // Cliente continua enviando-os no save (compat), mas server descarta. Se
             // houver divergência (ex: save local mais novo que p.*), o próximo
             // sendInvUpdate ressincroniza o cliente.
-            // Quest state segue aceito (XP de mob kill ainda é client-side). Cliente continua a fonte
-            // até lockdown total; aqui só sincroniza pra o handler questTurnIn validar.
+            // Quest state e skills seguem aceitos do save. Mob kill XP agora é server
+            // (T1), mas treino/party share/distância/escudo ainda creditam client-side.
+            // Lockdown total de skills (T3) requer migrar essas fontes pro server primeiro.
+            // SAVE_CAPS.skill=200 já clampa eventual abuso.
             if (data.skills && typeof data.skills === 'object') p.skills = data.skills;
             if (data.quests && typeof data.quests === 'object'){
                 p.quests = {
@@ -3483,8 +3521,13 @@ wss.on('connection', (ws) => {
                     const d = spawnGroundDrop(m.x, m.y, it.type, it.qty | 0 || 1);
                     spawnedDrops.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty });
                 }
+                // T1: XP authoritative na skill da arma equipada
+                const skillUsed = weaponSkillOf(p);
+                gainSkillXpServer(p, skillUsed, m.xp || 1);
                 // killer recebe mobKill (com loot legado pra compat de fallback no client)
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot, drops: spawnedDrops });
+                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1 });
+                // Envia skills atualizadas (autoritativo)
+                sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
                 broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level });
                 if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops });

@@ -5836,11 +5836,10 @@ function handleMP(msg){
         if (idx >= 0) monsters.splice(idx, 1);
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
     } else if (msg.t === 'mobKill'){
-        // sou o killer — loot + xp
+        // sou o killer — loot + xp (server creditou skills authoritative; vem em msg.skill)
         const def = MTYPE[msg.mobType];
         if (def){
-            const fakeMob = { id: msg.mobId, type: msg.mobType, name: def.name, x: msg.x, y: msg.y, xpReward: msg.xp };
-            // dispara o "ganhar XP" + drops, mas pula o splice (server já removeu via mobDead)
+            const fakeMob = { id: msg.mobId, type: msg.mobType, name: def.name, x: msg.x, y: msg.y, xpReward: msg.xpGained || msg.xp, skill: msg.skill };
             mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null);
         }
     } else if (msg.t === 'mobMissing'){
@@ -5942,10 +5941,15 @@ function mobKilledByServer(m, serverLoot, serverDrops){
     } else if (typeof rollDrops === 'function') {
         rollDrops(m.type, m.x, m.y);
     }
-    // XP no skill da arma equipada (simula killMonster sem mexer no monsters[])
+    // T1: XP do mob kill agora é creditado server-side via gainSkillXpServer.
+    // Em modo online, server manda `invUpdate { skills }` com skills autoritativas —
+    // não aplicamos gainSkillXp local pra evitar dobrar. Apenas log + float.
+    // Em modo offline (sem ws), fallback continua aplicando local.
     const wKey = player.equipped.weapon;
-    const skill = wKey ? ITEMS[wKey].skill : 'Punho';
-    if (player.skills[skill]) gainSkillXp(skill, m.xpReward || 1);
+    const skill = m.skill || (wKey ? ITEMS[wKey].skill : 'Punho');
+    if (!(ws && ws.readyState === 1 && _wsAuthed)){
+        if (player.skills[skill]) gainSkillXp(skill, m.xpReward || 1);
+    }
     log(`<span class="log-kill">☠ ${m.name} morreu! (+${m.xpReward||0} xp ${skill})</span>`);
     addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
     if (player.target === m.id){ player.target = null; /* mantém autoAttack */ }
