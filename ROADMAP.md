@@ -1,353 +1,149 @@
-# Valadares — Roadmap & Linha de Pensamento
+# Valadares — Roadmap
 
-> RPG tile-based estilo Tibia rodando no browser. Single-player + multiplayer básico.
-> Este arquivo é o **mapa mental** do projeto: o que existe, o que falta, e por quê.
-
----
-
-## 🆕 Adicionado em 27/05/2026 (sessão noite)
-
-**Features:** Party 1-4 com XP shared (raio 12) · Spectator pós-morte 15s · Death replay
-5s no Stats · 2 novas quest chains (Madame Crepúsculo, Embaixador Vohrim) · 20
-achievements totais (tiers bronze/prata/ouro + badges no boneco) · Eventos diários
-rotativos (Chuva de Ouro / Cerco / Sabedoria) · Duelo 1v1 consensual com aposta · 4
-cosméticos novos · attackVfx broadcast.
-
-**Infra/Seg:**
-- Hardening N3 fase 1 (5 ops server-side): Forja, Craft, Shop, Bênção da Fênix,
-  consumo de food/potion. ITEM_META + RECIPES + SHOP_BUY portadas no server.
-- Electron desktop wrapper (`valadares/electron/`) com F12 off + electron-updater.
-- MercadoPago Checkout Pro com PIX + Cartão. HTTP server compartilhado com WS,
-  endpoints /api/packages, /api/pix/create, /webhook/mp. 4 pacotes de gold em produção.
-
-## 🆕 Adicionado em 27/05/2026 (sessão N3 fase 2)
-
-**Hardening N3 fase 2 — todas as 5 ops migradas pro server:**
-- **Equip/Unequip** server-side (`invEquip`/`invUnequip`): valida posse + conflito
-  2H↔offhand. Server broadcasta `pstats.equipped` pros outros verem o visual.
-- **Chest** server-side (`invChest`): 6 ops (deposit/withdraw/depositGold/withdrawGold/
-  depositAll/withdrawAll). Valida adjacência ao baú (CHEST_POS 47-53 × 48-52).
-  `p.chests` agora é autoritativo, hidratado de acc.save no join.
-- **Pickup do chão** server-side (`groundPickup`): server mantém `groundDrops` Map com
-  ids únicos (`g123`). Mob death gera ids autoritativos, broadcast `groundSpawn` pra
-  todos, `groundRemove` ao pegar. TTL de despawn = 5min. Cliente legacy single-player
-  ainda usa lógica local (sem `serverAuthMobs`).
-- **Munição/lança** server-side: `attackMob` aceita `ammoKey` (decrementa flecha) e
-  `throwSpear:true` (consome lança equipada + re-equipa do inv se houver outra).
-- **Lockdown parcial saveUpload + playerSync**: server hidrata `p.inv/equipped/gold/chests`
-  do save no join e a cada saveUpload. PvP gold + CORACAO_HL drop agora são
-  authoritative no server (transferência no `pkDeath`). Lockdown FULL (bloquear writes
-  do cliente) fica pra fase 3, depende de migrar quest/event rewards pro server.
-
-**Electron build em produção:** `cd valadares/electron && npm run build` gera
-`Valadares-Setup-1.0.0.exe` (NSIS) + portable em `electron/dist/`. Publish config
-aponta pra GitHub Releases (owner: acapires-stack).
-
-**Pendente fase 3 (lockdown total — próxima janela):**
-- Migrar quest rewards pro server (validação de stage completion + grant authoritative)
-- Migrar daily event rewards (Chuva de Ouro / Cerco / Sabedoria) pro server
-- Aí sim: bloquear writes de inv/gold do cliente no saveUpload e playerSync.
+> Mapa de decisão pra próximas sessões. O `SESSION_NOTES.md` tem o registro
+> cronológico do que rolou; este aqui é o **norte**.
 
 ---
 
-## 📂 Estrutura de arquivos
+## 🟢 Estado em 28/05/2026
 
-```
-valadares/
-  index.html          ← Cliente completo (game + UI + lógica)
-  server/
-    server.js         ← WebSocket server (Node.js + ws)
-    package.json
-  README.md           ← Instruções de instalação/rodar
-  ROADMAP.md          ← este arquivo
-  DESIGN_PVP.md       ← design detalhado do sistema PvP
-  .gitignore
-```
-
-**Como rodar:**
-```bash
-# Cliente (browser)
-npx serve valadares -p 3333          # acesse http://localhost:3333
-
-# Servidor MP (opcional)
-cd valadares/server && npm install && npm start
-# escuta em ws://localhost:8080
-```
-
-Ou, no Claude Code: ambos `valadares` e `valadares-mp` configurados em `.claude/launch.json`.
+- Cliente: https://valadares.app.br/jogar (Vercel)
+- Server WS: wss://ws.valadares.app.br (Railway, Volume `/data`)
+- Electron desktop: v1.0.3 (auto-update via electron-updater)
+- Monetização: MercadoPago Checkout Pro (PIX + Cartão)
+- Anti-cheat: lockdown N3 FULL — gold/inv/equipped/chests/skills/hp/mp 100% server-side
+- Auth: email + reset de senha (Resend)
+- Mobile playable, season system, talent tree
 
 ---
 
-## ✅ O QUE JÁ EXISTE
+## 🧭 Princípios pra escolher o que fazer
 
-### Mundo & Render
-- Mapa procedural 100×100 com grama, terra, água, pedra, árvores
-- **Bioma neve** no quadrante superior (y<32) — tiles brancos/azulados, **Trolls exclusivos** (só nascem em tiles SNOW)
-- **Bioma deserto** quadrante inferior-direito (y>68, x>52) — tiles amarelo-dourados, **Lagartos + Escorpiões exclusivos** (só nascem em tiles SAND)
-- **Cavernas**: 5 (Morcegos 18,80 · Antro do Minotauro 82,18 · Cripta dos Mortos 18,18 · **Covil do Drake 82,80** · **Abismo do Golem 70,90**) com tiles próprios e mobs exclusivos
-- **PZ (Zona Segura)** ao redor do spawn — piso de pedra, 4 tochas, sem combate
-- **Animação suave** entre tiles (player e monstros deslizam, câmera segue float)
-- Tile types: GRASS, DIRT, TREE, WATER, STONE, CAVE, CAVE_WALL, **SNOW, SAND**
-- **Mini-mapa** 140×140 px no topo da sidebar esquerda (canvas dedicado), fog of war, descobre ao andar, mostra mobs/players/bosses coloridos
-
-### Personagem
-- **Visual no boneco**: armadura, elmo, escudo, arma e botas aparecem desenhados
-- Movimento WASD/setas com **diagonal** (custo 1.5×)
-- HP/MP com regen passivo
-- **Save persistente** no localStorage por nome (sessão auto-login + posição/HP/MP preservados ao deslogar — sem cheat de teleporte)
-- **Logout bloqueado** se em PvP ativo (selos/highlander/hurt recente)
-- 6 skills: Punho, Espada, Machado, Clava, Distância, Escudo, Magia
-- Stats derivados das skills: HP máx, MP máx, defesa de escudo, **velocidade** (cap −40ms)
-
-### Combate
-- **Melee**: Espada/Machado/Clava/Adaga/Maça/Marreta etc — dano + def por arma
-- **2H** bloqueia o slot do escudo
-- **Lanças 1H** com range melee **3 tiles** + arremesso (F) consumindo a lança
-- **Ranged** (Arco, Arco de caça, Besta) — consome flechas automaticamente
-- **Magia**: 1 spell ativo por vez (compra no altar)
-  - Bola de Fogo (R, 8 dmg, range 8, 20mp)
-  - Cura (R, +20 HP self, 25mp, funciona na PZ)
-  - Raio Místico (R, 5 dmg, range 10, 15mp, projétil tipo beam)
-- **Crítico** (4% base + skill da arma) e **Esquiva** (skill Escudo)
-- Damage numbers flutuantes + tingimento vermelho no boneco ao apanhar
-
-### Inteligência dos Mobs
-- **Intel 1** (Rato, Cobra, Morcego, Lagarto): chegam em fila, dumb
-- **Intel 2** (Aranha, Lobo, Orc, Esqueleto, Troll, Drake, Golem, Escorpião): cercam, evitam amontoar
-- **Intel 3** (Orc Líder, Minotauro, Drake Ancião, Golem Rei): flanqueiam por trás
-- **Difficulty curve por região**:
-  - Anel 1 (6-14): Rato, Cobra | Anel 2 (14-24): Cobra, Aranha, Rato | Anel 3 (24-36): Aranha, Lobo | Anel 4 (36+): Lobo, Orc
-  - Bioma **neve**: Troll (160hp/14dmg) — só em tiles SNOW
-  - Bioma **deserto**: Lagarto (55/9) + Escorpião (75/11) — só em tiles SAND
-- **Caçadores** (Highlander Hunt): aggro global, perseguem pelo mapa inteiro
-- Respawn dinâmico por anel (mantém população viva)
-- Boss **Orc Líder** em (46,95) com 6 guardas, respawn 5 min
-- Boss **Drake Ancião** no Covil do Drake (82,80), respawn 8 min
-- Boss **Golem Rei** no Abismo do Golem (70,90), respawn 8 min
-- **Bosses escalonam ★ Lv1→10** a cada respawn (HP +15%, dmg +10%, xp +20% por nível). Reset diário às 00:00 zera o nível.
-
-### Itens & Inventário
-- **50+ itens**: armas (1H/2H/ranged), armaduras, escudos, comidas, poções, materiais, munição
-- **Novos endgame**: Espada Dracônica (base 14), Martelo do Golem (base 13), Armadura de Escamas (def 9), Escudo de Pedra (def 8), Elmo Dracônico (def 4)
-- **Novos 1H**: Sabre, Adaga Dupla, Bordão de Pedra
-- **Novos materiais**: Escama de Drake, Pedra do Golem, Garra de Lagarto
-- **Equipamento** em 6 slots: mão dir, mão esq, corpo, cabeça, pés, **pescoço**
-- **Drops** com chance específica por monstro
-- **Auto-pickup** ao andar (raio 1)
-- **Sidebar** mostra cada slot equipado com stats + munição quando arco
-- **Inventário** scrollável em coluna própria
-
-### DP (Depósito Pessoal) na PZ
-- **4 baús independentes** (cor de fechadura por baú, sem categoria)
-- **Bancada de craft** (C) — 15 receitas consumindo materiais + ouro
-- **Altar de magias** (M) — troca/compra magia ativa + treina Magia
-- **Boneco de treino** (T) — treina arma equipada ou Escudo (gold + tempo)
-
-### Sistema de Treino
-- Cada sessão = 2s + custa max(5, skill×2) gold
-- XP escala com xpNext (~60 sessões = 1 nível em qualquer skill)
-- Boneco treina armas + Escudo (se equipado)
-- Altar treina Magia separado
-
-### Economia
-- **Ouro** central — drops de mobs + craft + treino + altar custam
-- Crafts comuns 24-100g, top-tier 3000-5000g
-- Boss Líder dropa 100-250g
-
-### PvP (Selos de Sangue + Highlander) — rebalanceado
-- Toggle PvP (P) — **exige 5000g** pra ligar
-- Cada PK kill = +1 selo (cap 5) com bônus escalonado:
-  - +5% dmg/selo · crit a partir do 3º (+3%/selo) · spd do 4º (+5%/selo) · regen 2× só no 5º
-- **PZ lock** com 3+ selos por 5 min
-- **Highlander**: 5 selos + último kill em alguém com selo → coroa dourada + aura + bônus extra
-  - HL bônus: +10% dmg, +15% spd (cap stack final ~+42% dmg, ~−25% delay com Coração)
-- **Coração do Highlander**: dropa do Drake/Highlander morto (5%), equipável (Pescoço, +5%dmg, +3%spd, +3%def)
-- **Vingança** (5min): vingador recupera 100% skills perdidas; killer vingado perde **60%**
-- **Drop**: 10% do gold cai pro killer na morte PvP
-- **Visual**: ☠ escala com selos + aura vermelha (3+) + coroa+aura dourada (Highlander)
-- **Highlander Hunt**: 3 min após ascender → 3 Caçadores surgem nos cantos do mapa com aggro global. Matar os 3 = 200–450g
-- Anúncios globais via servidor MP
-
-### Status effects
-- Engine poison/stun/bleed com tick, centralizada em `rollAttackerStatus(mobType)`
-- **Aranha** → veneno 15% / −2hp/3s × 4 ticks
-- **Escorpião** → veneno forte 30% / −3hp/3s × 5 ticks
-- **Lagarto** → sangra 20% / −1hp/2s × 6 ticks
-- **Troll** → stun 10% / 1.5s
-- **Minotauro** → stun forte 25% / 2.0s
-- **Stun** bloqueia move + attack do player; ícones flutuam acima do boneco (☠ ⚡ 🩸)
-- Funciona em modo offline (damagePlayer) e online (handler mobHit)
-- Limpa ao morrer
-
-### NPCs + Quests
-- **2 NPCs na PZ leste**:
-  - **Mercador** (52,49) — vende poção/flecha/comida + compra qualquer item (30% do preço base)
-  - **Atendente** (52,51) — quadro de quests
-- Interagir: ESPAÇO ao lado OU tecla **Q** abre o quadro
-- **5 quests iniciais** com tracker auto:
-  1. Caçada infestante (10 ratos → 50g + 100xp Punho)
-  2. Defenda o pátio (5 cobras → 80g + 100xp Espada)
-  3. Trama da Aranha (5 sedas → 200g)
-  4. Cabeças de Orc (3 orcs → 300g + 50xp 3 skills)
-  5. O Líder (Orc Líder → 500g)
-
-### Estatísticas (tecla I)
-- Modal com cards: mobs mortos, bosses, PvP kills, mortes (mob/PvP), tempo de jogo, K/D
-- Lista detalhada de kills por tipo de mob (bordas douradas em bosses)
-
-### Multiplayer (server autoritativo)
-- Server Node + ws: 150+ mobs gerados, tickAI (300ms), snapshot 250ms broadcast
-- **Mapa gerado server-side** com mesma seed (42) do cliente — bosses/mobs em tiles válidos
-- **Combate validado**: cliente envia attackMob, server valida range/dano, broadcasta updates
-- **Cliente em modo online** (`serverAuthMobs=true`) skipa simulação local
-- **Offline** (sem WS): cliente continua simulando local
-- **Chat real**: tab CHAT alterna com COMBATE, Enter envia, broadcast a todos
-- **Body stays**: corpo fica 3 min após logout, atacável por outros (drop 10% gold + 1 item)
-- **Persistência server-side**: `state.json` salvo a cada 30s + ao SIGINT (mobs, bosses, níveis)
-- **Railway Volume montado** em `/data/state.json` — sobrevive a deploys (config feita 26/05)
-- **Reset diário 00:00**: bosses voltam ao Lv1
-- **WS URL configurável**: ?ws=... na query, localStorage, ou auto-detect por hostname
-- **Ghost duplicado fix**: reconectar com mesmo nome remove ghost antigo automaticamente
-- **Mensagens do servidor (4 levels)**: info (azul) / warn (amarelo) / event (dourado) / admin (vermelho pulsante)
-- **MOTD**: enviado no state inicial
-- **Comandos admin (alcione hardcode)**: /say /event /warn /info /motd /setboss /respawnboss
-- **Reconexão automática infinita** com backoff (2-10s) + overlay "RECONECTANDO" visível
-- **Anti-farm offline**: WS cai → bloqueia ataques+movimento até reconectar
-- **Auto-update**: cliente fetcha HEAD a cada 60s, se ETag mudou → saveState+reload
-- **NPCs viram mini-PZ** (raio 2): mob não ataca player adjacente a NPC
-
-### UI/UX
-- Login com nome + senha (hash local) + auto-login por sessão + **link "servidor"** pra customizar WS URL
-- Layout: mini-mapa + personagem (esquerda) | canvas + chat panel embaixo | direita (PvP/Equip/Bosses/Alvo+Online) | inventário
-- Sidebars laterais com altura sincronizada via JS (acompanha a maior)
-- **Paper doll** visual no equipamento (3×3 grid, ícones pixel art coloridos)
-- **Sprites pixel art** de todos os itens (canvas off-screen + cache por (item, size))
-- Barra HP **e MP** sempre visível acima do boneco (HP em cima, MP embaixo)
-- Modal: baú, craft, altar, treino, login, **stats (I)**, **shop**, **quests (Q)** — todos com overlay+centralização
-- Log de combate com **filtros**: tudo / dano / mortes / loot / sistema
-- Tabs no chat panel: COMBATE / CHAT (chat funcional, tab pulsa quando nova msg)
-- Widgets sidebar direita: Status PvP (selos visuais + Hunt countdown), Equipamento (paper doll), Bosses (timer respawn + Lv), Alvo (HP bar grande), Online
-- Tema âmbar/dourado sobre escuro, fonte serif no título
+1. **Retenção > novidade** — feature que faz player voltar amanhã > feature que diverte 1 hora.
+2. **Playable em 1 sessão** — corte cada onda em <90min de trabalho. Se passar, divide.
+3. **Server-side por padrão** — nada que credita gold/inv/XP fica só no cliente.
+4. **Verifica antes de commitar** — preview eval ou DOM check. Bug em prod custa redeploy.
+5. **Documenta o "porquê"**, não o "o quê" — o código mostra o que faz; o motivo some no histórico.
 
 ---
 
-## 📋 TODO ATUAL (do que falta)
+## 🥇 Backlog priorizado
 
-### Curto prazo
-| # | Item | Notas |
-|---|---|---|
-| 1 | ✅ **Mais magias** | **Exori** (AoE raio 3, 40mp/cd 4s, dano base 7) · **Provocação** (taunt raio 5, 25mp/cd 8s, força aggro em grupo) · **Fúria** (buff +25% dmg/+25% spd por 12s, 35mp/cd 30s, com aura pulsante) |
-| 2 | **Skill cap / limitações** | Decisão: deixar **infinito** (sem cap), conforme decidido |
-| 3 | ~~2H ataca mais devagar~~ | ❌ **Descartado** — jogo está balanceado assim |
-| 4 | ✅ **Crafts lendários com Coração** | Espada do Highlander ★ (3 corações, base 20/def 8), Armadura do Trono ★ (2 corações, def 14), Coroa do Vendedor ★ (1 coração, def 7). Custo 8-12k g + materiais raros |
-| — | ✅ **Defesa percentual** | reduction = def/(def+30) — diminishing returns, sem mais "tomar 1 sempre" |
-| — | ✅ **Quests diárias** | 3 randomizadas por dia, tracker auto, recompensa 2-3× normal, reset 00:00 |
-| — | ✅ **Quest chains narrativas** | 5 chains com NPCs no mundo (Eremita/Ferreiro/Caçadora/Mineiro/Vendedor de Almas oculto) |
-| — | ✅ **Decisão moral** | Vendedor de Almas: Coroa lendária OU +5% XP permanente |
-| — | ✅ **Mega Raid: Senhor de Valadares ★★** | Trigger 3 bosses Lv10, spawna (50,30), 30min vida, dropa Coroa de Valadares (def 20) + Espada Eterna (base 30/def 12), reset bossLevel ao morrer, cooldown 24h |
+### 🔴 P0 — Verificações rápidas no início da próxima sessão
+- Confirmar que pots curam em prod (food + POTION_HP + POTION_MP) — fix lockdown
+- Testar convite de party via botão direito + modal aceitar
+- Testar menu admin (COMUNICADOS / BOSSES / MEGABOSS / GERENCIAR PLAYER / EXCLUIR CONTA)
+- Validar boneco de treino em (48,51) — 1 tile abaixo do Crupiê
+- Verificar webhook MP credita 1× só na próxima venda PIX aprovada (log Railway: `[mp] gold creditado online: NOME +N`)
+- Validar T4 Caçadores HL em MP (highlander → 3min → outro player vê em laranja)
 
-### Médio prazo (sistemas)
-| # | Item | Notas |
-|---|---|---|
-| 5 | ~~Classes (Guerreiro/Tank/Arqueiro/Mago)~~ | ❌ **Descartado** — magias do altar já dão variedade, sem precisar de classes fixas |
-| 6 | ✅ **NPCs / Quests** | Mercador (52,49) + Atendente (52,51) na PZ. 5 quests iniciais com tracker auto. Tecla Q abre quadro. Shop compra/vende items |
-| 7 | ✅ **Status effects** | Engine poison/stun/bleed com tick. Aranha aplica veneno (15%, -2hp/3s × 4). Stun bloqueia move+attack. Ícones flutuam acima do boneco |
-| 8 | ✅ **Body stays no logout** | Server mantém ghost 3 min após disconnect. Atacável (PvP), HP processado server-side. Ao morrer dropa 10% gold + 1 item random pro killer. Visual cinza + 💤 |
+### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-### Longo prazo (multiplayer real)
-| # | Item | Notas |
-|---|---|---|
-| 9 | ✅ **Monstros sincronizados** | Server autoritativo: spawna 146+ mobs no início, tickAI (300ms) move/ataca, snapshot 250ms broadcast pra todos. Cliente em modo online (`serverAuthMobs=true`) skipa simulação local. Offline: simulação local como antes |
-| 10 | ✅ **Combate MP validado** | Cliente envia `attackMob {monsterId, amount, range, crit}`. Server valida range (chebyshev) + dano ≤ teto. Aplica HP, broadcasta `mobUpdate`, on death envia `mobKill` (loot/xp local) + `mobDead` (remove pra todos) |
-| 11 | ~~Bônus de grupo~~ | ❌ **Descartado** — jogo está emocionante assim |
-| 12 | ✅ **Chat real** | Tab CHAT alterna com COMBATE, input habilitado. Enter envia `chat {text}`. Server broadcasta a todos. Self-msg vem azul, others douradas, tab pulsa laranja quando inativa |
+**#12 Devlog/blog** [~1 sessão]
+- Pasta `/devlog` com posts MD renderizados em HTML estático
+- Index ordenado por data
+- Cada sessão maratona vira post (material rico no SESSION_NOTES)
 
-### Conteúdo (mundo)
-| # | Item | Notas |
-|---|---|---|
-| 13 | ✅ **Mais cavernas/biomas** | Covil do Drake (82,80), Abismo do Golem (70,90). Bioma neve (y<32) com Troll exclusivo, deserto (y>68,x>52) com Lagarto + Escorpião exclusivos |
-| 14 | ✅ **Mais bosses** | Drake Ancião (700hp, resp 8min), Golem Rei (900hp, resp 8min). Drops: Escama, Pedra do Golem, endgame gear |
-| 15 | ✅ **Evento Highlander Hunt** | 3 min após virar Highlander → 3 Caçadores de Recompensa surgem nos cantos do mapa e perseguem globalmente. Matar os 3 = 400-800g |
-| 16 | ✅ **Mais armas exclusivas** | Sabre (1H Espada), Adaga Dupla (1H Espada), Bordão (1H Clava), Espada Dracônica 2H, Martelo do Golem 2H. Armaduras: Armadura de Escamas (def 9), Escudo de Pedra (def 8), Elmo Dracônico (def 4) |
+**M4 Dungeons instanciadas** [2-3 sessões grandes — endgame]
+- Room procedural por jogador (ou party 4)
+- Checkpoints, boss no fim, loot escalado
+- Mata o "matei tudo, agora?"
 
-### Polish
-| # | Item | Notas |
-|---|---|---|
-| 17 | ✅ **Sons** | Web Audio sintetizado (osciladores + filtros + reverb leve). Hooks: hit, crit, dano, kill, magia, pickup, level-up, morte. Sem arquivos externos, respeita volume do settings |
-| 18 | ✅ **Tutorial in-game** | Modal único no primeiro login com 6 seções (Mundo/Combate/Base/Progressão/PvP/Dicas). Flag `tutSeen:<user>` no localStorage. Reabre pelo settings |
-| 19 | ✅ **Settings panel** | Tecla **O**. Sliders volume geral + efeitos (música reservada). Botão "ver tutorial de novo". Lista de teclas read-only. Persiste em `valadares:settings` |
+**M6 Outros gold sinks** [~60min cada]
+- Tinturaria — pinta cosméticos por preço escalonado
+- Pet cosmético — segue o player, sem combat impact
 
-### Sessão 26/05 (madrugada) — Servidor/Infra/Polish
-| # | Item | Notas |
-|---|---|---|
-| 20 | ✅ **Save server-side** | Conta + senha + skills/inv/gold no Railway Volume (`accounts.json`). Sobrevive a troca de browser/PC. Hash sha256+salt sobre o hash leve do cliente. Throttle 5s, cap 200KB |
-| 21 | ✅ **Friends server-side** | `player.friends` parte do save (servidor). Migração 1× do localStorage legado. Trocar de PC mantém amigos |
-| 22 | ✅ **Guild polish** | Tag `[NOME]` em azul-prata acima do boneco, modal de membros (`/guild info` → líder 👑 + online em verde), nova aba GUILDS no ranking (total = mobs + pvp×5 + bosses×20) |
-| 23 | ✅ **Botões trade/msg na Online** | `⇄ trade` (dim quando >3 sqm) + `✉ msg` (pré-preenche `/msg nome ` no chat). Comandos via chat continuam funcionando |
-| 24 | ✅ **Sprites épicos** | 11 sprites pixel art únicos no inventário + visual no boneco (drawCharacter): ESPADA_HL ★, ESPADA_ETERNA ★★, COROA_VALADARES ★★, ARMADURA_TRONO ★, COROA_VENDEDOR ★, MACHADO_MINO (labrys), MARTELO_GOLEM, ARMADURA_ESCAMA, ESCUDO_PEDRA (runa), ELMO_DRACO (chifres+olhos), CORACAO_HL refeito |
-| 25 | ✅ **Cosméticos novos** | 2 trails (TRAIL_OURO, TRAIL_GELO — rastro estrela) + 2 partículas (PART_FOGO, PART_TROVAO — faíscas ao atacar). Drops do Arauto (10-15%) e Senhor de Valadares (15-25% bônus). Engine: `spawnTrailAt` / `spawnAttackParticles` com fade-out |
-| 26 | ✅ **Áudio ambient por bioma** | Pink noise + bandpass + lowshelf, crossfade 0.6s. PZ=fogueira 220Hz, neve=vento 1400Hz, deserto=700Hz, caverna=eco 280Hz, grama=900Hz, água=320Hz. Slider "Ambient (bioma)" em Settings (era Música disabled) |
-| 27 | ✅ **Magias +50%** | Bola de Fogo 8→12, Cura 20→30, Raio 5→8, Exori 7→11 (rebalanceamento pós-Senhor de Valadares) |
-| 28 | ✅ **Regen na PZ central** | HP 4× / MP 3× mais rápido + bônus de +1/+1 por tick na PZ. Anti-frustração pra novos players |
-| 29 | ✅ **Anti-exploit AFK** | Aba em background (`document.hidden=true`) zera os timers de regen. Sem mais farm passivo com tab oculta |
-| 30 | ✅ **Heartbeat WS** | Cliente manda `{t:'ping'}` a cada 25s, server `{t:'pong'}`. Evita idle timeout de proxy Cloudflare/Railway (~60s). Overlay "RECONECTANDO" com atraso 3s pra não incomodar em blips |
-| 31 | ✅ **Modais com scroll** | `.chest-box` agora tem `max-height: 90vh` + `overflow-y:auto`. Painel ADMIN expandido não estoura mais a tela |
-| 32 | ✅ **Hardening Nível 1+2** | Server clampa gold/skills/itemQty/HP/MP/permaBuffs no `saveUpload`. Drops gerados server-side (`rollLoot` no `handleMobDeath`). Cliente usa loot do server, fallback local. Bloqueia 90% dos ataques de F12. Nível 3 (inv 100% server) fica pra futuro |
+**M7 Arena PvP** [2 sessões]
+- Bracket 1v1 e 3v3 com matchmaking simples (queue → match quando 2/6 prontos)
+- Recompensa cosmética semanal
+
+**M8 Auction house** [2 sessões]
+- Trade assíncrono: lista item por preço, outros compram. Server escrowa.
+
+### 🟢 P2 — Marketing / SEO
+- Backlinks: post Reddit (r/WebGames, r/incremental_games), Discord servers RPG, Twitter
+- Itch.io: updates de release/changelog
+- YouTube/TikTok short de gameplay (30s)
+
+### 🟢 P3 — Polish operacional
+- Botão "Suporte" no jogo abre modal com email + form (`contato@valadares.app.br`)
+- Painel admin web (sem ser dentro do jogo): vendas, ranking de gasto, gold manual
+- Analytics privacy-friendly (Plausible ou Umami)
+- Email "obrigado pela compra" no `goldDelta` de `mp_purchase`
+
+### 🟢 P4 — Comercialização escala (quando faturar >R$1k/mês)
+- CNPJ + advogado já validados privacy/terms
+- Emissão de NF eletrônica via NFe.io ou similar
+- Cashback automático de gold se MP travar (refund handler)
 
 ---
 
-## 🎯 Decisões de Design (alinhadas com o player)
+## 🏁 Marcos concluídos (compacto)
 
-| Tópico | Decisão |
-|---|---|
-| **Progressão** | Apenas por skills (não há nível de personagem) |
-| **Save** | Persiste posição/HP/MP — não tem "logout pra escapar" |
-| **PZ** | Bloqueia ataque dos 2 lados |
-| **PK barrier** | 5 000 g mínimo pra ligar PvP |
-| **Bônus selo** | Escalonado: +5%dmg/selo, crit do 3º (+3%), spd do 4º (+5%), regen 2× só no 5º |
-| **HL bônus** | +10% dmg, +15% spd, regen 2× (cap stack ~+42% com Coração) |
-| **Coração HL** | +5% dmg, +3% spd, +3% def (era +10/+5/0) |
-| **Highlander** | Trono vago após morte, matador ganha Coração |
-| **Vingança** | Janela 5 min, recupera 100% / pena dobrada |
-| **Drop morte PvP** | 10% gold (sem drop de item por enquanto) |
-| **Mini-mapa** | Overlay no canvas, fog of war, descobre andando |
+**Maio 2026 — sprint final pra produção:**
+- 24-25/05: server WS autoritativo de mobs, body stays, persistência Railway Volume
+- 26/05: sociais (ranking, amigos, trade, guild, eventos diários)
+- 27/05: visual overhaul, MercadoPago em prod, Electron build, HMAC webhook MP
+- 27→28/05 madrugada: N3 fase 3 lockdown FULL, mobile/touch, season + talent tree, SEO
+- 28/05 manhã: domínio `ws.valadares.app.br`, GitHub Actions release (v1.0.3), T4 Caçadores HL server-side, T2 light, Fase 5 N3 lockdown FULL (hp/mp/maxHp/maxMp)
+- 28/05 tarde: privacy/terms, ranking público, cassino, fase 5.5 auth+email+reset
+- 28/05 ~13h+: pots curando (fix lockdown), party UX (right-click + modal), admin UI completo (`/deluser` `/checkuser` `/resetuser`), boneco repositionado, hardening de save (clamp x/y, force hp/mp server-side no save)
+
+> Histórico cronológico detalhado: `SESSION_NOTES.md` (sessão atual) e `docs/archive/sessions-pre-may28.md` (sessões anteriores).
 
 ---
 
-## 🧠 Linha de pensamento
+## ⚠️ Lições aprendidas (não cair de novo)
 
-A gente começou criando um clone básico de Tibia, mais focado em **single-player com loop sólido**.
-Cada decisão segue 3 princípios:
+**MercadoPago**
+- Preference API (Checkout Pro) > Payment API direto. Não exige homologação.
+- Webhook PRODUÇÃO e TESTE são separados — configurar nos 2.
+- SDK `mercadopago` precisa estar no `package.json` RAIZ (Railway roda npm install lá).
+- MP não permite o dono da conta pagar pra si — pra testar: outra conta/cartão.
 
-1. **Sistemas simples mas com profundidade.** Cada feature tem um trade-off — não é "tudo bom".
-2. **Skills no centro.** Tudo deriva de skills: HP, MP, dano, defesa, velocidade.
-3. **Multiplayer cresce devagar.** Hoje é só visual; combate sincronizado fica pra Fase 2.
+**DNS / Cloudflare**
+- Email Routing exige NS no Cloudflare. ImprovMX é alternativa sem migrar.
+- Records que apontam pra Vercel/Railway: **DNS only (cinza)** — proxy laranja quebra SSL.
+- Apex IP `76.76.21.21` (Vercel) tá OK — NÃO trocar pra `216.198.79.1`.
+- Quando "Add domain" no Cloudflare, scanner pode perder records — sempre conferir antes de "Continue activation".
 
-**Padrão de trabalho:**
-- Sessão começa: leio este ROADMAP, escolho 1-2 items do TODO
-- Codo, testo via eval no preview
-- Atualizo README/ROADMAP com mudanças relevantes
-- Sessão termina: faço commit no git
+**Email (Resend)**
+- Domínio precisa ser verificado no Resend antes de enviar. Sem isso → 403.
+- Gmail quoted-printable corrompe `=` em URLs → vira `\xEF\xBF\xBD`. Solução: `?t=` em vez de `?token=`.
+- API key só mostra UMA vez — copiar pro bloco de notas local, sem print.
+
+**Railway**
+- "Save" no Variables NÃO aplica — clicar "Deploy" (botão roxo) força redeploy.
+- Às vezes redeploy não recarrega vars — "Restart" como fallback.
+- Deploy demora ~1-2min; ocasionalmente trava em "Taking a snapshot" — esperar até ~10min antes de cancelar.
+
+**electron-builder**
+- Default cria release como DRAFT — invisível pra anônimos. Solução: `releaseType: "release"` no `build.publish`.
+- NSIS no Windows precisa Developer Mode ON pra build LOCAL (symlinks). CI Windows-latest funciona ootb.
+
+**Anti-cheat / lockdown N3**
+- F12 forjar `player.X` no client falha pra gold/inv/equipped/chests/hp/mp/maxHp/maxMp/skills.
+- Únicos vetores remanescentes: trail/cosmético/animação (zero impacto game).
+- DoTs poison/bleed são server-side. Stun é client-side mas server propaga.
+- **Pegadinha**: depois do lockdown, qualquer mutação local de hp/mp some no próximo tick do server. Se cliente precisa "aplicar efeito local", o handler do server precisa também aplicar autoritativo + broadcastPstatsAll (pots foram o exemplo).
+
+**Save corruption**
+- Cliente em race entre devices (mobile + PC) pode mandar `maxHp:undefined` no saveUpload.
+- Mitigação: server sobrescreve `hp/mp/maxHp/maxMp/x/y` com valores autoritativos antes de persistir.
+- Comando admin `/checkuser NOME` + `/resetuser NOME` resolve casos pontuais.
+
+**Segurança operacional**
+- NUNCA tirar print de API keys, tokens, secrets, env vars com valor visível.
+- Se vazar: revogar, gerar nova, atualizar Railway, redeploy.
+- API key vazada no chat = comprometida (logs/backups podem persistir).
 
 ---
 
-## 📜 Comandos úteis
+## 🛠 Padrão de trabalho
 
-```bash
-git log --oneline -10                 # ver últimas mudanças
-git status                            # o que mudou desde último commit
-```
-
-No console do browser (F12):
-```js
-player.gold += 10000        // tester: ganhar gold
-wipeSave()                  // apaga save do char atual
-player.selos = 5            // testa Highlander (precisa kill final em alguém com selo)
-```
-
----
-
-## 🔗 Doc detalhado por sistema
-
-- **`DESIGN_PVP.md`** — selos, highlander, vingança, ouro, drops
-- (futuro: DESIGN_CLASSES.md, DESIGN_QUESTS.md quando criarmos)
+- Commits sempre via `git -C "D:/claude/valadares"` (repo dentro de `D:/claude/`).
+- Branch única `main`. Push → Vercel + Railway auto-deploy.
+- Mudanças server-only sobem direto pra Railway (não dá pra testar WS local).
+- Mudanças client testáveis em preview (`launch.json` tem `valadares` na porta 3333).
+- Auto-update do Electron puxa nova versão em até 60s sem reload manual.
+- Produção tem 1+ usuário real — não quebrar sem testar.
