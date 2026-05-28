@@ -5162,33 +5162,37 @@ function armorHpRegenBonus(){
     return bonus;
 }
 function tickRegen(dt){
-    // Anti-exploit: aba em background não regenera (evita afk regen com tab oculta).
-    // Também devolve foco ao loop quando aba volta sem dar "salto" de regen.
-    if (typeof document !== 'undefined' && document.hidden){
-        player.hpRegenTimer = 0;
-        player.mpRegenTimer = 0;
-        return;
-    }
-    player.hpRegenTimer += dt;
-    player.mpRegenTimer += dt;
-    const m = pvpMults();
-    // PZ central = regen muito mais rápida (4× HP, 3× MP) — players novos
-    // ou voltando de morte recuperam rápido na zona segura
-    const inPz = inSafeZone(player.x, player.y);
-    const pzHp = inPz ? 4 : 1;
-    const pzMp = inPz ? 3 : 1;
-    const hpInterval = 4000 / (m.regenHp * pzHp);
-    const mpInterval = 2000 / (m.regenMp * pzMp);
-    const talentRegen = player.permaBuffs?.regenBonus || 0;   // talent t_regen
-    if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
-        const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0) + talentRegen;
-        player.hp = Math.min(player.maxHp, player.hp + heal);
-        player.hpRegenTimer = 0;
-    }
-    if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
-        const mpGain = (inPz ? 2 : 1) + talentRegen;
-        player.mp = Math.min(player.maxMp, player.mp + mpGain);
-        player.mpRegenTimer = 0;
+    // T2: regen autoritativo no server quando online (`serverAuthMobs && _wsAuthed`).
+    // Server broadcasta pstats com hp/mp atualizado — cliente só renderiza.
+    // manaBuff (POTION_MP que dá +80 MP em 10s) ainda é local pra UI snappy
+    // — não é vetor crítico, e o cap em maxMp é validado server-side a cada pstats.
+    const serverRegenActive = (typeof serverAuthMobs !== 'undefined' && serverAuthMobs) && _wsAuthed;
+    if (!serverRegenActive){
+        // Offline / single-player: regen local (lógica antiga)
+        if (typeof document !== 'undefined' && document.hidden){
+            player.hpRegenTimer = 0;
+            player.mpRegenTimer = 0;
+        } else {
+            player.hpRegenTimer += dt;
+            player.mpRegenTimer += dt;
+            const m = pvpMults();
+            const inPz = inSafeZone(player.x, player.y);
+            const pzHp = inPz ? 4 : 1;
+            const pzMp = inPz ? 3 : 1;
+            const hpInterval = 4000 / (m.regenHp * pzHp);
+            const mpInterval = 2000 / (m.regenMp * pzMp);
+            const talentRegen = player.permaBuffs?.regenBonus || 0;
+            if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
+                const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0) + talentRegen;
+                player.hp = Math.min(player.maxHp, player.hp + heal);
+                player.hpRegenTimer = 0;
+            }
+            if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
+                const mpGain = (inPz ? 2 : 1) + talentRegen;
+                player.mp = Math.min(player.maxMp, player.mp + mpGain);
+                player.mpRegenTimer = 0;
+            }
+        }
     }
     // Pot de mana: buff que adiciona mp/seg até acabar a vida
     if (player.manaBuff && player.manaBuff.life > 0){
@@ -5457,7 +5461,19 @@ function handleMP(msg){
         _rankingCache = msg;
         if (document.getElementById('rankingModal')?.style.display === 'flex') renderRankingBody();
     } else if (msg.t === 'pstats'){
-        // HP/MP de outro player (broadcast a cada playerSync de 5s)
+        // T2: server agora também broadcasta pstats pro PRÓPRIO player (regen
+        // server-side + dano de mob server-side). Atualiza player.hp/mp e
+        // dispara playerDie() quando hp chega a 0.
+        if (msg.id === myWsId){
+            const wasAlive = (player.hp ?? 100) > 0;
+            if (typeof msg.hp === 'number') player.hp = msg.hp;
+            if (typeof msg.maxHp === 'number') player.maxHp = msg.maxHp;
+            if (typeof msg.mp === 'number') player.mp = msg.mp;
+            if (typeof msg.maxMp === 'number') player.maxMp = msg.maxMp;
+            if (wasAlive && player.hp === 0 && !player._dying) playerDie();
+            return;
+        }
+        // HP/MP de outro player
         const rp = remotePlayers[msg.id];
         if (rp){
             if (typeof msg.hp === 'number') rp.hp = msg.hp;
@@ -5901,19 +5917,27 @@ function handleMP(msg){
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
     } else if (msg.t === 'mobHit'){
         if (_isUpdating) return;   // janela de auto-update — ignora dano
-        // mob me bateu — aplica dano com defesa percentual
-        const amount = msg.dmg | 0;
-        const defT = totalDefense();
-        const reduction = defT > 0 ? defT / (defT + 30) : 0;
-        const actual = Math.max(1, Math.round(amount * (1 - reduction)));
-        player.hp = Math.max(0, player.hp - actual);
+        // T2: dano aplicado server-side (vem via pstats). Cliente usa msg.actual
+        // pro float/log/FX. Fallback pra cálculo local se server não mandou actual
+        // (Electron v1.0.0/v1.0.1 conversando com server novo: server SEMPRE manda).
+        let actual = (typeof msg.actual === 'number') ? msg.actual : null;
+        if (actual == null){
+            const amount = msg.dmg | 0;
+            const defT = totalDefense();
+            const reduction = defT > 0 ? defT / (defT + 30) : 0;
+            actual = Math.max(1, Math.round(amount * (1 - reduction)));
+            // Sem actual = sem T2 ativo — aplica local pra não bugar
+            player.hp = Math.max(0, player.hp - actual);
+        }
         player.hurtTimer = 300;
         sndDmg();
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         const def = MTYPE[msg.mobType];
         log(`<span class="log-dmg">⚠ ${def?def.name:msg.mobType}: ${actual} dano</span>`);
         rollAttackerStatus(msg.mobType);
-        if (player.hp === 0) playerDie();
+        // playerDie é disparado via pstats com hp===0 (handler self acima).
+        // Fallback pra modo legacy se chegamos aqui sem msg.actual.
+        if (msg.actual == null && player.hp === 0) playerDie();
     }
 }
 
@@ -9041,7 +9065,13 @@ function clearAllKeys(){
     qPressed = false;
 }
 window.addEventListener('blur', clearAllKeys);
-document.addEventListener('visibilitychange', () => { if (document.hidden) clearAllKeys(); });
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearAllKeys();
+    // T2: server pausa regen quando tabActive=false (preserva anti-AFK)
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'tabActive', active: !document.hidden })); } catch {}
+    }
+});
 // Score de prioridade: menor é melhor.
 // Considera distância, HP do alvo e ALCANCE da arma — mobs fora do range
 // ganham penalidade alta pra não ficar "mirando" sem alcançar.

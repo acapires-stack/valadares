@@ -1325,8 +1325,17 @@ function tickAI(){
         if (td <= 1){
             if (now - m.lastAttackAt >= ATTACK_CD_MS){
                 m.lastAttackAt = now;
+                // T2: dano aplicado server-side com defesa percentual (espelha cliente).
+                // Cliente recebe mobHit pra FX + recebe pstats com hp novo.
+                const def = totalDefenseServer(target);
+                const reduction = def > 0 ? def / (def + 30) : 0;
+                const actual = Math.max(1, Math.round(m.dmg * (1 - reduction)));
+                if ((target.hp ?? 100) > 0){
+                    target.hp = Math.max(0, (target.hp ?? 100) - actual);
+                    broadcastPstatsAll(target);
+                }
                 if (target.ws.readyState === 1){
-                    target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg }));
+                    target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual }));
                 }
                 // T3: XP de Escudo se player tem escudo equipado (ganha XP apanhando)
                 if (hasShieldEquipped(target)){
@@ -2129,6 +2138,103 @@ function tickMobDots(){
 }
 setInterval(tickMobDots, 1000);
 
+// ─── T2: Regen passivo HP/MP autoritativo server-side ──────────────────────
+// Cliente para de aplicar regen quando online; server roda tick e broadcasta
+// pstats (incluindo o próprio player). Anti-AFK preservado via mensagem
+// tabActive { active } que o cliente envia no visibilitychange.
+const SRV_ARMOR_UPGRADES = [
+    null,
+    { def: 1 },
+    { def: 2 },
+    { def: 3, hpRegen: 1 },
+    { def: 5, hpRegen: 2 },
+    { def: 7, hpRegen: 3 },
+];
+function srvUpgradeBonusArmor(itemKey){
+    const tier = getUpgradeTier(itemKey);
+    return SRV_ARMOR_UPGRADES[tier.plus] || null;
+}
+function totalDefenseServer(p){
+    if (!p.equipped) return 0;
+    let total = 0;
+    for (const slot of ['weapon','offhand','armor','head','feet','neck']){
+        const k = p.equipped[slot];
+        if (!k) continue;
+        const tier = getUpgradeTier(k);
+        const meta = ITEM_META[tier.base];
+        if (meta && typeof meta.def === 'number') total += meta.def;
+        const up = srvUpgradeBonusArmor(k);
+        if (up && typeof up.def === 'number') total += up.def;
+    }
+    return total;
+}
+function armorHpRegenServer(p){
+    if (!p.equipped) return 0;
+    let total = 0;
+    for (const slot of ['armor','offhand','head','feet','neck']){
+        const k = p.equipped[slot];
+        if (!k) continue;
+        const up = srvUpgradeBonusArmor(k);
+        if (up && typeof up.hpRegen === 'number') total += up.hpRegen;
+    }
+    return total;
+}
+function pvpMultsServer(p){
+    const s = Math.min(5, p.selos || 0);
+    const m = { regenHp: s >= 5 ? 2 : 1, regenMp: s >= 5 ? 2 : 1 };
+    if (p.highlander){
+        m.regenHp = Math.max(m.regenHp, 2);
+        m.regenMp = Math.max(m.regenMp, 2);
+    }
+    return m;
+}
+function broadcastPstatsAll(p){
+    const payload = JSON.stringify({
+        t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
+        cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || []
+    });
+    for (const other of players.values()){
+        if (other.ws.readyState === 1) other.ws.send(payload);
+    }
+}
+const REGEN_HP_BASE_MS = 4000;
+const REGEN_MP_BASE_MS = 2000;
+function tickPlayerRegen(){
+    const now = Date.now();
+    for (const p of players.values()){
+        if (!p.ws || p.ws.readyState !== 1) continue;
+        if ((p.hp ?? 100) <= 0) continue;
+        if (p._tabActive === false) continue;
+        p._regenHpAt = p._regenHpAt || now;
+        p._regenMpAt = p._regenMpAt || now;
+        const inPz = inSafe(p.x, p.y);
+        const pzHp = inPz ? 4 : 1;
+        const pzMp = inPz ? 3 : 1;
+        const mults = pvpMultsServer(p);
+        const armorHp = armorHpRegenServer(p);
+        const talent = (p.permaBuffs && p.permaBuffs.regenBonus) || 0;
+        const hpInterval = REGEN_HP_BASE_MS / (mults.regenHp * pzHp);
+        const mpInterval = REGEN_MP_BASE_MS / (mults.regenMp * pzMp);
+        let changed = false;
+        const maxHp = p.maxHp || 100;
+        const maxMp = p.maxMp || 0;
+        if (now - p._regenHpAt >= hpInterval && p.hp < maxHp){
+            const heal = 1 + armorHp + (inPz ? 1 : 0) + talent;
+            p.hp = Math.min(maxHp, p.hp + heal);
+            p._regenHpAt = now;
+            changed = true;
+        }
+        if (maxMp > 0 && now - p._regenMpAt >= mpInterval && p.mp < maxMp){
+            const mpGain = (inPz ? 2 : 1) + talent;
+            p.mp = Math.min(maxMp, p.mp + mpGain);
+            p._regenMpAt = now;
+            changed = true;
+        }
+        if (changed) broadcastPstatsAll(p);
+    }
+}
+setInterval(tickPlayerRegen, 500);
+
 // ─── Evento semanal: O Arauto (sábado 20h-22h BRT) ─────────────────────────
 const EVENT_BOSS_TYPE = 'ARAUTO';
 const EVENT_BOSS_POS = { x: 50, y: 65 };
@@ -2904,7 +3010,22 @@ wss.on('connection', (ws) => {
 
         if (msg.t === 'pvp') {
             p.pvp = !!msg.pvp;
+            // T2: cliente também sinaliza selos + highlander pra server calcular
+            // regen autoritativo (pvpMultsServer). Clamp via sanitizeSave já cuida.
+            if (typeof msg.selos === 'number' && isFinite(msg.selos)){
+                p.selos = Math.max(0, Math.min(5, msg.selos | 0));
+            }
+            if (typeof msg.highlander === 'boolean'){
+                p.highlander = msg.highlander;
+            }
             broadcast(null, { t:'pvp', id, pvp:p.pvp });
+            return;
+        }
+
+        if (msg.t === 'tabActive') {
+            // T2: cliente sinaliza visibilidade (visibilitychange). Server pausa
+            // regen quando tabActive=false pra preservar anti-AFK do cliente.
+            p._tabActive = msg.active !== false;
             return;
         }
 
@@ -3290,6 +3411,11 @@ wss.on('connection', (ws) => {
             // Gold/inv/equipped só mudam via handlers server-side (questTurnIn, attackMob,
             // shop, craft, forja, invEquip, invChest, groundPickup, etc). Cliente continua
             // enviando esses campos (compat), mas server descarta silenciosamente.
+            // T2: hp/mp ainda aceitos (DoTs, magia Cura, PvP ainda mutações client-side
+            // pendentes). maxHp/maxMp aceitos pra recalc por equip (lockdown fica pra
+            // fase 5 N3 quando todos os sources migrarem). Regen server-side e dano
+            // de mob server-side aplicam direto em p.hp e broadcastam via pstats —
+            // forjar player.hp pra ESCAPAR de dano é zerado no próximo tick (~500ms).
             let statsChanged = false;
             if (typeof msg.hp === 'number' && isFinite(msg.hp)) { p.hp = msg.hp; statsChanged = true; }
             if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) { p.maxHp = msg.maxHp; statsChanged = true; }
