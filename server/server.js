@@ -3880,6 +3880,71 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // ─── M6: Cassino slot machine (gold sink) ──────────────────────────
+        // RNG + payout autoritativos no server. Cliente envia { amount },
+        // server valida 100-10000g, debita aposta, rola 3 símbolos e credita
+        // payout via goldDelta. House edge ~9% no longo prazo.
+        if (msg.t === 'casinoSpin') {
+            const CASINO_NPC_POS = { x: 48, y: 50 };
+            const CASINO_WEIGHTS = [
+                { key:'CHERRY',  weight:35, mult3:3 },
+                { key:'LEMON',   weight:25, mult3:5 },
+                { key:'GRAPE',   weight:20, mult3:10 },
+                { key:'SEVEN',   weight:15, mult3:20 },
+                { key:'DIAMOND', weight:5,  mult3:100 },
+            ];
+            const totalWeight = CASINO_WEIGHTS.reduce((s,x) => s + x.weight, 0);
+            const now = Date.now();
+            p._lastCasinoAt = p._lastCasinoAt || 0;
+            if (now - p._lastCasinoAt < 800) return;   // rate limit
+            p._lastCasinoAt = now;
+            if (chebyshev(p.x, p.y, CASINO_NPC_POS.x, CASINO_NPC_POS.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'casinoResult', error:'not_at_npc' }));
+                return;
+            }
+            const bet = Math.max(100, Math.min(10000, msg.amount | 0));
+            if ((p.gold || 0) < bet){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'casinoResult', error:'no_gold' }));
+                return;
+            }
+            // Debita aposta
+            p.gold -= bet;
+            // Rola 3 símbolos
+            const rollOne = () => {
+                let r = Math.random() * totalWeight;
+                for (const s of CASINO_WEIGHTS){
+                    r -= s.weight;
+                    if (r <= 0) return s;
+                }
+                return CASINO_WEIGHTS[0];
+            };
+            const symbols = [rollOne(), rollOne(), rollOne()];
+            let payout = 0, mult = 0, kind = 'sem combo';
+            if (symbols[0].key === symbols[1].key && symbols[1].key === symbols[2].key){
+                mult = symbols[0].mult3;
+                payout = bet * mult;
+                kind = `3× ${symbols[0].key}`;
+            } else if (symbols[0].key === symbols[1].key || symbols[1].key === symbols[2].key || symbols[0].key === symbols[2].key){
+                // 2 iguais: devolve aposta (sensação de "quase ganhei")
+                mult = 1;
+                payout = bet;
+                kind = 'par';
+            }
+            if (payout > 0){
+                p.gold += payout;
+            }
+            syncGoldRank(p.name, p.gold);
+            sendInvUpdate(p, { goldDelta:{ amount: payout - bet, reason: payout - bet > 0 ? 'casino_win' : 'casino_loss' } });
+            if (p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({
+                    t:'casinoResult',
+                    symbols: symbols.map(s => s.key),
+                    bet, payout, mult, kind,
+                }));
+            }
+            return;
+        }
+
         // ATAQUE A MOB (#10 validado)
         if (msg.t === 'attackMob') {
             const m = monsters.get(msg.monsterId);

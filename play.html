@@ -784,7 +784,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1627,6 +1627,37 @@
     </div>
 </div>
 
+<div id="casinoModal" style="display:none">
+    <div class="chest-box" style="min-width:420px;max-width:480px">
+        <div class="chest-title">🎰 CASSINO DO CRUPIÊ</div>
+        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
+            Slot Machine · 3 símbolos · house edge ~7%
+        </div>
+        <div id="casinoReels" style="display:flex;justify-content:center;gap:14px;margin:18px 0">
+            <div class="reel" style="width:80px;height:80px;background:#0a0805;border:2px solid #6a5020;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:48px">🍒</div>
+            <div class="reel" style="width:80px;height:80px;background:#0a0805;border:2px solid #6a5020;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:48px">🍋</div>
+            <div class="reel" style="width:80px;height:80px;background:#0a0805;border:2px solid #6a5020;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:48px">🍇</div>
+        </div>
+        <div id="casinoResult" style="text-align:center;min-height:24px;margin-bottom:14px;font-size:14px;color:#c8a050"></div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
+            <button class="qty-btn" onclick="casinoSpin(100)">100g</button>
+            <button class="qty-btn" onclick="casinoSpin(500)">500g</button>
+            <button class="qty-btn" onclick="casinoSpin(1000)">1.000g</button>
+            <button class="qty-btn" onclick="casinoSpin(5000)">5.000g</button>
+            <button class="qty-btn" onclick="casinoSpin(10000)">10.000g</button>
+        </div>
+        <div style="font-size:11px;color:#8a7050;line-height:1.6">
+            <div style="font-weight:600;color:#c8a050;margin-bottom:4px">PAGAMENTOS (sobre a aposta):</div>
+            <div>3× 💎 = <b style="color:#aacfff">100×</b> · 3× 7️⃣ = <b style="color:#ffaa20">20×</b> · 3× 🍇 = <b style="color:#cc60aa">10×</b></div>
+            <div>3× 🍋 = <b style="color:#ffcc40">5×</b> · 3× 🍒 = <b style="color:#cc3030">3×</b> · 2 iguais = <b>1×</b> (volta aposta)</div>
+        </div>
+        <div class="chest-hint" style="margin-top:10px">
+            <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeCasino()">×</button>
+    </div>
+</div>
+
 <div id="talentsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
         <div class="chest-title">⚜ TALENTOS</div>
@@ -1871,6 +1902,8 @@ const NPCS = [
     { id:'mercador',  name:'Mercador',     pos:{x:52,y:48}, body:'#3a5a8a', hat:'#ffcc40', action:'shop',     hint:'mercador' },
     { id:'banqueiro', name:'Banqueiro',    pos:{x:52,y:50}, body:'#6a4a10', hat:'#ffd700', action:'goldshop', hint:'comprar gold' },
     { id:'atendente', name:'Atendente',    pos:{x:52,y:52}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
+    // M6 Gold sink — Cassino (RNG autoritativo no server, house edge ~5-8%)
+    { id:'crupie',    name:'Crupiê',       pos:{x:48,y:50}, body:'#2a1a4a', hat:'#cc2050', action:'casino',   hint:'cassino' },
     // Mundo — chains narrativas (cada um tem seu local temático)
     { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', chain:'cripta' },
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
@@ -1919,6 +1952,7 @@ function npcInteractionHint(npc){
     if (npc.action === 'shop')     return { label:'comprar/vender', marker:'$', markerColor:'#ffcc40' };
     if (npc.action === 'goldshop') return { label:'comprar gold',   marker:'💰', markerColor:'#ffd700' };
     if (npc.action === 'quests')   return { label:'quests',         marker:null };
+    if (npc.action === 'casino')   return { label:'cassino',        marker:'🎰', markerColor:'#cc2050' };
     if (npc.action === 'chain'){
         const stages = (player.questFlags && player.questFlags[npc.chain]) || null;
         const chain = QUEST_CHAINS[npc.chain];
@@ -1940,6 +1974,7 @@ function interactNpc(npc){
     if (npc.action === 'shop')     { openShop(); return; }
     if (npc.action === 'goldshop') { openGoldShop(); return; }
     if (npc.action === 'quests')   { openQuests(); return; }
+    if (npc.action === 'casino')   { openCasino(); return; }
     if (npc.action === 'chain')    { openChainDialog(npc); return; }
 }
 const TRAINING_TIME = 2000;   // ms por sessão
@@ -4513,7 +4548,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -5770,6 +5805,25 @@ function handleMP(msg){
             log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
         }
         saveState();
+    } else if (msg.t === 'casinoResult'){
+        // M6 — server rolou os 3 símbolos + payout. Cliente só renderiza.
+        const reels = document.querySelectorAll('#casinoReels .reel');
+        const sym = msg.symbols || [];
+        if (reels.length === 3 && sym.length === 3){
+            for (let i = 0; i < 3; i++){
+                reels[i].textContent = CASINO_SYMBOLS[sym[i]] || '?';
+            }
+        }
+        const out = document.getElementById('casinoResult');
+        if (!out) return;
+        if (msg.payout > 0){
+            const net = msg.payout - msg.bet;
+            const color = net > 0 ? '#74d176' : '#c8a050';
+            const label = net > 0 ? `+${net}g (${msg.mult}× — ${msg.kind})` : `${msg.payout}g de volta (${msg.kind})`;
+            out.innerHTML = `<span style="color:${color};font-weight:600">${label}</span>`;
+        } else {
+            out.innerHTML = `<span style="color:#cc3030">−${msg.bet}g · sem combo</span>`;
+        }
     } else if (msg.t === 'playerDot'){
         // Fase 5: server iniciou DoT no player local — UI espelha pra renderizar
         // ícones de status (☠/🩸/🔥). dmg/ticks são autoritativos no server.
@@ -6307,6 +6361,43 @@ async function openGoldShop(){
 function closeGoldShop(){ document.getElementById('goldShopModal').style.display = 'none'; }
 window.openGoldShop = openGoldShop;
 window.closeGoldShop = closeGoldShop;
+
+// ─── M6 Cassino — slot machine simples ──────────────────────────────────
+// 3 reels, símbolos com pesos. Server (handler casinoSpin) é fonte do RNG +
+// payout. Cliente só envia aposta e renderiza resultado de `casinoResult`.
+const CASINO_SYMBOLS = { CHERRY:'🍒', LEMON:'🍋', GRAPE:'🍇', SEVEN:'7️⃣', DIAMOND:'💎' };
+function openCasino(){
+    closeAllModals();
+    document.getElementById('casinoModal').style.display = 'flex';
+    document.getElementById('casinoResult').textContent = '';
+}
+function closeCasino(){ document.getElementById('casinoModal').style.display = 'none'; }
+function casinoSpin(amount){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed){
+        document.getElementById('casinoResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        return;
+    }
+    if ((player.gold|0) < amount){
+        document.getElementById('casinoResult').innerHTML = `<span style="color:#cc3030">Sem ouro suficiente (${amount}g)</span>`;
+        return;
+    }
+    // Animação de spin: roda reels com símbolos aleatórios por 600ms
+    const reels = document.querySelectorAll('#casinoReels .reel');
+    const allKeys = Object.keys(CASINO_SYMBOLS);
+    const spinInterval = setInterval(() => {
+        reels.forEach(r => {
+            r.textContent = CASINO_SYMBOLS[allKeys[Math.floor(Math.random() * allKeys.length)]];
+        });
+    }, 80);
+    document.getElementById('casinoResult').innerHTML = '<span style="color:#c8a050">🎲 Girando...</span>';
+    setTimeout(() => clearInterval(spinInterval), 600);
+    try {
+        ws.send(JSON.stringify({ t:'casinoSpin', amount }));
+    } catch {}
+}
+window.openCasino = openCasino;
+window.closeCasino = closeCasino;
+window.casinoSpin = casinoSpin;
 
 function renderGoldShop(){
     const el = document.getElementById('goldShopList');
