@@ -4933,7 +4933,12 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.on('close', () => {
+    ws.on('error', (err) => {
+        console.warn(`[ws:err] id=${id} name=${p.name || '?'} code=${err.code || '?'} msg=${err.message || err}`);
+    });
+    ws.on('close', (code, reasonBuf) => {
+        const reason = reasonBuf ? reasonBuf.toString().slice(0, 100) : '';
+        console.log(`[ws:close] id=${id} name=${p.name || '?'} code=${code} reason=${reason || '(empty)'}`);
         // Duelo ativo: abandonar conta como derrota (oponente leva o pot)
         if (p.duel){
             const opp = players.get(p.duel.opponentId);
