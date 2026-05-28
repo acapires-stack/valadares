@@ -2646,10 +2646,23 @@ function getWalkBob(e){
     return Math.sin(performance.now() * 0.014) * 1.6;
 }
 function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
-    // Equipamento default vazio
+    // Equipamento default vazio. Defensivo: se outro player equipou _PLUS_N que
+    // o cliente local não conhece, ITEMS[key] = undefined. Em vez de crashar,
+    // tenta hidratar via ensureUpgradeItem ou usa cor fallback.
     const eq = equip || {};
-    const bodyColor = eq.armor ? ITEMS[eq.armor].color : (eq.bodyColor || '#3a3a3a');
-    const bootsColor = eq.feet ? ITEMS[eq.feet].color : '#2a3880';
+    const safeItem = (key) => {
+        if (!key) return null;
+        let def = ITEMS[key];
+        if (!def && typeof ensureUpgradeItem === 'function' && typeof getUpgradeTier === 'function'){
+            const t = getUpgradeTier(key);
+            if (t.plus > 0){ ensureUpgradeItem(t.base, t.plus); def = ITEMS[key]; }
+        }
+        return def || null;
+    };
+    const armorDef = safeItem(eq.armor);
+    const feetDef  = safeItem(eq.feet);
+    const bodyColor = armorDef ? armorDef.color : (eq.bodyColor || '#3a3a3a');
+    const bootsColor = feetDef ? feetDef.color : '#2a3880';
     // sombra (fica fixa no chão, varia ligeiramente com o bob — quando pula, sombra encolhe)
     const b = bob || 0;
     const shadowScale = b < 0 ? 1 - Math.abs(b)*0.04 : 1;
@@ -2740,7 +2753,8 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     ctx.fillStyle='#e8c090'; ctx.fillRect(px+14, py+4, 20, 16);
     // capacete
     if (eq.head){
-        const hc = ITEMS[eq.head].color;
+        const headDef = safeItem(eq.head);
+        const hc = headDef ? headDef.color : '#8a6020';
         ctx.fillStyle = hc; ctx.fillRect(px+13, py+2, 22, 8);
         ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(px+14, py+3, 20, 3);
         if (eq.head === 'ELMO_CHIFRES'){
@@ -2769,7 +2783,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
             ctx.fillRect(px+27, py+6, 3, 2);
         } else if (eq.head === 'COROA_VENDEDOR'){
             // ★ Coroa do Vendedor — 5 pontas com gemas + chifres pretos
-            const c = ITEMS[eq.head].color;
+            const c = (ITEMS[eq.head] && ITEMS[eq.head].color) || '#cc1010';
             // 5 pontas escalonadas
             ctx.fillStyle = c;
             ctx.fillRect(px+12, py-1, 3, 6);
@@ -4373,7 +4387,7 @@ function totalDefense(){
     let d = hasShield() ? (player.shieldDefense || 0) : 0;
     for (const slot of ['weapon','offhand','armor','head','feet']){
         const k = player.equipped[slot];
-        if (k) d += ITEMS[k].def || 0;
+        if (k && ITEMS[k]) d += ITEMS[k].def || 0;
     }
     // Coração do Highlander: +3% de defesa (arredondado p/ cima)
     if (player.equipped.neck === 'CORACAO_HL') d = Math.ceil(d * 1.03);
