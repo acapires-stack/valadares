@@ -507,17 +507,36 @@
         }
         .inv-item.equippable { background: #0a0a12; cursor: pointer; }
         .inv-item.equippable:hover { border-color: #8a6020; background: #1a1410; transform: translateX(2px); }
+        .inv-cat-group { margin-top: 10px; }
+        .inv-cat-group:first-child { margin-top: 0; }
         .inv-cat-head {
-            color: #8a7438; font-size: 9px; letter-spacing: 2.5px;
-            text-transform: uppercase; font-weight: 600;
-            padding: 7px 4px 3px 4px; margin-top: 4px;
-            border-bottom: 1px solid #2a1f10;
+            color: #d4b870; font-size: 10px; letter-spacing: 3px;
+            text-transform: uppercase; font-weight: 700;
+            padding: 9px 8px 6px 8px;
+            border-top: 1px solid #3a2d10;
+            border-bottom: 1px solid #3a2d10;
+            background: linear-gradient(90deg, rgba(58,45,16,0.5) 0%, rgba(40,30,10,0.25) 50%, rgba(58,45,16,0.5) 100%);
             display: flex; justify-content: space-between; align-items: center;
+            text-shadow: 0 0 6px rgba(220,180,90,0.25);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
         }
-        .inv-cat-head:first-child { margin-top: 0; }
+        .inv-cat-head:hover { background: linear-gradient(90deg, rgba(80,60,20,0.6) 0%, rgba(58,45,16,0.4) 50%, rgba(80,60,20,0.6) 100%); }
+        .inv-cat-arrow {
+            display: inline-block;
+            color: #a08038; font-size: 8px;
+            margin-right: 4px;
+            transition: transform 0.15s;
+            transform: rotate(0deg);
+        }
+        .inv-cat-group.collapsed .inv-cat-arrow { transform: rotate(-90deg); }
+        .inv-cat-group.collapsed .inv-cat-body { display: none; }
         .inv-cat-count {
-            color: #5a4818; font-size: 9px; font-weight: 400;
-            background: #0a0805; padding: 1px 6px; border-radius: 2px;
+            color: #ffd060; font-size: 10px; font-weight: 600;
+            background: #0a0805; padding: 2px 8px; border-radius: 2px;
+            border: 1px solid #3a2d10;
+            min-width: 14px; text-align: center;
         }
         .inv-icon {
             display: inline-block;
@@ -1938,8 +1957,8 @@ const ALTAR_POS = { x: 50, y: 48 };
 function atAltar(){
     return Math.max(Math.abs(player.x - ALTAR_POS.x), Math.abs(player.y - ALTAR_POS.y)) <= 1;
 }
-// Boneco de treino (1 tile abaixo do Crupiê)
-const DUMMY_POS = { x: 48, y: 51 };
+// Boneco de treino (2 tiles abaixo do Crupiê, canto inferior-esquerdo da PZ)
+const DUMMY_POS = { x: 48, y: 52 };
 function atDummy(){
     return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
 }
@@ -4566,7 +4585,7 @@ function renderChest(){
         const groups = categorizeItems(entries);
         if (!groups.length) return '<div class="chest-empty">vazio</div>';
         return groups
-            .map(c => `<div class="inv-cat-head"><span>${c.label}</span><span class="inv-cat-count">${c.items.length}</span></div>${c.items.map(([k,q]) => fmt(k,q,side)).join('')}`)
+            .map(c => renderCatGroup(c.label, c.items.map(([k,q]) => fmt(k,q,side)).join(''), c.items.length))
             .join('');
     };
     invEl.innerHTML = renderGroups(Object.entries(player.inv), 'inv');
@@ -8931,6 +8950,46 @@ function categorizeItems(entries){
     return groups.filter(g => g.items.length);
 }
 
+// Estado de categorias colapsadas persistido em localStorage.
+// Cliente local — não precisa de server.
+const COLLAPSED_CATS_KEY = 'valadares:invCollapsed';
+function loadCollapsedCats(){
+    try {
+        const raw = localStorage.getItem(COLLAPSED_CATS_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(arr) ? arr : []);
+    } catch { return new Set(); }
+}
+let _collapsedCats = loadCollapsedCats();
+function isCatCollapsed(label){ return _collapsedCats.has(label); }
+function toggleCatCollapsed(label){
+    if (_collapsedCats.has(label)) _collapsedCats.delete(label);
+    else _collapsedCats.add(label);
+    try { localStorage.setItem(COLLAPSED_CATS_KEY, JSON.stringify([..._collapsedCats])); } catch {}
+}
+function renderCatGroup(label, bodyHtml, count){
+    const collapsed = isCatCollapsed(label);
+    return `<div class="inv-cat-group ${collapsed?'collapsed':''}" data-cat="${escapeAttr(label)}">
+        <div class="inv-cat-head" data-cat-toggle="${escapeAttr(label)}">
+            <span><span class="inv-cat-arrow">▼</span>${label}</span>
+            <span class="inv-cat-count">${count}</span>
+        </div>
+        <div class="inv-cat-body">${bodyHtml}</div>
+    </div>`;
+}
+// Delegado: click no head colapsa/expande. Funciona pra inventário e baú.
+document.addEventListener('click', (e) => {
+    const head = e.target.closest('[data-cat-toggle]');
+    if (!head) return;
+    const label = head.getAttribute('data-cat-toggle');
+    if (!label) return;
+    toggleCatCollapsed(label);
+    // Toggle visual imediato em TODOS os grupos com esse label (inv + baú abertos)
+    document.querySelectorAll(`.inv-cat-group[data-cat="${CSS.escape(label)}"]`).forEach(g => {
+        g.classList.toggle('collapsed');
+    });
+});
+
 function renderInventoryIfChanged(){
     const sig = JSON.stringify([player.equipped, player.inv]);
     if (sig === invSignature) return;
@@ -8991,7 +9050,7 @@ function renderInventoryIfChanged(){
             </div>`;
         };
         invEl.innerHTML = groups
-            .map(c => `<div class="inv-cat-head"><span>${c.label}</span><span class="inv-cat-count">${c.items.length}</span></div>${c.items.map(renderItem).join('')}`)
+            .map(c => renderCatGroup(c.label, c.items.map(renderItem).join(''), c.items.length))
             .join('');
     }
 

@@ -4149,7 +4149,7 @@ wss.on('connection', (ws) => {
             if (now - p._lastTrainAt < 1500) return reject('too_fast');
             p._lastTrainAt = now;
             // Adjacência: Magia treina no Altar, demais skills no Boneco
-            const DUMMY = { x:48, y:51 };
+            const DUMMY = { x:48, y:52 };
             const ALTAR = { x:50, y:48 };
             const target = skill === 'Magia' ? ALTAR : DUMMY;
             if (Math.max(Math.abs(p.x - target.x), Math.abs(p.y - target.y)) > 1){
