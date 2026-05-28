@@ -8447,12 +8447,12 @@ function renderInventoryIfChanged(){
     //  WPN  ARMOR  OFF
     //   .   NECK    .
     //   .   FEET    .
-    const slotLabels = { weapon:'ARMA', offhand:'OFF', armor:'CORPO', head:'CABEÇA', feet:'PÉS', neck:'PESCOÇO' };
-    const slotGrid   = { head:'1/2', neck:'1/3', weapon:'2/1', armor:'2/2', offhand:'2/3', feet:'3/2' };
+    const slotLabels = { weapon:'ARMA', offhand:'OFF', armor:'CORPO', head:'CABEÇA', feet:'PÉS', neck:'PESCOÇO', cosmetic:'COSM' };
+    const slotGrid   = { head:'1/2', neck:'1/3', weapon:'2/1', armor:'2/2', offhand:'2/3', feet:'3/2', cosmetic:'3/3' };
     const eqEl = document.getElementById('equipment');
     let hasRanged = false;
 
-    const slotHtml = ['head','weapon','armor','offhand','neck','feet'].map(slot => {
+    const slotHtml = ['head','weapon','armor','offhand','neck','feet','cosmetic'].map(slot => {
         const k = player.equipped[slot];
         const area = slotGrid[slot];
         if (k){
@@ -8486,7 +8486,7 @@ function renderInventoryIfChanged(){
     } else {
         const renderItem = ([k,q]) => {
             const def = ITEMS[k];
-            const equippable = ['weapon','offhand','armor','head','feet','neck'].includes(def.kind);
+            const equippable = ['weapon','offhand','armor','head','feet','neck','cosmetic'].includes(def.kind);
             const extra = itemStatsCompact(def);
             const tip = itemFullDesc(def) + (equippable ? '\n\nClick p/ equipar' : '');
             return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${escapeHtml(tip)}">
