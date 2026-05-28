@@ -784,7 +784,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #forgotPwdModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -1290,10 +1290,14 @@
         <h2>⚔ VALADARES ⚔</h2>
         <input type="text" id="charInput" placeholder="Nome do personagem" maxlength="14" autocomplete="off">
         <input type="password" id="pwdInput" placeholder="Senha" maxlength="40" autocomplete="off">
+        <input type="email" id="emailInput" placeholder="Email (opcional — recuperar senha)" maxlength="120" autocomplete="email" style="font-size:11px">
         <div class="opt" id="loginStatus">— digite seu nome —</div>
         <div id="loginError" style="color:#d04040;font-size:11px;margin-bottom:8px;min-height:14px"></div>
         <button onclick="tryLogin(true)" style="width:100%">ENTRAR</button>
-        <div class="opt" style="margin-top:14px;font-size:9px">
+        <div class="opt" style="margin-top:10px;font-size:10px">
+            <a href="#" onclick="event.preventDefault(); openForgotPwd()" style="color:#888;text-decoration:none">esqueci minha senha</a>
+        </div>
+        <div class="opt" style="margin-top:8px;font-size:9px">
             <a href="#" onclick="event.preventDefault(); showServerInput()" style="color:#555;text-decoration:none">servidor</a> &nbsp;·&nbsp;
             <a href="#" onclick="event.preventDefault(); deleteAccount()" style="color:#555;text-decoration:none">excluir conta</a>
         </div>
@@ -1302,6 +1306,23 @@
             <div style="font-size:9px;color:#666;margin-top:4px">↑ URL do servidor (deixa vazio pra padrão localhost). Salva no navegador.</div>
             <button onclick="saveServerInput()" style="font-size:10px;padding:5px 12px;margin-top:6px">salvar servidor</button>
         </div>
+    </div>
+</div>
+
+<!-- Modal "Esqueci a senha" -->
+<div id="forgotPwdModal" style="display:none">
+    <div class="chest-box" style="min-width:380px;max-width:440px">
+        <div class="chest-title">RECUPERAR SENHA</div>
+        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
+            Digite o email cadastrado na sua conta. Vamos enviar um link pra redefinir.
+        </div>
+        <input type="email" id="forgotEmailInput" placeholder="seu@email.com" maxlength="120" style="width:100%;padding:10px;background:#0a0805;border:1px solid #6a5020;color:#e0d8c8;border-radius:2px;font-family:inherit;font-size:14px;margin-bottom:12px">
+        <div id="forgotPwdStatus" style="text-align:center;min-height:20px;margin-bottom:10px;font-size:13px;color:#c8a050"></div>
+        <button onclick="submitForgotPwd()" style="width:100%;padding:10px;background:#d4a847;color:#0a0805;border:0;font-weight:600;letter-spacing:1px;cursor:pointer;border-radius:2px">ENVIAR LINK</button>
+        <div class="chest-hint" style="margin-top:10px">
+            Sem email cadastrado? Não tem como recuperar. <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeForgotPwd()">×</button>
     </div>
 </div>
 
@@ -5321,7 +5342,7 @@ function connectMP(){
         }
         // Se temos pwHash, autentica primeiro. O `join` é mandado quando authOk chegar.
         if (_authPwHash){
-            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash })); } catch {}
+            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash, email: _authEmail || undefined })); } catch {}
             // Fallback: se server não responder ao auth em 8s, joina como legado (sem sync)
             const wsAtAuth = ws;
             setTimeout(() => {
@@ -11436,11 +11457,14 @@ window.closeTutorial = closeTutorial;
 function tryLogin(multiplayer){
     const name = document.getElementById('charInput').value.trim();
     const pwd  = document.getElementById('pwdInput').value;
+    const emailField = document.getElementById('emailInput');
+    const email = emailField ? emailField.value.trim() : '';
     const err  = document.getElementById('loginError');
     err.textContent = '';
     if (!name)  { err.textContent = 'Digite um nome.'; return; }
     if (!pwd)   { err.textContent = 'Digite uma senha.'; return; }
     if (pwd.length < 3){ err.textContent = 'Senha precisa de pelo menos 3 caracteres.'; return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent = 'Email inválido — deixe vazio se não quiser.'; return; }
     const acc = getAccount(name);
     if (acc){
         if (acc.pw !== hashPw(pwd)){ err.textContent = 'Senha incorreta.'; return; }
@@ -11451,10 +11475,62 @@ function tryLogin(multiplayer){
     try {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ name, pw: hashPw(pwd), mp: !!multiplayer }));
     } catch {}
-    // Guarda o pwHash pra mandar no `auth` do WS — server valida + devolve save server-side
+    // Guarda o pwHash + email pra mandar no `auth` do WS — server valida + devolve save.
+    // Email é opcional: server cria conta com ele se nova; ignora se conta já existe (use setEmail).
     _authPwHash = multiplayer ? hashPw(pwd) : null;
+    _authEmail = email || null;
     startGame(multiplayer, name);
 }
+let _authEmail = null;
+
+// ─── Esqueci a senha — modal + submit via HTTP ──────────────────────────
+function openForgotPwd(){
+    const m = document.getElementById('forgotPwdModal');
+    if (!m) return;
+    m.style.display = 'flex';
+    const inp = document.getElementById('forgotEmailInput');
+    if (inp){
+        // Pré-preenche com o email digitado no login (se houver)
+        const e = document.getElementById('emailInput');
+        inp.value = e && e.value ? e.value.trim() : '';
+        setTimeout(() => inp.focus(), 50);
+    }
+    const st = document.getElementById('forgotPwdStatus');
+    if (st) st.textContent = '';
+}
+function closeForgotPwd(){
+    const m = document.getElementById('forgotPwdModal');
+    if (m) m.style.display = 'none';
+}
+async function submitForgotPwd(){
+    const inp = document.getElementById('forgotEmailInput');
+    const st  = document.getElementById('forgotPwdStatus');
+    if (!inp || !st) return;
+    const email = inp.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+        st.innerHTML = '<span style="color:#cc3030">Email inválido</span>';
+        return;
+    }
+    st.innerHTML = '<span style="color:#c8a050">⏳ Enviando…</span>';
+    try {
+        const r = await fetch(SERVER_HTTP_BASE + '/api/password-reset/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        if (!r.ok){
+            st.innerHTML = '<span style="color:#cc3030">Falha — tente de novo em instantes</span>';
+            return;
+        }
+        // Resposta opaca: sempre 200 ok:true (anti-enumeration). Mensagem genérica.
+        st.innerHTML = '<span style="color:#74d176">✓ Se o email existir, um link foi enviado.<br>Verifique sua caixa de entrada (e spam).</span>';
+    } catch (e){
+        st.innerHTML = '<span style="color:#cc3030">Sem conexão — verifique sua internet</span>';
+    }
+}
+window.openForgotPwd = openForgotPwd;
+window.closeForgotPwd = closeForgotPwd;
+window.submitForgotPwd = submitForgotPwd;
 
 // Auto-login se sessão válida existir no localStorage
 function tryAutoLogin(){

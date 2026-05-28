@@ -73,6 +73,49 @@ async function handleHttpRequest(req, res){
     if (req.method === 'GET' && req.url === '/api/packages'){
         return httpJson(res, 200, { packages: GOLD_PACKAGES });
     }
+    if (req.method === 'POST' && req.url === '/api/password-reset/request'){
+        try {
+            const body = await readBody(req);
+            const email = String(body.email || '').trim().toLowerCase();
+            // Resposta opaca: sempre 200 com ok:true (não revela se email existe)
+            if (!isValidEmail(email)) return httpJson(res, 200, { ok: true });
+            const acc = findAccountByEmail(email);
+            if (acc){
+                const now = Date.now();
+                if (!acc.resetToken || !acc.resetToken.requestedAt || now - acc.resetToken.requestedAt >= RESET_REQUEST_COOLDOWN_MS){
+                    const token = generateResetToken();
+                    acc.resetToken = { token, expiresAt: now + RESET_TOKEN_TTL_MS, requestedAt: now };
+                    queueSaveAccounts();
+                    const resetUrl = `${SITE_BASE_URL}/reset?token=${token}`;
+                    const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#222"><h2 style="color:#8b2020">Valadares — Recuperação de senha</h2><p>Olá <b>${acc.name}</b>,</p><p>Recebemos uma solicitação pra redefinir a senha da sua conta. Clica no link abaixo nos próximos 60 minutos:</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#d4a847;color:#0a0805;text-decoration:none;border-radius:4px;font-weight:600">Redefinir senha</a></p><p style="color:#666;font-size:13px">Se não funcionar, copie: <br><code>${resetUrl}</code></p><p style="color:#666;font-size:13px">Se você não pediu, ignore — sua senha continua a mesma.</p></div>`;
+                    sendEmail(acc.email, 'Valadares — Redefinir sua senha', html).then(r => {
+                        if (!r.ok) console.error(`[reset http] email pra ${acc.email} falhou:`, r.error);
+                    });
+                }
+            }
+            return httpJson(res, 200, { ok: true });
+        } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
+    }
+    if (req.method === 'POST' && req.url === '/api/password-reset/confirm'){
+        try {
+            const body = await readBody(req);
+            const token = String(body.token || '');
+            const pwHash = String(body.pwHash || '');
+            if (!token || !pwHash) return httpJson(res, 400, { ok:false, error:'missing_fields' });
+            let acc = null;
+            for (const a of accounts.values()){
+                if (a.resetToken && a.resetToken.token === token){ acc = a; break; }
+            }
+            if (!acc || !acc.resetToken || acc.resetToken.expiresAt < Date.now()){
+                return httpJson(res, 400, { ok:false, error:'invalid_or_expired' });
+            }
+            acc.pwHash = hashPwServer(pwHash);
+            acc.resetToken = null;
+            queueSaveAccounts();
+            console.log(`[reset http] senha trocada pra conta ${acc.name}`);
+            return httpJson(res, 200, { ok:true, name: acc.name });
+        } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
+    }
     if (req.method === 'GET' && req.url.startsWith('/api/ranking')){
         // Ranking público — espelha o flow WS getRanking. Usado por /ranking.html
         // (página pública pra SEO + retenção).
@@ -2027,9 +2070,17 @@ function validAccountName(n){
     return typeof n === 'string' && n.length >= 1 && n.length <= 14 && /^[A-Za-z0-9_\- ]+$/.test(n);
 }
 function getAccount(name){ return accounts.get(String(name || '').toLowerCase()); }
-function createAccount(name, clientHash){
-    const a = { name, pwHash: hashPwServer(clientHash), save: null, savedAt: 0, createdAt: Date.now() };
+function createAccount(name, clientHash, email){
+    const a = {
+        name, pwHash: hashPwServer(clientHash),
+        save: null, savedAt: 0, createdAt: Date.now(),
+        email: null, emailVerified: false, resetToken: null,
+    };
     accounts.set(name.toLowerCase(), a);
+    if (email && setAccountEmail(a, email) !== true){
+        // Email inválido ou em uso — conta foi criada sem ele, user pode adicionar depois
+        console.warn(`[auth] conta ${name} criada sem email (motivo: setAccountEmail falhou)`);
+    }
     queueSaveAccounts();
     return a;
 }
@@ -2037,6 +2088,68 @@ function verifyAccount(name, clientHash){
     const a = getAccount(name);
     if (!a) return false;
     return a.pwHash === hashPwServer(clientHash);
+}
+
+// ─── Fase 5.5: Email + recuperação de senha ────────────────────────────────
+// Email armazenado em lowercase. Único por conta (Map auxiliar emailToAccount).
+// Reset token: 32 bytes hex, válido 1h. Envio via Resend (env RESEND_API_KEY)
+// — se não configurado, server loga URL de reset no stdout (modo dev/preview).
+const emailToAccount = new Map();   // email lowercase → nameLower
+function isValidEmail(s){
+    if (typeof s !== 'string') return false;
+    const e = s.trim();
+    if (e.length < 5 || e.length > 120) return false;
+    return /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(e);
+}
+function setAccountEmail(acc, email){
+    if (!isValidEmail(email)) return 'invalid_email';
+    const norm = email.trim().toLowerCase();
+    const owner = emailToAccount.get(norm);
+    if (owner && owner !== acc.name.toLowerCase()) return 'email_in_use';
+    // Remove email antigo do índice se existir
+    if (acc.email) emailToAccount.delete(acc.email);
+    acc.email = norm;
+    emailToAccount.set(norm, acc.name.toLowerCase());
+    queueSaveAccounts();
+    return true;
+}
+function findAccountByEmail(email){
+    const norm = String(email || '').trim().toLowerCase();
+    const nameLower = emailToAccount.get(norm);
+    return nameLower ? accounts.get(nameLower) : null;
+}
+function generateResetToken(){
+    return crypto.randomBytes(24).toString('hex');
+}
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;   // 1h
+const RESET_REQUEST_COOLDOWN_MS = 60 * 1000;  // 1 reset / minuto / conta
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const RESEND_FROM = process.env.RESEND_FROM || 'Valadares <noreply@send.valadares.app.br>';
+const SITE_BASE_URL = process.env.SITE_BASE_URL || 'https://valadares.app.br';
+async function sendEmail(to, subject, html){
+    if (!RESEND_API_KEY){
+        console.log(`[email:dev] TO=${to} SUBJECT="${subject}"\n${html}`);
+        return { ok: true, dev: true };
+    }
+    try {
+        const r = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${RESEND_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html }),
+        });
+        if (!r.ok){
+            const body = await r.text().catch(() => '');
+            console.error(`[email] Resend HTTP ${r.status}: ${body}`);
+            return { ok: false, error: `http_${r.status}` };
+        }
+        return { ok: true };
+    } catch (e){
+        console.error('[email] erro:', e.message);
+        return { ok: false, error: e.message };
+    }
 }
 function setPlayerSave(name, data){
     const a = getAccount(name);
@@ -2064,10 +2177,15 @@ function loadAccountsFromDisk(){
         if (!d || d.v !== 1) return;
         if (Array.isArray(d.accounts)){
             for (const a of d.accounts){
-                if (a && a.name && a.pwHash) accounts.set(a.name.toLowerCase(), a);
+                if (!a || !a.name || !a.pwHash) continue;
+                accounts.set(a.name.toLowerCase(), a);
+                // Fase 5.5: reconstrói índice email → conta
+                if (a.email && typeof a.email === 'string'){
+                    emailToAccount.set(a.email.toLowerCase(), a.name.toLowerCase());
+                }
             }
         }
-        console.log(`[accounts] ${accounts.size} contas carregadas de disco`);
+        console.log(`[accounts] ${accounts.size} contas carregadas de disco (${emailToAccount.size} com email)`);
     } catch(e){ console.error('[accounts] erro ao carregar:', e.message); }
 }
 loadAccountsFromDisk();
@@ -2992,9 +3110,12 @@ wss.on('connection', (ws) => {
             let acc = getAccount(name);
             let isNew = false;
             if (!acc){
-                acc = createAccount(name, pwHash);
+                // Email opcional no registro inicial — user pode adicionar depois.
+                // Se passou email inválido ou em uso, conta é criada sem ele.
+                const optEmail = isValidEmail(msg.email) ? msg.email : null;
+                acc = createAccount(name, pwHash, optEmail);
                 isNew = true;
-                console.log(`[auth] nova conta: ${name}`);
+                console.log(`[auth] nova conta: ${name}${acc.email ? ' (com email)' : ''}`);
             } else if (!verifyAccount(name, pwHash)){
                 ws.send(JSON.stringify({ t:'authFail', reason:'bad_password' }));
                 return;
@@ -3004,7 +3125,89 @@ wss.on('connection', (ws) => {
             // Já limpa ghosts antigos no momento do auth — mesmo se o WS cair antes do join,
             // não acumula corpos órfãos. Importante quando rede do user oscila bastante.
             removeGhostsByName(acc.name, id);
-            ws.send(JSON.stringify({ t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0 }));
+            ws.send(JSON.stringify({
+                t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0,
+                hasEmail: !!acc.email,
+            }));
+            return;
+        }
+
+        // ─── Fase 5.5: Adicionar/alterar email da conta (autenticado) ──────
+        if (msg.t === 'setEmail') {
+            if (!p.authed || !p.authedName) return;
+            const acc = getAccount(p.authedName);
+            if (!acc) return;
+            const result = setAccountEmail(acc, String(msg.email || ''));
+            if (result === true){
+                if (p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({ t:'setEmailResult', ok:true, email:acc.email }));
+                }
+                console.log(`[auth] email setado pra conta ${acc.name}`);
+            } else {
+                if (p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({ t:'setEmailResult', ok:false, reason: result }));
+                }
+            }
+            return;
+        }
+
+        // ─── Fase 5.5: Solicitar reset de senha via WS (alternativa ao HTTP) ──
+        if (msg.t === 'passwordResetRequest') {
+            // Resposta opaca: NÃO revela se email existe (anti-enumeration)
+            const ok = () => { if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetResult', ok:true })); };
+            const email = String(msg.email || '').trim().toLowerCase();
+            if (!isValidEmail(email)){ ok(); return; }
+            const acc = findAccountByEmail(email);
+            if (!acc){ ok(); return; }
+            // Cooldown anti-spam
+            const now = Date.now();
+            if (acc.resetToken && acc.resetToken.requestedAt && now - acc.resetToken.requestedAt < RESET_REQUEST_COOLDOWN_MS){
+                ok(); return;
+            }
+            const token = generateResetToken();
+            acc.resetToken = { token, expiresAt: now + RESET_TOKEN_TTL_MS, requestedAt: now };
+            queueSaveAccounts();
+            const resetUrl = `${SITE_BASE_URL}/reset?token=${token}`;
+            const html = `
+                <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#222">
+                    <h2 style="color:#8b2020">Valadares — Recuperação de senha</h2>
+                    <p>Olá <b>${acc.name}</b>,</p>
+                    <p>Recebemos uma solicitação pra redefinir a senha da sua conta no Valadares. Clica no link abaixo nos próximos 60 minutos:</p>
+                    <p><a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#d4a847;color:#0a0805;text-decoration:none;border-radius:4px;font-weight:600">Redefinir senha</a></p>
+                    <p style="color:#666;font-size:13px">Se o botão não funcionar, copie e cole: <br><code>${resetUrl}</code></p>
+                    <p style="color:#666;font-size:13px">Se você não pediu isso, pode ignorar este email — sua senha continua a mesma.</p>
+                    <hr style="border:0;border-top:1px solid #eee;margin:24px 0">
+                    <p style="color:#999;font-size:11px">Valadares · Paranaguá/PR</p>
+                </div>`;
+            sendEmail(acc.email, 'Valadares — Redefinir sua senha', html).then(r => {
+                if (!r.ok) console.error(`[reset] email pra ${acc.email} falhou:`, r.error);
+            });
+            ok();
+            return;
+        }
+
+        // ─── Fase 5.5: Confirmar reset com token + nova senha ─────────────
+        if (msg.t === 'passwordResetConfirm') {
+            const token = String(msg.token || '');
+            const newPwHash = String(msg.pwHash || '');
+            if (!token || !newPwHash){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetConfirmResult', ok:false, reason:'missing_fields' }));
+                return;
+            }
+            // Busca conta com esse token
+            let acc = null;
+            for (const a of accounts.values()){
+                if (a.resetToken && a.resetToken.token === token){ acc = a; break; }
+            }
+            if (!acc || !acc.resetToken || acc.resetToken.expiresAt < Date.now()){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetConfirmResult', ok:false, reason:'invalid_or_expired' }));
+                return;
+            }
+            acc.pwHash = hashPwServer(newPwHash);
+            acc.resetToken = null;
+            queueSaveAccounts();
+            console.log(`[reset] senha trocada pra conta ${acc.name}`);
+            if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetConfirmResult', ok:true, name:acc.name }));
             return;
         }
 
