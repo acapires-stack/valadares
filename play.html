@@ -5480,9 +5480,24 @@ function handleMP(msg){
             if (p.id !== msg.you){
                 remotePlayers[p.id] = p;
                 if (p.ghost) remotePlayers[p.id].ghost = true;
-            } else if ('guild' in p){
-                // Atualiza próprio guild a partir do snapshot
-                player.guild = p.guild;
+            } else {
+                // Server é autoritativo em hp/mp/maxHp/maxMp/x/y. Cliente carregou save
+                // local que pode ter sido corrompido (race entre devices, maxHp=undefined).
+                // Aplica valores do snapshot ANTES de renderizar — antes ficavam stale até
+                // o primeiro pstats, e nesse gap o sprite renderizava com NaN.
+                if (typeof p.hp === 'number') player.hp = p.hp;
+                if (typeof p.maxHp === 'number' && p.maxHp > 0) player.maxHp = p.maxHp;
+                if (typeof p.mp === 'number') player.mp = p.mp;
+                if (typeof p.maxMp === 'number' && p.maxMp >= 0) player.maxMp = p.maxMp;
+                if (typeof p.x === 'number' && isFinite(p.x)) {
+                    player.x = p.x;
+                    player.renderX = p.x; player.prevX = p.x;
+                }
+                if (typeof p.y === 'number' && isFinite(p.y)) {
+                    player.y = p.y;
+                    player.renderY = p.y; player.prevY = p.y;
+                }
+                if ('guild' in p) player.guild = p.guild;
             }
         });
         updatePlayersOnline(msg.players);
