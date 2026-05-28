@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidade — Valadares</title>
+<meta name="description" content="Política de Privacidade do Valadares — RPG online tile-based. Dados coletados, finalidades, direitos do titular (LGPD).">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://valadares.app.br/privacy">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0805; --bg-card: #1a1410; --bg-elev: #241b14; --border: #3a2d20;
+    --gold: #d4a847; --gold-bright: #f0c060; --blood: #8b2020;
+    --text: #e0d8c8; --text-dim: #8a7e6a;
+  }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+  }
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(212, 168, 71, 0.06), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(139, 32, 32, 0.06), transparent 40%);
+    background-attachment: fixed;
+  }
+  a { color: var(--gold); text-decoration: none; }
+  a:hover { color: var(--gold-bright); text-decoration: underline; }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10, 8, 5, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+  }
+  .nav-brand {
+    font-family: "Cinzel", Georgia, serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--gold); letter-spacing: 2px;
+    display: inline-block;
+  }
+  .nav-brand::before { content: "✦ "; color: var(--gold-bright); }
+  main {
+    max-width: 760px; margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+  h1 {
+    font-family: "Cinzel", Georgia, serif;
+    color: var(--gold); font-size: 36px;
+    margin-bottom: 8px; letter-spacing: 2px;
+  }
+  .updated { color: var(--text-dim); font-size: 13px; margin-bottom: 32px; }
+  h2 {
+    color: var(--gold-bright); font-size: 20px;
+    margin: 32px 0 12px; font-weight: 700;
+  }
+  h3 { color: var(--text); font-size: 16px; margin: 16px 0 8px; }
+  p, ul { margin-bottom: 12px; color: var(--text); font-size: 15px; }
+  ul { padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--gold-bright); }
+  .callout {
+    background: var(--bg-card); border-left: 3px solid var(--gold);
+    padding: 14px 18px; margin: 16px 0; font-size: 14px;
+    border-radius: 0 4px 4px 0;
+  }
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 24px; text-align: center;
+    color: var(--text-dim); font-size: 13px;
+  }
+  footer a { margin: 0 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-brand">VALADARES</a>
+</nav>
+
+<main>
+  <h1>Política de Privacidade</h1>
+  <p class="updated">Última atualização: 28 de maio de 2026</p>
+
+  <p>
+    O <strong>Valadares</strong> ("Jogo", "nós") é um RPG online tile-based operado por seu desenvolvedor independente
+    em Paranaguá/PR, Brasil. Esta política descreve quais dados coletamos, por que coletamos, como usamos e quais
+    são seus direitos como titular sob a Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018).
+  </p>
+
+  <div class="callout">
+    Ao criar uma conta ou jogar o Valadares, você concorda com esta Política de Privacidade.
+    Se você não concorda, não utilize o serviço.
+  </div>
+
+  <h2>1. Dados que coletamos</h2>
+
+  <h3>1.1 Dados de conta</h3>
+  <ul>
+    <li><strong>Nome de jogador</strong> escolhido pelo usuário (não precisa ser nome real).</li>
+    <li><strong>Hash da senha</strong> — armazenamos apenas o hash criptográfico (SHA-256 + salt), nunca a senha em texto.</li>
+    <li><strong>E-mail</strong> opcional, fornecido pelo usuário no momento da compra de pacotes de gold ou recuperação de conta. Usado apenas para recibo de pagamento e contato sobre a conta.</li>
+  </ul>
+
+  <h3>1.2 Dados de jogo</h3>
+  <ul>
+    <li>Estatísticas de personagem (gold, nível das skills, inventário, conquistas, posições no mapa, histórico de chat).</li>
+    <li>Logs de combate e ranking público (kills, mortes, vitórias em duelos).</li>
+    <li>Data e hora da última conexão.</li>
+  </ul>
+
+  <h3>1.3 Dados técnicos</h3>
+  <ul>
+    <li><strong>Endereço IP</strong> registrado temporariamente nos logs do servidor (Railway) para prevenção de fraude e diagnóstico de erros. Não associamos IP ao nome do jogador na base de dados persistente.</li>
+    <li><strong>User-Agent</strong> do navegador, para fins de compatibilidade.</li>
+    <li><strong>Cookies / localStorage</strong> apenas técnicos (autenticação automática, preferências de UI). Não usamos cookies de rastreamento publicitário.</li>
+  </ul>
+
+  <h3>1.4 Dados de pagamento</h3>
+  <ul>
+    <li>Quando você compra pacotes de gold, o pagamento é processado pelo <strong>Mercado Pago</strong> (Mercado Pago Ltda.).
+      Não recebemos nem armazenamos dados de cartão, PIX ou conta bancária — esses dados ficam exclusivamente com o Mercado Pago.</li>
+    <li>Recebemos apenas: status do pagamento (aprovado, pendente, rejeitado), valor, ID da transação e o e-mail do comprador (se informado).</li>
+  </ul>
+
+  <h2>2. Para que usamos seus dados</h2>
+  <ul>
+    <li><strong>Autenticar</strong> você no jogo e proteger sua conta de acesso não autorizado.</li>
+    <li><strong>Salvar progresso</strong> de personagem entre sessões e dispositivos.</li>
+    <li><strong>Processar compras</strong> de pacotes de gold via Mercado Pago e creditar o gold na conta correta.</li>
+    <li><strong>Exibir ranking público</strong> de jogadores (somente nome de jogador e estatísticas — nada de IP/e-mail).</li>
+    <li><strong>Prevenir fraude</strong>, trapaça (cheating) e violações dos Termos de Uso.</li>
+    <li><strong>Comunicar</strong> com você sobre sua conta, compras e atualizações importantes (apenas via e-mail informado).</li>
+  </ul>
+
+  <h2>3. Compartilhamento de dados</h2>
+  <p>
+    Não vendemos seus dados. Compartilhamos apenas com terceiros estritamente necessários para a operação:
+  </p>
+  <ul>
+    <li><strong>Mercado Pago</strong> (processamento de pagamentos) — recebem dados que você fornece no checkout.</li>
+    <li><strong>Railway</strong> (hospedagem do servidor) e <strong>Vercel</strong> (hospedagem do cliente) — processam seu IP e dados de jogo temporariamente para servir as conexões. Política deles: <a href="https://railway.com/legal/privacy" target="_blank">Railway</a>, <a href="https://vercel.com/legal/privacy-policy" target="_blank">Vercel</a>.</li>
+    <li><strong>Autoridades</strong> mediante ordem judicial ou solicitação legal formal.</li>
+  </ul>
+
+  <h2>4. Seus direitos (LGPD)</h2>
+  <p>Como titular dos dados, você tem direito a:</p>
+  <ul>
+    <li><strong>Acesso</strong> — saber quais dados temos sobre você.</li>
+    <li><strong>Correção</strong> — atualizar dados incompletos ou incorretos.</li>
+    <li><strong>Exclusão</strong> — solicitar a remoção da sua conta e dados associados.</li>
+    <li><strong>Portabilidade</strong> — receber uma cópia dos seus dados em formato estruturado (JSON).</li>
+    <li><strong>Revogação de consentimento</strong> — a qualquer momento (efeito: encerramento da conta).</li>
+  </ul>
+  <p>
+    Para exercer qualquer desses direitos, envie um e-mail para <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a>
+    com o nome de jogador. Respondemos em até 15 dias corridos.
+  </p>
+
+  <h2>5. Retenção de dados</h2>
+  <ul>
+    <li>Dados de conta e jogo: enquanto a conta estiver ativa.</li>
+    <li>Após exclusão solicitada: removidos em até 30 dias, exceto dados que somos obrigados a manter por lei (ex: registros de transações financeiras por 5 anos para fins fiscais).</li>
+    <li>Logs técnicos do servidor (IP, erros): retidos por 90 dias e descartados automaticamente.</li>
+  </ul>
+
+  <h2>6. Segurança</h2>
+  <ul>
+    <li>Todas as conexões usam <strong>HTTPS/WSS</strong> com certificado TLS válido (gerenciado por Vercel e Railway).</li>
+    <li>Senhas armazenadas apenas como hash criptográfico (SHA-256 + salt) — irreversíveis.</li>
+    <li>Webhooks de pagamento validados via HMAC para prevenir falsificação.</li>
+    <li>Nenhum sistema é 100% seguro — em caso de incidente de segurança que afete dados pessoais, notificaremos você e a ANPD conforme exigido pela LGPD.</li>
+  </ul>
+
+  <h2>7. Menores de idade</h2>
+  <p>
+    O Valadares não é destinado a menores de 13 anos. Não coletamos intencionalmente dados de crianças.
+    Menores entre 13 e 18 anos só podem usar o serviço com autorização dos responsáveis legais —
+    em particular, compras de gold via Mercado Pago exigem que o cartão/conta esteja em nome de maior de idade.
+  </p>
+
+  <h2>8. Cookies e armazenamento local</h2>
+  <p>
+    Usamos apenas armazenamento técnico no navegador (<code>localStorage</code>) para guardar:
+  </p>
+  <ul>
+    <li>Token de sessão (login automático).</li>
+    <li>Preferências de UI (volume, tutorial visto, painel aberto).</li>
+  </ul>
+  <p>
+    Não usamos cookies de terceiros, rastreamento publicitário ou analytics que identifiquem você individualmente.
+    Você pode limpar o <code>localStorage</code> a qualquer momento — isso desloga sua sessão mas não apaga seu progresso (que fica no servidor).
+  </p>
+
+  <h2>9. Mudanças nesta política</h2>
+  <p>
+    Podemos atualizar esta política periodicamente. A data de "Última atualização" no topo indica a versão atual.
+    Mudanças significativas serão comunicadas via mensagem no jogo ou e-mail (se fornecido).
+  </p>
+
+  <h2>10. Contato</h2>
+  <p>
+    Para dúvidas, solicitações ou reclamações sobre tratamento de dados:
+  </p>
+  <ul>
+    <li>E-mail: <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a></li>
+    <li>Encarregado de Proteção de Dados (DPO): o desenvolvedor responsável pelo Valadares (mesmo e-mail acima).</li>
+  </ul>
+  <p>
+    Se não estiver satisfeito com a resposta, você pode contatar a <strong>Autoridade Nacional de Proteção de Dados (ANPD)</strong>:
+    <a href="https://www.gov.br/anpd/" target="_blank">www.gov.br/anpd</a>.
+  </p>
+
+</main>
+
+<footer>
+  <p>
+    <a href="/">Início</a> ·
+    <a href="/jogar">Jogar</a> ·
+    <a href="/terms">Termos de Uso</a> ·
+    <a href="https://github.com/acapires-stack/valadares" target="_blank">GitHub</a>
+  </p>
+  <p style="margin-top: 12px; font-size: 11px;">
+    Valadares · feito com ♥ em Paranaguá/PR · 2026
+  </p>
+</footer>
+
+</body>
+</html>

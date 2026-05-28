@@ -1,6 +1,8 @@
 {
   "rewrites": [
-    { "source": "/jogar", "destination": "/play.html" }
+    { "source": "/jogar", "destination": "/play.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" }
   ],
   "headers": [
     {
