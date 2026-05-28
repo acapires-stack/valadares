@@ -73,6 +73,25 @@ async function handleHttpRequest(req, res){
     if (req.method === 'GET' && req.url === '/api/packages'){
         return httpJson(res, 200, { packages: GOLD_PACKAGES });
     }
+    if (req.method === 'GET' && req.url.startsWith('/api/ranking')){
+        // Ranking público — espelha o flow WS getRanking. Usado por /ranking.html
+        // (página pública pra SEO + retenção).
+        const url = new URL(req.url, 'http://localhost');
+        const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 20));
+        return httpJson(res, 200, {
+            mobs:   topRanking('mobKills',  limit),
+            pvp:    topRanking('pkKills',   limit),
+            bosses: topRanking('bossKills', limit),
+            gold:   topRanking('gold',      limit),
+            guilds: topGuildRanking(limit),
+            season: {
+                id: seasonState.id,
+                top: topSeason(limit),
+                archive: seasonState.archive.slice(0, 12),
+            },
+            updatedAt: Date.now(),
+        });
+    }
     if (req.method === 'POST' && req.url === '/api/pix/create'){
         try {
             const body = await readBody(req);
