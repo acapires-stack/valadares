@@ -2857,14 +2857,18 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
         ctx.stroke();
         ctx.restore();
     }
-    // nome (+ tag de guild acima quando aplicável)
+    // nome (+ tag de guild acima quando aplicável). Sem fundo retangular —
+    // só text shadow pra contraste sobre tile claro.
     if (nameTag){
         ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(px+TS/2-nameTag.length*3-3, py-12, nameTag.length*6+6, 11);
         // Cor do nome: override via equip.nameColor (cosmético)
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetY = 1;
         ctx.fillStyle = (equip && equip.nameColor) || '#e0c060';
         ctx.fillText(nameTag, px+TS/2, py-3);
+        ctx.restore();
         // Badges de conquista — render à direita do nome (até 2 ícones com glow da tier)
         if (eq.badges && eq.badges.length && typeof ACHIEVEMENTS !== 'undefined'){
             const startX = px + TS/2 + nameTag.length * 3 + 4;
