@@ -4309,8 +4309,8 @@ wss.on('connection', (ws, request) => {
         // ─── N3: Shop buy/sell server-side ───────────────────────────────
         if (msg.t === 'invShop') {
             const op = msg.op;
-            // Mercador em (52,49). Player tem que estar adjacente (chebyshev ≤1).
-            if (Math.max(Math.abs(p.x - 52), Math.abs(p.y - 49)) > 1){
+            // Mercador em (47,47) — sync com NPCS.mercador em play.html.
+            if (Math.max(Math.abs(p.x - 47), Math.abs(p.y - 47)) > 1){
                 sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se do Mercador.' }); return;
             }
             if (op === 'buy'){
