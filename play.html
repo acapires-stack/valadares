@@ -1220,6 +1220,87 @@
            Layout responsivo: <900px reorganiza pra coluna + sidebars
            colapsáveis via hamburguer.
            ──────────────────────────────────────────────────────────────── */
+        /* Top-bar mobile fixa: nome + HP/MP + gold sempre visíveis. */
+        #mobileTopBar { display: none; }
+        body.touch #mobileTopBar {
+            display: flex;
+            position: fixed;
+            top: env(safe-area-inset-top, 0);
+            left: 0; right: 0;
+            z-index: 145;
+            background: linear-gradient(180deg, rgba(20,16,8,0.95) 0%, rgba(40,28,12,0.88) 100%);
+            border-bottom: 2px solid #a88040;
+            padding: 6px 60px 6px 10px;  /* 60px à direita pra não cobrir o ≡ */
+            gap: 10px;
+            align-items: center;
+            pointer-events: auto;
+            font-family: inherit;
+        }
+        .mtb-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #ffd060;
+            text-shadow: 0 1px 2px #000;
+            flex-shrink: 0;
+            max-width: 90px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+        .mtb-bars {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+        .mtb-bar {
+            position: relative;
+            height: 14px;
+            background: #1a0e04;
+            border: 1px solid #4a3318;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .mtb-bar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.2s ease-out;
+        }
+        .mtb-hp .mtb-bar-fill { background: linear-gradient(180deg, #e05050 0%, #8a2020 100%); }
+        .mtb-mp .mtb-bar-fill { background: linear-gradient(180deg, #5080e0 0%, #2040a0 100%); }
+        .mtb-bar-text {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #fff;
+            line-height: 14px;
+            text-shadow: 0 1px 2px #000, 0 0 3px #000;
+            letter-spacing: 0.3px;
+        }
+        .mtb-gold {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(180deg, #a88040 0%, #5a4818 100%);
+            border: 1px solid #d4a850;
+            color: #ffe080;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 0 1px 1px #000;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .mtb-gold:active { transform: scale(0.95); filter: brightness(1.15); }
+        .mtb-gold-ico { font-size: 13px; }
         #touchControls { display: none; }
         body.touch #touchControls {
             display: block;
@@ -1270,10 +1351,175 @@
             text-align: center; line-height: 1;
         }
         .tbtn:active { transform: scale(0.92); background: radial-gradient(circle, #d4a850 0%, #8a5818 80%); }
-        #tbtnAttack { right: 16px; bottom: 30px; width: 84px; height: 84px; font-size: 22px; }
-        #tbtnMagic  { right: 110px; bottom: 88px; width: 56px; height: 56px; font-size: 14px; }
-        #tbtnSpear  { right: 50px; bottom: 130px; width: 50px; height: 50px; font-size: 13px; }
-        #tbtnEat    { right: 16px; bottom: 130px; width: 50px; height: 50px; font-size: 14px; }
+        /* Único botão de ação grande no canto inferior direito (atacar). Outras
+           ações secundárias (magia/lança/poções/comida) ficaram na hotbar inferior. */
+        #tbtnAttack { right: 16px; bottom: 30px; width: 92px; height: 92px; font-size: 14px; }
+        .tbtn .tbtn-ico { display: block; font-size: 1.8em; line-height: 1; margin-bottom: 3px; }
+        .tbtn .tbtn-lbl { display: block; font-size: 0.85em; letter-spacing: 0.5px; }
+        /* Hotbar mobile inferior: 5 slots quadrados centralizados acima do
+           joystick/ATK. Tap único = ação direta sem abrir inventário. */
+        #mobileHotbar { display: none; }
+        body.touch #mobileHotbar {
+            display: flex;
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 148;
+            gap: 6px;
+            pointer-events: auto;
+            padding: 0 4px;
+        }
+        .mhb-slot {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(180deg, rgba(60,45,16,0.95) 0%, rgba(30,22,10,0.95) 100%);
+            border: 2px solid #a88040;
+            border-radius: 6px;
+            color: #ffe080;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .mhb-slot:active { transform: scale(0.92); filter: brightness(1.2); }
+        .mhb-slot.empty { opacity: 0.45; border-color: #5a4828; }
+        .mhb-slot.empty .mhb-ico { filter: grayscale(0.8); }
+        .mhb-ico { font-size: 22px; line-height: 1; margin-bottom: 2px; }
+        .mhb-lbl { font-size: 9px; letter-spacing: 0.3px; color: #ffd070; font-weight: bold; }
+        .mhb-qty {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 1px 2px #000, 0 0 3px #000;
+            background: rgba(20,12,4,0.7);
+            border-radius: 3px;
+            padding: 0 3px;
+            min-width: 12px;
+            text-align: center;
+            line-height: 14px;
+        }
+        .mhb-qty:empty { display: none; }
+        /* Onboarding mobile (Fase C) — overlay com card explicando os controles */
+        #mobileTutOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.72);
+            z-index: 200;
+            pointer-events: auto;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        body.touch #mobileTutOverlay.active { display: flex; }
+        .mt-card {
+            background: linear-gradient(180deg, #2a1e0c 0%, #1a1208 100%);
+            border: 2px solid #a88040;
+            border-radius: 10px;
+            padding: 16px 18px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.8), 0 0 30px rgba(168,128,64,0.3);
+            color: #ffe080;
+            font-family: inherit;
+        }
+        .mt-card-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffd060;
+            text-align: center;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            text-shadow: 0 2px 4px #000;
+        }
+        .mt-card-sub {
+            font-size: 11px;
+            color: #c8a050;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .mt-card-list { display: flex; flex-direction: column; gap: 6px; }
+        .mt-item {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            background: rgba(0,0,0,0.3);
+            border-left: 3px solid #a88040;
+            padding: 6px 8px;
+            border-radius: 3px;
+        }
+        .mt-zone {
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffd060;
+            min-width: 78px;
+            letter-spacing: 0.3px;
+        }
+        .mt-desc {
+            font-size: 11px;
+            color: #e0c8a0;
+            line-height: 1.35;
+            flex: 1;
+        }
+        .mt-card-btn {
+            display: block;
+            margin: 14px auto 2px;
+            background: linear-gradient(180deg, #c89030 0%, #6a4818 100%);
+            border: 2px solid #d4a850;
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+        }
+        .mt-card-btn:active { transform: scale(0.96); filter: brightness(1.15); }
+        /* Orientation lock (Fase D) — portrait no celular não joga 2D top-down,
+           só aparece overlay pedindo pra virar a tela. Auto-dismiss quando muda. */
+        #orientationLock {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(180deg, #1a1208 0%, #0a0805 100%);
+            z-index: 300;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+            padding: 40px;
+            text-align: center;
+            font-family: inherit;
+            color: #ffe080;
+        }
+        @media (orientation: portrait) and (max-width: 900px) {
+            body.touch #orientationLock { display: flex; }
+        }
+        .ol-icon {
+            font-size: 80px;
+            animation: olRotate 2.2s ease-in-out infinite;
+        }
+        @keyframes olRotate {
+            0%, 100% { transform: rotate(0deg); }
+            45%, 55% { transform: rotate(90deg); }
+        }
+        .ol-title { font-size: 22px; font-weight: bold; color: #ffd060; text-shadow: 0 2px 4px #000; letter-spacing: 0.5px; }
+        .ol-sub { font-size: 14px; color: #c8a050; max-width: 280px; line-height: 1.45; }
         /* Hamburguer (topo) e sidebars colapsáveis em mobile */
         #mobileMenu {
             display: none;
@@ -1324,15 +1570,54 @@
 </head>
 <body>
 
+<!-- Top-bar mobile fixa — sempre visível com body.touch -->
+<div id="mobileTopBar">
+    <div class="mtb-name" id="mtbName" title="Personagem">Aventureiro</div>
+    <div class="mtb-bars">
+        <div class="mtb-bar mtb-hp"><div class="mtb-bar-fill" id="mtbHpFill"></div><span class="mtb-bar-text" id="mtbHpText">100/100</span></div>
+        <div class="mtb-bar mtb-mp"><div class="mtb-bar-fill" id="mtbMpFill"></div><span class="mtb-bar-text" id="mtbMpText">100/100</span></div>
+    </div>
+    <div class="mtb-gold" id="mtbGold" onclick="openGoldShop()" title="Comprar gold"><span class="mtb-gold-ico">💰</span><span id="mtbGoldVal">0</span></div>
+</div>
+
 <!-- Touch controls — só aparecem quando body.touch (detecção JS) -->
 <div id="touchControls">
     <div id="vjoy"><div id="vjoyKnob"></div></div>
-    <button class="tbtn" id="tbtnAttack" type="button">⚔<br>ATK</button>
-    <button class="tbtn" id="tbtnMagic"  type="button">✦<br>MAG</button>
-    <button class="tbtn" id="tbtnSpear"  type="button">↗<br>LCA</button>
-    <button class="tbtn" id="tbtnEat"    type="button">🍖</button>
+    <button class="tbtn" id="tbtnAttack" type="button"><span class="tbtn-ico">⚔</span><span class="tbtn-lbl">ATACAR</span></button>
+</div>
+<!-- Hotbar mobile — 5 slots com itens/ações de toque único -->
+<div id="mobileHotbar">
+    <button class="mhb-slot" id="mhbSlotHp"    type="button" title="Poção de vida"><span class="mhb-ico">🧪</span><span class="mhb-lbl">HP</span><span class="mhb-qty" id="mhbQtyHp"></span></button>
+    <button class="mhb-slot" id="mhbSlotMp"    type="button" title="Poção de mana"><span class="mhb-ico">💧</span><span class="mhb-lbl">MP</span><span class="mhb-qty" id="mhbQtyMp"></span></button>
+    <button class="mhb-slot" id="mhbSlotFood"  type="button" title="Comida"><span class="mhb-ico">🍖</span><span class="mhb-lbl">COMER</span><span class="mhb-qty" id="mhbQtyFood"></span></button>
+    <button class="mhb-slot" id="mhbSlotMagic" type="button" title="Magia ativa (compre no altar — tecla M)"><span class="mhb-ico">✦</span><span class="mhb-lbl">MAGIA</span><span class="mhb-qty" id="mhbQtyMagic"></span></button>
+    <button class="mhb-slot" id="mhbSlotSpear" type="button" title="Arremessar lança"><span class="mhb-ico">↗</span><span class="mhb-lbl">LANÇA</span><span class="mhb-qty" id="mhbQtySpear"></span></button>
 </div>
 <button id="mobileMenu" type="button" title="Menu">≡</button>
+
+<!-- Orientation lock: portrait no celular impede gameplay tile-based 2D —
+     mostra overlay pedindo pra virar a tela. CSS-only, sem JS necessário. -->
+<div id="orientationLock">
+    <div class="ol-icon">📱</div>
+    <div class="ol-title">VIRE O CELULAR</div>
+    <div class="ol-sub">Valadares é jogado em modo paisagem. Deite o celular pra continuar.</div>
+</div>
+
+<!-- Onboarding mobile — primeiro login no celular vê isso 1 vez -->
+<div id="mobileTutOverlay">
+    <div class="mt-card">
+        <div class="mt-card-title">👋 BEM-VINDO AO VALADARES</div>
+        <div class="mt-card-sub">Aqui é como você joga no celular:</div>
+        <div class="mt-card-list">
+            <div class="mt-item"><span class="mt-zone">⬆ TOPO</span><span class="mt-desc">Seu HP, MP e gold sempre visíveis</span></div>
+            <div class="mt-item"><span class="mt-zone">⬅ ESQUERDA</span><span class="mt-desc">Joystick — arrasta o círculo dourado pra andar</span></div>
+            <div class="mt-item"><span class="mt-zone">⬇ EMBAIXO</span><span class="mt-desc">Hotbar com 5 slots — 1 toque usa poção HP/MP, comida, magia, lança</span></div>
+            <div class="mt-item"><span class="mt-zone">➡ DIREITA</span><span class="mt-desc">Botão ATACAR — encosta num inimigo e toca</span></div>
+            <div class="mt-item"><span class="mt-zone">≡ MENU</span><span class="mt-desc">Abre inventário, baú, chat e ranking</span></div>
+        </div>
+        <button class="mt-card-btn" onclick="closeMobileTut()">ENTENDI ✦ JOGAR</button>
+    </div>
+</div>
 
 <!-- LOGIN -->
 <div id="login">
@@ -1406,7 +1691,7 @@
 <div id="gameWrapper">
 
     <!-- SIDEBAR ESQUERDA -->
-    <div class="sidebar">
+    <div class="sidebar" id="leftSidebar">
         <div class="s-section minimap-section">
             <div class="s-label">Mapa <span id="posMini" style="float:right;color:#888;font-weight:400">—</span></div>
             <canvas id="minimap" width="140" height="140"></canvas>
@@ -1820,6 +2105,7 @@
 
         <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
         <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
+        <button class="chest-btn" onclick="openMobileTut(true)">📱 Ver tutorial mobile (touch)</button>
 
         <div class="chest-head" style="margin-top:14px">SAVE</div>
         <div id="backupInfo" style="color:#998040;font-size:10px;letter-spacing:0.5px;padding:4px 6px;margin-bottom:4px"></div>
@@ -8071,6 +8357,14 @@ function updateSidebar(){
     document.getElementById('barMp').style.width = (player.mp/player.maxMp*100)+'%';
     document.getElementById('hpVal').textContent = `${player.hp}/${player.maxHp}`;
     document.getElementById('mpVal').textContent = `${player.mp}/${player.maxMp}`;
+    // Mobile top-bar (mesmos dados, render espelhado quando body.touch ativo)
+    const mtbHp = document.getElementById('mtbHpFill');
+    if (mtbHp){
+        mtbHp.style.width = (player.hp/player.maxHp*100)+'%';
+        document.getElementById('mtbHpText').textContent = `${player.hp}/${player.maxHp}`;
+        document.getElementById('mtbMpFill').style.width = (player.mp/player.maxMp*100)+'%';
+        document.getElementById('mtbMpText').textContent = `${player.mp}/${player.maxMp}`;
+    }
     document.getElementById('atkVal').textContent = playerAttack();
     document.getElementById('defVal').textContent = totalDefense();
     document.getElementById('critVal').textContent  = (playerCritChance()*100).toFixed(1)+'%';
@@ -8148,6 +8442,9 @@ function updateSidebar(){
     } else mpEl.style.boxShadow = '';
     document.getElementById('posVal').textContent = `${player.x}, ${player.y}`;
     document.getElementById('charName').textContent = player.name;
+    // Espelha nome no top-bar mobile (player.name pode mudar no auth/save reload)
+    const mtbN = document.getElementById('mtbName');
+    if (mtbN) mtbN.textContent = player.name || 'Aventureiro';
     for (const [n,s] of Object.entries(player.skills)){
         const e1=document.getElementById('sk-'+n), e2=document.getElementById('skb-'+n);
         if (e1) e1.textContent = s.val;
@@ -8165,8 +8462,48 @@ function updateSidebar(){
     renderBossesWidget();
     renderPlayersOnline();
     document.getElementById('goldVal').textContent = player.gold + ' g';
+    const mtbG = document.getElementById('mtbGoldVal');
+    if (mtbG) mtbG.textContent = player.gold;
     // Inventário e equipamento só re-renderizam quando MUDAM (evita perder o click no rebuild)
     renderInventoryIfChanged();
+    updateMobileHotbar();
+}
+
+// Atualiza os 5 slots da hotbar mobile. Mostra qty consolidada (HP = todas
+// poções+comidas que curam HP). Slot fica "empty" quando ação indisponível
+// (sem item, sem magia ativa, sem lança arremessável equipada).
+function updateMobileHotbar(){
+    const root = document.getElementById('mobileHotbar');
+    if (!root) return;
+    const inv = player.inv || {};
+    const sumOf = (keys) => keys.reduce((a, k) => a + (inv[k] || 0), 0);
+    const setSlot = (id, qtyId, qty, available) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const qEl = document.getElementById(qtyId);
+        el.classList.toggle('empty', !available);
+        if (qEl) qEl.textContent = (qty > 0 ? qty : '');
+    };
+    // HP: poção primeiro, depois qualquer comida
+    const hpKeys = ['POTION','HAM','MEAT','EGG','CHEESE','CARNE_LAGARTO'];
+    const hpQty = sumOf(hpKeys);
+    setSlot('mhbSlotHp', 'mhbQtyHp', hpQty, hpQty > 0);
+    // MP: só POTION_MP
+    const mpQty = inv.POTION_MP || 0;
+    setSlot('mhbSlotMp', 'mhbQtyMp', mpQty, mpQty > 0);
+    // Comida (separa de pots por ergonomia: HP gasta poção; este slot poupa pots)
+    const foodKeys = ['HAM','MEAT','CARNE_LAGARTO','EGG','CHEESE'];
+    const foodQty = sumOf(foodKeys);
+    setSlot('mhbSlotFood', 'mhbQtyFood', foodQty, foodQty > 0);
+    // Magia: ativo se há activeSpell. Não tem qty.
+    const magicEl = document.getElementById('mhbSlotMagic');
+    if (magicEl) magicEl.classList.toggle('empty', !player.activeSpell);
+    // Lança: empty se equipped weapon não tem throwable. Qty = inv da mesma key.
+    const wKey = player.equipped?.weapon;
+    const wItem = wKey ? ITEMS[wKey] : null;
+    const canThrow = !!(wItem && wItem.throwable);
+    const spearQty = canThrow ? ((inv[wKey] || 0) + 1) : 0;
+    setSlot('mhbSlotSpear', 'mhbQtySpear', spearQty, canThrow);
 }
 
 // ─── Widgets da sidebar direita ─────────────────────────────────────────────
@@ -9490,7 +9827,7 @@ document.addEventListener('keydown', e => {
         if (m && m.style.display !== 'none') closeAchievements(); else openAchievements();
     }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
-    if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -11851,6 +12188,24 @@ window.addEventListener('DOMContentLoaded', () => {
 // TUTORIAL (#18) — modal único no primeiro login (por usuário)
 // ═══════════════════════════════════════════════════════════════════════════
 function tutorialKey(name){ return 'valadares:tutSeen:' + (name || ''); }
+// Tutorial mobile-específico (Fase C). Replace do tutorial desktop quando
+// body.touch — explica controles touch em vez de teclas WASD.
+function mobileTutKey(name){ return 'valadares:mobileTutSeen:' + (name || ''); }
+function openMobileTut(force){
+    if (!force){
+        try { if (localStorage.getItem(mobileTutKey(player.name)) === '1') return; } catch {}
+    }
+    closeAllModals();
+    const el = document.getElementById('mobileTutOverlay');
+    if (el) el.classList.add('active');
+}
+function closeMobileTut(){
+    try { localStorage.setItem(mobileTutKey(player.name), '1'); } catch {}
+    const el = document.getElementById('mobileTutOverlay');
+    if (el) el.classList.remove('active');
+}
+window.openMobileTut = openMobileTut;
+window.closeMobileTut = closeMobileTut;
 function openTutorial(force){
     if (!force){
         try {
@@ -12151,8 +12506,13 @@ function startGame(multiplayer, name){
     if (restored) log('<span class="log-sys">Progresso restaurado.</span>');
     log('Use WASD para mover, ESPAÇO para atacar.');
     started = true;
-    // Tutorial só na primeira vez por usuário (flag em localStorage)
-    setTimeout(() => openTutorial(false), 500);
+    // Tutorial só na primeira vez por usuário (flag em localStorage).
+    // No mobile (body.touch) abre versão específica que explica controles touch,
+    // não WASD/SPACE como o desktop.
+    setTimeout(() => {
+        if (document.body.classList.contains('touch')) openMobileTut(false);
+        else openTutorial(false);
+    }, 500);
     // Limpa intervals antigos antes de criar novos (re-login na mesma aba)
     if (_saveStateIntervalId) clearInterval(_saveStateIntervalId);
     if (_playerSyncIntervalId) clearInterval(_playerSyncIntervalId);
@@ -13079,12 +13439,34 @@ function loop(ts){
     bindBtn('tbtnAttack',
         () => { attackPressed = true; engage(); },
         () => { attackPressed = false; });
-    bindBtn('tbtnMagic', () => {
+
+    // ─── Hotbar mobile: 5 slots tap-único ───
+    // HP/MP/Food consomem via invConsume (server valida). Magia precisa de
+    // activeSpell setado. Lança usa equipped throwable + player.target.
+    function useBestKey(keys){
+        if (!ws || ws.readyState !== 1) return false;
+        const k = keys.find(x => (player.inv?.[x] || 0) > 0);
+        if (!k) return false;
+        ws.send(JSON.stringify({ t:'invConsume', key: k }));
+        return true;
+    }
+    const HP_KEYS_ORDER   = ['POTION', 'HAM', 'MEAT', 'EGG', 'CHEESE', 'CARNE_LAGARTO'];
+    const MP_KEYS_ORDER   = ['POTION_MP'];
+    const FOOD_KEYS_ORDER = ['HAM', 'MEAT', 'CARNE_LAGARTO', 'EGG', 'CHEESE'];
+    bindBtn('mhbSlotHp', () => {
+        if (!useBestKey(HP_KEYS_ORDER)) log('<span class="log-sys">Sem poção/comida pra HP.</span>');
+    });
+    bindBtn('mhbSlotMp', () => {
+        if (!useBestKey(MP_KEYS_ORDER)) log('<span class="log-sys">Sem poção de mana.</span>');
+    });
+    bindBtn('mhbSlotFood', () => {
+        if (!useBestKey(FOOD_KEYS_ORDER)) log('<span class="log-sys">Sem comida no inventário.</span>');
+    });
+    bindBtn('mhbSlotMagic', () => {
         if (!player.activeSpell) log('<span class="log-sys">Vá ao altar (tecla M) e compre uma magia.</span>');
         else castSpell(player.activeSpell);
     });
-    bindBtn('tbtnSpear', () => throwSpear());
-    bindBtn('tbtnEat',   () => eatBestFood());
+    bindBtn('mhbSlotSpear', () => throwSpear());
 
     // ─── Hamburguer: mostra/esconde sidebars no mobile ───
     const menuBtn = document.getElementById('mobileMenu');
