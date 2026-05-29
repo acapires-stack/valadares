@@ -2971,6 +2971,53 @@ setInterval(safeTick('tickImpostorBot', tickImpostorBot), 250);
 setInterval(safeTick('spawnImpostorBot', spawnImpostorBot), BOT_SPAWN_INTERVAL_MS);
 setInterval(safeTick('tickBencaoTempCleanup', tickBencaoTempCleanup), 60 * 1000);
 
+// M4 anti-ninja: distribui o loot de um boss unique entre quem deu dano.
+// Gold = proporcional à contribuição; itens = sorteio ponderado pelo dano
+// (quem bateu mais tem mais chance de cada item). Vai DIRETO pro inventário —
+// não cai no chão. fallbackKiller leva tudo se ninguém foi rastreado.
+function distributeBossLoot(m, loot, fallbackKiller){
+    const dmgBy = m.damageBy || {};
+    const contribs = [];
+    let totalDmg = 0;
+    for (const pid in dmgBy){
+        const dmg = dmgBy[pid];
+        const pp = players.get(Number(pid));
+        if (pp && !pp.disconnected && dmg > 0){ contribs.push({ p: pp, dmg }); totalDmg += dmg; }
+    }
+    if (!contribs.length){
+        if (fallbackKiller && !fallbackKiller.disconnected){ contribs.push({ p: fallbackKiller, dmg: 1 }); totalDmg = 1; }
+        else return;
+    }
+    const got = new Map();   // pid -> { p, gold, items:{} }
+    const slot = (pp) => { let g = got.get(pp.id); if (!g){ g = { p: pp, gold: 0, items: {} }; got.set(pp.id, g); } return g; };
+    for (const it of loot){
+        if (!it || !it.type) continue;
+        if (it.type === 'GOLD'){
+            let dist = 0;
+            for (const c of contribs){
+                const share = Math.floor((it.qty || 0) * (c.dmg / totalDmg));
+                if (share > 0){ slot(c.p).gold += share; dist += share; }
+            }
+            const rest = (it.qty || 0) - dist;   // arredondamento → top damager
+            if (rest > 0){ const top = contribs.reduce((a,b) => b.dmg > a.dmg ? b : a, contribs[0]); slot(top.p).gold += rest; }
+        } else {
+            let r = Math.random() * totalDmg, winner = contribs[0];
+            for (const c of contribs){ r -= c.dmg; if (r <= 0){ winner = c; break; } }
+            const g = slot(winner.p);
+            g.items[it.type] = (g.items[it.type] || 0) + (it.qty | 0 || 1);
+        }
+    }
+    for (const g of got.values()){
+        const pp = g.p;
+        if (g.gold > 0){ pp.gold = (pp.gold || 0) + g.gold; syncGoldRank(pp.name, pp.gold); }
+        for (const type in g.items) incInv(pp, type, g.items[type]);
+        sendInvUpdate(pp, {
+            goldDelta: g.gold > 0 ? { amount: g.gold, reason:'boss_loot' } : undefined,
+            bossLoot: { boss: m.type, gold: g.gold, items: g.items },
+        });
+    }
+}
+
 // Resolve a morte de um mob (extração da lógica do attackMob handler) —
 // reutilizado pra mortes por DoT (veneno/sangra/fogo).
 function handleMobDeath(m, killerId){
@@ -3010,6 +3057,11 @@ function handleMobDeath(m, killerId){
     monsters.delete(m.id);
     const killer = players.get(killerId);
     const loot = rollLoot(m.type);
+    // M4 anti-ninja: boss unique distribui loot por dano (direto no inv). Mobs
+    // comuns mandam loot no mobKill (fallback). Boss → loot:[] pro cliente não
+    // criar drops no chão.
+    const isBoss = !!m.unique;
+    if (isBoss) distributeBossLoot(m, loot, killer);
     // T1: XP authoritative na skill da arma equipada do killer
     let xpGained = 0, skillUsed = null;
     if (killer){
@@ -3019,7 +3071,7 @@ function handleMobDeath(m, killerId){
     }
     if (killer && killer.ws.readyState === 1){
         killer.ws.send(JSON.stringify({
-            t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot,
+            t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot,
             skill: skillUsed, xpGained,
         }));
         // Envia skills atualizadas (autoritativo)
@@ -3048,6 +3100,8 @@ function tickMobDots(){
             if (now < d.nextTickAt) continue;
             const dmg = d.dmg;
             m.hp = Math.max(0, m.hp - dmg);
+            // M4: dano de DoT conta pro loot por contribuição (boss unique)
+            if (m.unique && d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dmg; }
             floats.push({ mobId: m.id, text: `-${dmg}`, color: dotColor[d.type] || '#aaa' });
             d.ticksLeft--;
             if (d.ticksLeft <= 0) m.dots.splice(i, 1);
@@ -5507,6 +5561,10 @@ wss.on('connection', (ws, request) => {
             const cap = (MTYPE[m.type]?.hp || 50) + 50;  // teto generoso
             const dmg = Math.max(1, Math.min(msg.amount | 0, cap));
             m.hp = Math.max(0, m.hp - dmg);
+            // M4: rastreia dano por player em bosses unique — pro loot ser
+            // distribuído por contribuição (anti-ninja). Só unique (sem overhead
+            // em mob comum). damageBy some quando o mob é deletado na morte.
+            if (m.unique){ m.damageBy = m.damageBy || {}; m.damageBy[id] = (m.damageBy[id] || 0) + dmg; }
             // T1/T3: XP de skill por hit (não só por kill).
             // - Melee (range≤1, sem ammo, sem spear): +1 na skill da arma
             // - Distância (range>1 OU ammo OU throwSpear): +1 em Distância
@@ -5576,28 +5634,34 @@ wss.on('connection', (ws, request) => {
                     }
                 }
                 const spawnedDrops = [];
-                // Espalha em anel quando há vários itens (ex: mega boss) — senão
-                // tudo empilha num tile e o player não vê/sente o loot épico.
-                // 1-2 itens ficam no tile do mob. Valida cada tile com mobTileOk.
-                const DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2]];
-                let spreadIdx = 0;
-                for (const it of loot){
-                    if (!it || !it.type) continue;
-                    let dx = 0, dy = 0;
-                    if (loot.length > 2){
-                        for (let t = 0; t < DROP_SPREAD.length; t++){
-                            const o = DROP_SPREAD[(spreadIdx + t) % DROP_SPREAD.length];
-                            if (mobTileOk(m, m.x + o[0], m.y + o[1])){ dx = o[0]; dy = o[1]; spreadIdx = (spreadIdx + t + 1) % DROP_SPREAD.length; break; }
+                const isBoss = !!m.unique;
+                if (isBoss){
+                    // M4 anti-ninja: boss unique distribui o loot por dano, direto
+                    // no inventário de quem bateu. NÃO cai no chão.
+                    distributeBossLoot(m, loot, p);
+                } else {
+                    // Mob comum: espalha em anel quando há vários itens (senão tudo
+                    // empilha num tile e some). 1-2 itens ficam no tile. Valida tile.
+                    const DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2]];
+                    let spreadIdx = 0;
+                    for (const it of loot){
+                        if (!it || !it.type) continue;
+                        let dx = 0, dy = 0;
+                        if (loot.length > 2){
+                            for (let t = 0; t < DROP_SPREAD.length; t++){
+                                const o = DROP_SPREAD[(spreadIdx + t) % DROP_SPREAD.length];
+                                if (mobTileOk(m, m.x + o[0], m.y + o[1])){ dx = o[0]; dy = o[1]; spreadIdx = (spreadIdx + t + 1) % DROP_SPREAD.length; break; }
+                            }
                         }
+                        const d = spawnGroundDrop(m.x + dx, m.y + dy, it.type, it.qty | 0 || 1, m.floor);
+                        spawnedDrops.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty });
                     }
-                    const d = spawnGroundDrop(m.x + dx, m.y + dy, it.type, it.qty | 0 || 1, m.floor);
-                    spawnedDrops.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty });
                 }
                 // T1: XP authoritative na skill da arma equipada
                 const skillUsed = weaponSkillOf(p);
                 gainSkillXpServer(p, skillUsed, m.xp || 1);
-                // killer recebe mobKill (com loot legado pra compat de fallback no client)
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1 });
+                // killer recebe mobKill (boss → loot:[] pro cliente não criar drops)
+                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1 });
                 // Envia skills atualizadas (autoritativo)
                 sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)

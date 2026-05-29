@@ -6322,6 +6322,21 @@ function handleMP(msg){
             const reasonLabel = d.reason === 'auction_expired' ? 'leilão expirado' : (d.reason === 'auction_buy' ? 'comprado' : 'recebido');
             log(`<span class="log-up">📦 +${d.qty}× ${escapeHtml(itemDisplayName(d.itemKey))} (${reasonLabel})</span>`);
         }
+        // M4: loot de boss distribuído por dano (direto no inv) — feedback bonito
+        if (msg.bossLoot){
+            const bl = msg.bossLoot;
+            const parts = [];
+            if (bl.gold > 0) parts.push(`${bl.gold.toLocaleString('pt-BR')}g`);
+            for (const type in (bl.items || {})){
+                parts.push(`${bl.items[type]}× ${escapeHtml(itemDisplayName(type))}`);
+            }
+            if (parts.length){
+                const bossName = (MTYPE[bl.boss] && MTYPE[bl.boss].name) || 'boss';
+                log(`<span class="log-up">🏆 Sua parte do loot de ${escapeHtml(bossName)}: ${parts.join(', ')}</span>`);
+                if (typeof showServerToast === 'function') showServerToast('event', `🏆 Loot: ${parts.join(', ')}`, null, 6500);
+                if (typeof sndLevelUp === 'function') sndLevelUp();
+            }
+        }
         // N3 fase 2: equipped também é autoritativo
         if (msg.equipped && typeof msg.equipped === 'object'){
             // Merge: server pode mandar slots null (desequipou). Não sobrescreve cosmetic
