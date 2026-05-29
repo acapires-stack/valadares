@@ -1520,12 +1520,14 @@
         }
         .ol-title { font-size: 22px; font-weight: bold; color: #ffd060; text-shadow: 0 2px 4px #000; letter-spacing: 0.5px; }
         .ol-sub { font-size: 14px; color: #c8a050; max-width: 280px; line-height: 1.45; }
-        /* Modal de versão desatualizada — block UI total, sai só baixando+reinstalando */
+        /* Modal de versão desatualizada — block UI total, sai só baixando+reinstalando.
+           z-index 800 fica acima do #loadingOverlay (600) que aparece quando o
+           server fecha o WS — sem isso o modal renderiza embaixo do "Carregando". */
         #versionTooOldModal {
             position: fixed;
             inset: 0;
             background: rgba(20, 8, 4, 0.92);
-            z-index: 500;
+            z-index: 800;
             display: none;
             align-items: center;
             justify-content: center;
@@ -12380,6 +12382,11 @@ function showVersionTooOldModal(current, required, downloadUrl){
     if (reqEl) reqEl.textContent = 'v' + (required || '?');
     if (btn && downloadUrl) btn.href = downloadUrl;
     modal.classList.add('active');
+    // Esconde o loadingOverlay — ele aparece quando server fecha o WS, e tem
+    // z-index 600 que cobriria o modal se ficasse visível. Modal subiu pra 800
+    // mas zeramos ele também por garantia em qualquer caso.
+    const lo = document.getElementById('loadingOverlay');
+    if (lo) lo.style.display = 'none';
     // Evita reconexão automática (modal bloqueia até user baixar a nova versão).
     // Sem isso o cliente fica tentando reabrir o WS toda hora.
     try {
