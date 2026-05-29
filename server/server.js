@@ -5258,6 +5258,18 @@ wss.on('connection', (ws, request) => {
             if (color === null) delete p.dyes[slot];
             else p.dyes[slot] = color;
             syncGoldRank(p.name, p.gold);
+            // Persiste imediatamente no acc.save — sem esperar o próximo saveUpload
+            // do cliente. Antes (bug): tinta sumia se o player reiniciasse o jogo
+            // antes do save throttled de 5s do cliente disparar.
+            if (p.authedName){
+                const acc = getAccount(p.authedName);
+                if (acc){
+                    acc.save = acc.save || {};
+                    acc.save.dyes = { ...p.dyes };
+                    acc.save.gold = p.gold;
+                    queueSaveAccounts();
+                }
+            }
             sendInvUpdate(p, {
                 goldDelta:{ amount: -cost, reason: color === null ? 'dye_remove' : 'dye' },
                 dyes: p.dyes,

@@ -7192,7 +7192,7 @@ function openDye(){
     document.getElementById('dyeResult').textContent = '';
     renderDye();
 }
-function closeDye(){ document.getElementById('dyeModal').style.display = 'none'; }
+function closeDye(){ document.getElementById('dyeModal').style.display = 'none'; saveState(); }
 function renderDye(){
     const body = document.getElementById('dyeBody');
     const dyes = player.dyes || {};
