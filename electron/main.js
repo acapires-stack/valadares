@@ -3,7 +3,7 @@
 // devtools desligado por padrão (anti-cheat básico).
 // Auto-update via electron-updater (puxa GitHub Releases).
 
-const { app, BrowserWindow, shell, Menu, dialog, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, screen, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -91,8 +91,51 @@ function createWindow() {
         }, 100);
     });
 
-    // Esconde menu nativo (File/Edit/View/etc)
-    Menu.setApplicationMenu(null);
+    // Menu invisível com accelerators só — backup de F11/zoom.
+    // before-input-event funciona na maioria dos cenários, mas em alguns
+    // drivers Windows / com foco perdido o F11 não dispara. Menu accelerator
+    // é o caminho canônico do Electron e funciona sempre que a janela tem
+    // foco. setMenuBarVisibility(false) esconde a barra do menu.
+    const toggleFs = () => {
+        if (!mainWindow) return;
+        const fs = !mainWindow.isFullScreen();
+        mainWindow.setFullScreen(fs);
+        savePrefs({ ...loadPrefs(), fullScreen: fs });
+    };
+    const zoomBy = (delta) => {
+        if (!mainWindow) return;
+        const cur = mainWindow.webContents.getZoomLevel();
+        let next = cur;
+        if (delta === 'in')    next = Math.min(5, cur + 0.5);
+        if (delta === 'out')   next = Math.max(-3, cur - 0.5);
+        if (delta === 'reset') next = 0;
+        mainWindow.webContents.setZoomLevel(next);
+        savePrefs({ ...loadPrefs(), zoomLevel: next });
+    };
+    const hiddenMenu = Menu.buildFromTemplate([{
+        label: 'Visual',
+        submenu: [
+            { label: 'Tela cheia',     accelerator: 'F11',                 click: toggleFs },
+            { label: 'Aumentar zoom',  accelerator: 'CommandOrControl+=',  click: () => zoomBy('in') },
+            { label: 'Diminuir zoom',  accelerator: 'CommandOrControl+-',  click: () => zoomBy('out') },
+            { label: 'Zoom padrão',    accelerator: 'CommandOrControl+0',  click: () => zoomBy('reset') },
+        ],
+    }]);
+    Menu.setApplicationMenu(hiddenMenu);
+    mainWindow.setMenuBarVisibility(false);
+
+    // Backup #3: globalShortcut F11. Funciona mesmo se a webContents perdeu
+    // foco (ex.: usuário clicou na borda da janela e teclou F11). Disparado
+    // só depois do ready-to-show pra não conflitar com instâncias prévias.
+    mainWindow.once('ready-to-show', () => {
+        try {
+            if (!globalShortcut.isRegistered('F11')) {
+                globalShortcut.register('F11', toggleFs);
+            }
+        } catch (e) {
+            console.warn('[globalShortcut] F11 register falhou:', e.message);
+        }
+    });
 
     // Aplica zoom: respeita preferência do user; senão, auto-detect.
     const initialZoom = (typeof prefs.zoomLevel === 'number') ? prefs.zoomLevel : detectInitialZoom();
@@ -246,6 +289,9 @@ if (autoUpdater) {
 
 app.whenReady().then(createWindow);
 
+app.on('will-quit', () => {
+    try { globalShortcut.unregisterAll(); } catch {}
+});
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
 });
