@@ -845,7 +845,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #forgotPwdModal, #partyInviteModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #forgotPwdModal, #partyInviteModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -2144,6 +2144,26 @@
     </div>
 </div>
 
+<div id="auctionModal" style="display:none">
+    <div class="chest-box" style="min-width:620px;max-width:760px;max-height:88vh;display:flex;flex-direction:column">
+        <div class="chest-title">⚖ CASA DE LEILÕES</div>
+        <div style="text-align:center;color:#c8a050;margin-bottom:12px;font-size:12px">
+            Trade assíncrono · 24h por listing · <b style="color:#ffd060">5%</b> de comissão por venda · máx 10 ativos
+        </div>
+        <div class="chat-tabs" style="border-bottom:1px solid #3a2d10;margin-bottom:12px">
+            <span class="chat-tab active" data-atab="browse" onclick="selectAuctionTab('browse')">BROWSE</span>
+            <span class="chat-tab" data-atab="mine" onclick="selectAuctionTab('mine')">MINHAS</span>
+            <span class="chat-tab" data-atab="sell" onclick="selectAuctionTab('sell')">VENDER</span>
+        </div>
+        <div id="auctionBody" style="flex:1;overflow-y:auto;min-height:260px;max-height:55vh"></div>
+        <div id="auctionResult" style="text-align:center;min-height:18px;margin-top:10px;font-size:12px;color:#c8a050"></div>
+        <div class="chest-hint" style="margin-top:10px">
+            <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeAuction()">×</button>
+    </div>
+</div>
+
 <div id="talentsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
         <div class="chest-title">⚜ TALENTOS</div>
@@ -2410,6 +2430,8 @@ const NPCS = [
     { id:'crupie',    name:'Crupiê',       pos:{x:48,y:50}, body:'#2a1a4a', hat:'#cc2050', action:'casino',   hint:'cassino' },
     // M6 Gold sink — Tinturaria (cor override por slot, 5kg/aplicação, 1kg/remover)
     { id:'tintureira',name:'Tintureira',   pos:{x:50,y:50}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
+    // M8 Auction House — trade assíncrono via Leiloeiro (5% comissão, 24h listing)
+    { id:'leiloeiro', name:'Leiloeiro',    pos:{x:50,y:48}, body:'#1a3a5a', hat:'#80a0c0', action:'auction',  hint:'leilão' },
     // Mundo — chains narrativas (cada um tem seu local temático)
     { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', chain:'cripta' },
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
@@ -2460,6 +2482,7 @@ function npcInteractionHint(npc){
     if (npc.action === 'quests')   return { label:'quests',         marker:null };
     if (npc.action === 'casino')   return { label:'cassino',        marker:'🎰', markerColor:'#cc2050' };
     if (npc.action === 'dye')      return { label:'tinturaria',     marker:'🎨', markerColor:'#e040a0' };
+    if (npc.action === 'auction')  return { label:'leilão',          marker:'⚖', markerColor:'#80a0c0' };
     if (npc.action === 'chain'){
         const stages = (player.questFlags && player.questFlags[npc.chain]) || null;
         const chain = QUEST_CHAINS[npc.chain];
@@ -2483,6 +2506,7 @@ function interactNpc(npc){
     if (npc.action === 'quests')   { openQuests(); return; }
     if (npc.action === 'casino')   { openCasino(); return; }
     if (npc.action === 'dye')      { openDye(); return; }
+    if (npc.action === 'auction')  { openAuction(); return; }
     if (npc.action === 'chain')    { openChainDialog(npc); return; }
 }
 const TRAINING_TIME = 2000;   // ms por sessão
@@ -5090,7 +5114,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -6132,6 +6156,22 @@ function handleMP(msg){
             const dm = document.getElementById('dyeModal');
             if (dm && dm.style.display === 'flex' && typeof renderDye === 'function') renderDye();
         }
+        // M8 Auction: feedback de op bem sucedida + auto refresh do snapshot
+        if (msg.auctionResult && msg.auctionResult.ok){
+            const r = msg.auctionResult;
+            const out = document.getElementById('auctionResult');
+            if (out){
+                if (r.op === 'list')   out.innerHTML = `<span style="color:#74d176">✓ Listado: ${escapeHtml(itemDisplayName(r.itemKey))}${r.qty>1?` x${r.qty}`:''} por ${fmtGold(r.price)}g</span>`;
+                if (r.op === 'cancel') out.innerHTML = `<span style="color:#c8a050">✓ Cancelado — ${escapeHtml(itemDisplayName(r.itemKey))} voltou pro inv</span>`;
+                if (r.op === 'buy')    out.innerHTML = `<span style="color:#74d176">✓ Comprado: ${escapeHtml(itemDisplayName(r.itemKey))}${r.qty>1?` x${r.qty}`:''} por ${fmtGold(r.price)}g</span>`;
+            }
+        }
+        // M8: itemDelta — pingou um item no inv (compra ou listing expirada).
+        if (msg.itemDelta && msg.itemDelta.qty > 0){
+            const d = msg.itemDelta;
+            const reasonLabel = d.reason === 'auction_expired' ? 'leilão expirado' : (d.reason === 'auction_buy' ? 'comprado' : 'recebido');
+            log(`<span class="log-up">📦 +${d.qty}× ${escapeHtml(itemDisplayName(d.itemKey))} (${reasonLabel})</span>`);
+        }
         // N3 fase 2: equipped também é autoritativo
         if (msg.equipped && typeof msg.equipped === 'object'){
             // Merge: server pode mandar slots null (desequipou). Não sobrescreve cosmetic
@@ -6390,6 +6430,33 @@ function handleMP(msg){
             log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
         }
         saveState();
+    } else if (msg.t === 'auctions'){
+        // M8 — snapshot do servidor (browse + mine + serverNow).
+        _auctionData = {
+            browse: Array.isArray(msg.browse) ? msg.browse : [],
+            mine: Array.isArray(msg.mine) ? msg.mine : [],
+            serverNow: msg.serverNow || Date.now(),
+        };
+        const am = document.getElementById('auctionModal');
+        if (am && am.style.display === 'flex' && typeof renderAuction === 'function') renderAuction();
+    } else if (msg.t === 'auctionResult'){
+        // M8 — feedback de erro. ok=true vem por invUpdate.auctionResult (junto
+        // com inv/gold autoritativos atualizados). aqui só tratamos errors.
+        const out = document.getElementById('auctionResult');
+        if (!out) return;
+        if (msg.error){
+            const errs = {
+                not_at_npc:    'Aproxime-se do Leiloeiro',
+                unknown_item:  'Item inválido',
+                no_item:       'Você não tem esse item',
+                max_listings:  'Limite de 10 listagens ativas',
+                not_owner:     'Essa listagem não é sua',
+                not_found:     'Listagem não existe mais',
+                own_listing:   'Você não pode comprar sua própria listagem',
+                no_gold:       'Sem ouro suficiente',
+            };
+            out.innerHTML = `<span style="color:#cc3030">✗ ${errs[msg.error] || 'Falhou'}</span>`;
+        }
     } else if (msg.t === 'dyeResult'){
         // M6 Tinturaria — feedback do server. invUpdate já atualizou player.dyes
         // e gold; aqui só renderizamos o resultado no modal (se aberto).
@@ -7128,6 +7195,174 @@ function applyDye(slot, color){
 window.openDye = openDye;
 window.closeDye = closeDye;
 window.applyDye = applyDye;
+
+// ─── M8 Auction House ──────────────────────────────────────────────────
+// Server (auctionList/Cancel/Buy/Browse) é fonte autoritativa de gold + item
+// escrow. Cliente envia request, recebe `auctions` snapshot e `auctionResult`
+// feedback. msg.auctions chega em t:'auctions' com browse + mine arrays.
+let _auctionTab = 'browse';   // 'browse' | 'mine' | 'sell'
+let _auctionData = { browse: [], mine: [], serverNow: 0 };
+
+function openAuction(){
+    closeAllModals();
+    document.getElementById('auctionModal').style.display = 'flex';
+    document.getElementById('auctionResult').textContent = '';
+    _auctionTab = 'browse';
+    selectAuctionTab('browse');
+    requestAuctionsSnapshot();
+}
+function closeAuction(){ document.getElementById('auctionModal').style.display = 'none'; }
+function requestAuctionsSnapshot(){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
+    try { ws.send(JSON.stringify({ t:'auctionBrowse' })); } catch {}
+}
+function selectAuctionTab(tab){
+    _auctionTab = tab;
+    document.querySelectorAll('#auctionModal .chat-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.atab === tab);
+    });
+    renderAuction();
+}
+function fmtGold(n){ return (n|0).toLocaleString('pt-BR'); }
+function fmtRemaining(expiresAt, now){
+    const ms = Math.max(0, expiresAt - now);
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+function itemDisplayName(itemKey){
+    const def = ITEMS[itemKey];
+    if (def && def.name) return def.name;
+    // _PLUS_N variants
+    if (itemKey.includes('_PLUS_')){
+        const [base, plus] = itemKey.split('_PLUS_');
+        const baseDef = ITEMS[base];
+        return (baseDef ? baseDef.name : base) + ' +' + plus;
+    }
+    return itemKey;
+}
+function renderAuction(){
+    const body = document.getElementById('auctionBody');
+    if (!body) return;
+    if (_auctionTab === 'browse') return renderAuctionBrowse(body);
+    if (_auctionTab === 'mine')   return renderAuctionMine(body);
+    if (_auctionTab === 'sell')   return renderAuctionSell(body);
+}
+function renderAuctionBrowse(body){
+    const items = _auctionData.browse || [];
+    const now = _auctionData.serverNow || Date.now();
+    if (items.length === 0){
+        body.innerHTML = '<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">Nenhuma listagem ativa no momento.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar a primeira.</div>';
+        return;
+    }
+    let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+    for (const a of items){
+        const myGold = player.gold | 0;
+        const canBuy = myGold >= a.price;
+        const btnStyle = canBuy
+            ? 'background:#3a5018;color:#c8e090;border:1px solid #5a7028;cursor:pointer'
+            : 'background:#1a1410;color:#5a5040;border:1px solid #2a2418;cursor:not-allowed';
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0a0805;border:1px solid #2a200a;border-radius:3px">`;
+        html += `<div style="flex:1;min-width:0">`;
+        html += `<div style="color:#e0c060;font-weight:600">${escapeHtml(itemDisplayName(a.itemKey))}${a.qty > 1 ? ` <span style="color:#8a7050">×${a.qty}</span>` : ''}</div>`;
+        html += `<div style="color:#8a7050;font-size:10px;margin-top:2px">por <b style="color:#c8a050">${escapeHtml(a.sellerName)}</b> · expira em ${fmtRemaining(a.expiresAt, now)}</div>`;
+        html += `</div>`;
+        html += `<div style="color:#ffd060;font-weight:600;text-align:right;min-width:90px">${fmtGold(a.price)}g</div>`;
+        html += `<button onclick="auctionBuyClick(${a.id})" ${canBuy ? '' : 'disabled'} style="padding:6px 14px;border-radius:3px;font-size:11px;font-weight:600;${btnStyle}">Comprar</button>`;
+        html += `</div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+}
+function renderAuctionMine(body){
+    const items = _auctionData.mine || [];
+    const now = _auctionData.serverNow || Date.now();
+    if (items.length === 0){
+        body.innerHTML = '<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">Você não tem listagens ativas.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar uma.</div>';
+        return;
+    }
+    let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+    for (const a of items){
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0a0805;border:1px solid #2a200a;border-radius:3px">`;
+        html += `<div style="flex:1;min-width:0">`;
+        html += `<div style="color:#e0c060;font-weight:600">${escapeHtml(itemDisplayName(a.itemKey))}${a.qty > 1 ? ` <span style="color:#8a7050">×${a.qty}</span>` : ''}</div>`;
+        html += `<div style="color:#8a7050;font-size:10px;margin-top:2px">expira em ${fmtRemaining(a.expiresAt, now)}</div>`;
+        html += `</div>`;
+        html += `<div style="color:#ffd060;font-weight:600;text-align:right;min-width:90px">${fmtGold(a.price)}g</div>`;
+        html += `<button onclick="auctionCancelClick(${a.id})" style="padding:6px 14px;border-radius:3px;font-size:11px;background:#3a1a1a;color:#e08080;border:1px solid #5a2020;cursor:pointer">Cancelar</button>`;
+        html += `</div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+}
+function renderAuctionSell(body){
+    // Lista itens do inv com qty > 0 — usuário escolhe um, qty, preço
+    const inv = player.inv || {};
+    const keys = Object.keys(inv).filter(k => (inv[k]|0) > 0);
+    if (keys.length === 0){
+        body.innerHTML = '<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">Seu inventário está vazio.</div>';
+        return;
+    }
+    keys.sort((a, b) => itemDisplayName(a).localeCompare(itemDisplayName(b), 'pt-BR'));
+    let html = '<div style="margin-bottom:12px;color:#8a7050;font-size:11px">Selecione um item do inventário pra listar:</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px">';
+    for (const k of keys){
+        const qty = inv[k] | 0;
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0a0805;border:1px solid #2a200a;border-radius:3px">`;
+        html += `<div style="flex:1;min-width:0">`;
+        html += `<div style="color:#e0c060">${escapeHtml(itemDisplayName(k))} <span style="color:#8a7050">(${qty} no inv)</span></div>`;
+        html += `</div>`;
+        html += `<input type="number" min="1" max="${qty}" value="1" style="width:55px;background:#050405;border:1px solid #3a2d10;color:#c8a050;padding:3px 6px;font-size:11px;border-radius:2px" id="aqty_${k}" title="Quantidade">`;
+        html += `<input type="number" min="1" placeholder="preço" style="width:80px;background:#050405;border:1px solid #3a2d10;color:#c8a050;padding:3px 6px;font-size:11px;border-radius:2px" id="aprice_${k}" title="Preço total em gold">`;
+        html += `<button onclick="auctionListClick('${k.replace(/'/g, "\\'")}')" style="padding:5px 12px;border-radius:3px;font-size:11px;background:#3a5018;color:#c8e090;border:1px solid #5a7028;cursor:pointer;font-weight:600">Listar</button>`;
+        html += `</div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+}
+function auctionBuyClick(id){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed){
+        document.getElementById('auctionResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        return;
+    }
+    const a = (_auctionData.browse || []).find(x => x.id === id);
+    if (!a) return;
+    const msg = `Comprar "${itemDisplayName(a.itemKey)}${a.qty > 1 ? ` x${a.qty}` : ''}" por ${fmtGold(a.price)}g de ${a.sellerName}?\n\nOuro atual: ${fmtGold(player.gold)}g`;
+    if (!confirm(msg)) return;
+    try { ws.send(JSON.stringify({ t:'auctionBuy', id })); } catch {}
+}
+function auctionCancelClick(id){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
+    const a = (_auctionData.mine || []).find(x => x.id === id);
+    if (!a) return;
+    const msg = `Cancelar a listagem de "${itemDisplayName(a.itemKey)}${a.qty > 1 ? ` x${a.qty}` : ''}"?\n\nO item volta pro seu inventário sem custo.`;
+    if (!confirm(msg)) return;
+    try { ws.send(JSON.stringify({ t:'auctionCancel', id })); } catch {}
+}
+function auctionListClick(itemKey){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed){
+        document.getElementById('auctionResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        return;
+    }
+    const qtyEl = document.getElementById('aqty_' + itemKey);
+    const priceEl = document.getElementById('aprice_' + itemKey);
+    const qty = qtyEl ? Math.max(1, qtyEl.value|0) : 1;
+    const price = priceEl ? (priceEl.value|0) : 0;
+    if (price < 1){
+        document.getElementById('auctionResult').innerHTML = '<span style="color:#cc3030">Defina um preço válido</span>';
+        return;
+    }
+    const msg = `Listar ${qty}× "${itemDisplayName(itemKey)}" por ${fmtGold(price)}g?\n\nDuração: 24h\nSe vender, você recebe ${fmtGold(Math.floor(price * 0.95))}g (95%, casa fica com 5%)\nSe não vender, item volta pro inv quando expirar.`;
+    if (!confirm(msg)) return;
+    try { ws.send(JSON.stringify({ t:'auctionList', itemKey, qty, price })); } catch {}
+}
+window.openAuction = openAuction;
+window.closeAuction = closeAuction;
+window.selectAuctionTab = selectAuctionTab;
+window.auctionBuyClick = auctionBuyClick;
+window.auctionCancelClick = auctionCancelClick;
+window.auctionListClick = auctionListClick;
 
 function renderGoldShop(){
     const el = document.getElementById('goldShopList');

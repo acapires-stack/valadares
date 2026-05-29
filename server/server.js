@@ -884,6 +884,53 @@ function isAdjacentTo(p, npc){
     return npc && Math.max(Math.abs(p.x - npc.x), Math.abs(p.y - npc.y)) <= 1;
 }
 
+// ─── M8 Auction House — helpers cross-player ──────────────────────────────
+// grantGoldByName/grantItemByName: entrega gold/item pra player pelo nome,
+// mesmo se estiver offline (persiste em accounts.json). Usado quando venda
+// fecha (paga seller) ou listing expira (devolve item pro dono).
+function grantGoldByName(name, amount, reason){
+    if (!name || amount <= 0) return false;
+    for (const p of players.values()){
+        if (p.disconnected) continue;
+        if (p.name && p.name.toLowerCase() === String(name).toLowerCase()){
+            p.gold = (p.gold || 0) + amount;
+            syncGoldRank(p.name, p.gold);
+            sendInvUpdate(p, { goldDelta:{ amount, reason } });
+            return true;
+        }
+    }
+    try {
+        const acc = getAccount(name);
+        if (acc && acc.save){
+            acc.save.gold = (acc.save.gold || 0) + amount;
+            if (typeof flushAccounts === 'function') flushAccounts();
+            return true;
+        }
+    } catch (e){ console.warn('[grantGold]', e.message); }
+    return false;
+}
+function grantItemByName(name, itemKey, qty, reason){
+    if (!name || !itemKey || qty <= 0) return false;
+    for (const p of players.values()){
+        if (p.disconnected) continue;
+        if (p.name && p.name.toLowerCase() === String(name).toLowerCase()){
+            incInv(p, itemKey, qty);
+            sendInvUpdate(p, { itemDelta:{ itemKey, qty, reason } });
+            return true;
+        }
+    }
+    try {
+        const acc = getAccount(name);
+        if (acc && acc.save){
+            acc.save.inv = acc.save.inv || {};
+            acc.save.inv[itemKey] = (acc.save.inv[itemKey] || 0) + qty;
+            if (typeof flushAccounts === 'function') flushAccounts();
+            return true;
+        }
+    } catch (e){ console.warn('[grantItem]', e.message); }
+    return false;
+}
+
 // Slot derivado do tipo de item (espelha SLOT_OF_KIND do cliente)
 const SLOT_OF_KIND = {
     weapon:'weapon', offhand:'offhand', armor:'armor',
@@ -1095,6 +1142,47 @@ let SERVER_MOTD_RUNTIME = SERVER_MOTD;  // pode ser editado via /motd (até rein
 // ─── Estado ─────────────────────────────────────────────────────────────────
 let nextId = 1;
 let nextMobId = 1;
+
+// ─── M8 Auction House — state global ──────────────────────────────────────
+// Trade assíncrono via NPC Leiloeiro em (50, 48). Server escrowa o item
+// (sai do p.inv), debita gold do comprador na compra, paga seller (online
+// ou offline) menos 5% comissão (gold sink). Listings expiram em 24h e
+// voltam pro seller. Persistido em state.json.
+const AUCTION_NPC_POS      = { x: 50, y: 48 };
+const AUCTION_COMMISSION   = 0.05;
+const AUCTION_DURATION_MS  = 24 * 60 * 60 * 1000;
+const AUCTION_MAX_LISTINGS = 10;
+const AUCTION_MIN_PRICE    = 1;
+const AUCTION_MAX_PRICE    = 10_000_000;
+let nextAuctionId = 1;
+const auctions = new Map();   // id → { id, sellerName, itemKey, qty, price, listedAt, expiresAt }
+
+function sendAuctionsTo(p){
+    if (!p || !p.ws || p.ws.readyState !== 1) return;
+    const mine = [], browse = [];
+    const myName = (p.name || '').toLowerCase();
+    for (const a of auctions.values()){
+        if (a.sellerName.toLowerCase() === myName) mine.push(a);
+        else browse.push(a);
+    }
+    browse.sort((x, y) => x.price - y.price);
+    mine.sort((x, y) => x.expiresAt - y.expiresAt);
+    p.ws.send(JSON.stringify({ t:'auctions', browse, mine, serverNow: Date.now() }));
+}
+function tickAuctionExpire(){
+    const now = Date.now();
+    let expired = 0;
+    for (const a of [...auctions.values()]){
+        if (a.expiresAt > now) continue;
+        auctions.delete(a.id);
+        if (grantItemByName(a.sellerName, a.itemKey, a.qty, 'auction_expired')){
+            expired++;
+        } else {
+            console.warn(`[auction] expired but couldn't return ${a.qty}× ${a.itemKey} to ${a.sellerName}`);
+        }
+    }
+    if (expired > 0) console.log(`[auction] ${expired} listing(s) expiraram e voltaram pro seller`);
+}
 const players  = new Map(); // id -> { ws, id, name, x, y, dir, pvp, hp, maxHp }
 const monsters = new Map(); // id -> { id, type, x, y, dir, hp, maxHp, dmg, speed, aggro, unique, lastMoveAt, lastAttackAt }
 
@@ -2000,6 +2088,8 @@ function saveStateToDisk(){
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
             aggro:m.aggro, unique:m.unique, level:m.level,
         })),
+        nextAuctionId,
+        auctions: Array.from(auctions.values()),
     };
     try {
         fs.writeFileSync(STATE_FILE, JSON.stringify(snap), 'utf8');
@@ -2036,6 +2126,23 @@ function loadStateFromDisk(){
         }
         if (Array.isArray(d.guilds)){
             for (const g of d.guilds) if (g && g.name) guilds.set(g.name, g);
+        }
+        // M8 Auction House
+        if (typeof d.nextAuctionId === 'number') nextAuctionId = d.nextAuctionId;
+        if (Array.isArray(d.auctions)){
+            auctions.clear();
+            for (const a of d.auctions){
+                if (!a || typeof a.id !== 'number' || !a.sellerName || !a.itemKey) continue;
+                auctions.set(a.id, {
+                    id: a.id,
+                    sellerName: String(a.sellerName).slice(0, 32),
+                    itemKey: String(a.itemKey).slice(0, 40),
+                    qty: Math.max(1, a.qty | 0),
+                    price: Math.max(1, a.price | 0),
+                    listedAt: a.listedAt | 0,
+                    expiresAt: a.expiresAt | 0,
+                });
+            }
         }
         monsters.clear();
         if (Array.isArray(d.monsters)){
@@ -2598,6 +2705,7 @@ function safeTick(name, fn){
 let lastResetDay = new Date().toDateString();
 if (!loadStateFromDisk()) spawnInitial();
 setInterval(safeTick('saveStateToDisk', saveStateToDisk), STATE_SAVE_INTERVAL_MS);
+setInterval(safeTick('tickAuctionExpire', tickAuctionExpire), 60 * 1000);   // M8: devolve listings expiradas
 process.on('SIGINT',  () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGINT)'); process.exit(0); });
 process.on('SIGTERM', () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGTERM)'); process.exit(0); });
 setInterval(safeTick('tickAI', tickAI), TICK_AI_MS);
@@ -4990,6 +5098,119 @@ wss.on('connection', (ws, request) => {
                     bet, payout, mult, kind,
                 }));
             }
+            return;
+        }
+
+        // ─── M8 Auction House handlers ──────────────────────────────────────
+        // Trade assíncrono via NPC Leiloeiro em (50, 48). Server escrowa item,
+        // valida proximidade + rate limit + max listings + gold antes de mexer.
+        // List/Cancel/Buy retornam invUpdate.auctionResult + auctions snapshot.
+        if (msg.t === 'auctionList') {
+            const now = Date.now();
+            p._lastAuctionAt = p._lastAuctionAt || 0;
+            if (now - p._lastAuctionAt < 800) return;
+            p._lastAuctionAt = now;
+            if (chebyshev(p.x, p.y, AUCTION_NPC_POS.x, AUCTION_NPC_POS.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_at_npc' }));
+                return;
+            }
+            const itemKey = String(msg.itemKey || '').slice(0, 40);
+            const qty   = Math.max(1, Math.min(999, msg.qty | 0));
+            const price = Math.max(AUCTION_MIN_PRICE, Math.min(AUCTION_MAX_PRICE, msg.price | 0));
+            // Aceita itens de ITEM_META ou variantes _PLUS_N (forja)
+            const baseKey = itemKey.split('_PLUS_')[0];
+            if (!ITEM_META[itemKey] && !ITEM_META[baseKey]){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'unknown_item' }));
+                return;
+            }
+            if (!hasInv(p, itemKey, qty)){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'no_item' }));
+                return;
+            }
+            let mineCount = 0;
+            const myName = p.name.toLowerCase();
+            for (const a of auctions.values()){
+                if (a.sellerName.toLowerCase() === myName) mineCount++;
+            }
+            if (mineCount >= AUCTION_MAX_LISTINGS){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'max_listings' }));
+                return;
+            }
+            // escrow
+            incInv(p, itemKey, -qty);
+            const id = nextAuctionId++;
+            auctions.set(id, {
+                id, sellerName: p.name, itemKey, qty, price,
+                listedAt: now, expiresAt: now + AUCTION_DURATION_MS,
+            });
+            sendInvUpdate(p, { auctionResult:{ ok:true, op:'list', id, itemKey, qty, price } });
+            sendAuctionsTo(p);
+            return;
+        }
+
+        if (msg.t === 'auctionCancel') {
+            const now = Date.now();
+            p._lastAuctionAt = p._lastAuctionAt || 0;
+            if (now - p._lastAuctionAt < 800) return;
+            p._lastAuctionAt = now;
+            if (chebyshev(p.x, p.y, AUCTION_NPC_POS.x, AUCTION_NPC_POS.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_at_npc' }));
+                return;
+            }
+            const id = msg.id | 0;
+            const a = auctions.get(id);
+            if (!a || a.sellerName.toLowerCase() !== p.name.toLowerCase()){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_owner' }));
+                return;
+            }
+            auctions.delete(id);
+            incInv(p, a.itemKey, a.qty);
+            sendInvUpdate(p, { auctionResult:{ ok:true, op:'cancel', id, itemKey: a.itemKey, qty: a.qty } });
+            sendAuctionsTo(p);
+            return;
+        }
+
+        if (msg.t === 'auctionBuy') {
+            const now = Date.now();
+            p._lastAuctionAt = p._lastAuctionAt || 0;
+            if (now - p._lastAuctionAt < 800) return;
+            p._lastAuctionAt = now;
+            if (chebyshev(p.x, p.y, AUCTION_NPC_POS.x, AUCTION_NPC_POS.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_at_npc' }));
+                return;
+            }
+            const id = msg.id | 0;
+            const a = auctions.get(id);
+            if (!a){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_found' }));
+                return;
+            }
+            if (a.sellerName.toLowerCase() === p.name.toLowerCase()){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'own_listing' }));
+                return;
+            }
+            if ((p.gold || 0) < a.price){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'no_gold' }));
+                return;
+            }
+            auctions.delete(id);
+            p.gold -= a.price;
+            syncGoldRank(p.name, p.gold);
+            incInv(p, a.itemKey, a.qty);
+            const sellerCut = Math.floor(a.price * (1 - AUCTION_COMMISSION));
+            grantGoldByName(a.sellerName, sellerCut, 'auction_sold');
+            sendInvUpdate(p, {
+                goldDelta:{ amount: -a.price, reason: 'auction_buy' },
+                itemDelta:{ itemKey: a.itemKey, qty: a.qty, reason: 'auction_buy' },
+                auctionResult:{ ok:true, op:'buy', id, itemKey: a.itemKey, qty: a.qty, price: a.price, sellerName: a.sellerName },
+            });
+            sendAuctionsTo(p);
+            console.log(`[auction] sold: ${p.name} bought ${a.qty}× ${a.itemKey} for ${a.price}g from ${a.sellerName}`);
+            return;
+        }
+
+        if (msg.t === 'auctionBrowse') {
+            sendAuctionsTo(p);
             return;
         }
 
