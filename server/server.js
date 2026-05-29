@@ -3581,12 +3581,19 @@ function removeGhostsByName(name, exceptId){
 }
 
 // ─── Conexões ───────────────────────────────────────────────────────────────
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, request) => {
     const id = nextId++;
-    const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', hp:100, maxHp:100, connectedAt: Date.now() };
+    // Detecta Electron pelo User-Agent — UA do Electron sempre contém 'Electron/X.Y.Z'.
+    // Importante: clientes v1.0.6 e anteriores NÃO mandam `platform` no auth,
+    // então sem essa detecção do UA o gate de versão seria pulado por eles
+    // (fail-open quando platform != 'electron'). Com UA, fechamos esse buraco.
+    const ua = (request?.headers?.['user-agent']) || '';
+    const electronMatch = ua.match(/Electron\/(\d+\.\d+\.\d+)/i);
+    const isElectronUA = !!electronMatch;
+    const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', hp:100, maxHp:100, connectedAt: Date.now(), isElectronUA, electronVer: electronMatch?.[1] || null };
     players.set(id, p);
     counters.connections_total++;
-    console.log(`[+] ${id} conectou (${players.size} online)`);
+    console.log(`[+] ${id} conectou (${players.size} online)${isElectronUA ? ` electron/${p.electronVer}` : ''}`);
 
     ws.on('message', (raw) => {
         let msg;
@@ -3608,16 +3615,17 @@ wss.on('connection', (ws) => {
         // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
         // Cria conta se não existir, devolve save server-side se houver.
         if (msg.t === 'auth') {
-            // Version gate: bloqueia Electron desatualizado. Browser sempre passa
-            // (Vercel = latest). Electron sem versão (clients muito antigos) também
-            // é bloqueado — não sabem mandar `clientVersion` então são pre-v1.0.7.
-            const platform = String(msg.platform || '').trim().toLowerCase();
+            // Version gate: bloqueia Electron desatualizado. Source of truth é
+            // o User-Agent (detectado na connection — `p.isElectronUA`). Não
+            // dá pra confiar só em msg.platform porque cliente antigo (v1.0.6-)
+            // simplesmente não envia esse campo. Browser sempre passa
+            // (Vercel = latest); só ataca Electron.
             const clientVersion = String(msg.clientVersion || '').trim();
-            if (platform === 'electron'){
+            if (p.isElectronUA){
                 const noVer = !clientVersion;
                 const tooOld = clientVersion && isVersionTooOld(clientVersion, MIN_CLIENT_VERSION);
                 if (noVer || tooOld){
-                    console.log(`[auth] electron desatualizado bloqueado: v${clientVersion || '?'} (min ${MIN_CLIENT_VERSION})`);
+                    console.log(`[auth] electron desatualizado bloqueado: app=v${clientVersion || '?'} electron=v${p.electronVer || '?'} (min app ${MIN_CLIENT_VERSION})`);
                     ws.send(JSON.stringify({
                         t: 'versionTooOld',
                         current: clientVersion || null,
