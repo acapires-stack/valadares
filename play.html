@@ -9774,17 +9774,24 @@ function renderInventoryIfChanged(){
 }
 
 // Chat/Combate preenchem dinamicamente o espaço abaixo do canvas — alvo é
-// usar toda altura da viewport menos o canvas e overhead (tabs + input + padding).
-// Mínimo 200px pra não engolir o chat em telas curtas.
+// caber inteiro na viewport sem scroll. Mede o overhead real (topo até o
+// wrapper + footer keybindings/margem inferior) em vez de chutar paddings.
+// Mínimo 160px pra não engolir o chat em telas curtas.
 function syncChatHeight(){
     const log = document.getElementById('log');
     const chat = document.getElementById('chatMessages');
-    if (!log || !chat) return;
-    // Heights aproximadas dos sticky elements do gameContainer
-    const TABS_H = 28, INPUT_H = 36, PADDING = 28;
+    const wrapper = document.getElementById('gameWrapper');
+    if (!log || !chat || !wrapper) return;
+    const TABS_H = 28, INPUT_H = 36;
     const canvasEl = document.getElementById('canvas');
     const canvasH = canvasEl ? canvasEl.getBoundingClientRect().height : 528;
-    const target = Math.max(200, window.innerHeight - canvasH - TABS_H - INPUT_H - PADDING);
+    // Overhead = tudo acima do wrapper (title bar do Electron, margens) +
+    // ~80px pra footer keybindings + folga inferior.
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const topGap    = Math.max(0, wrapperRect.top);
+    const bottomGap = 48;   // footer keybindings (~25px) + folga pra evitar scroll
+    const available = window.innerHeight - topGap - bottomGap;
+    const target = Math.max(160, available - canvasH - TABS_H - INPUT_H);
     log.style.height = target + 'px';
     chat.style.height = target + 'px';
 }
