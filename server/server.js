@@ -3792,6 +3792,18 @@ wss.on('connection', (ws, request) => {
                 ws.send(JSON.stringify({ t:'authFail', reason:'no_password' }));
                 return;
             }
+            // Rate limit (audit 29/05): antes não havia limite no auth → atacante
+            // podia spamar pwHashes brute-force. Agora cap em 5 tentativas/30s
+            // por conexão. Atingiu o cap → recusa imediato + warn.
+            const nowAuth = Date.now();
+            p._authAttempts = (p._authAttempts || []).filter(t => nowAuth - t < 30000);
+            if (p._authAttempts.length >= 5){
+                console.warn(`[auth] rate limit ${p._authAttempts.length} tentativas em 30s — fechando ws`);
+                ws.send(JSON.stringify({ t:'authFail', reason:'rate_limited' }));
+                setTimeout(() => { try { ws.close(4029, 'auth-rate-limit'); } catch {} }, 200);
+                return;
+            }
+            p._authAttempts.push(nowAuth);
             let acc = getAccount(name);
             let isNew = false;
             if (!acc){
@@ -3805,6 +3817,8 @@ wss.on('connection', (ws, request) => {
                 ws.send(JSON.stringify({ t:'authFail', reason:'bad_password' }));
                 return;
             }
+            // Auth ok — limpa contador
+            p._authAttempts = [];
             p.authed = true;
             p.authedName = acc.name;
             // Já limpa ghosts antigos no momento do auth — mesmo se o WS cair antes do join,
@@ -3838,6 +3852,17 @@ wss.on('connection', (ws, request) => {
 
         // ─── Fase 5.5: Solicitar reset de senha via WS (alternativa ao HTTP) ──
         if (msg.t === 'passwordResetRequest') {
+            // Rate limit (audit 29/05): findAccountByEmail itera todas accounts.
+            // Sem rate limit, spammer pode causar CPU pressure. 5/min por
+            // conexão é generoso pra UX legítima.
+            const nowReq = Date.now();
+            p._lastResetReqs = (p._lastResetReqs || []).filter(t => nowReq - t < 60000);
+            if (p._lastResetReqs.length >= 5){
+                // Resposta opaca mesmo se rate limited (anti-enumeration)
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetResult', ok:true }));
+                return;
+            }
+            p._lastResetReqs.push(nowReq);
             // Resposta opaca: NÃO revela se email existe (anti-enumeration)
             const ok = () => { if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetResult', ok:true })); };
             const email = String(msg.email || '').trim().toLowerCase();
@@ -5126,6 +5151,11 @@ wss.on('connection', (ws, request) => {
 
         // Duelo 1v1 — comandos via chat-like (consumido antes do broadcast normal)
         if (msg.t === 'duelInvite') {
+            // Rate limit (audit 29/05): sem isso um player podia spamar
+            // duelInvite pra outro 100×/seg → pop-up infinito de assédio.
+            const now = Date.now();
+            if (p._lastDuelInviteAt && (now - p._lastDuelInviteAt) < 3000) return;
+            p._lastDuelInviteAt = now;
             const toName = String(msg.toName || '').trim().substring(0, 14);
             const amount = Math.max(50, Math.min(1_000_000, msg.amount | 0));
             if (!toName) return;
@@ -5188,6 +5218,11 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'getRanking') {
+            // Rate limit (audit 29/05): getRanking percorre todos rankings —
+            // 1000 req/seg = CPU spike. 1s entre requests é mais que suficiente.
+            const now = Date.now();
+            if (p._lastRankingAt && (now - p._lastRankingAt) < 1000) return;
+            p._lastRankingAt = now;
             const limit = Math.min(20, Math.max(1, msg.limit | 0 || 10));
             sendTo(id, {
                 t: 'ranking',
@@ -5206,7 +5241,20 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'announce') {
-            broadcastMsg('info', String(msg.text).substring(0, 200));
+            // CRITICAL FIX (audit 29/05): handler antes não checava admin
+            // → qualquer player podia broadcast spam/phishing via F12.
+            // Agora exige isAdmin + rate limit 2s.
+            if (!isAdmin(p.name)){
+                console.warn(`[announce] tentativa não-admin de ${p.name || '?'}`);
+                return;
+            }
+            const now = Date.now();
+            if (p._lastAnnounceAt && (now - p._lastAnnounceAt) < 2000) return;
+            p._lastAnnounceAt = now;
+            const text = String(msg.text || '').slice(0, 200);
+            if (!text) return;
+            broadcastMsg('info', text);
+            console.log(`[announce] admin ${p.name}: ${text.slice(0, 80)}`);
             return;
         }
 
@@ -5217,6 +5265,11 @@ wss.on('connection', (ws, request) => {
 
         // ─── TRADE ─────────────────────────────────────────────────────
         if (msg.t === 'tradeRequest') {
+            // Rate limit (audit 29/05): trade request spam = pop-up infinito
+            // de assédio. 3s entre requests pro mesmo player ou qualquer.
+            const now = Date.now();
+            if (p._lastTradeReqAt && (now - p._lastTradeReqAt) < 3000) return;
+            p._lastTradeReqAt = now;
             const toName = String(msg.toName || '').trim().substring(0, 14);
             if (!toName || toName.toLowerCase() === p.name.toLowerCase()){
                 sendTo(id, { t:'serverMsg', level:'warn', text:'Trade inválido.' });
