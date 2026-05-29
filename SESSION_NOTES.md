@@ -5,96 +5,102 @@
 
 ---
 
-## 📅 Sessão 28/05/2026 — dia inteiro (23 commits, ~6h)
+## 📅 Sessão 29/05/2026 — dia inteiro (maratona ~10h)
 
-Sessão maratona reativa: bugs em produção apareceram conforme players reais
-(forasteiro77, arina, chucknorris, mãe, irmãos) usavam o jogo. Saímos de
-"caçar bug a bug" pra ter painel admin web + ferramentas pra diagnosticar
-em <5min.
+Sessão extensa motivada por 3 chamados do alcione:
+1. Manhã: P0 da auditoria de 28/05 (5 vulnerabilidades CRITICAL/HIGH)
+2. Tarde: overhaul mobile (esposa achou ruim no celular)
+3. Noite: bugs do desktop reportados via prints (scroll, fullscreen, auto-update)
 
-### 🩹 Bugfixes (11)
+**Commits do dia: 13.** Releases publicadas: v1.0.4 → v1.0.5 → v1.0.6 → v1.0.7 → v1.0.8.
 
-- **Pots não curavam** → server aplica heal autoritativo pro lockdown N3 (`ed6edef`)
-- **Party stale após reconnect** → server manda partyUpdate no join (`d680b9f`)
-- **Sprite invisível "Arina"** (3 fixes em cadeia):
-  - Clamp x/y inválidos no save (`3045957`)
-  - Server força hp/mp/maxHp/maxMp no saveUpload (`af7908f`)
-  - Cliente aplica self stats do snapshot no `t:state` (`83ccaaa`) ← **causa raiz**
-- **WS zumbi** → watchdog 10s no client + auto-reconnect (`cbf37c5`)
-- **drawCharacter crash** (irmãos caindo na mesma rede) → safeItem com fallback (`728b44a`)
-- **canWalk → isWalkable** fix no spawn do 007 (`812f633`)
-- **PvP feedback** → atacante agora vê float `-X` (`bc22c6d`)
-- **Cura em Grupo precisava party** → virou AoE pura (`eda4c5f`)
-- **Mobs durante reconnect** → grace period 10s (`61aaaa8`)
+### 🔒 P0 auditoria — 5 CRITICAL/HIGH (concluído)
 
-### ✨ Features (4)
+Todos os 5 itens da auditoria de 28/05 fechados ([commit 58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d72)):
 
-- **Admin web `/admin`** (`1af9ce8`) — métricas, players online, erros JS, ações (kick/reset/say/spawn 007)
-- **Bot 007 "caça ao impostor"** (`314d6b4`) — player virtual no Map, anda+ataca, HP 12000, recompensa 5k + Bênção 24h, smoke test gratuito
-- **Magia Cura em Grupo** (`bc22c6d`, `eda4c5f`) — AoE de heal em raio 8, 60 mana
-- **Colisão player↔player** fora da PZ (`d427ed4`, `fdbef3c`)
+1. `pos` handler aceitava hp/maxHp do cliente — bypassava lockdown N3
+2. Sem `uncaughtException`/`unhandledRejection` global — throw em tickAI matava processo
+3. `ws.on('message')` sem try/catch geral — handler ruim derrubava processo
+4. `pvpAttack` sem cap em amount/range — F12 one-shot
+5. `pvpAttack` sem rate limit — 100 hits/s + farm XP
 
-### 💎 UX
+### 📱 Mobile UX overhaul (4 fases — concluído)
 
-- Categorias colapsáveis no inv/baú com persistência localStorage (`773979d`, `55e22d0`)
-- Copiar texto do log de combate/chat (`03f3930`)
-- Nome do player sem retângulo de fundo (`b32e5d3`)
-- Overlay de reconexão discreto (chip canto top-right, vira fullscreen só se >15s) (`61aaaa8`)
+[Commit b44532a](https://github.com/acapires-stack/valadares/commit/b44532a):
 
-### 🛠 Operacional
+- **Fase A:** Top-bar mobile fixa (HP/MP bars + gold + nome) + labels PT-BR nos tbtns
+- **Fase B:** Hotbar inferior com 5 slots quadrados (🧪HP, 💧MP, 🍖COMER, ✦MAGIA, ↗LANÇA)
+- **Fase C:** Onboarding mobile substituindo tutorial desktop quando `body.touch`
+- **Fase D:** Orientation lock (portrait → "vire o celular") + zoom Settings UI
 
-- Boneco de treino (49,51) → (48,52) (`ed6edef`, `773979d`)
-- Comandos admin chat: `/spawn007`, `/checkuser`, `/resetuser`, `/deluser`
-- Painel admin in-game (Settings tecla O): COMUNICADOS, BOSSES, MEGABOSS, GERENCIAR PLAYER, EXCLUIR CONTA
-- Redirect 301 `valadares-xi.vercel.app` → canônico (`6bc476e`)
-- Docs consolidados: 1 ROADMAP, SESSION_NOTES enxuto, `docs/archive/` (`cae0b08`)
+### 🖥 Desktop acessibilidade (v1.0.4 → v1.0.8)
 
-### 🔴 RISCOS CRÍTICOS IDENTIFICADOS NA AUDITORIA — atacar próxima sessão
+Maratona reativa via screenshots:
 
-**Top 5 (ordem de prioridade):**
+- **v1.0.4** baseline. Bumps subsequentes resolvem problemas conforme apareciam:
+- **v1.0.5** [commit 17c38a6]: maximize() com `ready-to-show` + zoom auto pra 1080p
+- **v1.0.6** [commit 5c132fd]: setInterval 15min pra auto-update + botão manual + log persistente
+- **v1.0.7** [commit 02c2c17 + ed8a438]: server gate de versão (detecta Electron via UA + clientVersion) + modal "versão antiga"
+- **v1.0.8** [commit a50247c]: F11 com triple backup (menu accelerator + globalShortcut + before-input-event)
 
-1. **server.js:3823-3824** — handler `pos` aceita `hp/maxHp` do cliente. Bypassa lockdown N3. Cliente envia `{t:'pos', hp:99999}` e vira invencível. **Fix: deletar 2 linhas.**
+### 🧹 Polish
 
-2. **Server sem `process.on('uncaughtException')`** — qualquer throw em `tickAI`/`tickImpostorBot` derruba o processo. 50 players caem juntos se houver `equipped=null` em save legado. **Fix: try/catch interno + handler global.**
+- **Categorias do inv sempre visíveis** [commit b26c59c]: showEmpty=true mostra Armas/Equipamento/etc com contador 0
+- **Site download dinâmico** [commit b26c59c]: index.html fetch GH API → links sempre na última release sem editar HTML
 
-3. **`ws.on('message')` sem try/catch geral** — handler que joga = server cai. **Fix: envelopa corpo em try/catch que chama `recordError`.**
+### 🔒 P0.5 auditoria (concluído)
 
-4. **server.js:4200-4201** — `pvpAttack` aceita `amount` e `range` do cliente sem cap. F12 → `{amount:99999, range:999}` one-shotta qualquer um do outro lado do mapa. **Fix: cap server-side (2× weapon base) + range max 8.**
+[Commit 0e727c1] — fechou todos os 5 pendentes da auditoria 28/05:
 
-5. **`pvpAttack` sem rate limit** — 100 hits/s via console + XP infinito. **Fix: `if (now - p._lastPvpAt < 400) return;` (3 linhas).**
+- `permaBuffs` allowlist construída a partir de `TALENT_DEFS` (rejeita keys forjadas)
+- `pkDeath` server-side autônomo (não confia em msg.killerId do cliente)
+- `flags`/`questFlags` allowlist (set de 6 keys conhecidas + validação por chainId)
+- ADMIN_TOKEN: query string → `X-Admin-Token` header em todas chamadas admin.html
+- `broadcastMobs` skip-when-unchanged via signature + snapshot full a cada 10s
 
-**Outros riscos documentados:**
-- `permaBuffs` no save permite forjar buffs permanentes (#6 do audit)
-- `pkDeath` confia no cliente vítima — cúmplice ganha kills no ranking (#7)
-- Mesmo player 2× simultâneo (mobile + PC) gera 2 entries no `players` Map (#9)
-- ADMIN_TOKEN em query string — vaza em logs CDN. Mover pra header `X-Admin-Token` (já suportado server) (#15)
-- `_errorRateMap` leak lento — cleanup periódico
-- `broadcastMobs` 4×/seg = GC pressure com 50+ players — considerar diff snapshot
-- `flags`/`questFlags` sem allowlist no save (#14)
+### 🔒 Nova auditoria 29/05 (concluído)
 
-### 📈 Estado de produção pós-sessão
+[Commit 7bae381] — encontrou 6 novos vetores, todos relacionados a falta de rate limit:
 
-| Componente | Estado |
-|---|---|
-| Jogo | https://valadares.app.br/jogar ✅ |
-| Admin panel | https://valadares.app.br/admin (token salvo no Railway) ✅ |
-| Server WS | wss://ws.valadares.app.br ✅ |
-| Bot 007 | Spawn automático a cada 1h ✅ |
-| Observability | `/api/admin/state` polled a cada 5s no painel ✅ |
-| Grace period | 10s imunidade após connect (anti-deploy-deaths) ✅ |
-
-### 🎯 Próxima sessão — começar por:
-
-1. Atacar os 5 CRITICAL/HIGH listados acima (1-2h total)
-2. Considerar mover ADMIN_TOKEN pra header
-3. Implementar diff broadcastMobs quando players >20
-
-Não iniciar feature nova até CRITICAL #1-3 estarem fechados — qualquer um deles pode derrubar produção pra todo mundo.
+1. **🔴 CRITICAL `announce` sem admin check** — qualquer player podia broadcast spam pra todos. Fix: `isAdmin()` + rate 2s
+2. **🟡 HIGH `auth` sem rate limit** — brute force passwords. Fix: 5 tentativas/30s por conn → fecha
+3. **🟡 HIGH `duelInvite` sem rate limit** — pop-up infinito de assédio. Fix: 3s entre invites
+4. **🟡 HIGH `tradeRequest` sem rate limit** — mesma coisa. Fix: 3s
+5. **🟡 MEDIUM `getRanking` sem rate limit** — CPU spike por scan de rankings. Fix: 1s
+6. **🟡 MEDIUM `passwordResetRequest` sem rate limit** — CPU via `findAccountByEmail` O(N). Fix: 5/min por conn
 
 ### 📊 Métricas da sessão
 
-- **23 commits** em ~6h (média 1 commit / 15min)
-- **+2492 / -1903** linhas líquidas
-- **5 arquivos** modificados (+ 2 movidos, + 3 deletados, + 1 novo: admin.html)
-- **6+ horas** de dia em prod com players reais sem rollback
-- **0 mortes** de admin pelo bug do drawCharacter após `728b44a` (painel admin confirmou)
+- **13 commits**, ~10h
+- **+1100 / -200** linhas líquidas aproximadas
+- **5 releases Electron** publicadas (v1.0.4 a v1.0.8) em sequência rápida
+- **Builds GH Actions**: 91-150s (consistente)
+- **0 incidentes** em prod com players reais durante a sessão
+- **11 vulnerabilidades** de segurança fechadas (5 P0 + 5 P0.5 + 1 missed pkDeath = 11; + 6 da nova auditoria = 17 total)
+
+### 🎯 Próxima sessão — começar por
+
+1. **Validar com mãe** se v1.0.8 entregou a experiência esperada (janela maximizada + zoom + F11)
+2. **Validar com esposa** o overhaul mobile (top-bar + hotbar + onboarding)
+3. **Escolher P1 feature:**
+   - #12 Devlog/blog (1 sessão, marketing)
+   - M4 Dungeons instanciadas (2-3 sessões grandes — endgame)
+   - M6 Tinturaria/pet (gold sinks, ~60min cada)
+   - M7 Arena PvP (2 sessões — retenção)
+   - M8 Auction house (2 sessões)
+
+### 📌 Pendências de polish técnico (P3)
+
+- broadcastMobs ainda usa full snapshot — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo
+- Logs do updater em `userData/update.log` sem rotação por tempo — apenas por tamanho (200KB). Considerar rotação diária
+- Versionamento do client (browser) — Vercel sempre serve latest mas não há mecanismo de "force refresh" se HTML estiver cacheado no Electron
+- ALERTA: o GameServer de Railway tem deploy auto-trigger em qualquer push pra main. Se um commit quebrar o server, prod cai. Considerar staging branch ou env de teste
+
+### ⚠️ Hardening que ainda falta (P0.6 — pra próxima auditoria)
+
+Estes ficaram fora do escopo de hoje mas estão na lista:
+
+- Mesmo player 2× simultâneo (mobile + PC) gera 2 entries no `players` Map — pode causar inconsistências
+- `_errorRateMap` leak lento — sem cleanup periódico (pode crescer indefinidamente)
+- Algumas funções server-side ainda assumem `p.inv` existe — risk de TypeError se algum save legado vier sem
+- O `setMenuBarVisibility(false)` no Electron pode não pegar em todos os drivers — testar com mãe

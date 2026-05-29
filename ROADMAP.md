@@ -29,17 +29,21 @@
 
 ## 🥇 Backlog priorizado
 
-### 🔴 P0 — RISCOS CRÍTICOS (atacar ANTES de feature nova)
+### ✅ P0 + P0.5 RESOLVIDOS (sessão 29/05)
 
-**Auditoria 28/05 detectou 5 vulnerabilidades sérias. Detalhes em `SESSION_NOTES.md`.**
+Auditoria 28/05 (5 críticos) + P0.5 (5 pendentes) + nova auditoria 29/05
+(6 novos vetores de rate limit). Total: **16 vulnerabilidades fechadas**
+em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d72),
+[0e727c1](https://github.com/acapires-stack/valadares/commit/0e727c1),
+[7bae381](https://github.com/acapires-stack/valadares/commit/7bae381),
+[ed8a438](https://github.com/acapires-stack/valadares/commit/ed8a438)).
 
-1. **server.js:3823-3824** handler `pos` aceita `hp/maxHp` cliente — bypassa lockdown N3 (fix: deletar 2 linhas)
-2. **`process.on('uncaughtException')` faltando** — throw em tickAI derruba server inteiro (fix: handler global + try/catch nos ticks)
-3. **`ws.on('message')` sem try/catch geral** — handler ruim mata processo (fix: envelopa em try que chama recordError)
-4. **`pvpAttack` aceita amount/range cliente sem cap** — one-shot via F12 (fix: cap 2×weapon base + range max 8)
-5. **`pvpAttack` sem rate limit** — 100 hits/s + XP infinito (fix: `_lastPvpAt` cooldown 400ms)
+### 🔴 P0.6 — Hardening pendente pra próxima auditoria
 
-**Após esses 5:** mover ADMIN_TOKEN pra header (X-Admin-Token), allowlist permaBuffs/flags no save, detectar pkDeath autônomo no server.
+- **Same-player 2× simultâneo** (mobile + PC) cria 2 entries no `players` Map → state inconsistency
+- **`_errorRateMap` leak lento** — sem cleanup periódico, cresce indefinidamente
+- **Algumas funções server-side assumem `p.inv` existe** — TypeError potencial em save legado
+- **broadcastMobs ainda usa full snapshot** quando muda — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo
 
 ### 🟢 P0.5 — Verificações de smoke test antes de feature
 
