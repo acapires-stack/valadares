@@ -45,6 +45,20 @@ dano → alts parados no andar 5 farmavam loot. **Fix:** só quem deu dano entra
 Escala `1+0,6·(andar-1)` (andar 5 = 3,4×), boss isolado do leveling do mundo, clamp de
 coords no `pos`, DoTs clampados, `isTransitionTile`, PvP forçado persistindo pelos andares.
 
+### 🔧 Procedimento de manutenção (deploy gracioso) — ideia do dono
+Resolve "cai no mato" + "preso na masmorra pós-deploy" de uma vez.
+- **Reconnect → PZ**: na janela pós-boot (`POST_BOOT_HEAL_MS`, 3min) o join agora cura
+  E manda `p.x/y = (50,50)` (centro da PZ). A posição vai no snapshot self do `state` →
+  o cliente aplica sozinho (já era autoritativo em x/y). Flag `maintenance` → toast. Só
+  na janela → não vira fuga de PvP em reconexão normal.
+- **Countdown de aviso**: `/manutencao [min]` (admin) ou botão no painel admin
+  (seção MANUTENÇÃO). `startMaintenanceCountdown` faz broadcasts cronometrados
+  (Xmin → 30s → 10s → "reiniciando"). **Nuance**: o aviso NÃO sai do deploy (o Railway
+  mata o processo em segundos) — o dono dispara ANTES de pushar.
+- **Fluxo**: [botão 🔧 avisar 3min] → countdown → [push perto do fim] → restart → todos
+  reconectam curados na PZ. (Este 1º deploy já ativa o reconnect→PZ; só o countdown
+  ainda não, pq roda no server velho.)
+
 ---
 
 ## 📅 Sessão 29/05/2026 — M4 Fase 3 (descida + boss) + polish da masmorra
