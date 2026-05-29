@@ -14,7 +14,10 @@ if (!ADMIN_TOKEN) console.warn('[admin] ADMIN_TOKEN não configurado — painel 
 
 // HTTP server compartilhado com WS upgrade + endpoints REST (webhook MP, criar PIX, health)
 const httpServer = http.createServer((req, res) => handleHttpRequest(req, res));
-const wss = new WebSocketServer({ server: httpServer });
+// maxPayload: o maior frame legítimo é o saveUpload (SAVE_MAX_BYTES=200KB); 512KB dá
+// folga e bloqueia frames gigantes (default do ws = 100MB) que travariam o event loop
+// no JSON.parse (DoS de TODOS os players com uma mensagem só, sem auth).
+const wss = new WebSocketServer({ server: httpServer, maxPayload: 512 * 1024 });
 httpServer.listen(PORT);
 
 // MercadoPago SDK (carregamento lazy — só se token configurado)
@@ -577,9 +580,7 @@ const ITEM_META = {
 };
 
 // Custo derivado de cada item (igual itemGoldCost do cliente)
-const FIXED_COSTS = {};
 function itemGoldCost(key){
-    if (FIXED_COSTS[key] != null) return FIXED_COSTS[key];
     const d = ITEM_META[key]; if (!d) return 0;
     let g = 0;
     if (d.heal)     g += d.heal * 1.5;
@@ -4386,6 +4387,17 @@ wss.on('connection', (ws, request) => {
             // M6 Tinturaria — server é dono. Sobrescreve qualquer dyes do cliente
             // pelos valores autoritativos atuais (alteráveis só via handler dyeItem).
             data.dyes = p.dyes || {};
+            // ★ LOCKDOWN N3 — ENFORCEMENT (antes era só comentário!). setPlayerSave faz
+            // `a.save = data` as-is, e o join re-hidrata p.gold/inv/skills/equipped/chests
+            // desse save. Sem sobrescrever aqui pelos valores VIVOS do server, um cliente
+            // forjava {t:'saveUpload', data:{gold:1e8, inv:{...}, skills:{tudo 200}}} →
+            // reconectava → server carregava como legítimo (furava o lockdown E a venda
+            // de gold). Cliente honesto: data.* já == p.*, então é no-op. Forjador: bloqueado.
+            if (typeof p.gold === 'number' && isFinite(p.gold)) data.gold = p.gold;
+            if (p.inv && typeof p.inv === 'object')      data.inv = p.inv;
+            if (p.skills && typeof p.skills === 'object') data.skills = p.skills;
+            if (p.equipped && typeof p.equipped === 'object') data.equipped = p.equipped;
+            if (p.chests && typeof p.chests === 'object') data.chests = p.chests;
             setPlayerSave(p.authedName, data);
             return;
         }
