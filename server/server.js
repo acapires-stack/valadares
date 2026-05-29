@@ -1600,12 +1600,38 @@ function snapshotMobs(){
         dots: (m.dots && m.dots.length) ? m.dots.map(d => ({ type:d.type })) : undefined,
     }));
 }
+// Snapshot leve do estado de mobs pro skip-when-unchanged. Não inclui dots
+// detalhados (só count), pra reduzir custo de comparação. Se algum dot proc
+// fizer mob mudar de "tem dot" pra "não tem dot", o count diferencia.
+let _lastMobsSig = '';
+function mobsSignature(list){
+    let s = '';
+    for (const m of list){
+        s += `${m.id}:${m.x},${m.y}:${m.hp}:${m.dir}:${(m.dots && m.dots.length) || 0};`;
+    }
+    return s;
+}
 function broadcastMobs(){
-    const data = JSON.stringify({ t:'mobs', list: snapshotMobs() });
+    const list = snapshotMobs();
+    const sig = mobsSignature(list);
+    // Skip broadcast quando nada mudou desde o último tick — alivia GC e
+    // bandwidth pra players inativos / horários sem combate. Salvo full
+    // snapshot a cada 10s no broadcastMobsFull abaixo pra drift correction.
+    if (sig === _lastMobsSig) return;
+    _lastMobsSig = sig;
+    const data = JSON.stringify({ t:'mobs', list });
     for (const p of players.values()){
         if (p.ws.readyState === 1) p.ws.send(data);
     }
 }
+// Periodicamente força broadcast cheio — corrige qualquer drift de cliente
+// que tenha perdido um snapshot (ex.: reconnect sem state sync). Cliente
+// recebe um 'mobs' completo a cada 10s no pior caso.
+function broadcastMobsFull(){
+    _lastMobsSig = '';
+    broadcastMobs();
+}
+setInterval(safeTick('broadcastMobsFull', broadcastMobsFull), 10_000);
 
 // ─── Guilds ────────────────────────────────────────────────────────────────
 // Persiste em state.json. Estrutura: { name, leader, members:[names], createdAt }
@@ -2065,6 +2091,14 @@ function clampNumber(v, max, fallback = 0){
     if (typeof v !== 'number' || !isFinite(v) || v < 0) return fallback;
     return Math.min(v, max);
 }
+// Allowlist de flags persistentes — qualquer key fora dessa lista é deletada
+// no sanitizeSave. Adicionar nova flag aqui ao adicionar quest/feature que use.
+// Atualizar QUEST_CHAINS reward.flag e play.html ao mesmo tempo.
+const FLAGS_ALLOWLIST = new Set([
+    'flag_vendedor_revealed', 'flag_vendedor_killed',
+    'flag_vohrim_traitor',    'flag_vohrim_exposed',
+    'firstPartyShare',        'everHighlander',
+]);
 function sanitizeSave(data, ownerName){
     if (!data || typeof data !== 'object') return data;
     let touched = false;
@@ -2141,13 +2175,35 @@ function sanitizeSave(data, ownerName){
             if (v !== orig){ log(`pos.${k}`, orig, v); data[k] = v; }
         }
     }
-    // permaBuffs — xpBonus pode dar XP infinito permanente se adulterado
+    // permaBuffs — allowlist estrita. Antes: cliente podia forjar qualquer
+    // key (ex.: `permaBuffs.damageMultiplier=10`) e ela viraria buff persistente
+    // se algum sistema futuro lesse essa key. Agora rejeitamos keys fora do
+    // TALENT_DEFS + cap por key alinhado ao talent. Talents são single-rank,
+    // então cap = valor do buff. xpBonus mantém SAVE_CAPS.xpBonus (2.0) como
+    // margem pra futuros talents/eventos. Keys desconhecidas: deletadas.
     if (data.permaBuffs && typeof data.permaBuffs === 'object'){
+        // Constrói tabela de allowlist a partir de TALENT_DEFS
+        const allowed = {};
+        for (const def of Object.values(TALENT_DEFS)){
+            if (!def.buff) continue;
+            for (const [bk, bv] of Object.entries(def.buff)){
+                allowed[bk] = Math.max(allowed[bk] || 0, bv);
+            }
+        }
+        allowed.xpBonus = SAVE_CAPS.xpBonus;   // margem pra eventos futuros
         for (const k of Object.keys(data.permaBuffs)){
+            if (!(k in allowed)){
+                log(`permaBuffs.${k}`, data.permaBuffs[k], '(deletado: key não-allowlisted)');
+                delete data.permaBuffs[k];
+                continue;
+            }
             const orig = data.permaBuffs[k];
-            if (typeof orig !== 'number') continue;
-            const cap = k === 'xpBonus' ? SAVE_CAPS.xpBonus : 10;   // outros buffs futuros: cap 10x
-            const v = clampNumber(orig, cap, 0);
+            if (typeof orig !== 'number'){
+                log(`permaBuffs.${k}`, orig, '(deletado: não-número)');
+                delete data.permaBuffs[k];
+                continue;
+            }
+            const v = clampNumber(orig, allowed[k], 0);
             if (v !== orig){ log(`permaBuffs.${k}`, orig, v); data.permaBuffs[k] = v; }
         }
     }
@@ -2170,14 +2226,58 @@ function sanitizeSave(data, ownerName){
             }
         }
     }
-    // Quests + flags — cap quantidade de keys (evita save inflado por mau ator)
-    for (const field of ['quests', 'flags', 'questFlags']){
-        if (data[field] && typeof data[field] === 'object'){
-            const limit = field === 'quests' ? SAVE_CAPS.questsKeys : SAVE_CAPS.flagsKeys;
-            const keys = Object.keys(data[field]);
-            if (keys.length > limit){
-                log(`${field} keys`, keys.length, limit);
-                for (const k of keys.slice(limit)) delete data[field][k];
+    // Quests — só cap de quantidade de keys (quests são objetos complexos
+    // validados em handlers separados, não dá pra allowlistar facilmente).
+    if (data.quests && typeof data.quests === 'object'){
+        const keys = Object.keys(data.quests);
+        if (keys.length > SAVE_CAPS.questsKeys){
+            log('quests keys', keys.length, SAVE_CAPS.questsKeys);
+            for (const k of keys.slice(SAVE_CAPS.questsKeys)) delete data.quests[k];
+        }
+    }
+    // flags — allowlist estrita. Antes: cliente podia forjar
+    // flags.everHighlander, flags.flag_vohrim_exposed (qualquer flag) → ganhar
+    // recompensas/cosméticos sem completar quest. Agora keys fora da lista
+    // são deletadas. Valores não-boolean também (apenas true|false aceitos).
+    if (data.flags && typeof data.flags === 'object'){
+        for (const k of Object.keys(data.flags)){
+            if (!FLAGS_ALLOWLIST.has(k)){
+                log(`flags.${k}`, data.flags[k], '(deletado: key fora da allowlist)');
+                delete data.flags[k];
+                continue;
+            }
+            if (data.flags[k] !== true && data.flags[k] !== false){
+                log(`flags.${k}`, data.flags[k], '(coerced para boolean)');
+                data.flags[k] = !!data.flags[k];
+            }
+        }
+    }
+    // questFlags — allowlist por chainId (keys = chainId de QUEST_CHAINS).
+    // Dentro de cada chain: progress por stageId. Valida que stageId existe
+    // na chain antes de aceitar.
+    if (data.questFlags && typeof data.questFlags === 'object'){
+        for (const chainId of Object.keys(data.questFlags)){
+            const chain = QUEST_CHAINS[chainId];
+            if (!chain){
+                log(`questFlags.${chainId}`, '(deletado: chain desconhecida)', null);
+                delete data.questFlags[chainId];
+                continue;
+            }
+            const progress = data.questFlags[chainId];
+            if (!progress || typeof progress !== 'object'){
+                delete data.questFlags[chainId];
+                continue;
+            }
+            const validStages = new Set(chain.stages.map(s => s.id));
+            for (const stageId of Object.keys(progress)){
+                if (!validStages.has(stageId)){
+                    log(`questFlags.${chainId}.${stageId}`, progress[stageId], '(deletado: stage desconhecido)');
+                    delete progress[stageId];
+                    continue;
+                }
+                if (progress[stageId] !== true && progress[stageId] !== false){
+                    progress[stageId] = !!progress[stageId];
+                }
             }
         }
     }
@@ -2801,6 +2901,52 @@ function totalDefenseServer(p){
     }
     return total;
 }
+// Processa morte PvP server-side — chamado quando pvpAttack zera hp do alvo.
+// Antes: cliente vítima mandava msg.pkDeath {killerId, goldGain, dropHighlander}
+// e server confiava → cúmplice podia farmar kills no ranking forjando msgs.
+// Agora: server transfere gold (10% do que vítima tinha) + CORACAO_HL se tinha
+// + 1 selo pro killer + ranking. Tudo autoritativo.
+function processPkDeathServerSide(killer, victim){
+    if (!killer || !victim) return;
+    // Duelo: usa endDuel em vez do flow normal (não dá selo, não dropa)
+    if (killer.duel && killer.duel.opponentId === victim.id && victim.duel && victim.duel.opponentId === killer.id){
+        endDuel(killer, victim, false);
+        return;
+    }
+    // Gold drop: 10% do que vítima tinha (alinhado com ghost kill)
+    const goldDrop = Math.floor((victim.gold || 0) * 0.10);
+    if (goldDrop > 0){
+        victim.gold = Math.max(0, (victim.gold || 0) - goldDrop);
+        killer.gold = (killer.gold | 0) + goldDrop;
+        syncGoldRank(victim.name, victim.gold);
+        syncGoldRank(killer.name, killer.gold);
+    }
+    // Highlander drop: vítima perde CORACAO_HL (se tinha) e killer ganha 1
+    const dropHighlander = hasInv(victim, 'CORACAO_HL', 1);
+    if (dropHighlander){
+        incInv(victim, 'CORACAO_HL', -1);
+        incInv(killer, 'CORACAO_HL', 1);
+    }
+    // Sinaliza vítima (UI mostra "você perdeu Xg") + killer (ganhou Xg)
+    if (goldDrop > 0 || dropHighlander){
+        sendInvUpdate(victim, { pvpLoss:{ amount: goldDrop, dropHighlander } });
+        sendInvUpdate(killer, { pvpGain:{ amount: goldDrop, dropHighlander } });
+    }
+    // pkKill pro killer (UI float + log + selos de sangue)
+    if (killer.ws.readyState === 1){
+        killer.ws.send(JSON.stringify({
+            t: 'pkKill',
+            victimId: victim.id, victimName: victim.name,
+            victimHadSelos: (victim.selos || 0) >= 1,
+            goldGain: goldDrop,
+            dropHighlander,
+        }));
+    }
+    broadcastMsg('warn', `⚔ ${killer.name} matou ${victim.name}` + (dropHighlander ? ' (Highlander caiu!)' : ''));
+    bumpPkKill(killer.name);
+    console.log(`[pk] ${killer.name} → ${victim.name} (autoritativo) gold=${goldDrop} hl=${dropHighlander}`);
+}
+
 // Cap de dano PvP server-side. Cliente envia `amount` no pvpAttack — sem cap,
 // F12 → `{amount:99999}` one-shotta qualquer um. Margem generosa pra cobrir
 // dano máximo legítimo: base arma + forja+5 (+7 base) + skill bonus (+50-66) +
@@ -4359,12 +4505,21 @@ wss.on('connection', (ws, request) => {
             const def = isBotTarget ? BOT_DEFENSE : totalDefenseServer(tgt);
             const reduction = def > 0 ? def / (def + 30) : 0;
             const actual = Math.max(1, Math.round(amount * (1 - reduction)));
-            if ((tgt.hp ?? 100) > 0){
+            const wasAlive = (tgt.hp ?? 100) > 0;
+            if (wasAlive){
                 tgt.hp = Math.max(0, (tgt.hp ?? 100) - actual);
                 if (isBotTarget){
                     broadcast(null, { t:'pstats', id: tgt.id, hp: tgt.hp, maxHp: tgt.maxHp, mp: 0, maxMp: 0, cosmetic: null, equipped: tgt.equipped, badges: tgt.badges || [] });
                 } else {
                     broadcastPstatsAll(tgt);
+                }
+                // Marca quem foi o último atacante PvP (anti-cheat: previne
+                // cúmplice fake creditar kill via msg.pkDeath forjado). Janela
+                // de 8s — depois disso assume que dano não conta como "kill por X".
+                if (!isBotTarget){
+                    tgt._lastPvpAttackerId = id;
+                    tgt._lastPvpAttackerName = p.name;
+                    tgt._lastPvpAttackAt = Date.now();
                 }
             }
             if (!isBotTarget && tgt.ws.readyState === 1){
@@ -4375,6 +4530,16 @@ wss.on('connection', (ws, request) => {
             // Detecção morte do bot 007
             if (isBotTarget && tgt.hp === 0){
                 killImpostorBot(p);
+            }
+            // Detecção morte autônoma server-side (PvP entre players). Antes:
+            // a vítima tinha que mandar msg.pkDeath {killerId} e server confiava.
+            // Cúmplice podia farmar kills no ranking forjando msgs. Agora o
+            // server detecta sozinho quando hp chega a 0 por dano PvP e roda
+            // todo o flow (transferência de gold, drop de highlander, ranking).
+            // Marca `_pkServerHandled` pra ignorar a msg.pkDeath redundante.
+            if (wasAlive && !isBotTarget && tgt.hp === 0 && !tgt._pkServerHandled){
+                tgt._pkServerHandled = Date.now();
+                processPkDeathServerSide(p, tgt);
             }
             return;
         }
@@ -4930,43 +5095,32 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'pkDeath') {
+            // Server agora detecta morte PvP autonomamente em pvpAttack quando
+            // hp zera. Se _pkServerHandled foi setado nos últimos 15s, ignora
+            // essa msg (era a vítima reportando o que o server já processou).
+            if (p._pkServerHandled && (Date.now() - p._pkServerHandled) < 15000){
+                return;
+            }
             const killer = players.get(msg.killerId);
+            // Anti-cheat: msg.killerId precisa bater com o último atacante PvP
+            // dentro de 8s. Sem isso cúmplice fake podia enviar
+            // {t:'pkDeath', killerId: amigo} e farmar selos/ranking pro amigo
+            // sem nenhum combate real ter acontecido.
+            const recentAttack = p._lastPvpAttackerId && (Date.now() - (p._lastPvpAttackAt || 0)) < 8000;
+            if (!recentAttack || msg.killerId !== p._lastPvpAttackerId){
+                console.warn(`[pkDeath] rejeitado: ${p.name} claimou killer ${msg.killerId} mas último atacante foi ${p._lastPvpAttackerId} (${Math.floor((Date.now() - (p._lastPvpAttackAt||0))/1000)}s atrás)`);
+                return;
+            }
             // Se ambos estavam num duelo entre si, processa como vitória de duel (sem selo, sem drop)
             if (killer && p.duel && p.duel.opponentId === killer.id && killer.duel && killer.duel.opponentId === id){
                 endDuel(killer, p, false);
                 return;
             }
-            // N3 fase 2: transfere gold authoritative entre vítima e killer
-            // (cliente legacy ainda atualizava player.gold via playerSync; agora server faz)
-            const requestedGain = Math.max(0, msg.goldGain | 0);
-            const actualGain = Math.min(requestedGain, p.gold | 0);
-            if (actualGain > 0){
-                p.gold -= actualGain;
-                syncGoldRank(p.name, p.gold);
-                if (killer){
-                    killer.gold = (killer.gold | 0) + actualGain;
-                    syncGoldRank(killer.name, killer.gold);
-                }
-            }
-            // Highlander drop: vítima perde CORACAO_HL (se tinha) e killer ganha 1
-            if (msg.dropHighlander && killer && hasInv(p, 'CORACAO_HL', 1)){
-                incInv(p, 'CORACAO_HL', -1);
-                incInv(killer, 'CORACAO_HL', 1);
-            }
-            if (actualGain > 0 || msg.dropHighlander) sendInvUpdate(p, { pvpLoss:{ amount: actualGain, dropHighlander: !!msg.dropHighlander } });
-            if (killer && (actualGain > 0 || msg.dropHighlander)) sendInvUpdate(killer, { pvpGain:{ amount: actualGain, dropHighlander: !!msg.dropHighlander } });
-            if (killer && killer.ws.readyState === 1){
-                killer.ws.send(JSON.stringify({
-                    t:'pkKill',
-                    victimId: id, victimName: p.name,
-                    victimHadSelos: !!msg.hadSelos,
-                    goldGain: actualGain,
-                    dropHighlander: !!msg.dropHighlander,
-                }));
-            }
-            broadcastMsg('warn', `⚔ ${killer?killer.name:'?'} matou ${p.name}` + (msg.dropHighlander?' (Highlander caiu!)':''));
-            // Ranking: incrementa pkKills do killer (all-time + season)
-            if (killer) bumpPkKill(killer.name);
+            // Fallback (caso pvpAttack não tenha disparado o handler server-side
+            // por algum motivo — race, disconnect, etc): roda flow autoritativo.
+            // NOTA: goldDrop calculado server-side (não confia em msg.goldGain).
+            if (!killer) return;
+            processPkDeathServerSide(killer, p);
             return;
         }
 

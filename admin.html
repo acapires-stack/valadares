@@ -228,12 +228,21 @@ function showApp(){
     document.getElementById('appHeader').style.display = '';
     document.getElementById('app').style.display = '';
 }
+// Wrapper que injeta o token via X-Admin-Token (header), nunca via query.
+// Antes (em todas as chamadas): /api/admin/...?token=XYZ — vazava em logs
+// de CDN/proxy/Vercel/Cloudflare/Railway. Agora vai no header HTTP custom
+// e fica invisível em logs padrão.
+function adminFetch(path, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers || {}, { 'X-Admin-Token': token });
+    return fetch(apiBase() + path, opts);
+}
 async function doLogin(){
     const t = document.getElementById('loginToken').value.trim();
     if (!t) return;
-    // Testa o token batendo num endpoint protegido
+    // Testa o token batendo num endpoint protegido (header em vez de query)
     try {
-        const res = await fetch(apiBase() + '/api/admin/state?token=' + encodeURIComponent(t));
+        const res = await fetch(apiBase() + '/api/admin/state', { headers: { 'X-Admin-Token': t } });
         if (res.status === 401){
             document.getElementById('loginMsg').textContent = 'Token inválido.';
             return;
@@ -264,7 +273,7 @@ function apiBase(){
 }
 async function refreshNow(){
     try {
-        const res = await fetch(apiBase() + '/api/admin/state?token=' + encodeURIComponent(token));
+        const res = await adminFetch('/api/admin/state');
         if (res.status === 401){ doLogout(); return; }
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
@@ -349,7 +358,7 @@ async function doAction(kind){
     if (kind === 'delete' && !confirm(`Excluir conta "${target}" PERMANENTEMENTE?`)) return;
     if (kind === 'reset' && !confirm(`Resetar posição/HP de "${target}"?`)) return;
     try {
-        const res = await fetch(apiBase() + '/api/admin/action?token=' + encodeURIComponent(token), {
+        const res = await adminFetch('/api/admin/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind, target }),
@@ -369,7 +378,7 @@ async function doSay(){
     const level = document.getElementById('actLevel').value;
     if (!text) return setResult('Digite a mensagem.');
     try {
-        const res = await fetch(apiBase() + '/api/admin/action?token=' + encodeURIComponent(token), {
+        const res = await adminFetch('/api/admin/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'say', text, level }),
@@ -382,7 +391,7 @@ async function doSay(){
 async function doSpawn007(){
     if (!confirm('Spawnar Agente 007 agora?')) return;
     try {
-        const res = await fetch(apiBase() + '/api/admin/action?token=' + encodeURIComponent(token), {
+        const res = await adminFetch('/api/admin/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'spawn007' }),
