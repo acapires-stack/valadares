@@ -10518,6 +10518,15 @@ document.addEventListener('keydown', e => {
         const m = document.getElementById('achievementsModal');
         if (m && m.style.display !== 'none') closeAchievements(); else openAchievements();
     }
+    // Enter abre/foca o chat (padrão MMO). Ao enviar, o handler do input dá
+    // blur e devolve o teclado pro jogo (WASD volta a mover). Se a aba COMBATE
+    // está ativa, troca pra CHAT antes de focar.
+    if (e.key==='Enter' && started){
+        e.preventDefault();
+        const chatTab = document.querySelector('.chat-tab[data-tab="chat"]');
+        if (chatTab && !chatTab.classList.contains('active')) chatTab.click();
+        document.getElementById('chatInput')?.focus();
+    }
     if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
     if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
