@@ -2598,7 +2598,8 @@ function inCave(x, y){
 }
 
 // Zona Protegida (PZ) — círculo Chebyshev ao redor do spawn
-const SAFE_RADIUS = 3;
+// Raio 4 = quadrado 9×9 (de 46-54). Server-side em server.js:446 deve bater.
+const SAFE_RADIUS = 4;
 const SAFE_CX = 50, SAFE_CY = 50;
 function inSafeZone(x, y){
     return Math.max(Math.abs(x - SAFE_CX), Math.abs(y - SAFE_CY)) <= SAFE_RADIUS;

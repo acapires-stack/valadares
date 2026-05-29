@@ -443,7 +443,8 @@ const STATE_SAVE_INTERVAL_MS = 30 * 1000;  // 30s — menos janela de perda
 
 // ─── Constants do mundo ─────────────────────────────────────────────────────
 const M_W = 100, M_H = 100;
-const SAFE_RADIUS = 3, SAFE_CX = 50, SAFE_CY = 50;
+// PZ: raio 4 (quadrado 9×9, de 46-54). Cliente em play.html:2601 deve bater.
+const SAFE_RADIUS = 4, SAFE_CX = 50, SAFE_CY = 50;
 const T = { GRASS:0, DIRT:1, TREE:2, WATER:3, STONE:4, CAVE:5, CAVE_WALL:6, SNOW:7, SAND:8 };
 const walkable = t => t===T.GRASS||t===T.DIRT||t===T.STONE||t===T.CAVE||t===T.SNOW||t===T.SAND;
 
