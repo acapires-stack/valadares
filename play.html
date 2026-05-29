@@ -9363,6 +9363,10 @@ function _shade(hex, amt){
 
 // Sprites — todos desenham num quadrado SxS, normalizam pra qualquer size
 function drawItemSprite(ctx, def, key, S){
+    // Forjados (X_PLUS_N) usam o sprite da BASE: resolve a base p/ as comparações
+    // `key === 'X'` abaixo. Senão a +N perde o sprite especial e vira ícone genérico
+    // (ex: Coração do Highlander +1 sem o coração/corrente). def já é o clone da base.
+    if (typeof getUpgradeTier === 'function') key = getUpgradeTier(key).base;
     const c = def.color;
     const dark = _shade(c, -50);
     const light = _shade(c, 40);

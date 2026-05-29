@@ -1196,8 +1196,10 @@ const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de pro
 const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c)
 const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fundo da sala (longe da chegada 50,52; > aggro 9 → dorme até você chegar perto)
 // Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
-// Interior 41-59 é piso; mobs andam dentro deste box (server não tem o grid).
-const DUNGEON_ROOM = { x0: 41, y0: 41, x1: 59, y1: 59 };
+// Box = sala visível INTEIRA (CAVE 40-60) pra mobs usarem a beirada também.
+// Antes era 41-59 (1 tile menor): no canto/beirada só 1-2 mobs alcançavam o
+// player → o resto enfileirava. Com 40-60 alcançam até 3 no canto / 5 na borda.
+const DUNGEON_ROOM = { x0: 40, y0: 40, x1: 60, y1: 60 };
 const DUNGEON_MOB_TARGET = 9;                 // população de mobs no andar 1
 const DUNGEON_MOB_TYPES  = ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // pesos: mais Sombra
 // Mob pode pisar no tile? No andar usa o box da sala (sem PZ, sem grid do
