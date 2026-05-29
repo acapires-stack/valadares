@@ -2864,6 +2864,67 @@ function drawTile(t,px,py,tx,ty){
     _blendEdges(t, tx, ty, px, py);
 }
 
+// ─── Piso de pedra (PZ) — 4 variações pré-renderizadas em offscreen canvas ───
+// 9 pedrinhas 16×16 por tile 48×48, cada uma com cor levemente variada +
+// highlight TL + sombra BR + rachadura ocasional. Cached, gerado uma vez.
+let _stoneTileVariants = null;
+function getStoneTiles(){
+    if (_stoneTileVariants) return _stoneTileVariants;
+    _stoneTileVariants = [];
+    for (let v = 0; v < 4; v++){
+        const off = document.createElement('canvas');
+        off.width = TS; off.height = TS;
+        const o = off.getContext('2d');
+        // Fundo base (caso a grade não cubra borda)
+        o.fillStyle = '#5a5246';
+        o.fillRect(0, 0, TS, TS);
+        // 3×3 pedrinhas 16×16
+        for (let i = 0; i < 3; i++){
+            for (let j = 0; j < 3; j++){
+                // hash determinístico por variant + célula
+                const h = ((v * 1103 + i * 137 + j * 311) ^ ((i + 1) * (j + 1) * 17)) & 0xff;
+                const shade = ((h >> 1) & 0x0f) - 8;
+                const cx = i * 16, cy = j * 16;
+                // pedra base
+                o.fillStyle = `rgb(${90 + shade}, ${82 + shade}, ${70 + shade})`;
+                o.fillRect(cx + 1, cy + 1, 14, 14);
+                // highlight TL (luz do norte/oeste)
+                o.fillStyle = 'rgba(255, 245, 225, 0.12)';
+                o.fillRect(cx + 1, cy + 1, 14, 1);
+                o.fillRect(cx + 1, cy + 1, 1, 13);
+                // sombra BR (lado escuro)
+                o.fillStyle = 'rgba(10, 5, 0, 0.40)';
+                o.fillRect(cx + 1, cy + 14, 14, 1);
+                o.fillRect(cx + 14, cy + 1, 1, 13);
+                // junta entre pedras (cinza muito escuro)
+                o.fillStyle = 'rgba(20, 16, 12, 0.6)';
+                o.fillRect(cx, cy, 16, 1);
+                o.fillRect(cx, cy, 1, 16);
+                // rachadura ocasional
+                if (h & 0x80){
+                    o.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                    if (h & 0x40){
+                        o.fillRect(cx + 4 + (h & 0x03), cy + 6, 1, 6);
+                    } else {
+                        o.fillRect(cx + 5, cy + 8 + (h & 0x03), 6, 1);
+                    }
+                }
+                // pontinho de cristal/musgo ocasional
+                if ((h & 0x30) === 0x30){
+                    o.fillStyle = 'rgba(160, 200, 120, 0.25)';
+                    o.fillRect(cx + 6 + (h & 0x03), cy + 9, 1, 1);
+                }
+            }
+        }
+        // junta inferior + direita do tile (continuidade ao próximo)
+        o.fillStyle = 'rgba(20, 16, 12, 0.5)';
+        o.fillRect(0, TS - 1, TS, 1);
+        o.fillRect(TS - 1, 0, 1, TS);
+        _stoneTileVariants.push(off);
+    }
+    return _stoneTileVariants;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PERSONAGEM
 // ═══════════════════════════════════════════════════════════════════════════
@@ -13573,9 +13634,13 @@ function loop(ts){
             const mx=camTileX+tx, my=camTileY+ty;
             if (mx<0||my<0||mx>=M_W||my>=M_H) continue;
             const sx = tx*TS - offX, sy = ty*TS - offY;
-            drawTile(map[my][mx], sx, sy, mx, my);
+            // Na PZ, sobrescreve com piso de pedra (chão de praça) em vez do
+            // tile do mapa. Fora da PZ, tile normal.
             if (inSafeZone(mx, my)){
-                ctx.fillStyle = 'rgba(80, 150, 220, 0.18)';
+                const tiles = getStoneTiles();
+                const idx = (mx * 13 + my * 23) & 3;
+                ctx.drawImage(tiles[idx], sx, sy);
+                ctx.fillStyle = 'rgba(80, 150, 220, 0.10)';
                 ctx.fillRect(sx, sy, TS, TS);
                 const isEdge = Math.max(Math.abs(mx-SAFE_CX), Math.abs(my-SAFE_CY)) === SAFE_RADIUS;
                 if (isEdge){
@@ -13586,6 +13651,8 @@ function loop(ts){
                     if (my-SAFE_CY === -SAFE_RADIUS) { ctx.beginPath(); ctx.moveTo(sx, sy+1); ctx.lineTo(sx+TS, sy+1); ctx.stroke(); }
                     if (my-SAFE_CY ===  SAFE_RADIUS) { ctx.beginPath(); ctx.moveTo(sx, sy+TS-1); ctx.lineTo(sx+TS, sy+TS-1); ctx.stroke(); }
                 }
+            } else {
+                drawTile(map[my][mx], sx, sy, mx, my);
             }
         }
 
