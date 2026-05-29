@@ -137,13 +137,15 @@ function createWindow() {
         }
     });
 
-    // Aplica zoom: respeita preferência do user; senão, auto-detect.
-    const initialZoom = (typeof prefs.zoomLevel === 'number') ? prefs.zoomLevel : detectInitialZoom();
+    // Aplica zoom a CADA load (inclui reloads do auto-update). Lê o prefs ATUAL
+    // — não uma variável capturada no boot. Antes (bug): o reload re-aplicava o
+    // zoom inicial e descartava o ajuste do user ("regulo, atualiza, volta").
     mainWindow.webContents.on('did-finish-load', () => {
-        mainWindow.webContents.setZoomLevel(initialZoom);
-        // Se foi auto-detect (sem preferência salva), persiste pra próxima vez
-        if (typeof prefs.zoomLevel !== 'number') {
-            savePrefs({ ...prefs, zoomLevel: initialZoom });
+        const prefsNow = loadPrefs();
+        const z = (typeof prefsNow.zoomLevel === 'number') ? prefsNow.zoomLevel : detectInitialZoom();
+        mainWindow.webContents.setZoomLevel(z);
+        if (typeof prefsNow.zoomLevel !== 'number') {
+            savePrefs({ ...prefsNow, zoomLevel: z });
         }
     });
 
