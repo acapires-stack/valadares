@@ -40,6 +40,8 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 
 ### 🔴 P0.6 — Hardening pendente pra próxima auditoria
 
+- **🔍 AUDITORIA COMPLETA (próxima sessão, pedido do dono)** — segurança + código das mudanças da masmorra Fase 3: handlers `descendDungeon`/transições, `spawnDungeonMobs`/despawn por andar, escala de stats, `distributeBossLoot`, `isTransitionTile`. Rodar `/security-review` + `/code-review`.
+
 - **Same-player 2× simultâneo** (mobile + PC) cria 2 entries no `players` Map → state inconsistency
 - **`_errorRateMap` leak lento** — sem cleanup periódico, cresce indefinidamente
 - **Algumas funções server-side assumem `p.inv` existe** — TypeError potencial em save legado
@@ -62,7 +64,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-**M4 "As Profundezas" — masmorra ABERTA vertical** [3 sessões — endgame] 🎯 EM ANDAMENTO
+**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] 🎯 EM ANDAMENTO (3a descida + 3c boss ✅; falta 3b procedural)
 > Decisão de design (29/05): NÃO instanciada. Insight do dono: instância
 > fechada = farm seguro = pay-to-win fácil num jogo PvP. Em vez disso,
 > masmorra aberta e mortal estilo Tibia — melhor loot, maior perigo (mobs
@@ -92,9 +94,18 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
      distribuem loot DIRETO no inv de quem bateu (rastreado em m.damageBy). Solo
      = proporcional ao dano; em PARTY = divide IGUAL entre membros no andar.
      NÃO cai no chão. Mobs comuns continuam dropando (espalhado em anel).
-3. 🎯 **Profundidade** (PRÓXIMA): múltiplos andares (escada desce ao 2,3...),
-   geração procedural por andar (server precisa do grid pra spawn — hoje usa
-   bounding box fixo), boss no fundo, loot escala com profundidade, polish visual.
+3. ✅ **3a — Descida multi-andar** (RESOLVIDO 29/05, efed9cd): 5 andares; escada
+   descida (50,57)/subida (50,50); chega em (50,52); mobs escalam +60%/andar
+   (andar 5 ≈ 3,4×); spawn/limpeza por andar (efêmero). Entrada movida da PZ pro
+   **Antro do Minotauro (83,17)** (cf0e937). IA de cerco floor-aware + box da sala
+   = 40-60 (fim da "fila" no canto). Loot 3×3. Mobs não ficam nas escadas.
+4. ✅ **3c — Boss do andar 5** (RESOLVIDO 29/05, cae70b8): **O Senhor das
+   Profundezas** (5000hp/110dmg, intel 3, spawn 50,42), loot top-tier por dano,
+   respawna Lv1 fresco a cada delve (isolado do leveling dos bosses do mundo).
+5. 🎯 **3b — Geração procedural por andar** (PRÓXIMA SESSÃO): cada andar com
+   layout/sala diferente. Server precisa do **grid real** (hoje usa bounding box
+   fixo 40-60) pra spawn/colisão. Resolve as "escadas em linha" (posições por
+   andar). Polish: tonalidade por profundidade + indicador de andar.
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (50,50) na PZ, 4 slots tingíveis com 12 cores

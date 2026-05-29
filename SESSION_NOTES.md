@@ -2,74 +2,67 @@
 
 > Apenas a sessão atual. Sessões anteriores: `docs/archive/sessions-pre-may28.md`.
 > Roadmap e backlog: `ROADMAP.md`. Estado completo: memória `project_valadares.md`.
+> (A leva 29/05 anterior — devlog, M6 Tinturaria, M8 Auction, M4 fase 1+2 — está
+> nos ✅ RESOLVIDO do ROADMAP.)
 
 ---
 
-## 📅 Sessão 29/05/2026 — maratona tarde/noite (continuação do dia)
+## 📅 Sessão 29/05/2026 — M4 Fase 3 (descida + boss) + polish da masmorra
 
-> A leva anterior do dia (P0 auditoria, mobile overhaul, desktop v1.0.4→v1.0.8)
-> está nos marcos do ROADMAP. Esta seção cobre o resto do dia: devlog → v1.0.9.
+**6 commits** (`cf0e937` → `c6ed9f1`). Deploys feitos com o dono sozinho no servidor.
 
-**~25 commits + 1 release (v1.0.9).** Features grandes: Devlog, M6 Tinturaria,
-M8 Auction House, M4 masmorra (fase 1+2), loot de boss por dano/party.
+### ✅ M4 Fase 3 (a masmorra agora é uma descida real)
+- **3a — descida multi-andar** [`efed9cd`]: **5 andares**. Escada de descida (50,57)
+  → andar+1; subida (50,50) → andar-1 (andar 1 → cidade). Chega sempre em (50,52).
+  Mobs comuns escalam **+60%/andar** (andar 5 ≈ 3,4×). Spawn/limpeza por andar
+  (efêmero). Handlers `enterDungeon`/`descendDungeon`/`exitDungeon` + helper
+  `enterDungeonFloor` (popula antes do snapshot). Fog do overworld só salvo na entrada.
+- **3c — boss do andar 5** [`cae70b8`]: **O Senhor das Profundezas** (unique,
+  5000hp/110dmg, intel 3, spawn 50,42). Loot top-tier **por dano** (`distributeBossLoot`).
+  Isolado do leveling dos bosses do mundo → respawna Lv1 fresco a cada delve.
+  ✔ **Confirmado in-game** (dono tirou ~1800hp dele antes de um deploy resetar).
 
-### ✅ Features entregues (em prod)
+### ✅ Entrada do M4 movida [`cf0e937`]
+Da beirada da PZ (50,46) → **Antro do Minotauro (83,17)**, fora da PZ, gated por mobs.
+Novato não cai mais sem querer. Retorno em (83,18).
 
-- **#12 Devlog** [151290d] — `devlog/build.js` (Node puro, zero deps): posts MD
-  + frontmatter → HTML com tema do site. 4 posts. Live em /devlog. Pra novo
-  post: `.md` em `devlog/posts/`, `node devlog/build.js`, commit.
-- **M6 Tinturaria** [e97fbd1] — NPC Tintureira, tinge 4 slots (armor/head/feet/
-  cosmetic) com 12 cores, 5kg/aplicar 1kg/remover, server autoritativo, persiste
-  em acc.save.dyes. Confirm antes de gastar [9532393].
-- **M8 Auction House** [5bb5073] — NPC Leiloeiro, modal BROWSE/MINHAS/VENDER,
-  escrow server-side, 24h/listing, 5% comissão, máx 10. grantGold/ItemByName
-  entregam pra offline.
-- **M4 "As Profundezas" fase 1+2** — masmorra ABERTA (não instanciada — decisão
-  de design anti-pay-to-win). Escada PZ (50,46) → andar 1, PvP forçado, mobs
-  SOMBRA/CARRASCO, loot por dano. Detalhes no ROADMAP.
-- **Loot de boss por dano (anti-ninja)** [679f74f, cbe56ee] — bosses unique vão
-  pro inv de quem bateu; party divide igual. Não cai no chão.
+### ✅ Reconexão / infra
+- **Preso na masmorra após deploy** [`cf0e937`]: `t:'state'` reseta floor→cidade +
+  desliga PvP forçado no reconnect (era "boneco preso + PvP travado").
+- **Watch paths Railway** [`efed9cd`, `railway.json`]: push só-de-cliente NÃO reconecta
+  ninguém (só `server/**`/`package.json`/`Dockerfile`/`railway.json`). ✔ Confirmado
+  (deploy `c6ed9f1`, só cliente, não reconectou).
 
-### 🩹 Bugs/fixes notáveis
+### ✅ IA / loot / UI / sprites
+- **Mobs em fila** [`efed9cd`+`f36c28b`]: (1) `pickSurroundSlot` validava com regra de
+  cidade (`inSafe`) → na masmorra rejeitava tudo → fila. Agora `mobTileOk` floor-aware.
+  (2) `DUNGEON_ROOM` 41-59 → **40-60** (= sala visível): no canto só 1 mob alcançava;
+  agora 3. Carrasco → `intel 3` (flanco).
+- **Loot espalhado** [`efed9cd`]: `DROP_SPREAD` apertado pro **3×3** (coletar não puxa mob).
+- **Scroll do inventário** [`efed9cd`]: preserva `scrollTop` no re-render.
+- **Mobs em cima da escada** [`296bac8`]: `isTransitionTile` em `mobTileOk`+`spawnMob`
+  — mob não fica na escada/chegada (bloqueava entrar/subir/descer).
+- **Sprite de +N** [`cf0e937`+`f36c28b`+`c6ed9f1`]: itens forjados (`X_PLUS_N`) perdiam
+  o sprite especial (comparação por **key exata**). Resolvido com `getUpgradeTier(key).base`
+  em `drawWeaponSprite` (arma na mão), `drawItemSprite` (ícones) e `drawCharacter`
+  (armadura/elmo/botas no boneco). → **gotcha recorrente**: todo render que faz
+  `key === 'X'` quebra pra forjado; resolver a base.
 
-- NPCs reorganizados em layout simétrico 9×9 (PZ raio 3→4) [e187ff5, 40bdf91];
-  dessincronia server↔cliente de TODAS as posições de NPC corrigida [c1ec9fa,
-  110bb46] (shop/casino/dye/auction/quests/atendente).
-- Piso de pedra na PZ [f4aeee1]. Chat: Enter abre + fecha ao enviar [656770c];
-  chat preenche espaço dinâmico (sem overflow) [25e1309].
-- admin /admin destravado — CORS preflight faltava X-Admin-Token [94643a8].
-- Chip de reconexão dourado "ATUALIZANDO" (era vermelho "SEM CONEXÃO"),
-  threshold 15s→60s [43889f1]. Cura HP/MP cheios ao reconectar pós-restart
-  (não morrer/meia-vida no deploy) [b0c28e1]. HP da party no widget via
-  partyUpdate (era pstats stale) [c2d5b30]. Nome do player com fundo pill.
-- **Electron v1.0.9** [b6d616b] — zoom persiste entre reloads (did-finish-load
-  lê prefs atual, não a var capturada no boot). Resolve "regulo, atualiza, volta"
-  e "estoura ao comprar pots" (ambos eram zoom grande resetando).
+### ⚠️ Pendências (pra próxima)
+- **Reconexão da masmorra cai no mato** (coords da masmorra no overworld; dono saiu em
+  (40,40)). Fix OFERECIDO, não feito: jogar na cidade (50,50) com trava one-shot no join
+  (anti-abuso de teleporte/fuga de PvP). Aguardando OK do dono.
+- **Deploy mid-fight resetou o boss do dono.** Regra reforçada: **avisar antes de
+  deployar** se o dono puder estar em combate. (já em [[feedback-valadares-deploy]])
+- **Escadas em linha (x=50) = previsível/fácil** (feedback do dono). Caminho: randomizar
+  a escada de DESCIDA por andar (seed pelo floor) OU resolver de vez no 3b.
+- **Balanceamento boss/andares**: dono confirmou "tá difícil" (bom); calibrar hp/dmg/loot
+  após o veredito final do playtest.
 
-### ⚙️ Mudança de processo (IMPORTANTE pra próxima)
-
-O dono pediu (e foi salvo na memória [[feedback-valadares-deploy]]): **acumular
-mudanças testadas localmente e deployar em LOTES, de tempo em tempo** — NÃO um
-push a cada micro-fix. Cada push → Railway reconecta todos os players. Foram ~25
-deploys hoje e ele reclamou. Regra: testar local (node --check + preview), juntar
-lote, só push quando ele pedir ou ao fechar conjunto, avisando antes.
-
-### 🎯 Próxima sessão — começar por
-
-1. **Confirmar v1.0.9** aplicou no app do alcione (zoom -2 grudou, sem estourar).
-2. **Validar em prod** (smoke test): masmorra com mobs (descer, matar Sombra/
-   Carrasco, loot cai), loot de boss em party (matar Orc Líder com 2, divisão
-   igual), nome do player legível.
-3. **M4 fase 3** (Profundidade): múltiplos andares, geração procedural, boss no
-   fundo. OU **M6 Pet** / **M7 Arena PvP** (escolher 1).
-
-### ⚠️ Pendências técnicas (P0.6 — não resolvidas)
-
-- Same-player 2× simultâneo (mobile+PC) → 2 entries no `players` Map.
-- `_errorRateMap` leak lento (sem cleanup).
-- Algumas funções assumem `p.inv` existe (TypeError em save legado).
-- broadcastMobs usa full snapshot por floor (ok pra poucos; pra >20 ativos/andar
-  precisa diff real com novo `t`).
-- Morte por DoT em mob NÃO spawna drop no chão (comportamento antigo; só boss via
-  DoT distribui agora). Mobs comuns mortos por DoT não dropam — verificar se
-  incomoda.
+### 🎯 Próxima sessão (definido com o dono)
+1. **Auditoria completa** — segurança + código das mudanças da masmorra/boss: novos
+   handlers (`descendDungeon`, transições), `spawnDungeonMobs`/despawn, escala de stats,
+   `distributeBossLoot`, `isTransitionTile`. Rodar `/security-review` + `/code-review`.
+2. **M4 3b completo** — layout **procedural por andar** (sala diferente cada andar; o
+   server precisa do **grid real** pra spawn/colisão — hoje usa bounding box 40-60).
+   Resolve as "escadas em linha" de quebra.
