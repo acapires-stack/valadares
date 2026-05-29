@@ -6441,6 +6441,9 @@ function handleMP(msg){
         };
         const text = reasons[msg.reason] || 'Servidor rejeitou a entrega.';
         log(`<span class="log-sys">⚠ ${text}</span>`);
+        // Toast visível no centro — o log vai pra aba COMBATE e o player pode
+        // estar na aba CHAT, fazendo a falha parecer silenciosa ("não dá nada").
+        if (typeof showServerToast === 'function') showServerToast('warn', `⚠ ${text} (${msg.reason})`, null, 5000);
     } else if (msg.t === 'forceTeleport'){
         // Admin reset: teleporta + re-inicializa renderX/Y pra escapar sprite invisível.
         const tx = (typeof msg.x === 'number') ? msg.x : 50;
