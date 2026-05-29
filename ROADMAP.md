@@ -79,8 +79,11 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 - Bracket 1v1 e 3v3 com matchmaking simples (queue → match quando 2/6 prontos)
 - Recompensa cosmética semanal
 
-**M8 Auction house** [2 sessões]
-- Trade assíncrono: lista item por preço, outros compram. Server escrowa.
+**✅ M8 Auction House** (RESOLVIDO sessão 29/05 — 1 sessão, não 2)
+- NPC Leiloeiro em (50, 48). Modal BROWSE/MINHAS/VENDER.
+- Server escrowa, 24h por listing, 5% comissão, máx 10 ativos.
+- Helpers grantGoldByName/grantItemByName entregam pra offline players.
+- Detalhes: [commit 5bb5073](https://github.com/acapires-stack/valadares/commit/5bb5073)
 
 ### 🟢 P2 — Marketing / SEO
 - Backlinks: post Reddit (r/WebGames, r/incremental_games), Discord servers RPG, Twitter
