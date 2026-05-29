@@ -2974,7 +2974,14 @@ function getStoneTiles(){
 // ─── desenho de equipamentos sobre o boneco ─────────────────────────────────
 function drawWeaponSprite(px, py, weapon){
     if (!weapon) return;
-    const def = ITEMS[weapon]; if (!def) return;
+    // Forjadas chegam como BASE_PLUS_N e usam o sprite da BASE. Resolve a base
+    // pro lookup E pras comparações `weapon === 'X'` abaixo — senão a +N some:
+    // o `=== 'ESPADA_HL'` falha (vira sprite genérico) e o ITEMS[BASE_PLUS_N]
+    // pode nem existir (def undefined → return, nada desenhado). Era o caso da
+    // "highlander +1" sem sprite no próprio boneco enquanto a base do amigo via.
+    const base = (typeof getUpgradeTier === 'function') ? getUpgradeTier(weapon).base : weapon;
+    const def = ITEMS[weapon] || ITEMS[base]; if (!def) return;
+    weapon = base;
     const wx = px + 38;
     // Arcos/bestas: arco curvo na mão
     if (def.ranged){
@@ -6148,6 +6155,23 @@ function handleMP(msg){
         // estado completo: jogadores e monstros do servidor
         myWsId = msg.you;
         player.isAdmin = !!msg.isAdmin;
+        // M4: o server SEMPRE rejoina no overworld (floor 0) — a masmorra é efêmera.
+        // Se o cliente caiu/reconectou DENTRO da masmorra (deploy, watchdog WS zumbi),
+        // ele ficava com player.floor=1 + grid do andar enquanto o server já o pusera
+        // na cidade: a escada de saída não respondia e o PvP forçado ficava travado.
+        // Reseta pro overworld pra casar com o server. (No 1º login floor já é 0 = no-op.)
+        if ((player.floor || 0) !== 0){
+            player.floor = 0;
+            map = overworldMap;
+            if (_overworldVisited){ player.visited = _overworldVisited; _overworldVisited = null; }
+            player.target = null; player.autoAttack = false;
+            // PvP foi FORÇADO na masmorra. Ao voltar pra cidade por reconexão (e não
+            // pela escada), desliga — senão fica preso ligado sem o player conseguir
+            // tirar (era o sintoma "nem o pvp consigo tirar"). Avisa o server p/ casar.
+            player.pvp = false;
+            try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'pvp', pvp:false, selos:player.selos, highlander:player.highlander })); } catch {}
+            if (typeof showServerToast === 'function') showServerToast('event', '⬆ Reconectado — de volta à cidade (PvP desligado).', null, 4500);
+        }
         if (typeof showLoadingOverlay === 'function') showLoadingOverlay(false);
         if (msg.motd) showServerToast('event', '📜 ' + msg.motd, null, 7000);
         if (msg.dailyEvent) applyDailyEventInfo(msg.dailyEvent);
@@ -11732,7 +11756,7 @@ function handleMovement(dt){
 
 // M4: pisar na escada dispara a transição de andar (server valida adjacência).
 // Debounce 1.2s pra não re-disparar enquanto o server processa/teleporta.
-const DUNGEON_STAIR_IN  = { x: 50, y: 46 };   // entrada na PZ (deve bater com server)
+const DUNGEON_STAIR_IN  = { x: 83, y: 17 };   // entrada no Antro do Minotauro (deve bater com DUNGEON_ENTRANCE do server)
 const DUNGEON_STAIR_OUT = { x: 50, y: 50 };   // saída no andar
 let _lastStairTrigger = 0;
 function checkDungeonStairs(x, y){
@@ -14094,8 +14118,8 @@ function loop(ts){
         }
     }
 
-    // M4: escada da masmorra. No overworld (floor 0) = entrada descendo na PZ.
-    // No andar (floor 1) = saída subindo. Buraco escuro com degraus.
+    // M4: escada da masmorra. No overworld (floor 0) = entrada descendo no Antro
+    // do Minotauro (83,17). No andar (floor 1) = saída subindo. Buraco escuro com degraus.
     {
         const onFloor = (player.floor || 0);
         const stair = onFloor === 0 ? DUNGEON_STAIR_IN : DUNGEON_STAIR_OUT;

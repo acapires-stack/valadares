@@ -1176,8 +1176,8 @@ const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 // p.floor + posição + força PvP. Sem mobs ainda (Fase 2).
 // Escada de entrada na PZ (50,46), topo. Player desce → spawn (50,52) no andar.
 // Escada de saída no andar (50,50) → volta pra cidade (50,47).
-const DUNGEON_ENTRANCE = { x: 50, y: 46 };   // escada na PZ (overworld)
-const DUNGEON_RETURN   = { x: 50, y: 47 };   // onde o player reaparece na cidade
+const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
+const DUNGEON_RETURN   = { x: 83, y: 18 };   // reaparece 1 tile ao lado da escada, dentro do antro (cuidado: minotauros)
 const DUNGEON_SPAWN    = { x: 50, y: 52 };   // onde o player chega no andar 1
 const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de volta no andar 1
 const DUNGEON_MAX_FLOOR = 1;                  // MVP: só andar 1
