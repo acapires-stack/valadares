@@ -64,12 +64,9 @@
             background: #000;
         }
         canvas { display: block; }
-        /* Escala visual do canvas — sprites 33% maiores pra leitura confortável
-           em 1080p (TS interno continua 48, render fica em 720×528 e o browser
-           faz upscale nítido via pixelated). Sem mexer em coords/perf. */
+        /* Canvas no tamanho natural (720×528). Quem quiser maior usa zoom
+           do navegador (Ctrl+= / Ctrl+-) — funciona sem perder coords. */
         canvas#canvas {
-            width: 960px;
-            height: 704px;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
@@ -2422,16 +2419,18 @@ function atDummy(){
 }
 // ─── NPCs (PZ + mundo) ─────────────────────────────────────────────────────
 const NPCS = [
-    // PZ leste — comércio e quests principais (espaçados 1 tile entre cada)
-    { id:'mercador',  name:'Mercador',     pos:{x:52,y:48}, body:'#3a5a8a', hat:'#ffcc40', action:'shop',     hint:'mercador' },
-    { id:'banqueiro', name:'Banqueiro',    pos:{x:52,y:50}, body:'#6a4a10', hat:'#ffd700', action:'goldshop', hint:'comprar gold' },
-    { id:'atendente', name:'Atendente',    pos:{x:52,y:52}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
-    // M6 Gold sink — Cassino (RNG autoritativo no server, house edge ~5-8%)
-    { id:'crupie',    name:'Crupiê',       pos:{x:48,y:50}, body:'#2a1a4a', hat:'#cc2050', action:'casino',   hint:'cassino' },
-    // M6 Gold sink — Tinturaria (cor override por slot, 5kg/aplicação, 1kg/remover)
-    { id:'tintureira',name:'Tintureira',   pos:{x:50,y:50}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
-    // M8 Auction House — trade assíncrono via Leiloeiro (5% comissão, 24h listing)
-    { id:'leiloeiro', name:'Leiloeiro',    pos:{x:50,y:48}, body:'#1a3a5a', hat:'#80a0c0', action:'auction',  hint:'leilão' },
+    // PZ — layout simétrico nas bordas do quadrado 9×9 (PZ raio 4 ao redor de 50,50).
+    // Centerline livre pra Altar (50,48) e Craft (50,52). Cada NPC tem ≥2 tiles
+    // de respiro pros lados, player anda solto entre eles.
+    // Top row (y=47): comércio
+    { id:'mercador',  name:'Mercador',     pos:{x:47,y:47}, body:'#3a5a8a', hat:'#ffcc40', action:'shop',     hint:'mercador' },
+    { id:'leiloeiro', name:'Leiloeiro',    pos:{x:53,y:47}, body:'#1a3a5a', hat:'#80a0c0', action:'auction',  hint:'leilão' },
+    // Middle row (y=50): finança/sorte
+    { id:'crupie',    name:'Crupiê',       pos:{x:47,y:50}, body:'#2a1a4a', hat:'#cc2050', action:'casino',   hint:'cassino' },
+    { id:'banqueiro', name:'Banqueiro',    pos:{x:53,y:50}, body:'#6a4a10', hat:'#ffd700', action:'goldshop', hint:'comprar gold' },
+    // Bottom row (y=53): serviços
+    { id:'atendente', name:'Atendente',    pos:{x:47,y:53}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
+    { id:'tintureira',name:'Tintureira',   pos:{x:53,y:53}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
     // Mundo — chains narrativas (cada um tem seu local temático)
     { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', chain:'cripta' },
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
