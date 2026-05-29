@@ -470,7 +470,7 @@ const MTYPE = {
     CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999, intel:3 },
     // ─── M4 Masmorra "As Profundezas" — mobs exclusivos, mais fortes ───
     SOMBRA:     { hp:230, dmg:22, speed:300, xp:220, aggro:7, intel:2 },   // rápido, assedia
-    CARRASCO:   { hp:480, dmg:38, speed:500, xp:420, aggro:6, intel:2 },   // lento, pancada pesada
+    CARRASCO:   { hp:480, dmg:38, speed:500, xp:420, aggro:6, intel:3 },   // lento, pancada pesada — flanqueia (intel 3)
     // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
     SENHOR_VALADARES: { hp:18000, dmg:75, speed:240, xp:10000, aggro:12, unique:true, mega:true, intel:3 },
     // Boss de evento semanal (sábado 20h-22h BRT)
@@ -1178,9 +1178,11 @@ const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 // Escada de saída no andar (50,50) → volta pra cidade (50,47).
 const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
 const DUNGEON_RETURN   = { x: 83, y: 18 };   // reaparece 1 tile ao lado da escada, dentro do antro (cuidado: minotauros)
-const DUNGEON_SPAWN    = { x: 50, y: 52 };   // onde o player chega no andar 1
-const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de volta no andar 1
-const DUNGEON_MAX_FLOOR = 1;                  // MVP: só andar 1
+const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada ao entrar/trocar de andar (ao lado da escada de subida)
+const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de SUBIDA (volta 1 andar; do andar 1 = cidade)
+const DUNGEON_DOWN     = { x: 50, y: 57 };   // escada de DESCIDA (vai pro próximo andar; não existe no último)
+const DUNGEON_MAX_FLOOR = 5;                  // Fase 3: 5 andares (boss no 5 — slice 3c)
+const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
 // Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
 // Interior 41-59 é piso; mobs andam dentro deste box (server não tem o grid).
 const DUNGEON_ROOM = { x0: 41, y0: 41, x1: 59, y1: 59 };
@@ -1412,9 +1414,11 @@ function spawnMob(type, x, y, floor){
     // Bosses escalam por nível (cap 10): hp x(1+0.15k), dmg x(1+0.10k), xp x(1+0.20k) com k = lvl-1
     const level = def.unique ? Math.max(1, Math.min(BOSS_LEVEL_CAP, bossLevel.get(type) || 1)) : 1;
     const k = level - 1;
-    const hp  = def.unique ? Math.round(def.hp  * (1 + k * 0.15)) : def.hp;
-    const dmg = def.unique ? Math.round(def.dmg * (1 + k * 0.10)) : def.dmg;
-    const xp  = def.unique ? Math.round(def.xp  * (1 + k * 0.20)) : def.xp;
+    // Fase 3: mobs comuns escalam por profundidade da masmorra (+60%/andar; andar 1 = base).
+    const fMult = (!def.unique && (floor || 0) >= 1) ? (1 + DUNGEON_FLOOR_SCALE * ((floor || 0) - 1)) : 1;
+    const hp  = def.unique ? Math.round(def.hp  * (1 + k * 0.15)) : Math.round(def.hp  * fMult);
+    const dmg = def.unique ? Math.round(def.dmg * (1 + k * 0.10)) : Math.round(def.dmg * fMult);
+    const xp  = def.unique ? Math.round(def.xp  * (1 + k * 0.20)) : Math.round(def.xp  * fMult);
     const m = {
         id: nextMobId++, type, x, y, dir:'down',
         spawnX: x, spawnY: y,    // âncora pra wandering (volta pra perto)
@@ -1483,20 +1487,46 @@ function spawnInitial(){
 // M4: mantém a população de mobs no andar 1. Spawna na sala (evitando escada
 // e ponto de chegada do player). Chamado no boot e periodicamente.
 function spawnDungeonMobs(){
-    let count = 0;
-    for (const m of monsters.values()) if ((m.floor || 0) === 1 && m.hp > 0) count++;
-    let tries = 0;
-    while (count < DUNGEON_MOB_TARGET && tries < 120){
-        tries++;
-        const x = DUNGEON_ROOM.x0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.x1 - DUNGEON_ROOM.x0 - 1));
-        const y = DUNGEON_ROOM.y0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.y1 - DUNGEON_ROOM.y0 - 1));
-        // não nasce em cima da escada (50,50) nem no ponto de chegada (50,52) e adjacências
-        if (Math.abs(x - 50) <= 1 && y >= 49 && y <= 53) continue;
-        if (mobAt(x, y, 1)) continue;
-        const type = DUNGEON_MOB_TYPES[Math.floor(Math.random() * DUNGEON_MOB_TYPES.length)];
-        const mob = spawnMob(type, x, y, 1);
-        if (mob) count++;
+    // Fase 3: mantém população em CADA andar com player; limpa andares vazios
+    // (masmorra efêmera — não simula andar sem ninguém e evita acúmulo de mobs).
+    const floorsWithPlayers = new Set();
+    for (const p of players.values()){ const f = p.floor || 0; if (f >= 1) floorsWithPlayers.add(f); }
+    for (const m of Array.from(monsters.values())){
+        if ((m.floor || 0) >= 1 && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
     }
+    for (const floor of floorsWithPlayers){
+        let count = 0;
+        for (const m of monsters.values()) if ((m.floor || 0) === floor && m.hp > 0 && !m.unique) count++;
+        let tries = 0;
+        while (count < DUNGEON_MOB_TARGET && tries < 120){
+            tries++;
+            const x = DUNGEON_ROOM.x0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.x1 - DUNGEON_ROOM.x0 - 1));
+            const y = DUNGEON_ROOM.y0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.y1 - DUNGEON_ROOM.y0 - 1));
+            // não nasce nas escadas (subida 50,50 / descida 50,57) nem na chegada (50,52)
+            if (Math.abs(x - 50) <= 1 && ((y >= 49 && y <= 53) || (y >= 56 && y <= 58))) continue;
+            if (mobAt(x, y, floor)) continue;
+            const type = DUNGEON_MOB_TYPES[Math.floor(Math.random() * DUNGEON_MOB_TYPES.length)];
+            const mob = spawnMob(type, x, y, floor);
+            if (mob) count++;
+        }
+    }
+}
+
+// Fase 3: coloca o player num andar da masmorra (entrada nova OU troca de andar).
+// Popula o andar ANTES de mandar o snapshot (senão chega numa sala vazia). `dir`
+// só rotula a direção no cliente (log/toast).
+function enterDungeonFloor(p, id, floor, dir){
+    p.floor = floor;
+    p.x = DUNGEON_SPAWN.x; p.y = DUNGEON_SPAWN.y;
+    spawnDungeonMobs();
+    if (p.ws.readyState === 1){
+        p.ws.send(JSON.stringify({
+            t:'dungeonEnter', floor, dir: dir || 'down', x: p.x, y: p.y,
+            players: snapshotPlayers(floor).filter(sp => sp.id !== id),
+            mobs: snapshotMobs(floor),
+        }));
+    }
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
 }
 
 function tickRespawns(){
@@ -1604,18 +1634,17 @@ function pickSurroundSlot(m, target){
             if (!dx && !dy) continue;
             const x = target.x + dx, y = target.y + dy;
             if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
-            if (!isWalkable(x, y)) continue;
-            if (inSafe(x, y)) continue;
-            const occ = mobAt(x, y);
+            if (!mobTileOk(m, x, y)) continue;   // floor-aware: masmorra valida a sala; overworld = walkable + fora da PZ
+            const occ = mobAt(x, y, m.floor);
             if (occ && occ !== m) continue;
-            if (playerAt(x, y)) continue;
+            if (playerAt(x, y, m.floor)) continue;
             const d = Math.max(Math.abs(m.x - x), Math.abs(m.y - y));
             let score = d;
             // intel >=2: penaliza vagas perto de outros mobs (espalha)
             if (intel >= 2){
                 let cluster = 0;
                 for (const om of monsters.values()){
-                    if (om === m || om.hp <= 0) continue;
+                    if (om === m || om.hp <= 0 || (om.floor||0) !== (m.floor||0)) continue;
                     const od = Math.max(Math.abs(om.x - x), Math.abs(om.y - y));
                     if (od <= 1) cluster++;
                 }
@@ -5410,10 +5439,11 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
-        // ─── M4 Masmorra: descer/subir andares ──────────────────────────────
-        // enterDungeon: player adjacente à escada da PZ → vai pro andar 1.
-        // PvP forçado (salva o toggle anterior). exitDungeon: volta pra cidade.
-        // Broadcast leave/join pra ressincronizar quem vê o player em cada floor.
+        // ─── M4 Masmorra: descer/subir andares (Fase 3: 1..DUNGEON_MAX_FLOOR) ──
+        // enterDungeon: overworld → andar 1 (escada do Antro). descendDungeon:
+        // andar N → N+1 (escada de descida). exitDungeon: sobe 1 andar (andar 1 →
+        // cidade). PvP forçado em qualquer andar; o toggle só é restaurado ao sair
+        // pra cidade. Broadcast leave/join ressincroniza quem vê o player por floor.
         if (msg.t === 'enterDungeon') {
             const now = Date.now();
             p._lastFloorAt = p._lastFloorAt || 0;
@@ -5424,24 +5454,28 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             p._lastFloorAt = now;
-            // some do overworld pros players da cidade
-            broadcast(id, { t:'leave', id }, 0);
-            // PvP forçado — salva o estado anterior pra restaurar na saída
-            p._pvpBeforeDungeon = !!p.pvp;
+            broadcast(id, { t:'leave', id }, 0);       // some do overworld
+            p._pvpBeforeDungeon = !!p.pvp;             // salva PvP pra restaurar na saída
             p.pvp = true;
-            p.floor = 1;
-            p.x = DUNGEON_SPAWN.x; p.y = DUNGEON_SPAWN.y;
-            // manda o player pro andar
-            if (p.ws.readyState === 1){
-                p.ws.send(JSON.stringify({
-                    t:'dungeonEnter', floor: 1, x: p.x, y: p.y,
-                    players: snapshotPlayers(1).filter(sp => sp.id !== id),
-                    mobs: snapshotMobs(1),
-                }));
+            enterDungeonFloor(p, id, 1, 'down');
+            console.log(`[dungeon] ${p.name} entrou nas Profundezas (andar 1)`);
+            return;
+        }
+
+        if (msg.t === 'descendDungeon') {
+            const now = Date.now();
+            p._lastFloorAt = p._lastFloorAt || 0;
+            if (now - p._lastFloorAt < 600) return;
+            const cur = p.floor || 0;
+            if (cur < 1 || cur >= DUNGEON_MAX_FLOOR) return;   // precisa estar num andar e não no último
+            if (chebyshev(p.x, p.y, DUNGEON_DOWN.x, DUNGEON_DOWN.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
+                return;
             }
-            // aparece pros players já no andar
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 1);
-            console.log(`[dungeon] ${p.name} desceu pro andar 1`);
+            p._lastFloorAt = now;
+            broadcast(id, { t:'leave', id }, cur);     // some do andar atual
+            enterDungeonFloor(p, id, cur + 1, 'down');
+            console.log(`[dungeon] ${p.name} desceu pro andar ${cur + 1}`);
             return;
         }
 
@@ -5449,26 +5483,33 @@ wss.on('connection', (ws, request) => {
             const now = Date.now();
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
-            if ((p.floor || 0) === 0) return;          // já está na cidade
+            const cur = p.floor || 0;
+            if (cur === 0) return;                      // já está na cidade
             if (chebyshev(p.x, p.y, DUNGEON_EXIT.x, DUNGEON_EXIT.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
                 return;
             }
             p._lastFloorAt = now;
-            const fromFloor = p.floor || 0;
-            broadcast(id, { t:'leave', id }, fromFloor);   // some do andar
-            p.pvp = !!p._pvpBeforeDungeon;                 // restaura PvP
-            p.floor = 0;
-            p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
-            if (p.ws.readyState === 1){
-                p.ws.send(JSON.stringify({
-                    t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
-                    players: snapshotPlayers(0).filter(sp => sp.id !== id),
-                    mobs: snapshotMobs(0),
-                }));
+            broadcast(id, { t:'leave', id }, cur);      // some do andar atual
+            if (cur === 1){
+                // andar 1 → cidade (overworld): restaura PvP e volta pro Antro
+                p.pvp = !!p._pvpBeforeDungeon;
+                p.floor = 0;
+                p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
+                if (p.ws.readyState === 1){
+                    p.ws.send(JSON.stringify({
+                        t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
+                        players: snapshotPlayers(0).filter(sp => sp.id !== id),
+                        mobs: snapshotMobs(0),
+                    }));
+                }
+                broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+                console.log(`[dungeon] ${p.name} voltou pra cidade`);
+            } else {
+                // sobe 1 andar (continua na masmorra, PvP segue forçado)
+                enterDungeonFloor(p, id, cur - 1, 'up');
+                console.log(`[dungeon] ${p.name} subiu pro andar ${cur - 1}`);
             }
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
-            console.log(`[dungeon] ${p.name} voltou pra cidade`);
             return;
         }
 
@@ -5663,7 +5704,7 @@ wss.on('connection', (ws, request) => {
                 } else {
                     // Mob comum: espalha em anel quando há vários itens (senão tudo
                     // empilha num tile e some). 1-2 itens ficam no tile. Valida tile.
-                    const DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2]];
+                    const DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];   // só 3x3: loot perto da morte (coletar não puxa mais mob)
                     let spreadIdx = 0;
                     for (const it of loot){
                         if (!it || !it.type) continue;
