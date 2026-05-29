@@ -7,6 +7,46 @@
 
 ---
 
+## 🔒 Sessão 29/05/2026 (cont.) — Auditoria da masmorra + 4 fixes de combate/loot
+
+Pedido do dono: auditar a masmorra Fase 3 antes de seguir. **Descoberta de processo:**
+`/security-review` + `/code-review` comparam o branch contra `origin/main` — e como a
+Fase 3 já está em produção (`origin/main` == HEAD), o diff é vazio. Eles auditam *feature
+branch antes do merge*, não código já shipado. Auditoria feita **manual** nas funções
+nomeadas (handlers de transição, `spawnDungeonMobs`, escala, `distributeBossLoot`,
+`isTransitionTile`).
+
+### 🔴 CRÍTICO — dano client-side permitia one-shot do boss + roubo de 100% do loot
+`attackMob` capava o dano em `MTYPE[m.type].hp + 50` (comentário mentia "3× dmg"). Pro
+boss (5000hp) o teto era 5050: `{t:'attackMob', amount:5050}` matava em **1 hit** e
+levava todo o loot top-tier (`damageBy` = 100%). Pré-existente, mas o boss 5000hp de Fase
+3 elevou pra crítico (e neutralizava o cooldown). **2 fixes:**
+- `MAX_HIT_DMG = 600` — maior hit legítimo ≈ **372** (arma mítica+forja 37 + skill cap
+  `floor(200/3)`=66 + var 2 = 105, ×2 crit = 210, × mults máx ~1,77). 600 = folga 1,6×,
+  nunca capa hit real; boss vira ≥9 hits.
+- `ATTACK_MIN_INTERVAL_MS = 200` — rate-limit no attackMob. Ataque legítimo mais rápido =
+  **680ms** (`attackDelay` 800 × `atkSpd` máx 0,15 da forja; cliente trava o input nisso),
+  então 200ms tem 3,4× de folga (campo dedicado `_lastAttackMobAt`, não colide com a
+  mini-PZ). Juntos fecham o farm: ≥9 hits a ≥200ms = ≥1,8s, e o boss revida.
+
+### 🟠 MÉDIO — loot de boss farmável por alts em party
+`distributeBossLoot` em party puxava TODOS os membros no andar (peso 1), mesmo com 0 de
+dano → alts parados no andar 5 farmavam loot. **Fix:** só quem deu dano entra no rateio.
+(Removida a var morta `bossFloor` de quebra.)
+
+### 🟡 BAIXO — deferido (sistêmico, trust de movimento/combate do jogo todo)
+- Transição de andar é **UX-gated**: `p.x/y` é client-trusted → dá pra *rushar* 1→5 em
+  ~2,4s (anti-spam 600ms). A máquina de estados de floor É server-side (sem pulo
+  arbitrário). Resolver o crítico tira o valor disso.
+- `range` do attackMob é client-side → ataque de longe.
+> Refactor de movimento autoritativo é o caminho — fora do escopo de hotfix.
+
+### ✅ O que estava correto
+Escala `1+0,6·(andar-1)` (andar 5 = 3,4×), boss isolado do leveling do mundo, clamp de
+coords no `pos`, DoTs clampados, `isTransitionTile`, PvP forçado persistindo pelos andares.
+
+---
+
 ## 📅 Sessão 29/05/2026 — M4 Fase 3 (descida + boss) + polish da masmorra
 
 **6 commits** (`cf0e937` → `c6ed9f1`). Deploys feitos com o dono sozinho no servidor.
@@ -49,13 +89,10 @@ Novato não cai mais sem querer. Retorno em (83,18).
   `key === 'X'` quebra pra forjado; resolver a base.
 
 ### ⚠️ Pendências (pra próxima)
-- **🔁 Boss respawna NA HORA ao morrer** (dono 29/05: "matei e já deu spawn em
-  seguida rsrs"): `spawnDungeonMobs` repõe o boss sempre que o andar 5 tem player
-  e não tem boss vivo → **farm infinito**. Fix: cooldown de respawn (~8 min, tipo
-  bosses do mundo) — `dungeonBossDeath` (Map floor→ts) + checar `now - deadAt >
-  DUNGEON_BOSS_RESPAWN_MS` no spawn + registrar nos 2 caminhos de morte
-  (`handleMobDeath` + attackMob death) com `m.type === DUNGEON_BOSS_TYPE`. Vai no
-  próximo deploy de server (junto da auditoria/3b/calibragem).
+- **✅ 🔁 Boss respawna NA HORA ao morrer — RESOLVIDO** (ver seção Auditoria+fixes
+  acima): `dungeonBossDeath` (Map floor→ts) + gate de 8min no `spawnDungeonMobs` +
+  registro nos 2 caminhos de morte (`handleMobDeath` + attackMob). Foi junto do
+  deploy da auditoria.
 - **Reconexão da masmorra cai no mato** (coords da masmorra no overworld; dono saiu em
   (40,40)). Fix OFERECIDO, não feito: jogar na cidade (50,50) com trava one-shot no join
   (anti-abuso de teleporte/fuga de PvP). Aguardando OK do dono.

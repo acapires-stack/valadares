@@ -40,7 +40,8 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 
 ### 🔴 P0.6 — Hardening pendente pra próxima auditoria
 
-- **🔍 AUDITORIA COMPLETA (próxima sessão, pedido do dono)** — segurança + código das mudanças da masmorra Fase 3: handlers `descendDungeon`/transições, `spawnDungeonMobs`/despawn por andar, escala de stats, `distributeBossLoot`, `isTransitionTile`. Rodar `/security-review` + `/code-review`.
+- **✅ AUDITORIA COMPLETA (masmorra Fase 3) — FEITA 29/05.** Manual: os skills `/security-review`+`/code-review` só comparam o branch contra `origin/main`, e a Fase 3 já está shipada (`origin/main`==HEAD) → diff vazio. Achados: 🔴 **crítico** (dano client-side one-shotava o boss 5000hp e roubava 100% do loot via `damageBy` → `MAX_HIT_DMG=600` + rate-limit `ATTACK_MIN_INTERVAL_MS=200` no attackMob), 🟠 **médio** (alts parados em party farmavam loot do boss → só damager divide), 🟡 **baixo** deferido. Detalhes no `SESSION_NOTES.md`.
+- **🔧 Refactor de movimento/combate autoritativo (deferido, do audit)** — `p.x/y` (transição de andar) e `range`/cadência de ataque são client-trusted. Hoje mitigado por clamp de coords + `MAX_HIT_DMG` + rate-limit; o caminho definitivo é o server validar movimento e cadência por arma. Sistêmico — fora de hotfix.
 
 - **Same-player 2× simultâneo** (mobile + PC) cria 2 entries no `players` Map → state inconsistency
 - **`_errorRateMap` leak lento** — sem cleanup periódico, cresce indefinidamente
