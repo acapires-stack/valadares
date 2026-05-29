@@ -32,16 +32,18 @@ function savePrefs(p){
 }
 
 // ─── Auto-detect zoom baseado em resolução ────────────────────────────────
-// Telas pequenas (1366×768 = laptop popular) → +10% zoom. 4K mantém padrão.
-// Só roda na PRIMEIRA abertura (prefs.zoomLevel ausente). Depois respeita
-// preferência do usuário.
+// Telas pequenas (1366×768 = laptop popular) → +10-15% zoom. Mesmo 1080p
+// ganha um leve aumento (acessibilidade pra olhos cansados — usuário pode
+// reduzir via Ctrl+- ou Settings se preferir). Só roda na PRIMEIRA abertura
+// (prefs.zoomLevel ausente). Depois respeita preferência do usuário.
 function detectInitialZoom(){
     try {
         const { workAreaSize } = screen.getPrimaryDisplay();
         const w = workAreaSize.width;
-        if (w < 1280) return 1;   // tela apertada — zoom 1 (Electron level 1 ≈ +10%)
-        if (w < 1600) return 0.5; // laptop comum — leve aumento
-        return 0;                  // 1080p+ — padrão
+        if (w < 1280) return 1;     // tela apertada — zoom 1 (Electron level 1 ≈ +10%)
+        if (w < 1600) return 0.5;   // laptop comum (1366×768) — leve aumento
+        if (w < 2200) return 0.25;  // 1080p — pequeno boost de legibilidade
+        return 0;                    // 1440p+ / 4K — padrão (escala alta nativa)
     } catch { return 0; }
 }
 
@@ -56,6 +58,11 @@ function createWindow() {
         backgroundColor: '#0a0805',
         autoHideMenuBar: true,
         useContentSize: true,
+        // show:false combinado com ready-to-show é o padrão correto pra
+        // garantir que maximize() seja aplicado ANTES do user ver a janela.
+        // Antes (v1.0.4): maximize() chamado direto após o new BrowserWindow
+        // não pegava em todos os cenários — usuário via janela 1440×900 normal.
+        show: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -67,9 +74,22 @@ function createWindow() {
         },
     });
 
-    // Maximiza sempre ao abrir — acessibilidade pra quem tem dificuldade de
-    // arrastar canto da janela e quer aproveitar o monitor inteiro.
-    mainWindow.maximize();
+    // Maximiza ANTES de mostrar (acessibilidade pra quem tem dificuldade de
+    // arrastar canto da janela e quer aproveitar o monitor inteiro). Fallback
+    // explícito também após show por segurança em alguns drivers de janela.
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.maximize();
+        mainWindow.show();
+        // Se preferência de fullscreen salva: aplica também
+        if (prefs.fullScreen) mainWindow.setFullScreen(true);
+        // Belt-and-suspenders: se por algum motivo a janela não maximizou,
+        // tenta de novo após um tick (alguns drivers Windows demoram).
+        setTimeout(() => {
+            if (!mainWindow.isMaximized() && !mainWindow.isFullScreen()) {
+                mainWindow.maximize();
+            }
+        }, 100);
+    });
 
     // Esconde menu nativo (File/Edit/View/etc)
     Menu.setApplicationMenu(null);
