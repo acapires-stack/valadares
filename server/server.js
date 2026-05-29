@@ -1218,6 +1218,7 @@ function snapshotPlayers(){
         cosmetic: p.cosmetic || null,
         equipped: p.equipped || null,
         badges: p.badges || [],
+        dyes: p.dyes || null,
         guild: findGuildOfPlayer(p.name)?.name || null,
         ghost: !!p.disconnected,
     }));
@@ -2994,7 +2995,7 @@ function pvpMultsServer(p){
 function broadcastPstatsAll(p){
     const payload = JSON.stringify({
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
-        cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || []
+        cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null
     });
     for (const other of players.values()){
         if (other.ws.readyState === 1) other.ws.send(payload);
@@ -3984,6 +3985,9 @@ wss.on('connection', (ws, request) => {
             // Pos também — cliente pode mandar NaN/undefined
             if (typeof p.x === 'number' && isFinite(p.x)) data.x = p.x;
             if (typeof p.y === 'number' && isFinite(p.y)) data.y = p.y;
+            // M6 Tinturaria — server é dono. Sobrescreve qualquer dyes do cliente
+            // pelos valores autoritativos atuais (alteráveis só via handler dyeItem).
+            data.dyes = p.dyes || {};
             setPlayerSave(p.authedName, data);
             return;
         }
@@ -4035,6 +4039,14 @@ wss.on('connection', (ws, request) => {
                         if (TALENT_DEFS[tid] && acc.save.talents[tid]) p.talents[tid] = true;
                     }
                 }
+                // M6 Tinturaria: hidrata tintas autoritativas do save.
+                if (acc.save.dyes && typeof acc.save.dyes === 'object'){
+                    p.dyes = {};
+                    for (const slot of ['armor','head','feet','cosmetic']){
+                        const c = acc.save.dyes[slot];
+                        if (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) p.dyes[slot] = c;
+                    }
+                }
             } else {
                 if (msg.equipped && typeof msg.equipped === 'object') p.equipped = { ...p.equipped, ...msg.equipped };
             }
@@ -4079,7 +4091,7 @@ wss.on('connection', (ws, request) => {
             } else {
                 ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
             }
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], guild: findGuildOfPlayer(p.name)?.name || null } });
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } });
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
@@ -4593,7 +4605,7 @@ wss.on('connection', (ws, request) => {
                 statsChanged = true;
             }
             if (statsChanged){
-                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null });
             }
             return;
         }
@@ -4978,6 +4990,57 @@ wss.on('connection', (ws, request) => {
                     bet, payout, mult, kind,
                 }));
             }
+            return;
+        }
+
+        // ─── M6 Tinturaria — gold sink cosmético ────────────────────────────
+        // Override de cor por slot equipado (armor/head/feet/cosmetic). Cor é
+        // do slot, não do item: trocar a armor mantém a tinta. Server é dono —
+        // F12 com cor fora da palette ou slot inválido falha. Persiste em
+        // p.dyes, broadcast via pstats pra outros verem em tempo real.
+        if (msg.t === 'dyeItem') {
+            const TINTUREIRA_POS = { x: 50, y: 50 };
+            const DYE_SLOTS = ['armor', 'head', 'feet', 'cosmetic'];
+            const DYE_PALETTE = [
+                '#d04040','#e08020','#e0c040','#60c040','#40c0c0','#4080e0',
+                '#a040e0','#e040a0','#ffffff','#202020','#a06030','#808080'
+            ];
+            const DYE_PRICE = 5000;
+            const DYE_REMOVE_PRICE = 1000;
+            const now = Date.now();
+            p._lastDyeAt = p._lastDyeAt || 0;
+            if (now - p._lastDyeAt < 800) return;
+            p._lastDyeAt = now;
+            if (chebyshev(p.x, p.y, TINTUREIRA_POS.x, TINTUREIRA_POS.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dyeResult', error:'not_at_npc' }));
+                return;
+            }
+            const slot = String(msg.slot || '');
+            if (!DYE_SLOTS.includes(slot)) return;
+            const color = (msg.color === null || msg.color === undefined) ? null : String(msg.color);
+            if (color !== null && !DYE_PALETTE.includes(color)) return;
+            if (!p.equipped || !p.equipped[slot]){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dyeResult', error:'no_item' }));
+                return;
+            }
+            const cost = (color === null) ? DYE_REMOVE_PRICE : DYE_PRICE;
+            if ((p.gold || 0) < cost){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dyeResult', error:'no_gold' }));
+                return;
+            }
+            p.gold -= cost;
+            p.dyes = p.dyes || {};
+            if (color === null) delete p.dyes[slot];
+            else p.dyes[slot] = color;
+            syncGoldRank(p.name, p.gold);
+            sendInvUpdate(p, {
+                goldDelta:{ amount: -cost, reason: color === null ? 'dye_remove' : 'dye' },
+                dyes: p.dyes,
+            });
+            if (p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({ t:'dyeResult', ok:true, slot, color }));
+            }
+            broadcastPstatsAll(p);
             return;
         }
 

@@ -834,7 +834,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #forgotPwdModal, #partyInviteModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #forgotPwdModal, #partyInviteModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -2118,6 +2118,21 @@
     </div>
 </div>
 
+<div id="dyeModal" style="display:none">
+    <div class="chest-box" style="min-width:400px;max-width:480px">
+        <div class="chest-title">🎨 TINTURARIA</div>
+        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
+            Tinge um slot equipado · <b style="color:#ffd060">5.000g</b> por cor · <b style="color:#8aa050">1.000g</b> pra remover
+        </div>
+        <div id="dyeBody"></div>
+        <div id="dyeResult" style="text-align:center;min-height:18px;margin-top:10px;font-size:12px;color:#c8a050"></div>
+        <div class="chest-hint" style="margin-top:10px">
+            <kbd>ESC</kbd> fechar
+        </div>
+        <button class="chest-close" onclick="closeDye()">×</button>
+    </div>
+</div>
+
 <div id="talentsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
         <div class="chest-title">⚜ TALENTOS</div>
@@ -2382,6 +2397,8 @@ const NPCS = [
     { id:'atendente', name:'Atendente',    pos:{x:52,y:52}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
     // M6 Gold sink — Cassino (RNG autoritativo no server, house edge ~5-8%)
     { id:'crupie',    name:'Crupiê',       pos:{x:48,y:50}, body:'#2a1a4a', hat:'#cc2050', action:'casino',   hint:'cassino' },
+    // M6 Gold sink — Tinturaria (cor override por slot, 5kg/aplicação, 1kg/remover)
+    { id:'tintureira',name:'Tintureira',   pos:{x:50,y:50}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
     // Mundo — chains narrativas (cada um tem seu local temático)
     { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', chain:'cripta' },
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
@@ -2431,6 +2448,7 @@ function npcInteractionHint(npc){
     if (npc.action === 'goldshop') return { label:'comprar gold',   marker:'💰', markerColor:'#ffd700' };
     if (npc.action === 'quests')   return { label:'quests',         marker:null };
     if (npc.action === 'casino')   return { label:'cassino',        marker:'🎰', markerColor:'#cc2050' };
+    if (npc.action === 'dye')      return { label:'tinturaria',     marker:'🎨', markerColor:'#e040a0' };
     if (npc.action === 'chain'){
         const stages = (player.questFlags && player.questFlags[npc.chain]) || null;
         const chain = QUEST_CHAINS[npc.chain];
@@ -2453,6 +2471,7 @@ function interactNpc(npc){
     if (npc.action === 'goldshop') { openGoldShop(); return; }
     if (npc.action === 'quests')   { openQuests(); return; }
     if (npc.action === 'casino')   { openCasino(); return; }
+    if (npc.action === 'dye')      { openDye(); return; }
     if (npc.action === 'chain')    { openChainDialog(npc); return; }
 }
 const TRAINING_TIME = 2000;   // ms por sessão
@@ -3082,8 +3101,11 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     };
     const armorDef = safeItem(eq.armor);
     const feetDef  = safeItem(eq.feet);
-    const bodyColor = armorDef ? armorDef.color : (eq.bodyColor || '#3a3a3a');
-    const bootsColor = feetDef ? feetDef.color : '#2a3880';
+    // M6 Tinturaria: tinta override por slot (armor/head/feet/cosmetic).
+    // Cor do slot, não do item — trocar a armor mantém a tinta.
+    const dye = (slot) => (eq.dyes && eq.dyes[slot]) || null;
+    const bodyColor = dye('armor') || (armorDef ? armorDef.color : (eq.bodyColor || '#3a3a3a'));
+    const bootsColor = dye('feet') || (feetDef ? feetDef.color : '#2a3880');
     // sombra (fica fixa no chão, varia ligeiramente com o bob — quando pula, sombra encolhe)
     const b = bob || 0;
     const shadowScale = b < 0 ? 1 - Math.abs(b)*0.04 : 1;
@@ -3093,7 +3115,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     py += b;
     // Capa (cosmético) — desenhada atrás do corpo
     if (eq.cape){
-        ctx.fillStyle = eq.cape;
+        ctx.fillStyle = dye('cosmetic') || eq.cape;
         // trapézio descendente atrás do boneco
         ctx.beginPath();
         ctx.moveTo(px+12, py+14);
@@ -3175,7 +3197,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     // capacete
     if (eq.head){
         const headDef = safeItem(eq.head);
-        const hc = headDef ? headDef.color : '#8a6020';
+        const hc = dye('head') || (headDef ? headDef.color : '#8a6020');
         ctx.fillStyle = hc; ctx.fillRect(px+13, py+2, 22, 8);
         ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(px+14, py+3, 20, 3);
         if (eq.head === 'ELMO_CHIFRES'){
@@ -4326,6 +4348,7 @@ const player = {
     autoAttack: false,
     weapon: null,   // chave de ITEMS atualmente equipado (mão)
     equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null },
+    dyes: {},   // M6 Tinturaria: { armor:'#hex', head:'#hex', feet:'#hex', cosmetic:'#hex' } — server autoritativo
     skills: {
         'Punho':     { val:10, xp:0, xpNext:50 },
         'Espada':    { val:10, xp:0, xpNext:50 },
@@ -5056,7 +5079,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -5966,6 +5989,7 @@ function handleMP(msg){
                     player.renderY = p.y; player.prevY = p.y;
                 }
                 if ('guild' in p) player.guild = p.guild;
+                if ('dyes' in p) player.dyes = (p.dyes && typeof p.dyes === 'object') ? p.dyes : {};
             }
         });
         updatePlayersOnline(msg.players);
@@ -6055,6 +6079,7 @@ function handleMP(msg){
             if ('cosmetic' in msg) rp.cosmetic = msg.cosmetic;
             if (msg.equipped && typeof msg.equipped === 'object') rp.equipped = msg.equipped;
             if (Array.isArray(msg.badges)) rp.badges = msg.badges.slice(0, 2);
+            if ('dyes' in msg) rp.dyes = (msg.dyes && typeof msg.dyes === 'object') ? msg.dyes : {};
         }
     } else if (msg.t === 'float'){
         // mostra float text na posição do player remoto
@@ -6089,6 +6114,13 @@ function handleMP(msg){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
+        // M6 Tinturaria: dyes autoritativos do server.
+        if (msg.dyes && typeof msg.dyes === 'object'){
+            player.dyes = msg.dyes;
+            // Re-render do modal se aberto pra refletir cor selecionada
+            const dm = document.getElementById('dyeModal');
+            if (dm && dm.style.display === 'flex' && typeof renderDye === 'function') renderDye();
+        }
         // N3 fase 2: equipped também é autoritativo
         if (msg.equipped && typeof msg.equipped === 'object'){
             // Merge: server pode mandar slots null (desequipou). Não sobrescreve cosmetic
@@ -6347,6 +6379,25 @@ function handleMP(msg){
             log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
         }
         saveState();
+    } else if (msg.t === 'dyeResult'){
+        // M6 Tinturaria — feedback do server. invUpdate já atualizou player.dyes
+        // e gold; aqui só renderizamos o resultado no modal (se aberto).
+        const out = document.getElementById('dyeResult');
+        if (!out) return;
+        if (msg.ok){
+            if (msg.color === null){
+                out.innerHTML = '<span style="color:#8aa050">✓ Tinta removida (−1.000g)</span>';
+            } else {
+                out.innerHTML = `<span style="color:#74d176">✓ Tingido (−5.000g)</span>`;
+            }
+        } else {
+            const errs = {
+                not_at_npc: 'Aproxime-se da Tintureira',
+                no_item:    'Nenhum item equipado neste slot',
+                no_gold:    'Sem ouro suficiente',
+            };
+            out.innerHTML = `<span style="color:#cc3030">✗ ${errs[msg.error] || 'Falhou'}</span>`;
+        }
     } else if (msg.t === 'casinoResult'){
         // M6 — server rolou os 3 símbolos + payout. Cliente só renderiza.
         const reels = document.querySelectorAll('#casinoReels .reel');
@@ -6980,6 +7031,80 @@ function casinoSpin(amount){
 window.openCasino = openCasino;
 window.closeCasino = closeCasino;
 window.casinoSpin = casinoSpin;
+
+// ─── M6 Tinturaria — cor override por slot equipado ─────────────────────
+// Server (handler dyeItem) é fonte autoritativa de cor + gold. Cliente só
+// renderiza UI e envia request. player.dyes = { [slot]: '#hex' } reflete
+// snapshot do server (chega via invUpdate.dyes e pstats.dyes pra outros).
+const DYE_PALETTE = [
+    '#d04040','#e08020','#e0c040','#60c040','#40c0c0','#4080e0',
+    '#a040e0','#e040a0','#ffffff','#202020','#a06030','#808080'
+];
+const DYE_SLOT_LABELS = {
+    armor:    { label:'Armadura',         icon:'🛡' },
+    head:     { label:'Capacete',         icon:'🪖' },
+    feet:     { label:'Botas',            icon:'👢' },
+    cosmetic: { label:'Capa (cosmético)', icon:'✦' },
+};
+function openDye(){
+    closeAllModals();
+    document.getElementById('dyeModal').style.display = 'flex';
+    document.getElementById('dyeResult').textContent = '';
+    renderDye();
+}
+function closeDye(){ document.getElementById('dyeModal').style.display = 'none'; }
+function renderDye(){
+    const body = document.getElementById('dyeBody');
+    const dyes = player.dyes || {};
+    const eq = player.equipped || {};
+    let html = '';
+    for (const slot of ['armor','head','feet','cosmetic']){
+        const cfg = DYE_SLOT_LABELS[slot];
+        const itemKey = eq[slot];
+        const current = dyes[slot] || null;
+        const itemName = itemKey ? ((ITEMS[itemKey] && ITEMS[itemKey].name) || itemKey) : '— vazio —';
+        html += `<div style="margin-bottom:10px;padding:10px;background:#0a0805;border:1px solid #3a2d20;border-radius:4px">`;
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
+        html += `<div style="color:#c8a050;font-weight:600;font-size:13px">${cfg.icon} ${cfg.label}</div>`;
+        html += `<div style="color:#8a7050;font-size:11px">${itemName}</div>`;
+        html += `</div>`;
+        if (itemKey){
+            html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">`;
+            for (const c of DYE_PALETTE){
+                const isSel = current === c;
+                const border = isSel ? '2px solid #ffd060' : '1px solid #3a2d20';
+                const box = isSel ? '0 0 6px rgba(255,208,96,0.6)' : 'none';
+                html += `<button onclick="applyDye('${slot}','${c}')" title="Tingir 5.000g" style="width:26px;height:26px;background:${c};border:${border};border-radius:3px;cursor:pointer;box-shadow:${box};padding:0"></button>`;
+            }
+            const removeStyle = current
+                ? 'background:#3a1a1a;color:#e08080;border:1px solid #5a2020;cursor:pointer'
+                : 'background:#1a1410;color:#5a5040;border:1px solid #2a2418;cursor:not-allowed';
+            html += `<button onclick="applyDye('${slot}',null)" ${current ? '' : 'disabled'} title="Remover 1.000g" style="margin-left:6px;padding:4px 10px;border-radius:3px;font-size:11px;${removeStyle}">Remover</button>`;
+            html += `</div>`;
+        } else {
+            html += `<div style="color:#5a5040;font-size:11px;font-style:italic">Equipe um item neste slot pra tingir.</div>`;
+        }
+        html += `</div>`;
+    }
+    body.innerHTML = html;
+}
+function applyDye(slot, color){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed){
+        document.getElementById('dyeResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        return;
+    }
+    const cost = (color === null) ? 1000 : 5000;
+    if ((player.gold|0) < cost){
+        document.getElementById('dyeResult').innerHTML = `<span style="color:#cc3030">Sem ouro suficiente (${cost.toLocaleString('pt-BR')}g)</span>`;
+        return;
+    }
+    try {
+        ws.send(JSON.stringify({ t:'dyeItem', slot, color }));
+    } catch {}
+}
+window.openDye = openDye;
+window.closeDye = closeDye;
+window.applyDye = applyDye;
 
 function renderGoldShop(){
     const el = document.getElementById('goldShopList');
@@ -13447,7 +13572,7 @@ function loop(ts){
             const hpPct = (p.maxHp > 0) ? Math.max(0, Math.min(1, (p.hp ?? p.maxHp) / p.maxHp)) : 1;
             const mpPct = (p.maxMp > 0) ? Math.max(0, Math.min(1, (p.mp ?? 0) / p.maxMp)) : null;
             drawCharacter(px, py, p.dir||'down',
-                withCosmetics({ ...(p.equipped || { weapon:'ESPADA' }), bodyColor: bodyCol, guild: p.guild || null, badges: p.badges || null }, p.cosmetic),
+                withCosmetics({ ...(p.equipped || { weapon:'ESPADA' }), bodyColor: bodyCol, guild: p.guild || null, badges: p.badges || null, dyes: p.dyes || null }, p.cosmetic),
                 p.name, hpPct, 0, mpPct, getWalkBob(p));
             // overlay cinza translúcido se for ghost (corpo desconectado)
             if (p.ghost){
@@ -13467,7 +13592,7 @@ function loop(ts){
     // player (renderX/Y interpolado, com todos equipamentos visíveis)
     const ppx = (player.renderX-cam.x)*TS, ppy = (player.renderY-cam.y)*TS;
     drawCharacter(ppx, ppy, player.dir,
-        withCosmetics({ ...player.equipped, bodyColor: player.color }),
+        withCosmetics({ ...player.equipped, bodyColor: player.color, dyes: player.dyes || null }),
         null, player.hp/player.maxHp, player.hurtTimer/450,
         player.maxMp > 0 ? player.mp/player.maxMp : null,
         getWalkBob(player));
