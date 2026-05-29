@@ -1103,11 +1103,28 @@ function rollLoot(mobType){
 
 const BOSS_RESPAWN_MS = 5 * 60 * 1000;
 const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
+// Teto de dano por hit (anti-forja de msg.amount no attackMob). O maior hit
+// LEGÍTIMO possível é ~372: arma mítica forjada (ESPADA_ETERNA base 30 +5 = 37)
+// + skill no cap (floor(200/3)=66) + variância (2) = 105, ×2 crit = 210, × mults
+// máximos (selos+HL+buff ≈ 1,77) ≈ 372. 600 dá folga (nunca capa hit real) mas
+// impede one-shot de boss (ex.: Senhor das Profundezas 5000hp → ≥9 hits) e o
+// roubo de 100% do damageBy num único golpe forjado.
+const MAX_HIT_DMG = 600;
+// Intervalo mínimo entre ataques (attackMob) por player. O ataque legítimo mais
+// rápido é 680ms (attackDelay 800 × atkSpd máx 0,15 da forja), então 200ms tem
+// 3,4× de folga e nunca bloqueia jogo limpo — mas impede rajada de hits forjados.
+const ATTACK_MIN_INTERVAL_MS = 200;
 const BOSS_POS  = { type:'ORC_LIDER',   x:46, y:95, respawn: BOSS_RESPAWN_MS };
 const DRAKE_POS = { type:'DRAKE_LIDER', x:82, y:80, respawn: DUNGEON_BOSS_RESPAWN_MS };
 const GOLEM_POS = { type:'GOLEM_REI',   x:70, y:90, respawn: DUNGEON_BOSS_RESPAWN_MS };
 const BOSSES = [BOSS_POS, DRAKE_POS, GOLEM_POS];
 const bossDeath = new Map(); // type -> deathAt
+// M4 anti-farm: cooldown de respawn do boss da masmorra (Senhor das Profundezas).
+// Sem isso, spawnDungeonMobs repunha o boss no tick seguinte (8s) sempre que o andar
+// 5 tinha player e nenhum boss vivo → farm infinito ("matei e já spawnou de novo").
+// In-memory e efêmero como a própria masmorra: NÃO persiste no save nem precisa de
+// cleanup — bounded a 1 chave (DUNGEON_MAX_FLOOR) e é apagado no respawn.
+const dungeonBossDeath = new Map(); // floor -> deathAt
 const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
 const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
@@ -1523,10 +1540,17 @@ function spawnDungeonMobs(){
         if ((m.floor || 0) >= 1 && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
     }
     for (const floor of floorsWithPlayers){
-        // ★ Boss do último andar: 1 por delve (respawna fresco quando o andar reabre)
+        // ★ Boss do último andar: 1 por vez, com cooldown de respawn pós-morte (anti-farm)
         if (floor === DUNGEON_MAX_FLOOR){
             const hasBoss = Array.from(monsters.values()).some(mm => mm.type === DUNGEON_BOSS_TYPE && (mm.floor||0) === floor && mm.hp > 0);
-            if (!hasBoss) spawnMob(DUNGEON_BOSS_TYPE, DUNGEON_BOSS_SPAWN.x, DUNGEON_BOSS_SPAWN.y, floor);
+            // Cooldown anti-farm: só repõe o boss DUNGEON_BOSS_RESPAWN_MS (8min) após a
+            // última morte. Sem isso, matar e ficar no andar 5 = respawn no tick (8s).
+            // 1ª descida (sem morte registrada) → deadAt 0 → spawna na hora. OK.
+            const deadAt = dungeonBossDeath.get(floor) || 0;
+            if (!hasBoss && Date.now() - deadAt >= DUNGEON_BOSS_RESPAWN_MS){
+                spawnMob(DUNGEON_BOSS_TYPE, DUNGEON_BOSS_SPAWN.x, DUNGEON_BOSS_SPAWN.y, floor);
+                dungeonBossDeath.delete(floor);   // respawnou: zera o cooldown pro próximo ciclo
+            }
         }
         let count = 0;
         for (const m of monsters.values()) if ((m.floor || 0) === floor && m.hp > 0 && !m.unique) count++;
@@ -3039,7 +3063,6 @@ setInterval(safeTick('tickBencaoTempCleanup', tickBencaoTempCleanup), 60 * 1000)
 // não cai no chão. fallbackKiller leva tudo se ninguém foi rastreado.
 function distributeBossLoot(m, loot, fallbackKiller){
     const dmgBy = m.damageBy || {};
-    const bossFloor = m.floor || 0;
     // Quem deu dano (online)
     const damagers = [];
     for (const pid in dmgBy){
@@ -3057,15 +3080,10 @@ function distributeBossLoot(m, loot, fallbackKiller){
     const inParty = damagers.some(d => findPartyOfPlayer(d.p.name));
     const benef = new Map();   // pid -> { p, weight }
     if (inParty){
-        for (const d of damagers){
-            if (!benef.has(d.p.id)) benef.set(d.p.id, { p: d.p, weight: 1 });
-            const party = findPartyOfPlayer(d.p.name);
-            if (party){
-                for (const mp of partyMembersOnline(party)){
-                    if ((mp.floor || 0) === bossFloor && !benef.has(mp.id)) benef.set(mp.id, { p: mp, weight: 1 });
-                }
-            }
-        }
+        // Em party: quem DEU DANO divide igual. (Antes puxava TODOS os membros da
+        // party no andar, mesmo com 0 de dano → alts parados no andar 5 farmavam o
+        // loot do boss. Agora só participa do rateio quem efetivamente bateu.)
+        for (const d of damagers) benef.set(d.p.id, { p: d.p, weight: 1 });
     } else {
         for (const d of damagers) benef.set(d.p.id, { p: d.p, weight: d.dmg });
     }
@@ -3108,7 +3126,7 @@ function handleMobDeath(m, killerId){
         if (m.type === MEGA_BOSS_TYPE){
             const killer = players.get(killerId);
             if (killer) handleMegaBossDeath(killer, m);
-        } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 bosses do mundo escalam/respawnam por timer; boss de masmorra respawna fresco no re-entry
+        } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 bosses do mundo escalam/respawnam por timer
             bossDeath.set(m.type, Date.now());
             const cur = bossLevel.get(m.type) || 1;
             const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
@@ -3116,6 +3134,9 @@ function handleMobDeath(m, killerId){
             console.log(`[boss] ${m.type} morto (Lv${cur}) por DoT/killer=${killerId} → próximo Lv${next}`);
             saveStateToDisk();
             checkMegaBossSpawn();
+        } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da masmorra: registra cooldown anti-farm (não escala/persiste como os do mundo)
+            dungeonBossDeath.set(m.floor || 0, Date.now());
+            console.log(`[dungeon] ${DUNGEON_BOSS_TYPE} morto no andar ${m.floor||0} (DoT/killer=${killerId}) → cooldown ${DUNGEON_BOSS_RESPAWN_MS/60000}min`);
         }
     }
     // Hunter HL: se foi o último caçador do target, credita bonus
@@ -5613,6 +5634,14 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'attackMob') {
             const m = monsters.get(msg.monsterId);
             if (!m || m.hp <= 0) { sendTo(id, { t:'mobMissing', mobId: msg.monsterId }); return; }
+            // Rate-limit anti-spam: o ataque legítimo MAIS rápido é 680ms (o cliente
+            // trava o input nesse ritmo). 200ms tem 3,4× de folga — não afeta jogo
+            // limpo, mas barra a rajada de hits forjados que (mesmo com o teto de 600)
+            // mataria o boss 5000hp num piscar. Campo dedicado p/ não colidir com
+            // lastAttackAt (que serve à mini-PZ do NPC).
+            const nowAtk = Date.now();
+            if (nowAtk - (p._lastAttackMobAt || 0) < ATTACK_MIN_INTERVAL_MS) return;
+            p._lastAttackMobAt = nowAtk;
             const range = msg.range || 1;
             if (chebyshev(p.x, p.y, m.x, m.y) > range) return;
             p.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
@@ -5652,9 +5681,10 @@ wss.on('connection', (ws, request) => {
                 broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
             }
             if (invDirty) sendInvUpdate(p, { reason:'ammo' });
-            // teto de dano: 3x o dmg base do mob (margem confortável pros crits)
-            const cap = (MTYPE[m.type]?.hp || 50) + 50;  // teto generoso
-            const dmg = Math.max(1, Math.min(msg.amount | 0, cap));
+            // teto de dano por hit: MAX_HIT_DMG cobre o maior hit legítimo (~372) com
+            // folga. Antes era (hp do mob + 50) → permitia one-shot de QUALQUER mob,
+            // inclusive o boss 5000hp (amount:5050 = 1 golpe + 100% do loot por dano).
+            const dmg = Math.max(1, Math.min(msg.amount | 0, MAX_HIT_DMG));
             m.hp = Math.max(0, m.hp - dmg);
             // M4: rastreia dano por player em bosses unique — pro loot ser
             // distribuído por contribuição (anti-ninja). Só unique (sem overhead
@@ -5702,7 +5732,7 @@ wss.on('connection', (ws, request) => {
                     if (m.type === MEGA_BOSS_TYPE){
                         // ★★ Mega boss morreu — recompensa épica + reset bossLevel
                         handleMegaBossDeath(p, m);
-                    } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 do mundo escalam; boss de masmorra respawna fresco no re-entry
+                    } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 do mundo escalam/respawnam por timer
                         bossDeath.set(m.type, Date.now());
                         // próxima encarnação fica +1 nível (cap)
                         const cur = bossLevel.get(m.type) || 1;
@@ -5713,6 +5743,9 @@ wss.on('connection', (ws, request) => {
                         saveStateToDisk();
                         // Verifica se desbloqueou o mega boss
                         checkMegaBossSpawn();
+                    } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da masmorra: registra cooldown anti-farm
+                        dungeonBossDeath.set(m.floor || 0, Date.now());
+                        console.log(`[dungeon] ${DUNGEON_BOSS_TYPE} morto no andar ${m.floor||0} por ${p.name} → cooldown ${DUNGEON_BOSS_RESPAWN_MS/60000}min`);
                     }
                 }
                 monsters.delete(m.id);
