@@ -67,9 +67,13 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 - Checkpoints, boss no fim, loot escalado
 - Mata o "matei tudo, agora?"
 
-**M6 Outros gold sinks** [~60min cada]
-- Tinturaria — pinta cosméticos por preço escalonado
-- Pet cosmético — segue o player, sem combat impact
+**✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
+- NPC Tintureira em (50,50) na PZ, 4 slots tingíveis com 12 cores
+- 5.000g/aplicação · 1.000g/remover · server autoritativo
+- Detalhes: [commit e97fbd1](https://github.com/acapires-stack/valadares/commit/e97fbd1)
+
+**M6 Pet cosmético** [~60min]
+- Segue o player, sem combat impact
 
 **M7 Arena PvP** [2 sessões]
 - Bracket 1v1 e 3v3 com matchmaking simples (queue → match quando 2/6 prontos)
