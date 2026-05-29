@@ -2395,7 +2395,8 @@ const CHESTS = [
     { id:'b3', x:47, y:52, name:'Baú 3', lock:'#40cc40' },
     { id:'b4', x:53, y:52, name:'Baú 4', lock:'#ffcc40' },
 ];
-const TORCHES = [{x:47,y:47},{x:53,y:47},{x:47,y:53},{x:53,y:53}];
+// Tochas nos 4 cantos extremos da PZ (raio 4 = 46-54), longe dos NPCs (47/53)
+const TORCHES = [{x:46,y:46},{x:54,y:46},{x:46,y:54},{x:54,y:54}];
 
 function nearestChest(){
     for (const c of CHESTS){

@@ -1091,7 +1091,7 @@ const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 // Mantém aqui no server porque cliente é dono dos NPCs (não precisa sincronizar tudo).
 // Também usado pelo questTurnIn pra validar adjacência no momento da entrega.
 const QUEST_NPCS = {
-    atendente:  { x:52, y:52 },   // espaçada da Mercador/Banqueiro (1 tile entre cada)
+    atendente:  { x:47, y:53 },   // canto SO da PZ (sync com play.html NPCS)
     eremita:    { x:22, y:22 },
     ferreiro:   { x:78, y:22 },
     cacadora:   { x:76, y:78 },
@@ -1101,8 +1101,11 @@ const QUEST_NPCS = {
     vendedor:   { x:75, y:20 },
 };
 const NPC_POSITIONS = [
-    { x:52, y:48 },  // mercador
-    { x:52, y:50 },  // banqueiro
+    { x:47, y:47 },  // mercador (canto NO da PZ)
+    { x:53, y:50 },  // banqueiro (E meio da PZ)
+    { x:47, y:50 },  // crupiê (O meio da PZ)
+    { x:53, y:53 },  // tintureira (canto SE da PZ)
+    { x:53, y:47 },  // leiloeiro (canto NE da PZ)
     QUEST_NPCS.atendente,
     QUEST_NPCS.eremita,
     QUEST_NPCS.ferreiro,
@@ -1149,7 +1152,7 @@ let nextMobId = 1;
 // (sai do p.inv), debita gold do comprador na compra, paga seller (online
 // ou offline) menos 5% comissão (gold sink). Listings expiram em 24h e
 // voltam pro seller. Persistido em state.json.
-const AUCTION_NPC_POS      = { x: 50, y: 48 };
+const AUCTION_NPC_POS      = { x: 53, y: 47 };   // sync com NPCS.leiloeiro em play.html
 const AUCTION_COMMISSION   = 0.05;
 const AUCTION_DURATION_MS  = 24 * 60 * 60 * 1000;
 const AUCTION_MAX_LISTINGS = 10;
@@ -5042,7 +5045,7 @@ wss.on('connection', (ws, request) => {
         // server valida 100-10000g, debita aposta, rola 3 símbolos e credita
         // payout via goldDelta. House edge ~9% no longo prazo.
         if (msg.t === 'casinoSpin') {
-            const CASINO_NPC_POS = { x: 48, y: 50 };
+            const CASINO_NPC_POS = { x: 47, y: 50 };   // sync com NPCS.crupie em play.html
             const CASINO_WEIGHTS = [
                 { key:'CHERRY',  weight:35, mult3:3 },
                 { key:'LEMON',   weight:25, mult3:5 },
@@ -5221,7 +5224,7 @@ wss.on('connection', (ws, request) => {
         // F12 com cor fora da palette ou slot inválido falha. Persiste em
         // p.dyes, broadcast via pstats pra outros verem em tempo real.
         if (msg.t === 'dyeItem') {
-            const TINTUREIRA_POS = { x: 50, y: 50 };
+            const TINTUREIRA_POS = { x: 53, y: 53 };   // sync com NPCS.tintureira em play.html
             const DYE_SLOTS = ['armor', 'head', 'feet', 'cosmetic'];
             const DYE_PALETTE = [
                 '#d04040','#e08020','#e0c040','#60c040','#40c0c0','#4080e0',
