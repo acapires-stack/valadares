@@ -946,14 +946,16 @@ const CHEST_POS = {
 const groundDrops = new Map();   // id -> { id, x, y, type, qty, spawnedAt }
 let _nextGroundId = 1;
 const GROUND_TTL_MS = 5 * 60 * 1000;  // 5min — após isso, despawna
-function spawnGroundDrop(x, y, type, qty){
+function spawnGroundDrop(x, y, type, qty, floor){
     const id = 'g' + (_nextGroundId++);
-    const drop = { id, x, y, type, qty, spawnedAt: Date.now() };
+    const drop = { id, x, y, type, qty, floor: floor || 0, spawnedAt: Date.now() };
     groundDrops.set(id, drop);
     return drop;
 }
-function snapshotGroundDrops(){
-    return Array.from(groundDrops.values()).map(d => ({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }));
+function snapshotGroundDrops(floor){
+    return Array.from(groundDrops.values())
+      .filter(d => floor === undefined || (d.floor || 0) === floor)
+      .map(d => ({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }));
 }
 function tickGroundDespawn(){
     const now = Date.now();
@@ -1283,10 +1285,13 @@ function hasLineOfSight(x1, y1, x2, y2){
     }
     return false;  // não conseguiu chegar — coord fora do mapa, etc
 }
-function broadcast(except, msg){
+// M4: floor opcional. undefined = global (todos). Definido = só players do
+// andar `floor`. Quem não tem p.floor é tratado como 0 (overworld).
+function broadcast(except, msg, floor){
     const data = JSON.stringify(msg);
     for (const p of players.values()){
         if (p.id === except) continue;
+        if (floor !== undefined && (p.floor || 0) !== floor) continue;
         if (p.ws.readyState === 1) p.ws.send(data);
     }
 }
@@ -1302,8 +1307,10 @@ function sendTo(id, msg){
     const p = players.get(id);
     if (p && p.ws.readyState === 1) p.ws.send(JSON.stringify(msg));
 }
-function snapshotPlayers(){
-    return Array.from(players.values()).map(p => ({
+function snapshotPlayers(floor){
+    return Array.from(players.values())
+      .filter(p => floor === undefined || (p.floor || 0) === floor)
+      .map(p => ({
         id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:!!p.pvp,
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
@@ -1315,35 +1322,41 @@ function snapshotPlayers(){
         ghost: !!p.disconnected,
     }));
 }
-function mobAt(x, y){
-    for (const m of monsters.values()) if (m.x === x && m.y === y && m.hp > 0) return m;
+function mobAt(x, y, floor){
+    for (const m of monsters.values()){
+        if (m.x !== x || m.y !== y || m.hp <= 0) continue;
+        if (floor !== undefined && (m.floor || 0) !== floor) continue;
+        return m;
+    }
     return null;
 }
-function playerAt(x, y){
+function playerAt(x, y, floor){
     for (const p of players.values()){
         if (p.disconnected) continue;
+        if (floor !== undefined && (p.floor || 0) !== floor) continue;
         if (p.x === x && p.y === y) return p;
     }
     return null;
 }
 // Empurra mob 1 tile pro lado se ele acabou ficando em cima de player (race condition
 // entre tickAI do server e movimento client-authoritative).
-function bumpMobAwayFrom(x, y){
-    const m = mobAt(x, y);
+function bumpMobAwayFrom(x, y, floor){
+    const m = mobAt(x, y, floor);
     if (!m) return;
+    const f = m.floor || 0;
     const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
     for (const [dx, dy] of dirs){
         const nx = m.x + dx, ny = m.y + dy;
         if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
         if (!isWalkable(nx, ny)) continue;
         if (inSafe(nx, ny)) continue;
-        if (mobAt(nx, ny)) continue;
-        if (playerAt(nx, ny)) continue;
+        if (mobAt(nx, ny, f)) continue;
+        if (playerAt(nx, ny, f)) continue;
         m.x = nx; m.y = ny;
         return;
     }
 }
-function spawnMob(type, x, y){
+function spawnMob(type, x, y, floor){
     const def = MTYPE[type];
     if (!def) return null;
     // Bosses escalam por nível (cap 10): hp x(1+0.15k), dmg x(1+0.10k), xp x(1+0.20k) com k = lvl-1
@@ -1355,6 +1368,7 @@ function spawnMob(type, x, y){
     const m = {
         id: nextMobId++, type, x, y, dir:'down',
         spawnX: x, spawnY: y,    // âncora pra wandering (volta pra perto)
+        floor: floor || 0,       // M4: andar onde o mob vive (0 = overworld)
         hp, maxHp: hp, dmg, speed: def.speed, xp,
         aggro: def.aggro, unique: !!def.unique,
         level,
@@ -1570,8 +1584,10 @@ function tickAI(){
         }
         if (!target){
             // procura player mais próximo em aggro range (ignora PZ e mini-PZ de NPC)
+            const mFloor = m.floor || 0;   // M4: mob só mira player do mesmo andar
             for (const p of players.values()){
                 if ((p.hp ?? 100) <= 0) continue;
+                if ((p.floor || 0) !== mFloor) continue;
                 if (inSafe(p.x, p.y)) continue;
                 if (playerNearNpc(p)) continue;   // mini-PZ ao redor de NPCs
                 const d = chebyshev(m.x, m.y, p.x, p.y);
@@ -1685,8 +1701,10 @@ function tickAI(){
 
 // ─── Snapshots ──────────────────────────────────────────────────────────────
 const SNAPSHOT_MS = 250;
-function snapshotMobs(){
-    return Array.from(monsters.values()).map(m => ({
+function snapshotMobs(floor){
+    return Array.from(monsters.values())
+      .filter(m => floor === undefined || (m.floor || 0) === floor)
+      .map(m => ({
         id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir, hp:m.hp, maxHp:m.maxHp, unique:!!m.unique,
         level: m.level || 1,
         hunter: m.hunter ? 1 : undefined,
@@ -1696,7 +1714,6 @@ function snapshotMobs(){
 // Snapshot leve do estado de mobs pro skip-when-unchanged. Não inclui dots
 // detalhados (só count), pra reduzir custo de comparação. Se algum dot proc
 // fizer mob mudar de "tem dot" pra "não tem dot", o count diferencia.
-let _lastMobsSig = '';
 function mobsSignature(list){
     let s = '';
     for (const m of list){
@@ -1704,24 +1721,30 @@ function mobsSignature(list){
     }
     return s;
 }
+// M4: broadcast de mobs POR ANDAR. Cada player só recebe os mobs do seu floor.
+// skip-when-unchanged agora é por floor (Map floor→sig). Com todos em floor 0
+// há 1 só grupo — comportamento idêntico ao anterior.
+const _lastMobsSigByFloor = new Map();
 function broadcastMobs(){
-    const list = snapshotMobs();
-    const sig = mobsSignature(list);
-    // Skip broadcast quando nada mudou desde o último tick — alivia GC e
-    // bandwidth pra players inativos / horários sem combate. Salvo full
-    // snapshot a cada 10s no broadcastMobsFull abaixo pra drift correction.
-    if (sig === _lastMobsSig) return;
-    _lastMobsSig = sig;
-    const data = JSON.stringify({ t:'mobs', list });
-    for (const p of players.values()){
-        if (p.ws.readyState === 1) p.ws.send(data);
+    const floorsWithPlayers = new Set();
+    for (const p of players.values()) floorsWithPlayers.add(p.floor || 0);
+    for (const f of floorsWithPlayers){
+        const list = snapshotMobs(f);
+        const sig = mobsSignature(list);
+        if (_lastMobsSigByFloor.get(f) === sig) continue;
+        _lastMobsSigByFloor.set(f, sig);
+        const data = JSON.stringify({ t:'mobs', list });
+        for (const p of players.values()){
+            if ((p.floor || 0) !== f) continue;
+            if (p.ws.readyState === 1) p.ws.send(data);
+        }
     }
 }
 // Periodicamente força broadcast cheio — corrige qualquer drift de cliente
 // que tenha perdido um snapshot (ex.: reconnect sem state sync). Cliente
 // recebe um 'mobs' completo a cada 10s no pior caso.
 function broadcastMobsFull(){
-    _lastMobsSig = '';
+    _lastMobsSigByFloor.clear();
     broadcastMobs();
 }
 setInterval(safeTick('broadcastMobsFull', broadcastMobsFull), 10_000);
@@ -3109,7 +3132,9 @@ function broadcastPstatsAll(p){
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
         cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null
     });
+    const f = p.floor || 0;   // M4: só players do mesmo andar veem os stats
     for (const other of players.values()){
+        if ((other.floor || 0) !== f) continue;
         if (other.ws.readyState === 1) other.ws.send(payload);
     }
 }
@@ -3849,7 +3874,7 @@ wss.on('connection', (ws, request) => {
     const ua = (request?.headers?.['user-agent']) || '';
     const electronMatch = ua.match(/Electron\/(\d+\.\d+\.\d+)/i);
     const isElectronUA = !!electronMatch;
-    const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', hp:100, maxHp:100, connectedAt: Date.now(), isElectronUA, electronVer: electronMatch?.[1] || null };
+    const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', floor:0, hp:100, maxHp:100, connectedAt: Date.now(), isElectronUA, electronVer: electronMatch?.[1] || null };
     players.set(id, p);
     counters.connections_total++;
     console.log(`[+] ${id} conectou (${players.size} online)${isElectronUA ? ` electron/${p.electronVer}` : ''}`);
@@ -4182,14 +4207,17 @@ wss.on('connection', (ws, request) => {
             // (race condition de reconexões rápidas, ou WS órfão antes do join).
             removeGhostsByName(p.name, id);
             console.log(`    ${id} = ${p.name}${isAdmin(p.name) ? ' [admin]' : ''}`);
+            // M4: login sempre nasce no overworld (masmorra é efêmera — deslogar
+            // lá embaixo te traz pra cidade). Snapshots filtrados pelo floor do player.
+            p.floor = 0;
             ws.send(JSON.stringify({
                 t:'state', you: id,
-                players: snapshotPlayers(),
-                mobs: snapshotMobs(),
+                players: snapshotPlayers(p.floor),
+                mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
                 isAdmin: isAdmin(p.name),
                 dailyEvent: dailyEventSnapshot(),
-                groundDrops: snapshotGroundDrops(),
+                groundDrops: snapshotGroundDrops(p.floor),
             }));
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
@@ -4203,7 +4231,7 @@ wss.on('connection', (ws, request) => {
             } else {
                 ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
             }
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } });
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
@@ -4221,8 +4249,8 @@ wss.on('connection', (ws, request) => {
             // Mutações de hp vêm de tickAI/tickPlayerDots/pvpAttack/spellCast/invConsume
             // /playerDeath/recomputeMaxStats — esses já chamam broadcastPstatsAll.
             // Se um mob acabou no mesmo tile (race com tickAI), empurra
-            bumpMobAwayFrom(p.x, p.y);
-            broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp });
+            bumpMobAwayFrom(p.x, p.y, p.floor);
+            broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp }, p.floor);
             return;
         }
 
@@ -5985,7 +6013,7 @@ wss.on('connection', (ws, request) => {
         // Remove ghosts antigos com mesmo nome — mantém só este (o mais recente)
         removeGhostsByName(p.name, id);
         console.log(`[~] ${id} (${p.name}) virou ghost — ${(GHOST_TIMEOUT_MS/60000).toFixed(0)}min até sumir`);
-        broadcast(id, { t:'ghost', id, name:p.name });
+        broadcast(id, { t:'ghost', id, name:p.name }, p.floor);
     });
 
     ws.on('error', (e) => console.error(`[!] ${id}:`, e.message));
