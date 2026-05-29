@@ -1149,6 +1149,14 @@ let SERVER_MOTD_RUNTIME = SERVER_MOTD;  // pode ser editado via /motd (até rein
 let nextId = 1;
 let nextMobId = 1;
 
+// Momento em que o processo (re)iniciou. Usado pra detectar reconexões logo
+// após um deploy/restart — nesses casos o player não teve culpa de cair, então
+// curamos HP/MP cheios no join (evita "morri/meia-vida no update"). Fora dessa
+// janela (server rodando há tempo), o HP do save é mantido (sem exploit de
+// relogar pra curar em PvP).
+const SERVER_BOOT_TIME = Date.now();
+const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
+
 // ─── M4 "As Profundezas" — masmorra aberta vertical ───────────────────────
 // Andar é compartilhado e perigoso (PvP forçado). Pro MVP: 1 andar, sala de
 // caverna 100×100 gerada pelo cliente (determinística). Server só rastreia
@@ -4213,6 +4221,13 @@ wss.on('connection', (ws, request) => {
             // Garante hp/mp dentro do novo cap (se save tava com cap maior)
             if (typeof p.hp === 'number') p.hp = Math.min(p.hp, p.maxHp);
             if (typeof p.mp === 'number') p.mp = Math.min(p.mp, p.maxMp);
+            // Reconexão logo após deploy/restart: cura cheio (o player não teve
+            // culpa de cair). Fora dessa janela, mantém o HP do save.
+            if (Date.now() - SERVER_BOOT_TIME < POST_BOOT_HEAL_MS){
+                p.hp = p.maxHp;
+                p.mp = p.maxMp;
+                console.log(`[heal] ${p.name} curado no join pós-restart (HP ${p.maxHp})`);
+            }
             if (p.hp == null) p.hp = p.maxHp;
             if (p.mp == null) p.mp = p.maxMp;
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
