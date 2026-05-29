@@ -2411,6 +2411,28 @@ const ERRORS_FILE = (process.env.STATE_FILE_PATH
     : path.join(__dirname, 'errors.json'));
 const ERRORS_CAP = 200;
 const errors = [];   // { ts, kind, player, msg, stack?, meta? }
+
+// ─── Version gate ─────────────────────────────────────────────────────────
+// Cliente Electron desatualizado é bloqueado no auth (auto-update do
+// electron-updater nem sempre dispara — força user a baixar manualmente).
+// Browser nunca é bloqueado (Vercel serve sempre a última build).
+// Override via env var MIN_CLIENT_VERSION sem precisar redeploy do código.
+const MIN_CLIENT_VERSION = process.env.MIN_CLIENT_VERSION || '1.0.7';
+const CLIENT_DOWNLOAD_URL = process.env.CLIENT_DOWNLOAD_URL || 'https://valadares.app.br/#download';
+function parseSemver(s){
+    const m = String(s || '').match(/^(\d+)\.(\d+)\.(\d+)/);
+    return m ? [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)] : null;
+}
+function isVersionTooOld(clientVer, minVer){
+    const c = parseSemver(clientVer);
+    const m = parseSemver(minVer);
+    if (!c || !m) return false; // não consegue parsear: passa (fail-open)
+    for (let i = 0; i < 3; i++){
+        if (c[i] < m[i]) return true;
+        if (c[i] > m[i]) return false;
+    }
+    return false; // exatamente igual = OK
+}
 const counters = {
     connections_total: 0,
     ws_closes: {},   // { '1006': N, '1001': N, ... }
@@ -3586,6 +3608,26 @@ wss.on('connection', (ws) => {
         // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
         // Cria conta se não existir, devolve save server-side se houver.
         if (msg.t === 'auth') {
+            // Version gate: bloqueia Electron desatualizado. Browser sempre passa
+            // (Vercel = latest). Electron sem versão (clients muito antigos) também
+            // é bloqueado — não sabem mandar `clientVersion` então são pre-v1.0.7.
+            const platform = String(msg.platform || '').trim().toLowerCase();
+            const clientVersion = String(msg.clientVersion || '').trim();
+            if (platform === 'electron'){
+                const noVer = !clientVersion;
+                const tooOld = clientVersion && isVersionTooOld(clientVersion, MIN_CLIENT_VERSION);
+                if (noVer || tooOld){
+                    console.log(`[auth] electron desatualizado bloqueado: v${clientVersion || '?'} (min ${MIN_CLIENT_VERSION})`);
+                    ws.send(JSON.stringify({
+                        t: 'versionTooOld',
+                        current: clientVersion || null,
+                        required: MIN_CLIENT_VERSION,
+                        downloadUrl: CLIENT_DOWNLOAD_URL,
+                    }));
+                    setTimeout(() => { try { ws.close(4001, 'version-too-old'); } catch {} }, 200);
+                    return;
+                }
+            }
             const name = String(msg.name || '').trim().substring(0, 14);
             const pwHash = String(msg.pwHash || '');
             if (!validAccountName(name)){

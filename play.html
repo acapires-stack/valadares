@@ -1520,6 +1520,70 @@
         }
         .ol-title { font-size: 22px; font-weight: bold; color: #ffd060; text-shadow: 0 2px 4px #000; letter-spacing: 0.5px; }
         .ol-sub { font-size: 14px; color: #c8a050; max-width: 280px; line-height: 1.45; }
+        /* Modal de versão desatualizada — block UI total, sai só baixando+reinstalando */
+        #versionTooOldModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 8, 4, 0.92);
+            z-index: 500;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            font-family: inherit;
+        }
+        #versionTooOldModal.active { display: flex; }
+        .vto-card {
+            background: linear-gradient(180deg, #2a1208 0%, #1a0a04 100%);
+            border: 3px solid #d44848;
+            border-radius: 12px;
+            padding: 24px 28px;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.9), 0 0 60px rgba(212,72,72,0.25);
+            color: #ffe0c0;
+            text-align: center;
+        }
+        .vto-icon { font-size: 56px; line-height: 1; margin-bottom: 4px; filter: drop-shadow(0 2px 6px rgba(212,72,72,0.6)); }
+        .vto-title { font-size: 22px; font-weight: bold; color: #ff8060; letter-spacing: 1px; text-shadow: 0 2px 4px #000; }
+        .vto-sub { font-size: 13px; color: #d0a080; margin: 8px 0 14px; }
+        .vto-versions {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid #4a2818;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin: 0 auto 14px;
+            display: inline-flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 13px;
+            font-family: 'Consolas', monospace;
+        }
+        .vto-label { color: #888; }
+        .vto-val { font-weight: bold; }
+        .vto-old { color: #ff6060; }
+        .vto-new { color: #80ff80; }
+        .vto-steps { text-align: left; margin: 12px auto; max-width: 360px; }
+        .vto-step { font-size: 12px; color: #c8a080; padding: 3px 0; border-left: 2px solid #6a4818; padding-left: 10px; margin-bottom: 2px; }
+        .vto-btn {
+            display: inline-block;
+            margin: 16px auto 6px;
+            background: linear-gradient(180deg, #d04848 0%, #6a1818 100%);
+            border: 2px solid #ff8060;
+            color: #fff;
+            padding: 14px 32px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.1s;
+        }
+        .vto-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+        .vto-btn:active { transform: translateY(1px); }
+        .vto-hint { font-size: 11px; color: #886040; margin-top: 8px; font-style: italic; }
         /* Hamburguer (topo) e sidebars colapsáveis em mobile */
         #mobileMenu {
             display: none;
@@ -1594,6 +1658,28 @@
     <button class="mhb-slot" id="mhbSlotSpear" type="button" title="Arremessar lança"><span class="mhb-ico">↗</span><span class="mhb-lbl">LANÇA</span><span class="mhb-qty" id="mhbQtySpear"></span></button>
 </div>
 <button id="mobileMenu" type="button" title="Menu">≡</button>
+
+<!-- Modal full-screen: cliente Electron desatualizado bloqueado pelo server.
+     Aparece no handler t:'versionTooOld' (ver showVersionTooOldModal). -->
+<div id="versionTooOldModal" style="display:none">
+    <div class="vto-card">
+        <div class="vto-icon">⚠</div>
+        <div class="vto-title">VERSÃO DESATUALIZADA</div>
+        <div class="vto-sub">O servidor exige uma versão mais nova do Valadares.</div>
+        <div class="vto-versions">
+            <div><span class="vto-label">Você tem:</span> <span class="vto-val vto-old" id="vtoCurrent">—</span></div>
+            <div><span class="vto-label">Mínimo:</span> <span class="vto-val vto-new" id="vtoRequired">—</span></div>
+        </div>
+        <div class="vto-steps">
+            <div class="vto-step">1. Clique no botão abaixo</div>
+            <div class="vto-step">2. Baixe o instalador novo</div>
+            <div class="vto-step">3. Feche o Valadares e instale por cima</div>
+            <div class="vto-step">4. Abra de novo — vai conectar normalmente</div>
+        </div>
+        <a id="vtoDownloadBtn" href="https://valadares.app.br/#download" target="_blank" rel="noopener" class="vto-btn">⬇ BAIXAR NOVA VERSÃO</a>
+        <div class="vto-hint">Seu save está no servidor — nada se perde no update.</div>
+    </div>
+</div>
 
 <!-- Orientation lock: portrait no celular impede gameplay tile-based 2D —
      mostra overlay pedindo pra virar a tela. CSS-only, sem JS necessário. -->
@@ -5743,7 +5829,7 @@ function connectMP(){
         }
         // Se temos pwHash, autentica primeiro. O `join` é mandado quando authOk chegar.
         if (_authPwHash){
-            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash, email: _authEmail || undefined })); } catch {}
+            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash, email: _authEmail || undefined, platform: CLIENT_PLATFORM, clientVersion: CLIENT_VERSION })); } catch {}
             // Fallback: se server não responder ao auth em 8s, joina como legado (sem sync)
             const wsAtAuth = ws;
             setTimeout(() => {
@@ -5821,6 +5907,14 @@ function handleMP(msg){
         }
         _didInitialAuth = true;
         sendJoinNow();
+        return;
+    }
+    if (msg.t === 'versionTooOld'){
+        // Server diz: seu cliente Electron é antigo demais. Mostra modal full-screen
+        // bloqueando login até o user baixar a nova versão (auto-update foi pouco
+        // confiável em versões antigas — força download manual).
+        showVersionTooOldModal(msg.current, msg.required, msg.downloadUrl);
+        try { ws.close(); } catch {}
         return;
     }
     if (msg.t === 'authFail'){
@@ -12254,18 +12348,50 @@ if (typeof window.electronApi === 'undefined'){
     if (z !== 1) document.body.style.zoom = z;
 }
 
+// Platform + versão atuais. Browser sempre 'browser'/null. Electron preenche
+// via preload bridge no _initElectronUI (executa antes do primeiro WS open
+// porque _initElectronUI roda no scope global no carregamento do script).
+let CLIENT_PLATFORM = 'browser';
+let CLIENT_VERSION = null;
 // Em Electron desktop, mostra seção SISTEMA com versão + botão verificar
 // atualização. Em browser, fica escondida (não tem updater).
 async function _initElectronUI(){
     if (typeof window.electronApi === 'undefined') return;
+    CLIENT_PLATFORM = 'electron';
     document.getElementById('systemSectionHead')?.style.setProperty('display', 'block');
     document.getElementById('systemSection')?.style.setProperty('display', 'block');
     try {
         const v = await window.electronApi.getVersion();
+        CLIENT_VERSION = v;
         const el = document.getElementById('appVersion');
         if (el) el.textContent = 'v' + v;
     } catch {}
 }
+// Server sinalizou que o cliente é antigo demais — bloqueia UI com modal,
+// link de download pra release oficial. Forçado e intransponível (close do
+// modal não fecha — único caminho é baixar/instalar nova versão).
+function showVersionTooOldModal(current, required, downloadUrl){
+    const modal = document.getElementById('versionTooOldModal');
+    if (!modal) return;
+    const curEl = document.getElementById('vtoCurrent');
+    const reqEl = document.getElementById('vtoRequired');
+    const btn = document.getElementById('vtoDownloadBtn');
+    if (curEl) curEl.textContent = current ? 'v' + current : '(desconhecida)';
+    if (reqEl) reqEl.textContent = 'v' + (required || '?');
+    if (btn && downloadUrl) btn.href = downloadUrl;
+    modal.classList.add('active');
+    // Evita reconexão automática (modal bloqueia até user baixar a nova versão).
+    // Sem isso o cliente fica tentando reabrir o WS toda hora.
+    try {
+        if (typeof _reconnectTimer !== 'undefined' && _reconnectTimer){
+            clearTimeout(_reconnectTimer);
+            _reconnectTimer = null;
+        }
+        _reconnectAttempt = 99; // marca como "desistiu" pra não tentar de novo
+    } catch {}
+}
+window.showVersionTooOldModal = showVersionTooOldModal;
+
 async function checkUpdateNow(){
     const status = document.getElementById('updateStatus');
     if (!status) return;
