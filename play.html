@@ -2399,6 +2399,16 @@ const CHESTS = [
 ];
 // Tochas nos 4 cantos extremos da PZ (raio 4 = 46-54), longe dos NPCs (47/53)
 const TORCHES = [{x:46,y:46},{x:54,y:46},{x:46,y:54},{x:54,y:54}];
+// M4: tochas próprias da masmorra (sala 40-60). Mais tochas = sala bem iluminada
+// sem depender das tochas da praça (que ficam só na cidade).
+const DUNGEON_TORCHES = [
+    {x:42,y:42},{x:50,y:42},{x:58,y:42},
+    {x:42,y:50},            {x:58,y:50},
+    {x:42,y:58},{x:50,y:58},{x:58,y:58},
+];
+// Retorna as tochas do contexto atual (cidade vs masmorra) — usado nos 3
+// pontos de render (luz, embers, sprite).
+function activeTorches(){ return (player.floor || 0) === 0 ? TORCHES : DUNGEON_TORCHES; }
 
 function nearestChest(){
     if ((player.floor || 0) !== 0) return null;   // M4: baús só na cidade
@@ -11019,8 +11029,8 @@ function drawLighting(cam, day){
     const ppy = (player.renderY - cam.y) * TS + TS/2;
     const pr = playerInCave ? 4.5*TS : 6*TS;
     _carve(ppx, ppy, pr, 1);
-    // tochas da PZ (sempre acesas, com flicker)
-    for (const t of TORCHES){
+    // tochas (PZ na cidade / próprias na masmorra) — acesas com flicker
+    for (const t of activeTorches()){
         if (t.x < cam.x-3 || t.x >= cam.x+VP_W+3 || t.y < cam.y-3 || t.y >= cam.y+VP_H+3) continue;
         const tx = (t.x - cam.x) * TS + TS/2;
         const ty = (t.y - cam.y) * TS + TS/2;
@@ -11152,8 +11162,8 @@ function tickAmbientParticles(dt){
                 if (p) ambientParticles.push(p);
             }
         }
-        // embers fixos perto das tochas da PZ
-        for (const torch of TORCHES){
+        // embers fixos perto das tochas (cidade ou masmorra)
+        for (const torch of activeTorches()){
             if (torch.x < cam.x-1 || torch.x > cam.x+VP_W+1) continue;
             if (torch.y < cam.y-1 || torch.y > cam.y+VP_H+1) continue;
             if (Math.random() < 0.5){
@@ -13792,8 +13802,8 @@ function loop(ts){
             ctx.fillText('[B] abrir', cpx+TS/2, cpy-2);
         }
     }
-    // Tochas nos cantos (chama oscilante)
-    for (const t of TORCHES){
+    // Tochas (cidade ou masmorra — chama oscilante)
+    for (const t of activeTorches()){
         if (t.x < cam.x-1 || t.x >= cam.x+VP_W+1 || t.y < cam.y-1 || t.y >= cam.y+VP_H+1) continue;
         const tpx = (t.x - cam.x) * TS;
         const tpy = (t.y - cam.y) * TS;
