@@ -49,6 +49,13 @@ Novato não cai mais sem querer. Retorno em (83,18).
   `key === 'X'` quebra pra forjado; resolver a base.
 
 ### ⚠️ Pendências (pra próxima)
+- **🔁 Boss respawna NA HORA ao morrer** (dono 29/05: "matei e já deu spawn em
+  seguida rsrs"): `spawnDungeonMobs` repõe o boss sempre que o andar 5 tem player
+  e não tem boss vivo → **farm infinito**. Fix: cooldown de respawn (~8 min, tipo
+  bosses do mundo) — `dungeonBossDeath` (Map floor→ts) + checar `now - deadAt >
+  DUNGEON_BOSS_RESPAWN_MS` no spawn + registrar nos 2 caminhos de morte
+  (`handleMobDeath` + attackMob death) com `m.type === DUNGEON_BOSS_TYPE`. Vai no
+  próximo deploy de server (junto da auditoria/3b/calibragem).
 - **Reconexão da masmorra cai no mato** (coords da masmorra no overworld; dono saiu em
   (40,40)). Fix OFERECIDO, não feito: jogar na cidade (50,50) com trava one-shot no join
   (anti-abuso de teleporte/fuga de PvP). Aguardando OK do dono.
