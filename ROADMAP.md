@@ -51,12 +51,16 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 - Validar T4 Caçadores HL em MP (highlander → 3min → outro player vê em laranja)
 - Confirmar bot 007 spawnando a cada 1h automático
 
-### 🟡 P1 — Próximas features (escolher 1 por sessão)
+### ✅ #12 Devlog (RESOLVIDO — sessão 29/05 tarde)
 
-**#12 Devlog/blog** [~1 sessão]
-- Pasta `/devlog` com posts MD renderizados em HTML estático
-- Index ordenado por data
-- Cada sessão maratona vira post (material rico no SESSION_NOTES)
+Gerador estático em `devlog/build.js` (Node puro, zero deps). Posts MD com
+frontmatter YAML → HTML com tema visual do site. 4 posts iniciais cobrindo
+lançamento + sprint produção + maratona segurança + mobile overhaul. Live em
+[valadares.app.br/devlog](https://valadares.app.br/devlog). Schema.org
+BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
+`devlog/posts/`, rodar `node devlog/build.js`, commit.
+
+### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
 **M4 Dungeons instanciadas** [2-3 sessões grandes — endgame]
 - Room procedural por jogador (ou party 4)
