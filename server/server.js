@@ -2977,17 +2977,38 @@ setInterval(safeTick('tickBencaoTempCleanup', tickBencaoTempCleanup), 60 * 1000)
 // não cai no chão. fallbackKiller leva tudo se ninguém foi rastreado.
 function distributeBossLoot(m, loot, fallbackKiller){
     const dmgBy = m.damageBy || {};
-    const contribs = [];
-    let totalDmg = 0;
+    const bossFloor = m.floor || 0;
+    // Quem deu dano (online)
+    const damagers = [];
     for (const pid in dmgBy){
-        const dmg = dmgBy[pid];
         const pp = players.get(Number(pid));
-        if (pp && !pp.disconnected && dmg > 0){ contribs.push({ p: pp, dmg }); totalDmg += dmg; }
+        if (pp && !pp.disconnected && dmgBy[pid] > 0) damagers.push({ p: pp, dmg: dmgBy[pid] });
     }
-    if (!contribs.length){
-        if (fallbackKiller && !fallbackKiller.disconnected){ contribs.push({ p: fallbackKiller, dmg: 1 }); totalDmg = 1; }
+    if (!damagers.length){
+        if (fallbackKiller && !fallbackKiller.disconnected) damagers.push({ p: fallbackKiller, dmg: 1 });
         else return;
     }
+    // Beneficiários + peso:
+    //  - Se algum damager está em PARTY → divide IGUAL entre todos os membros
+    //    online da(s) party(s) no mesmo andar + os damagers solo (peso 1 cada).
+    //  - Senão (todos solo) → por dano individual (peso = dano).
+    const inParty = damagers.some(d => findPartyOfPlayer(d.p.name));
+    const benef = new Map();   // pid -> { p, weight }
+    if (inParty){
+        for (const d of damagers){
+            if (!benef.has(d.p.id)) benef.set(d.p.id, { p: d.p, weight: 1 });
+            const party = findPartyOfPlayer(d.p.name);
+            if (party){
+                for (const mp of partyMembersOnline(party)){
+                    if ((mp.floor || 0) === bossFloor && !benef.has(mp.id)) benef.set(mp.id, { p: mp, weight: 1 });
+                }
+            }
+        }
+    } else {
+        for (const d of damagers) benef.set(d.p.id, { p: d.p, weight: d.dmg });
+    }
+    const contribs = Array.from(benef.values()).map(b => ({ p: b.p, dmg: b.weight }));
+    const totalDmg = contribs.reduce((s, c) => s + c.dmg, 0) || 1;
     const got = new Map();   // pid -> { p, gold, items:{} }
     const slot = (pp) => { let g = got.get(pp.id); if (!g){ g = { p: pp, gold: 0, items: {} }; got.set(pp.id, g); } return g; };
     for (const it of loot){
@@ -2998,7 +3019,7 @@ function distributeBossLoot(m, loot, fallbackKiller){
                 const share = Math.floor((it.qty || 0) * (c.dmg / totalDmg));
                 if (share > 0){ slot(c.p).gold += share; dist += share; }
             }
-            const rest = (it.qty || 0) - dist;   // arredondamento → top damager
+            const rest = (it.qty || 0) - dist;   // arredondamento → maior peso
             if (rest > 0){ const top = contribs.reduce((a,b) => b.dmg > a.dmg ? b : a, contribs[0]); slot(top.p).gold += rest; }
         } else {
             let r = Math.random() * totalDmg, winner = contribs[0];
