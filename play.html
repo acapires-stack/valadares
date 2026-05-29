@@ -2623,6 +2623,11 @@ const SAFE_CX = 50, SAFE_CY = 50;
 function inSafeZone(x, y){
     return Math.max(Math.abs(x - SAFE_CX), Math.abs(y - SAFE_CY)) <= SAFE_RADIUS;
 }
+// M4: zona segura só vale na cidade (floor 0). Na masmorra as coords coincidem
+// com a PZ, mas lá é perigoso. Use onde a segurança depende de ONDE o player está.
+function playerInSafeZone(){
+    return (player.floor || 0) === 0 && inSafeZone(player.x, player.y);
+}
 
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
@@ -3577,6 +3582,9 @@ const MTYPE = {
     GOLEM_REI:  { name:'Golem Rei',    hp:900, dmg:20, speed:490, xp:700, color:'#4a5868', size:1.55, dodge:0.03, crit:0.15, unique:true, intel:3 },
     // caçadores do Highlander Hunt
     CACADOR:    { name:'Caçador de Recompensa', hp:350, dmg:18, speed:320, xp:0, color:'#ff8c20', size:1.2, dodge:0.12, crit:0.22, intel:3 },
+    // ─── M4 Masmorra "As Profundezas" — mobs exclusivos do andar ───
+    SOMBRA:     { name:'Sombra Errante', hp:230, dmg:22, speed:300, xp:220, color:'#2a1838', size:1.0,  dodge:0.22, crit:0.18, intel:2 },
+    CARRASCO:   { name:'Carrasco Abissal', hp:480, dmg:38, speed:500, xp:420, color:'#5a1020', size:1.35, dodge:0.04, crit:0.20, intel:2 },
     // ★★ MEGA RAID BOSS — Senhor de Valadares (spawna quando 3 bosses Lv10)
     SENHOR_VALADARES: { name:'O Senhor de Valadares ★★', hp:18000, dmg:75, speed:240, xp:10000, color:'#ffd040', size:1.9, dodge:0.05, crit:0.40, unique:true, intel:3 },
     // Boss de evento semanal (sábado 20h-22h BRT) — só spawna pelo servidor
@@ -4304,7 +4312,7 @@ function updateMonster(m, dt){
     const distHit   = melee(m, player);
 
     // Aggro: range maior, esquece se player muito longe OU dentro da PZ ou perto de NPC
-    const safeNow = inSafeZone(player.x, player.y) || playerNearNpcMiniPZ();
+    const safeNow = playerInSafeZone() || playerNearNpcMiniPZ();
     if (safeNow) m.aggro = false;
     else if (distChase <= 10) m.aggro = true;
     else if (distChase > 22) m.aggro = false;
@@ -5683,7 +5691,7 @@ function findArrow(){
 // Arremesso de lança — consome a equipada, auto-equipa outra do inv se houver.
 function throwSpear(){
     if (blockedByDisconnect()) return;
-    if (inSafeZone(player.x, player.y)){
+    if (playerInSafeZone()){
         log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
     }
     player.lastAttackAt = Date.now();
@@ -5759,7 +5767,7 @@ window.throwSpear = throwSpear;
 function doAttack(m){
     if (blockedByDisconnect()) return;
     if (player._spectate && player._spectate.until > Date.now()) return;   // espectando
-    if (inSafeZone(player.x, player.y)){
+    if (playerInSafeZone()){
         if (!doAttack._warned || Date.now() - doAttack._warned > 2000){
             log(`<span class="log-sys">Não pode atacar dentro da zona segura.</span>`);
             doAttack._warned = Date.now();
@@ -5922,7 +5930,7 @@ function tickRegen(dt){
             player.hpRegenTimer += dt;
             player.mpRegenTimer += dt;
             const m = pvpMults();
-            const inPz = inSafeZone(player.x, player.y);
+            const inPz = playerInSafeZone();
             const pzHp = inPz ? 4 : 1;
             const pzMp = inPz ? 3 : 1;
             const hpInterval = 4000 / (m.regenHp * pzHp);
@@ -6546,7 +6554,7 @@ function handleMP(msg){
         if (msg.deleted){
             player._party = null;
         } else {
-            player._party = { id: msg.partyId, leader: msg.leader, members: Array.isArray(msg.members) ? msg.members.slice(0, 4) : [] };
+            player._party = { id: msg.partyId, leader: msg.leader, members: Array.isArray(msg.members) ? msg.members.slice(0, 4) : [], memberHp: (msg.memberHp && typeof msg.memberHp === 'object') ? msg.memberHp : {} };
         }
         renderPartyWidget();
     } else if (msg.t === 'partyInvite'){
@@ -7620,12 +7628,19 @@ function renderPartyWidget(){
         if (isMe){
             hpStr = `${player.hp}/${player.maxHp}`;
         } else {
-            // Procura nas remotePlayers pelo nome
-            for (const id in remotePlayers){
-                const rp = remotePlayers[id];
-                if (rp.name && rp.name.toLowerCase() === n.toLowerCase()){
-                    hpStr = `${rp.hp ?? '?'}/${rp.maxHp ?? '?'}`;
-                    break;
+            // Fonte primária: memberHp do partyUpdate (autoritativo, atualizado a
+            // cada 3s pelo server). Fallback: remotePlayers (pstats). Antes só
+            // dependia de pstats e ficava stale (ex: "0/208") quando um se perdia.
+            const mh = player._party.memberHp && player._party.memberHp[n];
+            if (mh && typeof mh.hp === 'number'){
+                hpStr = `${mh.hp}/${mh.maxHp}`;
+            } else {
+                for (const id in remotePlayers){
+                    const rp = remotePlayers[id];
+                    if (rp.name && rp.name.toLowerCase() === n.toLowerCase()){
+                        hpStr = `${rp.hp ?? '?'}/${rp.maxHp ?? '?'}`;
+                        break;
+                    }
                 }
             }
             if (!hpStr) hpStr = '<span style="color:#666">offline</span>';
@@ -9163,7 +9178,7 @@ function updateMobileHotbar(){
 function renderTargetWidget(){
     const el = document.getElementById('targetWidget');
     if (!el) return;
-    if (inSafeZone(player.x, player.y)){
+    if (playerInSafeZone()){
         el.className = '';
         el.innerHTML = '<div style="text-align:center;color:#6fb8e8;padding:6px 0;font-size:11px;font-weight:600;letter-spacing:1px">🛡 ZONA SEGURA</div>';
         return;
@@ -10264,7 +10279,7 @@ function closePlayerMenu(){
 function showPlayerMenu(rp, screenX, screenY){
     closePlayerMenu();
     const d = Math.max(Math.abs(rp.x - player.x), Math.abs(rp.y - player.y));
-    const meInSafe    = inSafeZone(player.x, player.y);
+    const meInSafe    = playerInSafeZone();
     const otherInSafe = inSafeZone(rp.x, rp.y);
     const canTrade = d <= 3 && meInSafe && otherInSafe;
     let tradeHint;
@@ -10778,7 +10793,7 @@ function castSpell(spellKey){
     // Bloqueia magias de ataque/cura offline pra evitar farm; cura local é permitida pq autocura mais útil
     if (sp.damage && blockedByDisconnect()) return;
     // Cura é permitida na PZ; ataque não
-    if (sp.damage && inSafeZone(player.x, player.y)){
+    if (sp.damage && playerInSafeZone()){
         log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
     }
     // Magias ofensivas/AoE/taunt quebram mini-PZ do NPC
@@ -11482,7 +11497,7 @@ function togglePvP(){
 
 // Verifica se player está em PZ lock e força saída se for o caso
 function checkPzLock(){
-    if (Date.now() < player.pzLockUntil && inSafeZone(player.x, player.y)){
+    if (Date.now() < player.pzLockUntil && playerInSafeZone()){
         // Empurra pra fora da PZ — escolhe direção sul (longe do spawn)
         log(`<span class="log-dmg">⚠ PZ bloqueada por PK! ${Math.ceil((player.pzLockUntil-Date.now())/1000)}s</span>`);
         // teleporta pra borda da PZ + 1
@@ -11492,7 +11507,7 @@ function checkPzLock(){
         snapRender(player);
     }
     // Transição fora→dentro de PZ: cancela alvos automaticamente
-    const inSafe = inSafeZone(player.x, player.y);
+    const inSafe = playerInSafeZone();
     if (inSafe && !player._lastInSafe && (player.target || player.autoAttack)){
         player.target = null;
         player.autoAttack = false;
@@ -11572,7 +11587,7 @@ function pvpAttackPlayer(targetId){
     const tgt = remotePlayers[targetId];
     if (!tgt){ return; }
     if (!tgt.pvp){ log('<span class="log-sys">Este player não está com PvP ligado.</span>'); return; }
-    if (inSafeZone(player.x, player.y) || inSafeZone(tgt.x, tgt.y)){
+    if (playerInSafeZone() || inSafeZone(tgt.x, tgt.y)){
         log('<span class="log-sys">Não pode PvP na PZ.</span>'); return;
     }
     if (player.attackTimer > 0) return;
@@ -13693,7 +13708,7 @@ function loop(ts){
 
     // Auto-engage passivo: fora da PZ, sem alvo → procura inimigo no viewport
     // (vale pra punho também — boneco novo sem arma equipada engaja igual).
-    if (!player.autoAttack && !player.target && !inSafeZone(player.x, player.y)){
+    if (!player.autoAttack && !player.target && !playerInSafeZone()){
         targetNearest(false, true);
     }
 

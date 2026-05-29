@@ -62,10 +62,27 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-**M4 Dungeons instanciadas** [2-3 sessões grandes — endgame]
-- Room procedural por jogador (ou party 4)
-- Checkpoints, boss no fim, loot escalado
-- Mata o "matei tudo, agora?"
+**M4 "As Profundezas" — masmorra ABERTA vertical** [3 sessões — endgame] 🎯 EM ANDAMENTO
+> Decisão de design (29/05): NÃO instanciada. Insight do dono: instância
+> fechada = farm seguro = pay-to-win fácil num jogo PvP. Em vez disso,
+> masmorra aberta e mortal estilo Tibia — melhor loot, maior perigo (mobs
+> fortes + outros players).
+
+- **Andares de verdade** (sistema `floor`/z): escadas descem a níveis separados.
+  Você só vê quem está no mesmo andar. Broadcast/tickAI filtrados por floor.
+- **PvP forçado**: pisou na masmorra (floor ≥ 1), PvP liga automático.
+- **Morte usa penalidades que JÁ existem** (sem regra nova):
+  - mob → perde 15% das skills treinadas + volta pra cidade (perde a descida)
+  - player → killer leva 10% do gold + Coração HL (processPkDeathServerSide)
+- **Mobs novos exclusivos**, mais fortes por profundidade.
+- **Loot**: gold escalado + chance de item raro por andar.
+- Save NÃO lembra o floor — deslogar na masmorra = renasce na cidade (efêmero).
+
+**Plano faseado** (cada fase sobe testada, overworld nunca quebra):
+1. **Infra**: conceito de `floor`, 1 escada entra/sai, 1 andar de teste,
+   broadcast por floor, PvP forçado, render troca mapa. ← FASE ATUAL
+2. **Combate**: mobs novos escalados, loot/gold por profundidade.
+3. **Profundidade**: múltiplos andares, geração procedural, boss no fundo, polish.
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (50,50) na PZ, 4 slots tingíveis com 12 cores

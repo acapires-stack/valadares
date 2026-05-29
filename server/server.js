@@ -468,6 +468,9 @@ const MTYPE = {
     GOLEM_REI:  { hp:900, dmg:20, speed:490, xp:700, aggro:7, unique:true, intel:3 },
     SCORPION:   { hp:75,  dmg:11, speed:320, xp:55,  aggro:4, intel:2 },
     CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999, intel:3 },
+    // ─── M4 Masmorra "As Profundezas" — mobs exclusivos, mais fortes ───
+    SOMBRA:     { hp:230, dmg:22, speed:300, xp:220, aggro:7, intel:2 },   // rápido, assedia
+    CARRASCO:   { hp:480, dmg:38, speed:500, xp:420, aggro:6, intel:2 },   // lento, pancada pesada
     // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
     SENHOR_VALADARES: { hp:18000, dmg:75, speed:240, xp:10000, aggro:12, unique:true, mega:true, intel:3 },
     // Boss de evento semanal (sábado 20h-22h BRT)
@@ -1048,6 +1051,16 @@ const LOOT = {
         ['GOLD', 1.00, 40, 100], ['POTION', 1.00, 2, 4],
         ['SABRE', 0.30, 1, 1], ['BESTA', 0.25, 1, 1], ['ARMADURA', 0.40, 1, 1],
     ],
+    // M4 Masmorra — loot escalado (gold alto + chance de material/item raro)
+    SOMBRA: [
+        ['GOLD', 1.00, 30, 80], ['POTION', 0.30, 1, 2], ['POTION_MP', 0.25, 1, 2],
+        ['ESSENCIA', 0.20, 1, 1], ['ESCAMA', 0.08, 1, 1], ['OSSO', 0.30, 1, 2],
+    ],
+    CARRASCO: [
+        ['GOLD', 1.00, 80, 200], ['POTION', 0.50, 2, 4], ['POTION_MP', 0.30, 1, 3],
+        ['ESSENCIA', 0.40, 1, 2], ['PEDRA_GOLEM', 0.12, 1, 1], ['ESCAMA', 0.12, 1, 1],
+        ['MACHADO_MINO', 0.05, 1, 1], ['CORACAO_HL', 0.02, 1, 1],
+    ],
     SENHOR_VALADARES: [
         ['GOLD', 1.00, 5000, 10000], ['ESSENCIA', 1.00, 5, 10], ['CORACAO_HL', 1.00, 3, 5],
         ['POTION', 1.00, 10, 20], ['POTION_MP', 1.00, 10, 20],
@@ -1168,6 +1181,19 @@ const DUNGEON_RETURN   = { x: 50, y: 47 };   // onde o player reaparece na cidad
 const DUNGEON_SPAWN    = { x: 50, y: 52 };   // onde o player chega no andar 1
 const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de volta no andar 1
 const DUNGEON_MAX_FLOOR = 1;                  // MVP: só andar 1
+// Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
+// Interior 41-59 é piso; mobs andam dentro deste box (server não tem o grid).
+const DUNGEON_ROOM = { x0: 41, y0: 41, x1: 59, y1: 59 };
+const DUNGEON_MOB_TARGET = 9;                 // população de mobs no andar 1
+const DUNGEON_MOB_TYPES  = ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // pesos: mais Sombra
+// Mob pode pisar no tile? No andar usa o box da sala (sem PZ, sem grid do
+// overworld). No overworld, regra normal (walkable + fora da PZ).
+function mobTileOk(m, x, y){
+    if ((m.floor || 0) >= 1){
+        return x >= DUNGEON_ROOM.x0 && x <= DUNGEON_ROOM.x1 && y >= DUNGEON_ROOM.y0 && y <= DUNGEON_ROOM.y1;
+    }
+    return isWalkable(x, y) && !inSafe(x, y);
+}
 
 // ─── M8 Auction House — state global ──────────────────────────────────────
 // Trade assíncrono via NPC Leiloeiro em (50, 48). Server escrowa o item
@@ -1216,6 +1242,10 @@ const monsters = new Map(); // id -> { id, type, x, y, dir, hp, maxHp, dmg, spee
 function chebyshev(ax, ay, bx, by){ return Math.max(Math.abs(ax-bx), Math.abs(ay-by)); }
 function manhattan(ax, ay, bx, by){ return Math.abs(ax-bx) + Math.abs(ay-by); }
 function inSafe(x, y){ return chebyshev(x, y, SAFE_CX, SAFE_CY) <= SAFE_RADIUS; }
+// M4: zona segura SÓ vale na cidade (floor 0). Na masmorra (floor ≥ 1) não há
+// PZ — as coords coincidem com a PZ da cidade, mas lá é perigoso (mobs atacam,
+// regen normal, PvP forçado). Use este helper onde a segurança depende do player.
+function playerInSafe(p){ return (p.floor || 0) === 0 && inSafe(p.x, p.y); }
 function inCave(x, y){
     for (const c of CAVES) if (chebyshev(x, y, c.x, c.y) <= c.r) return c;
     return null;
@@ -1450,6 +1480,25 @@ function spawnInitial(){
 }
 
 // ─── Respawn dinâmico ───────────────────────────────────────────────────────
+// M4: mantém a população de mobs no andar 1. Spawna na sala (evitando escada
+// e ponto de chegada do player). Chamado no boot e periodicamente.
+function spawnDungeonMobs(){
+    let count = 0;
+    for (const m of monsters.values()) if ((m.floor || 0) === 1 && m.hp > 0) count++;
+    let tries = 0;
+    while (count < DUNGEON_MOB_TARGET && tries < 120){
+        tries++;
+        const x = DUNGEON_ROOM.x0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.x1 - DUNGEON_ROOM.x0 - 1));
+        const y = DUNGEON_ROOM.y0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.y1 - DUNGEON_ROOM.y0 - 1));
+        // não nasce em cima da escada (50,50) nem no ponto de chegada (50,52) e adjacências
+        if (Math.abs(x - 50) <= 1 && y >= 49 && y <= 53) continue;
+        if (mobAt(x, y, 1)) continue;
+        const type = DUNGEON_MOB_TYPES[Math.floor(Math.random() * DUNGEON_MOB_TYPES.length)];
+        const mob = spawnMob(type, x, y, 1);
+        if (mob) count++;
+    }
+}
+
 function tickRespawns(){
     // Bosses por timer
     const now = Date.now();
@@ -1608,7 +1657,7 @@ function tickAI(){
             for (const p of players.values()){
                 if ((p.hp ?? 100) <= 0) continue;
                 if ((p.floor || 0) !== mFloor) continue;
-                if (inSafe(p.x, p.y)) continue;
+                if (playerInSafe(p)) continue;   // PZ só protege na cidade; masmorra é perigosa
                 if (playerNearNpc(p)) continue;   // mini-PZ ao redor de NPCs
                 const d = chebyshev(m.x, m.y, p.x, p.y);
                 if (d <= m.aggro && d < td){ target = p; td = d; }
@@ -1638,10 +1687,9 @@ function tickAI(){
             }
             const nx = m.x + dx, ny = m.y + dy;
             if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
-            if (!isWalkable(nx, ny)) continue;
-            if (inSafe(nx, ny)) continue;
-            if (mobAt(nx, ny)) continue;
-            if (playerAt(nx, ny)) continue;
+            if (!mobTileOk(m, nx, ny)) continue;
+            if (mobAt(nx, ny, m.floor)) continue;
+            if (playerAt(nx, ny, m.floor)) continue;
             m.x = nx; m.y = ny;
             m.dir = dy > 0 ? 'down' : dy < 0 ? 'up' : dx > 0 ? 'right' : 'left';
             m.lastMoveAt = now;
@@ -1708,10 +1756,9 @@ function tickAI(){
         ];
         for (const [nx, ny] of candidates){
             if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
-            if (!isWalkable(nx, ny)) continue;
-            if (inSafe(nx, ny)) continue;
-            if (mobAt(nx, ny)) continue;
-            if (playerAt(nx, ny)) continue;   // não entra no tile de player
+            if (!mobTileOk(m, nx, ny)) continue;
+            if (mobAt(nx, ny, m.floor)) continue;
+            if (playerAt(nx, ny, m.floor)) continue;   // não entra no tile de player
             m.x = nx; m.y = ny;
             m.dir = dy > 0 ? 'down' : dy < 0 ? 'up' : dx > 0 ? 'right' : 'left';
             break;
@@ -2133,7 +2180,7 @@ function saveStateToDisk(){
         monsters: Array.from(monsters.values()).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
-            aggro:m.aggro, unique:m.unique, level:m.level,
+            aggro:m.aggro, unique:m.unique, level:m.level, floor:m.floor||0,
         })),
         nextAuctionId,
         auctions: Array.from(auctions.values()),
@@ -2197,7 +2244,7 @@ function loadStateFromDisk(){
                 monsters.set(m.id, {
                     id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir||'down',
                     hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
-                    aggro:m.aggro, unique:!!m.unique, level:m.level||1,
+                    aggro:m.aggro, unique:!!m.unique, level:m.level||1, floor:m.floor||0,
                     intel: m.intel || (MTYPE[m.type]?.intel || 1),  // backfill saves antigos
                     lastMoveAt: 0, lastAttackAt: 0,
                 });
@@ -2758,6 +2805,9 @@ process.on('SIGTERM', () => { saveStateToDisk(); flushAccounts(); console.log('[
 setInterval(safeTick('tickAI', tickAI), TICK_AI_MS);
 setInterval(safeTick('broadcastMobs', broadcastMobs), SNAPSHOT_MS);
 setInterval(safeTick('tickRespawns', tickRespawns), 1000);
+setInterval(safeTick('spawnDungeonMobs', spawnDungeonMobs), 8000);   // M4: repõe mobs do andar
+spawnDungeonMobs();   // popula o andar 1 no boot
+setInterval(safeTick('tickPartyHp', tickPartyHp), 3000);   // HP da party no widget
 
 // ─── Bot 007 — caça ao impostor ────────────────────────────────────────
 // Player virtual no Map de players. Anda random, ataca players adjacentes,
@@ -3168,7 +3218,7 @@ function tickPlayerRegen(){
         if (p._tabActive === false) continue;
         p._regenHpAt = p._regenHpAt || now;
         p._regenMpAt = p._regenMpAt || now;
-        const inPz = inSafe(p.x, p.y);
+        const inPz = playerInSafe(p);   // regen turbo só na cidade, não na masmorra
         const pzHp = inPz ? 4 : 1;
         const pzMp = inPz ? 3 : 1;
         const mults = pvpMultsServer(p);
@@ -3592,10 +3642,22 @@ function partyMembersOnline(party){
 }
 function broadcastPartyUpdate(party){
     if (!party) return;
-    const payload = { t:'partyUpdate', partyId: party.id, leader: party.leader, members: party.members };
+    // M4 fix: inclui HP dos membros online. O widget de party dependia só de
+    // pstats (esporádico) — se um pstats se perdia (reconexão/deploy), o HP
+    // ficava stale (ex: "0/208"). Agora vem direto no partyUpdate, autoritativo.
+    const memberHp = {};
+    for (const pp of partyMembersOnline(party)){
+        memberHp[pp.name] = { hp: pp.hp ?? 0, maxHp: pp.maxHp ?? 0 };
+    }
+    const payload = { t:'partyUpdate', partyId: party.id, leader: party.leader, members: party.members, memberHp };
     for (const pp of partyMembersOnline(party)){
         if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify(payload));
     }
+}
+// Reenvia partyUpdate de todas as parties a cada 3s pra manter o HP do widget
+// atualizado mesmo sem pstats recente.
+function tickPartyHp(){
+    for (const party of parties.values()) broadcastPartyUpdate(party);
 }
 function sendPartyEnded(memberName){
     for (const pp of players.values()){
@@ -5514,9 +5576,21 @@ wss.on('connection', (ws, request) => {
                     }
                 }
                 const spawnedDrops = [];
+                // Espalha em anel quando há vários itens (ex: mega boss) — senão
+                // tudo empilha num tile e o player não vê/sente o loot épico.
+                // 1-2 itens ficam no tile do mob. Valida cada tile com mobTileOk.
+                const DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2]];
+                let spreadIdx = 0;
                 for (const it of loot){
                     if (!it || !it.type) continue;
-                    const d = spawnGroundDrop(m.x, m.y, it.type, it.qty | 0 || 1);
+                    let dx = 0, dy = 0;
+                    if (loot.length > 2){
+                        for (let t = 0; t < DROP_SPREAD.length; t++){
+                            const o = DROP_SPREAD[(spreadIdx + t) % DROP_SPREAD.length];
+                            if (mobTileOk(m, m.x + o[0], m.y + o[1])){ dx = o[0]; dy = o[1]; spreadIdx = (spreadIdx + t + 1) % DROP_SPREAD.length; break; }
+                        }
+                    }
+                    const d = spawnGroundDrop(m.x + dx, m.y + dy, it.type, it.qty | 0 || 1, m.floor);
                     spawnedDrops.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty });
                 }
                 // T1: XP authoritative na skill da arma equipada
@@ -5527,8 +5601,8 @@ wss.on('connection', (ws, request) => {
                 // Envia skills atualizadas (autoritativo)
                 sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
-                broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level });
-                if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops });
+                broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level }, m.floor);
+                if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops }, m.floor);
                 // Ranking: incrementa mobKills (e bossKills se for unique) — all-time + season
                 bumpMobKill(p.name, !!m.unique);
                 sharePartyKill(p, m);
@@ -5697,8 +5771,9 @@ wss.on('connection', (ws, request) => {
                 if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
             }
             if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`${toName} não está online.` }); return; }
-            // Trade só na PZ central (zona segura) — anti-griefing em campo aberto
-            if (!inSafe(p.x, p.y) || !inSafe(target.x, target.y)){
+            // Trade só na PZ central (zona segura) — anti-griefing. Na masmorra
+            // (floor ≥ 1) não há PZ, então trade não rola lá.
+            if (!playerInSafe(p) || !playerInSafe(target)){
                 sendTo(id, { t:'serverMsg', level:'warn', text:'Trade só pode ser feito na Zona Segura (PZ central).' });
                 return;
             }
