@@ -6184,6 +6184,11 @@ function handleMP(msg){
         if (typeof showLoadingOverlay === 'function') showLoadingOverlay(false);
         if (msg.motd) showServerToast('event', '📜 ' + msg.motd, null, 7000);
         if (msg.dailyEvent) applyDailyEventInfo(msg.dailyEvent);
+        // Manutenção: o server reiniciou e te jogou na PZ (a posição já vem no snapshot
+        // self, aplicada abaixo). Explica o teleporte pro player não se assustar.
+        if (msg.maintenance && typeof showServerToast === 'function'){
+            showServerToast('event', '🔧 Servidor reiniciado — você foi levado pra Zona Segura.', null, 6000);
+        }
         for (const id in remotePlayers) delete remotePlayers[id];
         msg.players.forEach(p => {
             if (p.id !== msg.you){
@@ -12807,6 +12812,15 @@ function renderAdminPanel(){
             <button class="chest-qty-btn" onclick="adminBroadcast()">enviar</button>
         </div>
 
+        <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">MANUTENÇÃO</div>
+        <div style="display:flex;gap:4px;align-items:center;margin:3px 0;font-size:11px">
+            <input type="number" id="admMaintMin" min="1" max="10" value="3"
+                   style="width:50px;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;text-align:center">
+            <span style="color:#998040;font-size:10px">min</span>
+            <button class="chest-qty-btn" onclick="adminMaintenance()">🔧 avisar todos</button>
+        </div>
+        <div style="color:#888;font-size:9px;padding:0 2px">Dispara o countdown pra todos. Pushe o deploy perto do fim — ao voltar, todos caem na PZ.</div>
+
         <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">BOSSES</div>
         <div style="display:flex;gap:4px;align-items:center;margin:3px 0;font-size:11px">
             <select id="admBossType" style="background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:2px 4px;font-family:Consolas,monospace;font-size:11px">
@@ -12863,6 +12877,12 @@ function adminBroadcast(){
     if (!txt){ log('<span class="log-sys">Mensagem vazia.</span>'); return; }
     _adminSendChat(`/${lv} ${txt}`);
     txtEl.value = '';
+}
+function adminMaintenance(){
+    const el = document.getElementById('admMaintMin');
+    const min = Math.max(1, Math.min(10, parseInt(el && el.value, 10) || 3));
+    _adminSendChat(`/manutencao ${min}`);
+    log(`<span class="log-up">[admin] Countdown de manutenção (${min}min) disparado pra todos. Pushe o deploy perto do fim.</span>`);
 }
 function adminSetBoss(){
     const type = document.getElementById('admBossType').value;

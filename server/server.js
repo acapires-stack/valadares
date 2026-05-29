@@ -1399,6 +1399,27 @@ function broadcastMsg(level, text, fromName){
     broadcast(null, out);
     console.log(`[msg ${level}]${fromName?' '+fromName+':':''} ${text}`);
 }
+// Manutenção: countdown de avisos antes de um deploy/restart MANUAL. O aviso NÃO
+// pode vir do deploy (o Railway mata o processo em segundos) — é o admin que dispara
+// isto ANTES de pushar. Ao reiniciar, a janela pós-boot (POST_BOOT_HEAL_MS) cura e
+// joga todo mundo na PZ. Timers one-shot; re-disparar cancela o countdown anterior.
+let _maintenanceTimers = [];
+function startMaintenanceCountdown(mins){
+    for (const t of _maintenanceTimers) clearTimeout(t);
+    _maintenanceTimers = [];
+    const m = Math.max(1, Math.min(10, (mins | 0) || 3));
+    const totalMs = m * 60 * 1000;
+    broadcastMsg('warn', `🔧 MANUTENÇÃO em ${m} min — o servidor vai reiniciar. Você voltará pra Zona Segura.`);
+    const marks = [];
+    for (let k = m - 1; k >= 1; k--) marks.push([totalMs - k * 60000, `🔧 Manutenção em ${k} min.`]);
+    marks.push([totalMs - 30000, '🔧 Manutenção em 30 segundos — volte pra um lugar seguro.']);
+    marks.push([totalMs - 10000, '🔧 Manutenção em 10 segundos!']);
+    marks.push([totalMs, '🔄 Manutenção iniciando — o servidor pode reiniciar a qualquer momento. Você reaparecerá na Zona Segura.']);
+    for (const [at, txt] of marks){
+        if (at > 0) _maintenanceTimers.push(setTimeout(() => broadcastMsg('warn', txt), at));
+    }
+    console.log(`[maintenance] countdown ${m}min disparado`);
+}
 function sendTo(id, msg){
     const p = players.get(id);
     if (p && p.ws.readyState === 1) p.ws.send(JSON.stringify(msg));
@@ -4441,12 +4462,18 @@ wss.on('connection', (ws, request) => {
             // Garante hp/mp dentro do novo cap (se save tava com cap maior)
             if (typeof p.hp === 'number') p.hp = Math.min(p.hp, p.maxHp);
             if (typeof p.mp === 'number') p.mp = Math.min(p.mp, p.maxMp);
-            // Reconexão logo após deploy/restart: cura cheio (o player não teve
-            // culpa de cair). Fora dessa janela, mantém o HP do save.
-            if (Date.now() - SERVER_BOOT_TIME < POST_BOOT_HEAL_MS){
+            // Reconexão logo após deploy/restart: cura cheio E joga na Zona Segura
+            // (procedimento de manutenção). O player não teve culpa de cair, e voltar
+            // no meio do mapa/masmorra era o "cai no mato". A posição (50,50) vai no
+            // snapshot do state → o cliente aplica sozinho (linha "Server é autoritativo
+            // em x/y"). Só vale na janela pós-boot → NÃO é fuga de PvP em reconexão
+            // normal. Fora da janela: mantém a posição do save.
+            const postRestart = Date.now() - SERVER_BOOT_TIME < POST_BOOT_HEAL_MS;
+            if (postRestart){
                 p.hp = p.maxHp;
                 p.mp = p.maxMp;
-                console.log(`[heal] ${p.name} curado no join pós-restart (HP ${p.maxHp})`);
+                p.x = SAFE_CX; p.y = SAFE_CY;   // centro da PZ (cidade)
+                console.log(`[restart] ${p.name} curado + levado pra PZ pós-restart`);
             }
             if (p.hp == null) p.hp = p.maxHp;
             if (p.mp == null) p.mp = p.maxMp;
@@ -4465,6 +4492,7 @@ wss.on('connection', (ws, request) => {
                 isAdmin: isAdmin(p.name),
                 dailyEvent: dailyEventSnapshot(),
                 groundDrops: snapshotGroundDrops(p.floor),
+                maintenance: postRestart || undefined,   // cliente mostra toast "levado pra PZ"
             }));
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
@@ -6181,8 +6209,14 @@ wss.on('connection', (ws, request) => {
                     broadcastMsg('info', arg);
                     return;
                 }
+                if (cmd === '/manutencao' || cmd === '/manut'){
+                    const mins = arg ? parseInt(arg, 10) : 3;
+                    startMaintenanceCountdown(mins);
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Countdown de manutenção disparado. Pushe o deploy perto do fim — ao voltar, todos caem na PZ.' });
+                    return;
+                }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME' });
                     return;
                 }
                 if (cmd === '/deluser'){
