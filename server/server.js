@@ -2449,15 +2449,37 @@ function errorsRecent5min(){
     return errors.filter(e => e.ts > cutoff).length;
 }
 
+// Guardas globais: throw num tick (equipped=null em save legado, race condition,
+// undefined dereference) derrubava o processo inteiro — 50 players caem juntos.
+// uncaughtException/unhandledRejection: registra + segue. safeTick: wrapper que
+// envolve cada tick em try/catch.
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err && err.stack || err);
+    try { recordError({ kind:'uncaughtException', msg: err && err.message || String(err), stack: err && err.stack || null }); } catch {}
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
+    try { recordError({ kind:'unhandledRejection', msg: (reason && reason.message) || String(reason), stack: (reason && reason.stack) || null }); } catch {}
+});
+function safeTick(name, fn){
+    return () => {
+        try { fn(); }
+        catch (err) {
+            console.error(`[tick:${name}]`, err && err.stack || err);
+            try { recordError({ kind:'tick:'+name, msg: err && err.message || String(err), stack: err && err.stack || null }); } catch {}
+        }
+    };
+}
+
 // Inicia mundo
 let lastResetDay = new Date().toDateString();
 if (!loadStateFromDisk()) spawnInitial();
-setInterval(saveStateToDisk, STATE_SAVE_INTERVAL_MS);
+setInterval(safeTick('saveStateToDisk', saveStateToDisk), STATE_SAVE_INTERVAL_MS);
 process.on('SIGINT',  () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGINT)'); process.exit(0); });
 process.on('SIGTERM', () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGTERM)'); process.exit(0); });
-setInterval(tickAI, TICK_AI_MS);
-setInterval(broadcastMobs, SNAPSHOT_MS);
-setInterval(tickRespawns, 1000);
+setInterval(safeTick('tickAI', tickAI), TICK_AI_MS);
+setInterval(safeTick('broadcastMobs', broadcastMobs), SNAPSHOT_MS);
+setInterval(safeTick('tickRespawns', tickRespawns), 1000);
 
 // ─── Bot 007 — caça ao impostor ────────────────────────────────────────
 // Player virtual no Map de players. Anda random, ataca players adjacentes,
@@ -2617,9 +2639,9 @@ function tickBencaoTempCleanup(){
     }
 }
 
-setInterval(tickImpostorBot, 250);
-setInterval(spawnImpostorBot, BOT_SPAWN_INTERVAL_MS);
-setInterval(tickBencaoTempCleanup, 60 * 1000);
+setInterval(safeTick('tickImpostorBot', tickImpostorBot), 250);
+setInterval(safeTick('spawnImpostorBot', spawnImpostorBot), BOT_SPAWN_INTERVAL_MS);
+setInterval(safeTick('tickBencaoTempCleanup', tickBencaoTempCleanup), 60 * 1000);
 
 // Resolve a morte de um mob (extração da lógica do attackMob handler) —
 // reutilizado pra mortes por DoT (veneno/sangra/fogo).
@@ -2725,7 +2747,7 @@ function tickMobDots(){
         if (p.ws.readyState === 1) p.ws.send(payload);
     }
 }
-setInterval(tickMobDots, 1000);
+setInterval(safeTick('tickMobDots', tickMobDots), 1000);
 
 // ─── T2: Regen passivo HP/MP autoritativo server-side ──────────────────────
 // Cliente para de aplicar regen quando online; server roda tick e broadcasta
@@ -2756,6 +2778,30 @@ function totalDefenseServer(p){
         if (up && typeof up.def === 'number') total += up.def;
     }
     return total;
+}
+// Cap de dano PvP server-side. Cliente envia `amount` no pvpAttack — sem cap,
+// F12 → `{amount:99999}` one-shotta qualquer um. Margem generosa pra cobrir
+// dano máximo legítimo: base arma + forja+5 (+7 base) + skill bonus (+50-66) +
+// crit (×2) + pvpMults (×1.35 com 5 selos + highlander) + CORACAO_HL (×1.05).
+// Ex.: ESPADA_ETERNA base 30 → cap 550 (dano legit máximo ~360). 99999 ainda bloqueia.
+function pvpDamageCapServer(p){
+    const wKey = p.equipped?.weapon;
+    if (!wKey) return 100;
+    const tier = getUpgradeTier(wKey);
+    const meta = ITEM_META[tier.base];
+    const base = meta?.base || 5;
+    return base * 15 + 100;
+}
+// Cap de range PvP. Cliente envia `range` — sem cap aceitaria range:999.
+// Melee = 1; ranged usa weapon.ranged (4-8); throwable usa weapon.throwable.
+function pvpRangeCapServer(p){
+    const wKey = p.equipped?.weapon;
+    if (!wKey) return 1;
+    const tier = getUpgradeTier(wKey);
+    const meta = ITEM_META[tier.base];
+    if (meta && typeof meta.ranged === 'number') return Math.min(8, meta.ranged);
+    if (meta && typeof meta.throwable === 'number') return Math.min(8, meta.throwable);
+    return 1;
 }
 function armorHpRegenServer(p){
     if (!p.equipped) return 0;
@@ -2837,7 +2883,7 @@ function tickPlayerRegen(){
         if (changed) broadcastPstatsAll(p);
     }
 }
-setInterval(tickPlayerRegen, 500);
+setInterval(safeTick('tickPlayerRegen', tickPlayerRegen), 500);
 
 // ─── Fase 5 N3: DoTs em players (poison/bleed) + stun server-side ──────────
 // Espelha ATTACKER_STATUS do cliente. tickAI chama applyAttackerStatus(target,
@@ -2934,7 +2980,7 @@ function tickPlayerDots(){
         if (hpChanged) broadcastPstatsAll(p);
     }
 }
-setInterval(tickPlayerDots, 1000);
+setInterval(safeTick('tickPlayerDots', tickPlayerDots), 1000);
 
 // ─── Evento semanal: O Arauto (sábado 20h-22h BRT) ─────────────────────────
 const EVENT_BOSS_TYPE = 'ARAUTO';
@@ -2971,7 +3017,7 @@ function tickEvent(){
         }
     }
 }
-setInterval(tickEvent, 60_000);
+setInterval(safeTick('tickEvent', tickEvent), 60_000);
 setTimeout(tickEvent, 5_000);   // primeiro check 5s após boot
 
 // ─── Eventos Diários (rotativos por dia) ──────────────────────────────────
@@ -3116,7 +3162,7 @@ function dailyEventSnapshot(){
         until: active ? getDailyEventEndMs(info) : 0,
     };
 }
-setInterval(tickDailyEvent, 30_000);
+setInterval(safeTick('tickDailyEvent', tickDailyEvent), 30_000);
 setTimeout(tickDailyEvent, 8_000);   // primeiro check 8s após boot
 
 // ─── Duelos 1v1 consensuais ──────────────────────────────────────────────
@@ -3189,7 +3235,7 @@ function tickDuels(){
         }
     }
 }
-setInterval(tickDuels, 5_000);
+setInterval(safeTick('tickDuels', tickDuels), 5_000);
 
 // ─── Party 1-4 players ─────────────────────────────────────────────────────
 // Grupo efêmero (não persiste). Lidera quem cria. Compartilha XP de mob por
@@ -3367,7 +3413,7 @@ function tickPartyInvites(){
         }
     }
 }
-setInterval(tickPartyInvites, 10_000);
+setInterval(safeTick('tickPartyInvites', tickPartyInvites), 10_000);
 
 // Boss heal Lv3+ — regen lento pra bosses upados (2% maxHp + 0.5% por lvl, cap 5%)
 // Bundle: 1 broadcast por player com lista de updates+floats em vez de 2N msgs
@@ -3391,7 +3437,7 @@ function tickBossHeal(){
         if (p.ws.readyState === 1) p.ws.send(payload);
     }
 }
-setInterval(tickBossHeal, 5000);
+setInterval(safeTick('tickBossHeal', tickBossHeal), 5000);
 
 // ─── Reset diário (00:00) ──────────────────────────────────────────────────
 function tickDailyReset(){
@@ -3408,7 +3454,7 @@ function tickDailyReset(){
     broadcastMsg('event', '🌅 Novo dia em Valadares! Bosses voltaram ao Lv1.');
     console.log('[reset] daily reset — bosses Lv1');
 }
-setInterval(tickDailyReset, 60 * 1000);  // checa a cada minuto
+setInterval(safeTick('tickDailyReset', tickDailyReset), 60 * 1000);  // checa a cada minuto
 
 // ─── ★★ MEGA BOSS — Senhor de Valadares ──────────────────────────────────
 function allBossesAtMaxLevel(){
@@ -3480,7 +3526,7 @@ function tickMegaBoss(){
         console.log('[mega] Senhor expirou (30min sem morrer)');
     }
 }
-setInterval(tickMegaBoss, 5000);
+setInterval(safeTick('tickMegaBoss', tickMegaBoss), 5000);
 
 // ─── Ghosts (body stays) ───────────────────────────────────────────────────
 function tickGhosts(){
@@ -3493,7 +3539,7 @@ function tickGhosts(){
         console.log(`[x] ghost ${id} (${p.name}) expirou`);
     }
 }
-setInterval(tickGhosts, 15 * 1000);
+setInterval(safeTick('tickGhosts', tickGhosts), 15 * 1000);
 
 // Remove TODOS os ghosts com este nome (exceto o próprio id, se passado).
 // Chamado em auth, join e close pra impedir acúmulo quando o WS cai antes do join.
@@ -3523,6 +3569,11 @@ wss.on('connection', (ws) => {
     ws.on('message', (raw) => {
         let msg;
         try { msg = JSON.parse(raw); } catch { return; }
+
+        // Envelope try/catch: qualquer throw num handler (forja em save legado,
+        // race com tickAI, undefined dereference) cairia o processo inteiro
+        // levando 50+ players juntos. Registra via recordError e continua.
+        try {
 
         // Heartbeat app-level — cliente manda a cada ~25s pra evitar idle timeout
         // de proxies (Cloudflare/Railway costumam fechar WS após 60s sem dados C→S).
@@ -3820,8 +3871,10 @@ wss.on('connection', (ws) => {
             const ny = Math.max(0, Math.min(M_H - 1, Math.floor(Number(msg.y)) || 0));
             p.x = nx; p.y = ny;
             p.dir = (typeof msg.dir === 'string' && msg.dir.length < 8) ? msg.dir : p.dir;
-            if (typeof msg.hp === 'number' && isFinite(msg.hp)) p.hp = msg.hp;
-            if (typeof msg.maxHp === 'number' && isFinite(msg.maxHp)) p.maxHp = msg.maxHp;
+            // Lockdown N3: hp/maxHp são server-authoritative. msg.hp/msg.maxHp do
+            // cliente NUNCA são aceitos aqui (F12 `{t:'pos',hp:99999}` virava invencível).
+            // Mutações de hp vêm de tickAI/tickPlayerDots/pvpAttack/spellCast/invConsume
+            // /playerDeath/recomputeMaxStats — esses já chamam broadcastPstatsAll.
             // Se um mob acabou no mesmo tile (race com tickAI), empurra
             bumpMobAwayFrom(p.x, p.y);
             broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp });
@@ -4189,6 +4242,11 @@ wss.on('connection', (ws) => {
         if (msg.t === 'pvpAttack') {
             const tgt = players.get(msg.targetId);
             if (!tgt) return;
+            // Rate limit: 400ms entre hits PvP (sem isso, F12 → 100 hits/s + farm
+            // infinito de XP de skill via gainSkillXpServer abaixo).
+            const nowPvp = Date.now();
+            if (nowPvp - (p._lastPvpAt || 0) < 400) return;
+            p._lastPvpAt = nowPvp;
             // Duelo consensual: permite ataque mesmo sem PvP toggle, se for o oponente
             const inDuel = p.duel && p.duel.opponentId === tgt.id && tgt.duel && tgt.duel.opponentId === id;
             // Bot 007 — qualquer player pode atacar sem precisar de PvP toggle
@@ -4197,10 +4255,15 @@ wss.on('connection', (ws) => {
                 if (!p.pvp) return;
                 if (!tgt.pvp && !tgt.disconnected) return;   // se vivo, precisa estar com PvP
             }
-            if (chebyshev(p.x, p.y, tgt.x, tgt.y) > (msg.range || 1)) return;
-            const amount = Math.max(1, msg.amount | 0);
+            // Caps server-side: cliente envia amount/range mas sem cap aceitaria
+            // {amount:99999, range:999} one-shottando alvo do outro lado do mapa.
+            const rangeCap = pvpRangeCapServer(p);
+            const range = Math.max(1, Math.min(rangeCap, msg.range | 0 || 1));
+            if (chebyshev(p.x, p.y, tgt.x, tgt.y) > range) return;
+            const dmgCap = pvpDamageCapServer(p);
+            const amount = Math.max(1, Math.min(dmgCap, msg.amount | 0));
             // T3: XP de skill por hit PvP (autoritativo)
-            const isRanged = (msg.range || 1) > 1;
+            const isRanged = range > 1;
             gainSkillXpServer(p, isRanged ? 'Distância' : weaponSkillOf(p), 1);
             sendSkillsOnly(p, 'pvpAttack');
             // Se ghost: server processa o dano local (cliente não está)
@@ -5296,6 +5359,18 @@ wss.on('connection', (ws) => {
             }
             broadcast(null, { t:'chat', id, name:p.name, text });
             return;
+        }
+
+        } catch (err) {
+            // Erro num handler — não derruba processo. Loga + recordError.
+            console.error(`[ws:msg-handler] id=${id} name=${p.name || '?'} t=${msg && msg.t || '?'} err=${err.message || err}`);
+            recordError({
+                kind: 'msg_handler',
+                player: p.name || null,
+                msg: err.message || String(err),
+                stack: err.stack || null,
+                meta: { id, msgType: (msg && msg.t) || null },
+            });
         }
     });
 
