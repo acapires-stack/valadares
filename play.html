@@ -7098,6 +7098,18 @@ function applyDye(slot, color){
         document.getElementById('dyeResult').innerHTML = `<span style="color:#cc3030">Sem ouro suficiente (${cost.toLocaleString('pt-BR')}g)</span>`;
         return;
     }
+    // Não desperdiça gold se o slot já está com essa cor
+    const cur = (player.dyes && player.dyes[slot]) || null;
+    if (cur === color){
+        document.getElementById('dyeResult').innerHTML = '<span style="color:#c8a050">Esse slot já está nessa cor.</span>';
+        return;
+    }
+    // Confirmação antes de gastar — evita clique acidental
+    const slotName = (DYE_SLOT_LABELS[slot] && DYE_SLOT_LABELS[slot].label) || slot;
+    const msg = (color === null)
+        ? `Remover a tinta de ${slotName}?\n\nCusto: 1.000g\nOuro atual: ${(player.gold|0).toLocaleString('pt-BR')}g`
+        : `Tingir ${slotName} desta cor?\n\nCusto: 5.000g\nOuro atual: ${(player.gold|0).toLocaleString('pt-BR')}g`;
+    if (!confirm(msg)) return;
     try {
         ws.send(JSON.stringify({ t:'dyeItem', slot, color }));
     } catch {}
