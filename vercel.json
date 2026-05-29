@@ -13,7 +13,9 @@
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/ranking", "destination": "/ranking.html" },
     { "source": "/reset", "destination": "/reset.html" },
-    { "source": "/admin", "destination": "/admin.html" }
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/devlog", "destination": "/devlog/index.html" },
+    { "source": "/devlog/:slug", "destination": "/devlog/:slug.html" }
   ],
   "headers": [
     {

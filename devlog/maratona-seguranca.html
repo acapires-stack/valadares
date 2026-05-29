@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maratona de segurança — 17 vulnerabilidades fechadas em duas sessões — Devlog Valadares</title>
+<meta name="description" content="Auditoria pós-lançamento encontrou 5 CRITICAL, e isso virou uma maratona de hardening. No final, mais 12 issues fechadas — incluindo um handler que aceitava HP do cliente direto.">
+<link rel="canonical" href="https://valadares.app.br/devlog/maratona-seguranca">
+<meta property="og:title" content="Maratona de segurança — 17 vulnerabilidades fechadas em duas sessões — Devlog Valadares">
+<meta property="og:description" content="Auditoria pós-lançamento encontrou 5 CRITICAL, e isso virou uma maratona de hardening. No final, mais 12 issues fechadas — incluindo um handler que aceitava HP do cliente direto.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://valadares.app.br/devlog/maratona-seguranca">
+<meta property="og:image" content="https://valadares.app.br/og.jpg">
+<meta property="og:site_name" content="Valadares">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Maratona de segurança — 17 vulnerabilidades fechadas em duas sessões — Devlog Valadares">
+<meta name="twitter:description" content="Auditoria pós-lançamento encontrou 5 CRITICAL, e isso virou uma maratona de hardening. No final, mais 12 issues fechadas — incluindo um handler que aceitava HP do cliente direto.">
+<meta name="twitter:image" content="https://valadares.app.br/og.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Maratona de segurança — 17 vulnerabilidades fechadas em duas sessões",
+  "description": "Auditoria pós-lançamento encontrou 5 CRITICAL, e isso virou uma maratona de hardening. No final, mais 12 issues fechadas — incluindo um handler que aceitava HP do cliente direto.",
+  "datePublished": "2026-05-29",
+  "author": { "@type": "Organization", "name": "Valadares" },
+  "publisher": { "@type": "Organization", "name": "Valadares", "url": "https://valadares.app.br/" },
+  "image": "https://valadares.app.br/og.jpg",
+  "url": "https://valadares.app.br/devlog/maratona-seguranca"
+}
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0805; --bg-card: #1a1410; --bg-elev: #241b14; --border: #3a2d20;
+  --gold: #d4a847; --gold-bright: #f0c060; --blood: #8b2020; --blood-bright: #c83030;
+  --text: #e0d8c8; --text-dim: #8a7e6a; --green: #4ab040;
+}
+html, body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.7; overflow-x: hidden; }
+body { background-image: radial-gradient(circle at 20% 10%, rgba(212, 168, 71, 0.06), transparent 40%), radial-gradient(circle at 80% 80%, rgba(139, 32, 32, 0.06), transparent 40%); background-attachment: fixed; }
+a { color: var(--gold); text-decoration: none; }
+a:hover { color: var(--gold-bright); text-decoration: underline; }
+nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 8, 5, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+.nav-brand { font-family: "Cinzel", Georgia, serif; font-size: 22px; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
+.nav-brand::before { content: "✦ "; color: var(--gold-bright); }
+.nav-links { display: flex; gap: 24px; }
+.nav-links a { color: var(--text-dim); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+.nav-links a:hover { color: var(--gold); text-decoration: none; }
+.nav-links a.active { color: var(--gold); }
+main { max-width: 820px; margin: 0 auto; padding: 60px 24px 80px; }
+.page-title { font-family: "Cinzel", Georgia, serif; font-size: clamp(36px, 6vw, 56px); color: var(--gold); letter-spacing: 4px; text-align: center; margin-bottom: 12px; text-shadow: 0 0 20px rgba(212, 168, 71, 0.3); }
+.page-sub { text-align: center; color: var(--text-dim); margin-bottom: 56px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+.post-list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+.post-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; transition: all 0.2s ease; display: block; color: inherit; text-decoration: none; }
+.post-card:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); text-decoration: none; color: inherit; }
+.post-card-meta { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+.post-card-title { font-family: "Cinzel", Georgia, serif; font-size: 22px; color: var(--gold-bright); margin-bottom: 10px; letter-spacing: 1px; }
+.post-card-summary { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+.tag { display: inline-block; background: var(--bg-elev); color: var(--gold); padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+article header { margin-bottom: 40px; text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
+article h1 { font-family: "Cinzel", Georgia, serif; font-size: clamp(28px, 5vw, 44px); color: var(--gold); letter-spacing: 2px; margin-bottom: 16px; line-height: 1.2; }
+article .meta { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+article h2 { font-family: "Cinzel", Georgia, serif; color: var(--gold-bright); font-size: 26px; margin: 48px 0 16px; letter-spacing: 1px; }
+article h3 { color: var(--gold-bright); font-size: 19px; margin: 32px 0 12px; }
+article h4 { color: var(--gold); font-size: 16px; margin: 24px 0 8px; }
+article p { margin-bottom: 16px; color: var(--text); }
+article ul, article ol { margin: 0 0 20px 24px; color: var(--text); }
+article li { margin-bottom: 6px; }
+article a { color: var(--gold-bright); border-bottom: 1px dotted var(--gold); }
+article a:hover { color: var(--gold); text-decoration: none; border-bottom-style: solid; }
+article code { background: var(--bg-elev); color: var(--gold); padding: 2px 6px; border-radius: 3px; font-size: 13px; font-family: ui-monospace, "Consolas", monospace; }
+article pre { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--gold); padding: 16px 20px; border-radius: 4px; overflow-x: auto; margin: 20px 0; }
+article pre code { background: none; padding: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+article blockquote { border-left: 3px solid var(--blood-bright); background: var(--bg-elev); padding: 12px 20px; margin: 20px 0; color: var(--text-dim); font-style: italic; }
+article hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+article strong { color: var(--gold-bright); }
+.back-link { display: inline-block; margin-top: 60px; padding: 12px 24px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 13px; }
+.back-link:hover { background: var(--gold); color: var(--bg); text-decoration: none; }
+footer { border-top: 1px solid var(--border); padding: 40px 24px; text-align: center; color: var(--text-dim); font-size: 13px; }
+footer a { margin: 0 12px; }
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+  main { padding: 40px 16px 60px; }
+  .page-title { letter-spacing: 2px; }
+  article h2 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-brand">VALADARES</a>
+  <div class="nav-links">
+    <a href="/" >Home</a>
+    <a href="/devlog" class="active">Devlog</a>
+    <a href="/ranking">Ranking</a>
+    <a href="/jogar">Jogar</a>
+  </div>
+</nav>
+<main>
+<article>
+  <header>
+    <h1>Maratona de segurança — 17 vulnerabilidades fechadas em duas sessões</h1>
+    <div class="meta">
+      <span>📅 29 Mai 2026</span>
+      <span class="tag">segurança</span> <span class="tag">hardening</span> <span class="tag">server</span>
+    </div>
+  </header>
+  <h2>🔒 Por que auditar</h2>
+<p>No último commit da sprint de lançamento, marquei um TODO: &quot;rodar auditoria de segurança antes da próxima feature&quot;. Eu sabia que tinha pressa demais nos últimos 4 dias e que alguns handlers tinham passado sem peer-review.</p>
+<p>A auditoria rodou na manhã do 29/05 e veio com <strong>5 CRITICAL/HIGH</strong>:</p>
+<ol><li>Handler <code>pos</code> aceitava <code>hp/maxHp</code> do cliente</li><li>Sem <code>uncaughtException</code> global → throw em <code>tickAI</code> matava o processo</li><li><code>ws.on('message')</code> sem try/catch geral → mensagem ruim derrubava o server</li><li><code>pvpAttack</code> sem cap em <code>amount</code>/<code>range</code> → F12 one-shot</li><li><code>pvpAttack</code> sem rate limit → 100 hits/s + farm XP</li></ol>
+<h2>#1 — O handler <code>pos</code> aceitava HP do cliente</h2>
+<p>Esse foi o mais embaraçoso. O lockdown N3 cobria <code>saveUpload</code>, <code>playerSync</code> e ~15 handlers de mutação. Mas o handler <code>pos</code> (que atualiza posição quando o player anda) estava assim:</p>
+<pre><code class="lang-js">case 'pos': {
+  p.x = clamp(msg.x, 0, MAP_W - 1);
+  p.y = clamp(msg.y, 0, MAP_H - 1);
+  if (typeof msg.hp === 'number') p.hp = msg.hp;       // 🔴
+  if (typeof msg.maxHp === 'number') p.maxHp = msg.maxHp; // 🔴
+  break;
+}</code></pre>
+<p>Esse <code>if (typeof msg.hp === 'number')</code> sobrevivia desde antes do lockdown — provavelmente porque &quot;o cliente precisa atualizar HP quando regenera&quot;. Acontece que a regen tinha virado server-side desde o T2.</p>
+<p>F12 no cliente, mandar <code>{t:'pos', x:.., y:.., hp: 99999, maxHp: 99999}</code> → players imortais.</p>
+<p>Fix: remover qualquer mutação de stats do handler <code>pos</code>. Server é dono.</p>
+<h2>#2 e #3 — Sem <code>uncaughtException</code>, qualquer throw mata prod</h2>
+<p>Caso clássico de Node: <code>tickAI</code> roda a cada 100ms. Se algum mob entrar num estado inválido (item null, target já desconectado, etc.) e o handler dispara <code>TypeError</code>, o evento sobe até o topo do loop e <strong>mata o processo</strong>.</p>
+<p>Railway reinicia, mas no meio:</p>
+<ul><li>Players perdem conexão</li><li>Estado em memória que não tinha persistido ainda some</li><li>Logs de erro são parciais (nem sempre dá tempo de flush)</li></ul>
+<p>Fix duplo:</p>
+<pre><code class="lang-js">process.on('uncaughtException', (err) =&gt; {
+  console.error('[fatal:uncaught]', err);
+  // não rethrow — log e segue
+});
+process.on('unhandledRejection', (err) =&gt; {
+  console.error('[fatal:unhandled]', err);
+});</code></pre>
+<p>E o handler de message:</p>
+<pre><code class="lang-js">ws.on('message', async (raw) =&gt; {
+  try {
+    const msg = JSON.parse(raw);
+    await dispatch(ws, msg);
+  } catch (err) {
+    console.error('[ws:msg]', err);
+    // não fecha o socket — só loga
+  }
+});</code></pre>
+<p>Isso não é &quot;fingir que tá tudo bem&quot;. É garantir que <strong>um player mal-intencionado</strong> não derruba o server pros outros.</p>
+<h2>#4 e #5 — <code>pvpAttack</code> sem cap nem rate limit</h2>
+<p>Esse handler aceita um amount calculado no cliente (legado pré-lockdown). F12, mandar <code>{t:'pvpAttack', target:'X', amount: 99999}</code> → one-shot.</p>
+<p>Pior: nada limita frequência. Loop infinito mandando 100 attacks/segundo = farm de XP de skill via PvP.</p>
+<p>Fix:</p>
+<pre><code class="lang-js">// Cap server-side por skill+equip
+const maxAtk = computeMaxDamage(p);
+const amount = Math.min(msg.amount | 0, maxAtk);
+
+// Rate limit por conn
+if (now - p._lastPvpAttack &lt; 600) return; // 600ms entre hits
+p._lastPvpAttack = now;</code></pre>
+<h2>🟡 P0.5 — Mais 5 issues que apareceram</h2>
+<p>Depois de fechar os P0, fiz uma segunda passada e achei:</p>
+<ul><li><code>permaBuffs</code> aceitava qualquer chave do cliente → construí allowlist a partir de <code>TALENT_DEFS</code></li><li><code>pkDeath</code> confiava em <code>msg.killerId</code> → server determina autonomamente</li><li><code>flags</code>/<code>questFlags</code> sem allowlist → set de 6 keys válidas + validação por <code>chainId</code></li><li>ADMIN_TOKEN passava por query string → migrei pra header <code>X-Admin-Token</code></li><li><code>broadcastMobs</code> sempre full snapshot → skip-when-unchanged via signature + snapshot full só a cada 10s</li></ul>
+<h2>🟡 Nova auditoria 29/05 à tarde — 6 vetores de rate limit</h2>
+<p>Bateu o sininho de &quot;talvez ainda tenha gente abusando&quot; e fiz uma terceira passada focada em rate limit:</p>
+<ol><li><strong>🔴 <code>announce</code> sem admin check</strong> — qualquer player podia broadcast spam. Fix: <code>isAdmin()</code> + 2s rate</li><li><strong>🟡 <code>auth</code> sem rate limit</strong> — brute force passwords. Fix: 5 tentativas/30s por conn → fecha</li><li><strong>🟡 <code>duelInvite</code> sem rate limit</strong> — pop-up infinito de assédio. Fix: 3s</li><li><strong>🟡 <code>tradeRequest</code> sem rate limit</strong> — mesma coisa. Fix: 3s</li><li><strong>🟡 <code>getRanking</code> sem rate limit</strong> — CPU spike. Fix: 1s</li><li><strong>🟡 <code>passwordResetRequest</code> sem rate limit</strong> — CPU via <code>findAccountByEmail</code> O(N). Fix: 5/min</li></ol>
+<h2>📊 Resultado final</h2>
+<p>| Categoria | Quantos | |---|---| | CRITICAL (P0) | 5 | | P0.5 (HIGH) | 5 + 1 missed (pkDeath) | | Nova auditoria (rate limit) | 6 | | <strong>Total fechado em 2 sessões</strong> | <strong>17</strong> |</p>
+<p>Commits:</p>
+<ul><li><a href="https://github.com/acapires-stack/valadares/commit/58c1d72"><code>58c1d72</code></a> — P0</li><li><a href="https://github.com/acapires-stack/valadares/commit/0e727c1"><code>0e727c1</code></a> — P0.5</li><li><a href="https://github.com/acapires-stack/valadares/commit/7bae381"><code>7bae381</code></a> — rate limit</li></ul>
+<h2>🧠 Lição</h2>
+<p>Auditoria periódica não é luxo. É a única coisa que pega o canto cego do &quot;eu já cobri isso no lockdown N3&quot;. O lockdown cobria <code>saveUpload</code> e <code>playerSync</code>. Não cobria <code>pos</code>. Não cobria <code>pvpAttack</code>. Não cobria <code>announce</code>.</p>
+<p><strong>Cada handler novo é um vetor novo.</strong> Trate como tal.</p>
+<p>Próximo post: o overhaul mobile que veio porque a esposa achou ruim no celular.</p>
+</article>
+<a href="/devlog" class="back-link">← Voltar ao Devlog</a>
+</main>
+<footer>
+  <div>
+    <a href="/">Home</a>·
+    <a href="/devlog">Devlog</a>·
+    <a href="/jogar">Jogar</a>·
+    <a href="/ranking">Ranking</a>·
+    <a href="/privacy">Privacidade</a>·
+    <a href="/terms">Termos</a>
+  </div>
+  <div style="margin-top: 12px;">© 2026 Valadares · RPG online tile-based</div>
+</footer>
+</body>
+</html>

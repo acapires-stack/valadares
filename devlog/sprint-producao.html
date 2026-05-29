@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint de produção — do single-player ao MMO em 4 dias — Devlog Valadares</title>
+<meta name="description" content="Como Valadares saiu do &quot;rodando localmente&quot; pra ter domínio próprio, server autoritativo, monetização real, cliente desktop e SEO em 4 dias corridos. Spoiler — o gargalo nunca é código.">
+<link rel="canonical" href="https://valadares.app.br/devlog/sprint-producao">
+<meta property="og:title" content="Sprint de produção — do single-player ao MMO em 4 dias — Devlog Valadares">
+<meta property="og:description" content="Como Valadares saiu do &quot;rodando localmente&quot; pra ter domínio próprio, server autoritativo, monetização real, cliente desktop e SEO em 4 dias corridos. Spoiler — o gargalo nunca é código.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://valadares.app.br/devlog/sprint-producao">
+<meta property="og:image" content="https://valadares.app.br/og.jpg">
+<meta property="og:site_name" content="Valadares">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sprint de produção — do single-player ao MMO em 4 dias — Devlog Valadares">
+<meta name="twitter:description" content="Como Valadares saiu do &quot;rodando localmente&quot; pra ter domínio próprio, server autoritativo, monetização real, cliente desktop e SEO em 4 dias corridos. Spoiler — o gargalo nunca é código.">
+<meta name="twitter:image" content="https://valadares.app.br/og.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Sprint de produção — do single-player ao MMO em 4 dias",
+  "description": "Como Valadares saiu do \"rodando localmente\" pra ter domínio próprio, server autoritativo, monetização real, cliente desktop e SEO em 4 dias corridos. Spoiler — o gargalo nunca é código.",
+  "datePublished": "2026-05-28",
+  "author": { "@type": "Organization", "name": "Valadares" },
+  "publisher": { "@type": "Organization", "name": "Valadares", "url": "https://valadares.app.br/" },
+  "image": "https://valadares.app.br/og.jpg",
+  "url": "https://valadares.app.br/devlog/sprint-producao"
+}
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0805; --bg-card: #1a1410; --bg-elev: #241b14; --border: #3a2d20;
+  --gold: #d4a847; --gold-bright: #f0c060; --blood: #8b2020; --blood-bright: #c83030;
+  --text: #e0d8c8; --text-dim: #8a7e6a; --green: #4ab040;
+}
+html, body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.7; overflow-x: hidden; }
+body { background-image: radial-gradient(circle at 20% 10%, rgba(212, 168, 71, 0.06), transparent 40%), radial-gradient(circle at 80% 80%, rgba(139, 32, 32, 0.06), transparent 40%); background-attachment: fixed; }
+a { color: var(--gold); text-decoration: none; }
+a:hover { color: var(--gold-bright); text-decoration: underline; }
+nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 8, 5, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+.nav-brand { font-family: "Cinzel", Georgia, serif; font-size: 22px; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
+.nav-brand::before { content: "✦ "; color: var(--gold-bright); }
+.nav-links { display: flex; gap: 24px; }
+.nav-links a { color: var(--text-dim); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+.nav-links a:hover { color: var(--gold); text-decoration: none; }
+.nav-links a.active { color: var(--gold); }
+main { max-width: 820px; margin: 0 auto; padding: 60px 24px 80px; }
+.page-title { font-family: "Cinzel", Georgia, serif; font-size: clamp(36px, 6vw, 56px); color: var(--gold); letter-spacing: 4px; text-align: center; margin-bottom: 12px; text-shadow: 0 0 20px rgba(212, 168, 71, 0.3); }
+.page-sub { text-align: center; color: var(--text-dim); margin-bottom: 56px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+.post-list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+.post-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; transition: all 0.2s ease; display: block; color: inherit; text-decoration: none; }
+.post-card:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); text-decoration: none; color: inherit; }
+.post-card-meta { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+.post-card-title { font-family: "Cinzel", Georgia, serif; font-size: 22px; color: var(--gold-bright); margin-bottom: 10px; letter-spacing: 1px; }
+.post-card-summary { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+.tag { display: inline-block; background: var(--bg-elev); color: var(--gold); padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+article header { margin-bottom: 40px; text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
+article h1 { font-family: "Cinzel", Georgia, serif; font-size: clamp(28px, 5vw, 44px); color: var(--gold); letter-spacing: 2px; margin-bottom: 16px; line-height: 1.2; }
+article .meta { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+article h2 { font-family: "Cinzel", Georgia, serif; color: var(--gold-bright); font-size: 26px; margin: 48px 0 16px; letter-spacing: 1px; }
+article h3 { color: var(--gold-bright); font-size: 19px; margin: 32px 0 12px; }
+article h4 { color: var(--gold); font-size: 16px; margin: 24px 0 8px; }
+article p { margin-bottom: 16px; color: var(--text); }
+article ul, article ol { margin: 0 0 20px 24px; color: var(--text); }
+article li { margin-bottom: 6px; }
+article a { color: var(--gold-bright); border-bottom: 1px dotted var(--gold); }
+article a:hover { color: var(--gold); text-decoration: none; border-bottom-style: solid; }
+article code { background: var(--bg-elev); color: var(--gold); padding: 2px 6px; border-radius: 3px; font-size: 13px; font-family: ui-monospace, "Consolas", monospace; }
+article pre { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--gold); padding: 16px 20px; border-radius: 4px; overflow-x: auto; margin: 20px 0; }
+article pre code { background: none; padding: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+article blockquote { border-left: 3px solid var(--blood-bright); background: var(--bg-elev); padding: 12px 20px; margin: 20px 0; color: var(--text-dim); font-style: italic; }
+article hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+article strong { color: var(--gold-bright); }
+.back-link { display: inline-block; margin-top: 60px; padding: 12px 24px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 13px; }
+.back-link:hover { background: var(--gold); color: var(--bg); text-decoration: none; }
+footer { border-top: 1px solid var(--border); padding: 40px 24px; text-align: center; color: var(--text-dim); font-size: 13px; }
+footer a { margin: 0 12px; }
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+  main { padding: 40px 16px 60px; }
+  .page-title { letter-spacing: 2px; }
+  article h2 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-brand">VALADARES</a>
+  <div class="nav-links">
+    <a href="/" >Home</a>
+    <a href="/devlog" class="active">Devlog</a>
+    <a href="/ranking">Ranking</a>
+    <a href="/jogar">Jogar</a>
+  </div>
+</nav>
+<main>
+<article>
+  <header>
+    <h1>Sprint de produção — do single-player ao MMO em 4 dias</h1>
+    <div class="meta">
+      <span>📅 28 Mai 2026</span>
+      <span class="tag">sprint</span> <span class="tag">produção</span> <span class="tag">infra</span>
+    </div>
+  </header>
+  <h2>⏱ O ponto de partida</h2>
+<p>Domingo 24/05/2026, Valadares era um arquivo HTML com mob single-player, sem persistência. Quinta 28/05, ele estava em produção com:</p>
+<ul><li>Domínio próprio (valadares.app.br)</li><li>Server WS autoritativo na Railway com volume persistente</li><li>Cliente desktop (Electron) com auto-update via GitHub Releases</li><li>Pagamentos em PIX e cartão via MercadoPago</li><li>Email transacional via Resend (reset de senha funcionando)</li><li>Sistema social: ranking, amigos, party 4-player, trade, guilds</li><li>Sazonalidade mensal com Coroa de Temporada</li><li>Talent tree com 6 passivos</li><li>SEO base: sitemap, robots.txt, schema.org, Search Console verificado</li></ul>
+<p>4 dias. E não — não é mérito de &quot;código rápido&quot;. Cada dia teve um gargalo diferente.</p>
+<h2>🗓 Dia 1 — 24/05: server WS autoritativo</h2>
+<p>O salto mais difícil. Migrar de &quot;lógica no cliente&quot; pra &quot;server é a fonte da verdade&quot; exige reescrever <strong>tudo que importa</strong>: mob AI, combate, drops, regen.</p>
+<p>A decisão que economizou horas: <strong>mob tick rodando no server</strong>, broadcast diff. Cliente só desenha. Quem joga não nota a diferença, mas agora F12 não move sprite de mob.</p>
+<p>Persistência no Railway Volume (<code>/data/state.json</code>). Saves a cada N segundos + on disconnect. Sobrevive a redeploys.</p>
+<h2>🗓 Dia 2 — 25-26/05: sociais</h2>
+<p>Ranking, amigos, trade entre players, guilds, eventos diários. Tudo isso parece &quot;feature simples&quot; até você lembrar que precisa:</p>
+<ul><li>Validar que A e B aceitam o trade (race condition: A cancela enquanto B confirma)</li><li>Escrowar items no server pra evitar duplicação</li><li>Broadcast só pros membros da guild (não pro mundo inteiro)</li><li>Persistir guilds num save separado</li></ul>
+<p>O escrow de trade levou 2 horas. A lógica do &quot;aceito → travado, mas posso destravar até o outro lado aceitar também&quot; é cheia de canto.</p>
+<h2>🗓 Dia 3 — 27/05: monetização</h2>
+<p>MercadoPago Checkout Pro (Preference API). Webhook valida HMAC pra não aceitar callback forjado:</p>
+<pre><code class="lang-js">// Server recebe POST /webhook/mp com header x-signature
+// Calcula HMAC-SHA256 de &quot;id:&lt;id&gt;;ts:&lt;ts&gt;;&quot; com secret
+// Compara em tempo constante. Mismatch = 401.</code></pre>
+<p><strong>Lição cara:</strong> SDK do MercadoPago precisa estar no <code>package.json</code> da <strong>raiz</strong> do repo. Railway roda <code>npm install</code> na raiz, não na subpasta <code>server/</code>.</p>
+<p>Gold creditado via reason canônico <code>mp_purchase</code> no <code>goldDelta</code>. Idempotência por payment ID — webhook pode chegar 2x, gold só credita 1x.</p>
+<h2>🗓 Dia 4 — 28/05 madrugada: tudo junto</h2>
+<p>Sessão de ~7 horas com 20+ commits. Lockdown N3 fase 3 (saveUpload ignora msg.gold/inv/equipped/chests/skills do cliente), mobile touch controls, season system, talent tree, SEO base.</p>
+<p>E a maior batalha do dia: <strong>Dockerfile</strong>.</p>
+<p>Railpack/Nixpacks do Railway quebraram aleatoriamente — build falhava sem erro claro. Solução foi escrever um <code>Dockerfile</code> na raiz e fazer o Railway buildar isso direto. <code>nixpacks.toml</code> ficou como fallback.</p>
+<h2>🧠 O que não é código</h2>
+<p>O que mais custou tempo:</p>
+<ul><li><strong>DNS</strong> — Registro.br → Cloudflare leva 1-3h pra delegação NS. Records DNS-only (cinza, sem proxy laranja) pra Vercel/Railway senão SSL handshake quebra.</li><li><strong>Resend</strong> — domínio precisa ser verificado antes de mandar email. Sem isso → 403 silencioso.</li><li><strong>Gmail quoted-printable</strong> — corrompe <code>=</code> em URLs longas de email. URL com <code>?token=</code> virava <code>?\xEF\xBF\xBD</code>. Mudei pra <code>?t=</code> e funcionou.</li><li><strong>MercadoPago painel</strong> — webhooks de PRODUÇÃO e TESTE são separados. Configurar nos 2.</li></ul>
+<p>Resumo: o código que importa pra rodar o jogo eu poderia escrever em uma tarde. <strong>Os 4 dias foram quase todos na infra.</strong></p>
+<h2>📊 Snapshot pós-sprint</h2>
+<ul><li>20+ commits só na madrugada do 27→28</li><li>~3.800 linhas no <code>server/server.js</code></li><li>~11.000 linhas no <code>play.html</code></li><li>Anti-cheat lockdown N3 FULL — gold/inv/equipped/chests/skills/hp/mp 100% server-side</li><li>1 usuário real (eu) + auditoria pendente</li></ul>
+<p>A próxima sprint foi inteira de segurança. Conto no próximo post.</p>
+</article>
+<a href="/devlog" class="back-link">← Voltar ao Devlog</a>
+</main>
+<footer>
+  <div>
+    <a href="/">Home</a>·
+    <a href="/devlog">Devlog</a>·
+    <a href="/jogar">Jogar</a>·
+    <a href="/ranking">Ranking</a>·
+    <a href="/privacy">Privacidade</a>·
+    <a href="/terms">Termos</a>
+  </div>
+  <div style="margin-top: 12px;">© 2026 Valadares · RPG online tile-based</div>
+</footer>
+</body>
+</html>
