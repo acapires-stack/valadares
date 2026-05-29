@@ -3236,6 +3236,11 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     // o cliente local não conhece, ITEMS[key] = undefined. Em vez de crashar,
     // tenta hidratar via ensureUpgradeItem ou usa cor fallback.
     const eq = equip || {};
+    // Forjados (X_PLUS_N) usam os detalhes visuais da BASE: resolve a base p/ os
+    // checks `=== 'X'` abaixo (a cor já vem do safeItem). Senão armadura/elmo/botas
+    // forjados perdem brilho/chifres/runas/glow e ficam lisos.
+    const ubase = (k) => (k && typeof getUpgradeTier === 'function') ? getUpgradeTier(k).base : k;
+    const eqArmorB = ubase(eq.armor), eqHeadB = ubase(eq.head), eqFeetB = ubase(eq.feet);
     const safeItem = (key) => {
         if (!key) return null;
         let def = ITEMS[key];
@@ -3278,7 +3283,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     ctx.fillStyle = bootsColor;
     ctx.fillRect(px+13,py+34,10,12);
     ctx.fillRect(px+27,py+34,10,12);
-    if (eq.feet === 'BOTAS_VENTO'){
+    if (eqFeetB ==='BOTAS_VENTO'){
         // brilho azul
         ctx.fillStyle = 'rgba(150, 220, 255, 0.5)';
         ctx.fillRect(px+13, py+44, 10, 2);
@@ -3294,18 +3299,18 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     ctx.fillRect(px+9, py+15, 8, 6);
     ctx.fillRect(px+31, py+15, 8, 6);
     // detalhes por armadura
-    if (eq.armor === 'ARMADURA'){
+    if (eqArmorB ==='ARMADURA'){
         ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(px+30, py+18, 4, 14);  // brilho
         ctx.fillStyle = '#5a5a70'; ctx.fillRect(px+22, py+22, 4, 10);                 // fivela central
-    } else if (eq.armor === 'ARMADURA_OSSO'){
+    } else if (eqArmorB ==='ARMADURA_OSSO'){
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.fillRect(px+15, py+20, 18, 1);
         ctx.fillRect(px+15, py+24, 18, 1);
         ctx.fillRect(px+15, py+28, 18, 1);
         ctx.fillStyle = '#aa6680'; ctx.fillRect(px+22, py+22, 4, 4);   // crânio central
-    } else if (eq.armor === 'COURO'){
+    } else if (eqArmorB ==='COURO'){
         ctx.fillStyle = '#5a3818'; ctx.fillRect(px+22, py+22, 4, 10);   // fivela couro
-    } else if (eq.armor === 'ARMADURA_TRONO'){
+    } else if (eqArmorB ==='ARMADURA_TRONO'){
         // ★ Armadura do Trono — cruz dourada + gema vermelha + ombreiras com pontas
         ctx.fillStyle = '#ffcc40';
         ctx.fillRect(px+22, py+18, 4, 16);   // barra vertical da cruz
@@ -3323,7 +3328,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
         ctx.fillStyle = '#aa8020';
         ctx.fillRect(px+7, py+13, 4, 4);
         ctx.fillRect(px+37, py+13, 4, 4);
-    } else if (eq.armor === 'ARMADURA_ESCAMA'){
+    } else if (eqArmorB ==='ARMADURA_ESCAMA'){
         // Armadura de Escamas — padrão escamado em V
         const scaleD = '#1a4818';
         const scaleL = '#a8e090';
@@ -3346,7 +3351,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
         const hc = dye('head') || (headDef ? headDef.color : '#8a6020');
         ctx.fillStyle = hc; ctx.fillRect(px+13, py+2, 22, 8);
         ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(px+14, py+3, 20, 3);
-        if (eq.head === 'ELMO_CHIFRES'){
+        if (eqHeadB ==='ELMO_CHIFRES'){
             ctx.fillStyle = '#2a1808';
             // chifre esquerdo
             ctx.beginPath();
@@ -3356,7 +3361,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
             ctx.beginPath();
             ctx.moveTo(px+35, py+2); ctx.lineTo(px+40, py-3); ctx.lineTo(px+33, py+2);
             ctx.closePath(); ctx.fill();
-        } else if (eq.head === 'ELMO_DRACO'){
+        } else if (eqHeadB ==='ELMO_DRACO'){
             // Elmo Dracônico — chifres curvados pra fora + olhos vermelhos no visor
             ctx.fillStyle = '#2a1808';
             // chifres longos pra fora
@@ -3370,7 +3375,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
             ctx.fillStyle = '#ff4030';
             ctx.fillRect(px+18, py+6, 3, 2);
             ctx.fillRect(px+27, py+6, 3, 2);
-        } else if (eq.head === 'COROA_VENDEDOR'){
+        } else if (eqHeadB ==='COROA_VENDEDOR'){
             // ★ Coroa do Vendedor — 5 pontas com gemas + chifres pretos
             const c = (ITEMS[eq.head] && ITEMS[eq.head].color) || '#cc1010';
             // 5 pontas escalonadas
@@ -3388,7 +3393,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
             ctx.fillStyle = '#1a0a04';
             ctx.fillRect(px+8, py+1, 2, 4);
             ctx.fillRect(px+38, py+1, 2, 4);
-        } else if (eq.head === 'COROA_VALADARES'){
+        } else if (eqHeadB ==='COROA_VALADARES'){
             // ★★ Coroa de Valadares — coroa dourada robusta + gemas multicoloridas
             ctx.fillStyle = '#ffe060';
             ctx.fillRect(px+11, py+2, 26, 4);    // aro
