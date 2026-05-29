@@ -778,8 +778,8 @@
             pointer-events: auto;
         }
         .reconnect-box {
-            background: linear-gradient(180deg, #2a1010 0%, #150505 100%);
-            border: 1px solid #6a3030;
+            background: linear-gradient(180deg, #2a2010 0%, #150e05 100%);
+            border: 1px solid #6a5030;
             box-shadow: 0 4px 16px rgba(0,0,0,0.6);
             padding: 8px 14px;
             border-radius: 3px;
@@ -798,7 +798,7 @@
         }
         .reconnect-spinner {
             font-size: 16px;
-            color: #ff8060;
+            color: #ffc060;
             animation: spin 2s linear infinite;
             display: inline-block;
         }
@@ -808,7 +808,7 @@
         }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .reconnect-title {
-            color: #ff8060;
+            color: #ffc060;
             font-family: 'Consolas', monospace;
             font-size: 11px;
             letter-spacing: 2px;
@@ -1774,12 +1774,14 @@
     </div>
 </div>
 
-<!-- Overlay de reconexão (aparece quando WS cai estando em modo MP) -->
+<!-- Overlay de reconexão (aparece quando WS cai estando em modo MP).
+     Chip discreto dourado por padrão (atualização normal de Railway ~30-60s).
+     Após 60s vira fullscreen vermelho ("grave") — só pra problema real. -->
 <div id="reconnectOverlay">
     <div class="reconnect-box">
         <div class="reconnect-spinner">⚙</div>
-        <div class="reconnect-title">SEM CONEXÃO</div>
-        <div class="reconnect-desc">Reconectando ao servidor automaticamente…</div>
+        <div class="reconnect-title">ATUALIZANDO</div>
+        <div class="reconnect-desc">Servidor está atualizando — voltamos em segundos.</div>
         <div class="reconnect-hint">Ataques e movimento bloqueados até voltar</div>
     </div>
 </div>
@@ -6896,12 +6898,14 @@ function showReconnectOverlay(show){
     if (!el) return;
     if (show){
         el.style.display = 'flex';
-        // Após 15s de tentativa, escalona pra modo "grave" (fullscreen vermelho).
-        // Reconexões rápidas (<15s) ficam só com o chip discreto no canto.
+        // Após 60s de tentativa, escalona pra modo "grave" (fullscreen vermelho).
+        // Deploy normal do Railway leva ~30-60s, então chip dourado discreto
+        // cobre o caso comum sem assustar com tela vermelha. Só vira "grave"
+        // se demorou demais (problema real, não atualização rotineira).
         if (_reconnectGraveTimer) clearTimeout(_reconnectGraveTimer);
         _reconnectGraveTimer = setTimeout(() => {
             if (el.style.display !== 'none') el.classList.add('grave');
-        }, 15000);
+        }, 60000);
     } else {
         el.style.display = 'none';
         el.classList.remove('grave');
@@ -6914,8 +6918,8 @@ function showReconnectOverlay(show){
 function blockedByDisconnect(){
     if (!mpDisconnected) return false;
     if (!doAttack._discWarn || Date.now() - doAttack._discWarn > 2500){
-        log('<span class="log-sys">⚠ Sem conexão com o servidor. Ataques bloqueados até reconectar.</span>');
-        addFloat(player.x, player.y, 'SEM CONEXÃO', '#ff5050', true, -10);
+        log('<span class="log-sys">⚙ Servidor atualizando — aguarde…</span>');
+        addFloat(player.x, player.y, 'ATUALIZANDO', '#ffc060', true, -10);
         doAttack._discWarn = Date.now();
     }
     return true;
