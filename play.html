@@ -13780,21 +13780,55 @@ function loop(ts){
             ctx.fillText(hint.marker, nx+TS/2, ny-6);
             ctx.globalAlpha = 1;
         }
-        // nome (sempre visível)
+        // nome (sempre visível) — pill com padding real, borda dourada e sombra
         const label = npc.name;
-        ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(nx+TS/2-label.length*2.6-2, ny+TS+1, label.length*5.2+4, 9);
-        ctx.fillStyle = '#e0c060';
-        ctx.fillText(label, nx+TS/2, ny+TS+8);
+        ctx.font = 'bold 11px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const labelW = ctx.measureText(label).width;
+        const PAD_X = 6, BOX_H = 14;
+        const boxW = Math.ceil(labelW + PAD_X * 2);
+        const boxX = nx + TS/2 - boxW/2;
+        const boxY = ny + TS + 2;
+        // sombra externa pra "elevar" do background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.fillRect(boxX + 1, boxY + 1, boxW, BOX_H);
+        // fundo escuro
+        ctx.fillStyle = 'rgba(10, 8, 5, 0.92)';
+        ctx.fillRect(boxX, boxY, boxW, BOX_H);
+        // borda dourada sutil
+        ctx.strokeStyle = 'rgba(212, 168, 71, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, BOX_H - 1);
+        // texto dourado
+        ctx.fillStyle = '#ffd060';
+        ctx.fillText(label, nx + TS/2, boxY + BOX_H/2 + 0.5);
+        ctx.textBaseline = 'alphabetic';
         // brilho ao aproximar + hint
         if (near){
-            ctx.strokeStyle = 'rgba(220,180,80,0.6)';
+            ctx.strokeStyle = 'rgba(220,180,80,0.7)';
             ctx.lineWidth = 2;
             ctx.strokeRect(nx+6, ny+4, 36, 44);
+            // hint pill (mesmo padrão do nome, cor diferenciada)
+            const hintLabel = `[ESPAÇO] ${hint.label || 'falar'}`;
+            ctx.font = 'bold 10px "Segoe UI", system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const hintW = ctx.measureText(hintLabel).width;
+            const HPAD_X = 6, HBOX_H = 14;
+            const hboxW = Math.ceil(hintW + HPAD_X * 2);
+            const hboxX = nx + TS/2 - hboxW/2;
+            const hboxY = boxY + BOX_H + 3;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.fillRect(hboxX + 1, hboxY + 1, hboxW, HBOX_H);
+            ctx.fillStyle = 'rgba(48, 32, 8, 0.96)';
+            ctx.fillRect(hboxX, hboxY, hboxW, HBOX_H);
+            ctx.strokeStyle = '#ffd060';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(hboxX + 0.5, hboxY + 0.5, hboxW - 1, HBOX_H - 1);
             ctx.fillStyle = '#ffd060';
-            ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
-            ctx.fillText(`[ESPAÇO] ${hint.label || 'falar'}`, nx+TS/2, ny+TS+20);
+            ctx.fillText(hintLabel, nx + TS/2, hboxY + HBOX_H/2 + 0.5);
+            ctx.textBaseline = 'alphabetic';
         }
     }
 
