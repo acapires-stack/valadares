@@ -471,6 +471,7 @@ const MTYPE = {
     // ─── M4 Masmorra "As Profundezas" — mobs exclusivos, mais fortes ───
     SOMBRA:     { hp:230, dmg:22, speed:300, xp:220, aggro:7, intel:2 },   // rápido, assedia
     CARRASCO:   { hp:480, dmg:38, speed:500, xp:420, aggro:6, intel:3 },   // lento, pancada pesada — flanqueia (intel 3)
+    SENHOR_PROFUNDEZAS: { hp:5000, dmg:110, speed:340, xp:3000, aggro:9, unique:true, intel:3 },   // ★ boss do andar 5 (3c)
     // ★★ MEGA RAID BOSS — spawna quando os 3 bosses normais chegam ao Lv10
     SENHOR_VALADARES: { hp:18000, dmg:75, speed:240, xp:10000, aggro:12, unique:true, mega:true, intel:3 },
     // Boss de evento semanal (sábado 20h-22h BRT)
@@ -1061,6 +1062,15 @@ const LOOT = {
         ['ESSENCIA', 0.40, 1, 2], ['PEDRA_GOLEM', 0.12, 1, 1], ['ESCAMA', 0.12, 1, 1],
         ['MACHADO_MINO', 0.05, 1, 1], ['CORACAO_HL', 0.02, 1, 1],
     ],
+    SENHOR_PROFUNDEZAS: [
+        ['GOLD', 1.00, 600, 1600], ['ESSENCIA', 1.00, 3, 6], ['POTION', 1.00, 5, 10], ['POTION_MP', 1.00, 4, 8],
+        ['CORACAO_HL', 0.50, 1, 2],
+        ['ARMADURA_ESCAMA', 0.35, 1, 1], ['ELMO_DRACO', 0.30, 1, 1], ['ESCUDO_PEDRA', 0.28, 1, 1],
+        ['MARTELO_GOLEM', 0.22, 1, 1], ['ESPADA_DRACO', 0.20, 1, 1], ['ESPADA_HL', 0.18, 1, 1],
+        ['MACHADO_MINO', 0.15, 1, 1], ['BOTAS_VENTO', 0.10, 1, 1],
+        ['CAPA_SOMBRA', 0.15, 1, 1], ['TRAIL_GELO', 0.10, 1, 1],
+        ['ESPADA_ETERNA', 0.05, 1, 1], ['ARMADURA_TRONO', 0.08, 1, 1],
+    ],
     SENHOR_VALADARES: [
         ['GOLD', 1.00, 5000, 10000], ['ESSENCIA', 1.00, 5, 10], ['CORACAO_HL', 1.00, 3, 5],
         ['POTION', 1.00, 10, 20], ['POTION_MP', 1.00, 10, 20],
@@ -1183,6 +1193,8 @@ const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de SUBIDA (volta 1 andar;
 const DUNGEON_DOWN     = { x: 50, y: 57 };   // escada de DESCIDA (vai pro próximo andar; não existe no último)
 const DUNGEON_MAX_FLOOR = 5;                  // Fase 3: 5 andares (boss no 5 — slice 3c)
 const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
+const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c)
+const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fundo da sala (longe da chegada 50,52; > aggro 9 → dorme até você chegar perto)
 // Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
 // Interior 41-59 é piso; mobs andam dentro deste box (server não tem o grid).
 const DUNGEON_ROOM = { x0: 41, y0: 41, x1: 59, y1: 59 };
@@ -1495,6 +1507,11 @@ function spawnDungeonMobs(){
         if ((m.floor || 0) >= 1 && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
     }
     for (const floor of floorsWithPlayers){
+        // ★ Boss do último andar: 1 por delve (respawna fresco quando o andar reabre)
+        if (floor === DUNGEON_MAX_FLOOR){
+            const hasBoss = Array.from(monsters.values()).some(mm => mm.type === DUNGEON_BOSS_TYPE && (mm.floor||0) === floor && mm.hp > 0);
+            if (!hasBoss) spawnMob(DUNGEON_BOSS_TYPE, DUNGEON_BOSS_SPAWN.x, DUNGEON_BOSS_SPAWN.y, floor);
+        }
         let count = 0;
         for (const m of monsters.values()) if ((m.floor || 0) === floor && m.hp > 0 && !m.unique) count++;
         let tries = 0;
@@ -3075,7 +3092,7 @@ function handleMobDeath(m, killerId){
         if (m.type === MEGA_BOSS_TYPE){
             const killer = players.get(killerId);
             if (killer) handleMegaBossDeath(killer, m);
-        } else {
+        } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 bosses do mundo escalam/respawnam por timer; boss de masmorra respawna fresco no re-entry
             bossDeath.set(m.type, Date.now());
             const cur = bossLevel.get(m.type) || 1;
             const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
@@ -5669,7 +5686,7 @@ wss.on('connection', (ws, request) => {
                     if (m.type === MEGA_BOSS_TYPE){
                         // ★★ Mega boss morreu — recompensa épica + reset bossLevel
                         handleMegaBossDeath(p, m);
-                    } else {
+                    } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 do mundo escalam; boss de masmorra respawna fresco no re-entry
                         bossDeath.set(m.type, Date.now());
                         // próxima encarnação fica +1 nível (cap)
                         const cur = bossLevel.get(m.type) || 1;
