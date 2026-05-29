@@ -2719,7 +2719,25 @@ function genMap() {
     }
     return m;
 }
-const map = genMap();
+// M4: `map` agora é mutável — troca pro grid do andar ao descer a masmorra,
+// volta pro overworld ao subir. genMap() roda uma vez; o overworld fica
+// guardado em overworldMap pra restaurar.
+let map = genMap();
+let overworldMap = map;
+// Grid do andar da masmorra (gerado sob demanda, cacheado por floor). Sala de
+// caverna 100×100: anel CAVE_WALL + sala CAVE central. Determinístico — o mesmo
+// andar é sempre igual (server não precisa mandar o grid no MVP sem mobs).
+const _dungeonFloorCache = {};
+function genDungeonFloor(floor){
+    if (_dungeonFloorCache[floor]) return _dungeonFloorCache[floor];
+    const m = Array.from({length:M_H}, () => new Uint8Array(M_W).fill(T.CAVE_WALL));
+    // sala central jogável (40..60 nos dois eixos = 21×21 de piso de caverna)
+    for (let y=40; y<=60; y++)
+        for (let x=40; x<=60; x++)
+            m[y][x] = T.CAVE;
+    _dungeonFloorCache[floor] = m;
+    return m;
+}
 const VAR = Array.from({length:M_H}, (_,y) =>
     Float32Array.from({length:M_W}, (_,x) => (Math.sin(x*127.1+y*311.7)*43758.5453)%1));
 const vr = (tx,ty) => Math.abs(VAR[ty]?.[tx] ?? 0.5);
@@ -4448,6 +4466,7 @@ const player = {
     weapon: null,   // chave de ITEMS atualmente equipado (mão)
     equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null },
     dyes: {},   // M6 Tinturaria: { armor:'#hex', head:'#hex', feet:'#hex', cosmetic:'#hex' } — server autoritativo
+    floor: 0,   // M4: andar atual (0 = overworld/cidade, 1+ = masmorra). Server autoritativo.
     skills: {
         'Punho':     { val:10, xp:0, xpNext:50 },
         'Espada':    { val:10, xp:0, xpNext:50 },
@@ -4768,6 +4787,48 @@ async function playerDie(){
     }
     saveState();
     } finally { player._dying = false; }
+}
+
+// ─── M4 Masmorra: transição de andar (cliente) ──────────────────────────────
+// Server manda dungeonEnter/dungeonExit com pos + snapshot dos players/mobs do
+// andar de destino. Cliente troca o grid `map`, teleporta, e força/restaura PvP.
+let _overworldVisited = null;   // guarda o fog do overworld enquanto na masmorra
+function enterDungeonClient(msg){
+    player.floor = msg.floor || 1;
+    map = genDungeonFloor(player.floor);            // troca o grid ativo
+    player.x = msg.x; player.y = msg.y;
+    player.renderX = msg.x; player.renderY = msg.y;
+    player.prevX = msg.x; player.prevY = msg.y;
+    player.target = null; player.autoAttack = false;
+    snapRender(player);
+    player.pvp = true;                              // PvP forçado lá dentro
+    // Andar inteiro visível (sem fog). Guarda o fog do overworld pra restaurar.
+    if (player.visited) _overworldVisited = player.visited;
+    player.visited = new Uint8Array(M_W * M_H).fill(1);
+    // Repopula com quem está no andar (server já filtrou por floor)
+    for (const id in remotePlayers) delete remotePlayers[id];
+    if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = sp; }
+    monsters.length = 0;
+    if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
+    if (typeof showServerToast === 'function') showServerToast('warn', '⬇ Você desceu às Profundezas — PvP FORÇADO. Cuidado.', null, 5500);
+    log('<span class="log-die">━━ AS PROFUNDEZAS · Andar 1 ━━</span>');
+}
+function exitDungeonClient(msg){
+    player.floor = 0;
+    map = overworldMap;                             // restaura o overworld
+    player.x = msg.x; player.y = msg.y;
+    player.renderX = msg.x; player.renderY = msg.y;
+    player.prevX = msg.x; player.prevY = msg.y;
+    player.target = null; player.autoAttack = false;
+    snapRender(player);
+    if (typeof msg.pvp === 'boolean') player.pvp = msg.pvp;   // restaura toggle anterior
+    if (_overworldVisited) { player.visited = _overworldVisited; _overworldVisited = null; }
+    for (const id in remotePlayers) delete remotePlayers[id];
+    if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = sp; }
+    monsters.length = 0;
+    if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
+    if (typeof showServerToast === 'function') showServerToast('event', '⬆ De volta à cidade.', null, 4000);
+    log('<span class="log-sys">Você voltou à superfície.</span>');
 }
 
 function killMonster(m){
@@ -6444,6 +6505,16 @@ function handleMP(msg){
         // Toast visível no centro — o log vai pra aba COMBATE e o player pode
         // estar na aba CHAT, fazendo a falha parecer silenciosa ("não dá nada").
         if (typeof showServerToast === 'function') showServerToast('warn', `⚠ ${text} (${msg.reason})`, null, 5000);
+    } else if (msg.t === 'dungeonEnter'){
+        // M4: server confirmou descida pro andar. Troca o grid ativo, teleporta,
+        // PvP forçado, e repopula remotePlayers com quem está no andar.
+        enterDungeonClient(msg);
+    } else if (msg.t === 'dungeonExit'){
+        // M4: voltou pra cidade. Restaura overworld, PvP anterior, players da cidade.
+        exitDungeonClient(msg);
+    } else if (msg.t === 'dungeonResult'){
+        const errs = { not_at_entrance:'Aproxime-se da escada da masmorra.', not_at_exit:'Aproxime-se da escada de saída.' };
+        if (msg.error && typeof showServerToast === 'function') showServerToast('warn', errs[msg.error] || 'Falhou', null, 4000);
     } else if (msg.t === 'forceTeleport'){
         // Admin reset: teleporta + re-inicializa renderX/Y pra escapar sprite invisível.
         const tx = (typeof msg.x === 'number') ? msg.x : 50;
@@ -11599,7 +11670,30 @@ function handleMovement(dt){
     const trailCol = ITEMS[player.equipped.cosmetic]?.trail;
     if (trailCol) spawnTrailAt(player.prevX, player.prevY, trailCol);
     pickupAt(nx, ny);
+    checkDungeonStairs(nx, ny);
     if (ws && ws.readyState===1) ws.send(JSON.stringify({t:'pos', x:nx, y:ny, dir:player.dir}));
+}
+
+// M4: pisar na escada dispara a transição de andar (server valida adjacência).
+// Debounce 1.2s pra não re-disparar enquanto o server processa/teleporta.
+const DUNGEON_STAIR_IN  = { x: 50, y: 46 };   // entrada na PZ (deve bater com server)
+const DUNGEON_STAIR_OUT = { x: 50, y: 50 };   // saída no andar
+let _lastStairTrigger = 0;
+function checkDungeonStairs(x, y){
+    if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
+    const now = performance.now();
+    if (now - _lastStairTrigger < 1200) return;
+    if ((player.floor || 0) === 0){
+        if (x === DUNGEON_STAIR_IN.x && y === DUNGEON_STAIR_IN.y){
+            _lastStairTrigger = now;
+            try { ws.send(JSON.stringify({ t:'enterDungeon' })); } catch {}
+        }
+    } else {
+        if (x === DUNGEON_STAIR_OUT.x && y === DUNGEON_STAIR_OUT.y){
+            _lastStairTrigger = now;
+            try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}
+        }
+    }
 }
 
 // ─── Itens: pickup automático no raio 1 ──────────────────────────────────────
@@ -13642,9 +13736,9 @@ function loop(ts){
             const mx=camTileX+tx, my=camTileY+ty;
             if (mx<0||my<0||mx>=M_W||my>=M_H) continue;
             const sx = tx*TS - offX, sy = ty*TS - offY;
-            // Na PZ, sobrescreve com piso de pedra (chão de praça) em vez do
-            // tile do mapa. Fora da PZ, tile normal.
-            if (inSafeZone(mx, my)){
+            // Na PZ (só no overworld), sobrescreve com piso de pedra (chão de
+            // praça). No andar da masmorra, desenha sempre o tile do grid.
+            if ((player.floor || 0) === 0 && inSafeZone(mx, my)){
                 const tiles = getStoneTiles();
                 const idx = (mx * 13 + my * 23) & 3;
                 ctx.drawImage(tiles[idx], sx, sy);
@@ -13664,9 +13758,9 @@ function loop(ts){
             }
         }
 
-    // 4 Baús do DP
+    // 4 Baús do DP (só na cidade — no andar da masmorra não existem)
     const nearC = nearestChest();
-    for (const c of CHESTS){
+    if ((player.floor || 0) === 0) for (const c of CHESTS){
         if (c.x < cam.x-1 || c.x >= cam.x+VP_W+1 || c.y < cam.y-1 || c.y >= cam.y+VP_H+1) continue;
         const cpx = (c.x - cam.x) * TS;
         const cpy = (c.y - cam.y) * TS;
@@ -13765,8 +13859,8 @@ function loop(ts){
         }
     }
 
-    // Altar de magias
-    if (ALTAR_POS.x >= cam.x-1 && ALTAR_POS.x < cam.x+VP_W+1 && ALTAR_POS.y >= cam.y-1 && ALTAR_POS.y < cam.y+VP_H+1){
+    // Altar de magias (só na cidade)
+    if ((player.floor || 0) === 0 && ALTAR_POS.x >= cam.x-1 && ALTAR_POS.x < cam.x+VP_W+1 && ALTAR_POS.y >= cam.y-1 && ALTAR_POS.y < cam.y+VP_H+1){
         const apx = (ALTAR_POS.x - cam.x) * TS;
         const apy = (ALTAR_POS.y - cam.y) * TS;
         // sombra
@@ -13817,8 +13911,8 @@ function loop(ts){
         }
     }
 
-    // NPCs (todos do array NPCS, respeita hidden)
-    for (const npc of NPCS){
+    // NPCs (todos do array NPCS, respeita hidden) — só na cidade
+    if ((player.floor || 0) === 0) for (const npc of NPCS){
         if (!npcVisible(npc)) continue;
         if (npc.pos.x < cam.x-1 || npc.pos.x >= cam.x+VP_W+1 || npc.pos.y < cam.y-1 || npc.pos.y >= cam.y+VP_H+1) continue;
         const nx = (npc.pos.x - cam.x) * TS;
@@ -13907,8 +14001,8 @@ function loop(ts){
         }
     }
 
-    // Bancada de craft
-    if (CRAFT_POS.x >= cam.x-1 && CRAFT_POS.x < cam.x+VP_W+1 && CRAFT_POS.y >= cam.y-1 && CRAFT_POS.y < cam.y+VP_H+1){
+    // Bancada de craft (só na cidade)
+    if ((player.floor || 0) === 0 && CRAFT_POS.x >= cam.x-1 && CRAFT_POS.x < cam.x+VP_W+1 && CRAFT_POS.y >= cam.y-1 && CRAFT_POS.y < cam.y+VP_H+1){
         const cpx = (CRAFT_POS.x - cam.x) * TS;
         const cpy = (CRAFT_POS.y - cam.y) * TS;
         // sombra
@@ -13941,6 +14035,43 @@ function loop(ts){
             ctx.fillStyle = 'rgba(255,200,80,0.9)';
             ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
             ctx.fillText('[C] fabricar', cpx+TS/2, cpy-2);
+        }
+    }
+
+    // M4: escada da masmorra. No overworld (floor 0) = entrada descendo na PZ.
+    // No andar (floor 1) = saída subindo. Buraco escuro com degraus.
+    {
+        const onFloor = (player.floor || 0);
+        const stair = onFloor === 0 ? DUNGEON_STAIR_IN : DUNGEON_STAIR_OUT;
+        const descending = onFloor === 0;
+        if (stair.x >= cam.x-1 && stair.x < cam.x+VP_W+1 && stair.y >= cam.y-1 && stair.y < cam.y+VP_H+1){
+            const sx = (stair.x - cam.x) * TS;
+            const sy = (stair.y - cam.y) * TS;
+            // moldura de pedra
+            ctx.fillStyle = '#2a2418';
+            ctx.fillRect(sx+5, sy+5, TS-10, TS-10);
+            ctx.fillStyle = '#4a4030';
+            ctx.fillRect(sx+5, sy+5, TS-10, 3);
+            // buraco escuro
+            ctx.fillStyle = descending ? '#050505' : '#1a1410';
+            ctx.fillRect(sx+9, sy+9, TS-18, TS-18);
+            // degraus (claros pra cima se sobe, escuros pra baixo se desce)
+            for (let i = 0; i < 4; i++){
+                const shade = descending ? (50 - i*12) : (60 + i*22);
+                ctx.fillStyle = `rgb(${shade},${shade-8},${Math.max(0,shade-20)})`;
+                const yy = descending ? (sy + 12 + i*6) : (sy + 30 - i*6);
+                ctx.fillRect(sx+12, yy, TS-24, 4);
+            }
+            // glow + label ao aproximar (chebyshev <=1)
+            const near = Math.max(Math.abs(player.x - stair.x), Math.abs(player.y - stair.y)) <= 1;
+            if (near){
+                ctx.strokeStyle = descending ? 'rgba(200,80,200,0.7)' : 'rgba(120,200,255,0.7)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx+4, sy+4, TS-8, TS-8);
+                ctx.fillStyle = '#ffd060';
+                ctx.font = 'bold 10px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(descending ? '⬇ As Profundezas' : '⬆ Subir', sx+TS/2, sy-3);
+            }
         }
     }
 

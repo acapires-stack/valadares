@@ -1149,6 +1149,18 @@ let SERVER_MOTD_RUNTIME = SERVER_MOTD;  // pode ser editado via /motd (até rein
 let nextId = 1;
 let nextMobId = 1;
 
+// ─── M4 "As Profundezas" — masmorra aberta vertical ───────────────────────
+// Andar é compartilhado e perigoso (PvP forçado). Pro MVP: 1 andar, sala de
+// caverna 100×100 gerada pelo cliente (determinística). Server só rastreia
+// p.floor + posição + força PvP. Sem mobs ainda (Fase 2).
+// Escada de entrada na PZ (50,46), topo. Player desce → spawn (50,52) no andar.
+// Escada de saída no andar (50,50) → volta pra cidade (50,47).
+const DUNGEON_ENTRANCE = { x: 50, y: 46 };   // escada na PZ (overworld)
+const DUNGEON_RETURN   = { x: 50, y: 47 };   // onde o player reaparece na cidade
+const DUNGEON_SPAWN    = { x: 50, y: 52 };   // onde o player chega no andar 1
+const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de volta no andar 1
+const DUNGEON_MAX_FLOOR = 1;                  // MVP: só andar 1
+
 // ─── M8 Auction House — state global ──────────────────────────────────────
 // Trade assíncrono via NPC Leiloeiro em (50, 48). Server escrowa o item
 // (sai do p.inv), debita gold do comprador na compra, paga seller (online
@@ -5243,6 +5255,68 @@ wss.on('connection', (ws, request) => {
 
         if (msg.t === 'auctionBrowse') {
             sendAuctionsTo(p);
+            return;
+        }
+
+        // ─── M4 Masmorra: descer/subir andares ──────────────────────────────
+        // enterDungeon: player adjacente à escada da PZ → vai pro andar 1.
+        // PvP forçado (salva o toggle anterior). exitDungeon: volta pra cidade.
+        // Broadcast leave/join pra ressincronizar quem vê o player em cada floor.
+        if (msg.t === 'enterDungeon') {
+            const now = Date.now();
+            p._lastFloorAt = p._lastFloorAt || 0;
+            if (now - p._lastFloorAt < 600) return;   // anti-spam de transição
+            if ((p.floor || 0) !== 0) return;          // já está num andar
+            if (chebyshev(p.x, p.y, DUNGEON_ENTRANCE.x, DUNGEON_ENTRANCE.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_entrance' }));
+                return;
+            }
+            p._lastFloorAt = now;
+            // some do overworld pros players da cidade
+            broadcast(id, { t:'leave', id }, 0);
+            // PvP forçado — salva o estado anterior pra restaurar na saída
+            p._pvpBeforeDungeon = !!p.pvp;
+            p.pvp = true;
+            p.floor = 1;
+            p.x = DUNGEON_SPAWN.x; p.y = DUNGEON_SPAWN.y;
+            // manda o player pro andar
+            if (p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({
+                    t:'dungeonEnter', floor: 1, x: p.x, y: p.y,
+                    players: snapshotPlayers(1).filter(sp => sp.id !== id),
+                    mobs: snapshotMobs(1),
+                }));
+            }
+            // aparece pros players já no andar
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 1);
+            console.log(`[dungeon] ${p.name} desceu pro andar 1`);
+            return;
+        }
+
+        if (msg.t === 'exitDungeon') {
+            const now = Date.now();
+            p._lastFloorAt = p._lastFloorAt || 0;
+            if (now - p._lastFloorAt < 600) return;
+            if ((p.floor || 0) === 0) return;          // já está na cidade
+            if (chebyshev(p.x, p.y, DUNGEON_EXIT.x, DUNGEON_EXIT.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
+                return;
+            }
+            p._lastFloorAt = now;
+            const fromFloor = p.floor || 0;
+            broadcast(id, { t:'leave', id }, fromFloor);   // some do andar
+            p.pvp = !!p._pvpBeforeDungeon;                 // restaura PvP
+            p.floor = 0;
+            p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
+            if (p.ws.readyState === 1){
+                p.ws.send(JSON.stringify({
+                    t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
+                    players: snapshotPlayers(0).filter(sp => sp.id !== id),
+                    mobs: snapshotMobs(0),
+                }));
+            }
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+            console.log(`[dungeon] ${p.name} voltou pra cidade`);
             return;
         }
 
