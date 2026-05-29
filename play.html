@@ -2103,6 +2103,16 @@
             <div class="settings-val" id="setVolMusicVal">40</div>
         </div>
 
+        <div class="chest-head" style="margin-top:14px">ACESSIBILIDADE</div>
+        <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px">Aumenta toda a interface (texto, ícones, janela). Útil pra quem tem dificuldade de enxergar.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('in')">🔍+ Aumentar</button>
+            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('out')">🔍− Diminuir</button>
+            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('reset')">↺ Padrão</button>
+        </div>
+        <button class="chest-btn" style="margin-top:6px" onclick="uiToggleFullscreen()" id="uiFullscreenBtn">⛶ Tela cheia (F11)</button>
+        <div style="color:#666;font-size:10px;padding:6px 6px 0;letter-spacing:0.3px">atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia</div>
+
         <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
         <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
         <button class="chest-btn" onclick="openMobileTut(true)">📱 Ver tutorial mobile (touch)</button>
@@ -9382,7 +9392,11 @@ const ITEM_CATEGORIES = [
     { label: 'Materiais',    kinds: ['mat'] },
 ];
 const ITEM_CATEGORY_KNOWN_KINDS = new Set(ITEM_CATEGORIES.flatMap(c => c.kinds));
-function categorizeItems(entries){
+// showEmpty=true mantém todas as 7 categorias padrão visíveis (mesmo vazias) —
+// usado no inv principal pro player saber sempre onde cada coisa fica
+// (consistência com o baú). showEmpty=false (default) filtra vazias — usado
+// no modal de baú pra não poluir com 6 categorias zeradas.
+function categorizeItems(entries, showEmpty){
     const usable = entries.filter(([k,q]) => q > 0 && ITEMS[k]);
     const groups = ITEM_CATEGORIES.map(cat => ({
         label: cat.label,
@@ -9394,6 +9408,7 @@ function categorizeItems(entries){
         .filter(([k]) => !ITEM_CATEGORY_KNOWN_KINDS.has(ITEMS[k].kind))
         .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
     if (orphans.length) groups.push({ label: 'Outros', items: orphans });
+    if (showEmpty) return groups;
     return groups.filter(g => g.items.length);
 }
 
@@ -9480,8 +9495,11 @@ function renderInventoryIfChanged(){
     eqEl.innerHTML = `<div class="paper-doll">${slotHtml}</div>${ammoLine}`;
 
     const invEl = document.getElementById('inventory');
-    const groups = categorizeItems(Object.entries(player.inv));
-    if (!groups.length){
+    // showEmpty=true: mostra todas as 7 categorias no inv lateral mesmo com 0 items
+    // (player espera ver "Equipamento" mesmo sem ter — sabe onde aparece quando pegar)
+    const groups = categorizeItems(Object.entries(player.inv), true);
+    const hasAny = groups.some(g => g.items.length > 0);
+    if (!hasAny){
         invEl.innerHTML = '<span style="color:#666">vazio</span>';
     } else {
         const renderItem = ([k,q]) => {
@@ -12187,6 +12205,48 @@ window.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // TUTORIAL (#18) — modal único no primeiro login (por usuário)
 // ═══════════════════════════════════════════════════════════════════════════
+// ─── Acessibilidade: zoom + fullscreen ────────────────────────────────────
+// No Electron desktop usa window.electronApi (preload bridge). No browser
+// usa document.body.style.zoom (Chromium/Edge) + requestFullscreen.
+// Browser zoom persiste em localStorage. Electron zoom persiste em userData.
+const UI_ZOOM_KEY = 'valadares:uiZoom';
+function _getBrowserZoom(){
+    try { return parseFloat(localStorage.getItem(UI_ZOOM_KEY)) || 1; } catch { return 1; }
+}
+function _setBrowserZoom(z){
+    z = Math.max(0.7, Math.min(2.0, z));
+    document.body.style.zoom = z;
+    try { localStorage.setItem(UI_ZOOM_KEY, String(z)); } catch {}
+}
+async function uiZoom(delta){
+    if (typeof window.electronApi !== 'undefined' && window.electronApi.isDesktop){
+        try { await window.electronApi.setZoom(delta); return; } catch {}
+    }
+    // Fallback browser
+    const cur = _getBrowserZoom();
+    if (delta === 'in')    _setBrowserZoom(cur + 0.1);
+    if (delta === 'out')   _setBrowserZoom(cur - 0.1);
+    if (delta === 'reset') _setBrowserZoom(1);
+}
+async function uiToggleFullscreen(){
+    if (typeof window.electronApi !== 'undefined' && window.electronApi.isDesktop){
+        try { await window.electronApi.toggleFullscreen(); return; } catch {}
+    }
+    // Fallback browser fullscreen
+    if (!document.fullscreenElement){
+        document.documentElement.requestFullscreen?.().catch(e => log('<span class="log-sys">Fullscreen bloqueado pelo navegador.</span>'));
+    } else {
+        document.exitFullscreen?.();
+    }
+}
+window.uiZoom = uiZoom;
+window.uiToggleFullscreen = uiToggleFullscreen;
+// Restaura zoom do browser na carga inicial (Electron faz isso via main.js)
+if (typeof window.electronApi === 'undefined'){
+    const z = _getBrowserZoom();
+    if (z !== 1) document.body.style.zoom = z;
+}
+
 function tutorialKey(name){ return 'valadares:tutSeen:' + (name || ''); }
 // Tutorial mobile-específico (Fase C). Replace do tutorial desktop quando
 // body.touch — explica controles touch em vez de teclas WASD.

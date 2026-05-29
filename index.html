@@ -442,15 +442,15 @@
       <span class="dl-icon">💾</span>
       <h3 class="dl-title">Installer</h3>
       <p class="dl-desc">Instala em pasta, cria atalho no Desktop + Menu Iniciar. Recomendado pra uso diário.</p>
-      <a href="https://github.com/acapires-stack/valadares/releases/download/v1.0.1/Valadares-Setup-1.0.1.exe" class="btn btn-primary">⬇ Baixar Setup</a>
-      <div class="dl-size">78 MB · Windows x64</div>
+      <a id="dlSetupBtn" href="https://github.com/acapires-stack/valadares/releases/latest" class="btn btn-primary">⬇ Baixar Setup</a>
+      <div class="dl-size"><span id="dlSetupSize">Windows x64</span> · <span id="dlVersionLabel">última versão</span></div>
     </div>
     <div class="dl-card">
       <span class="dl-icon">📦</span>
       <h3 class="dl-title">Portable</h3>
       <p class="dl-desc">Executável único. Roda direto sem instalar. Bom pra pen drive ou teste rápido.</p>
-      <a href="https://github.com/acapires-stack/valadares/releases/download/v1.0.1/Valadares-Portable-1.0.1.exe" class="btn btn-primary">⬇ Baixar Portable</a>
-      <div class="dl-size">78 MB · Windows x64</div>
+      <a id="dlPortableBtn" href="https://github.com/acapires-stack/valadares/releases/latest" class="btn btn-primary">⬇ Baixar Portable</a>
+      <div class="dl-size"><span id="dlPortableSize">Windows x64</span></div>
     </div>
     <div class="dl-card">
       <span class="dl-icon">🌐</span>
@@ -478,6 +478,40 @@
     Valadares · feito com ♥ em Paranaguá/PR · 2026
   </p>
 </footer>
+
+<script>
+// Resolve URL da última release do Electron via GitHub API. Sem isso o site
+// ficava com link hardcoded de versão antiga após cada release. Fallback
+// se a API falhar: href padrão aponta pra /releases/latest (página do GH).
+(async () => {
+    try {
+        const r = await fetch('https://api.github.com/repos/acapires-stack/valadares/releases/latest', {
+            headers: { 'Accept': 'application/vnd.github+json' },
+        });
+        if (!r.ok) return;
+        const data = await r.json();
+        const setup    = data.assets?.find(a => /Setup-.+\.exe$/i.test(a.name));
+        const portable = data.assets?.find(a => /Portable-.+\.exe$/i.test(a.name));
+        const setupBtn = document.getElementById('dlSetupBtn');
+        const portableBtn = document.getElementById('dlPortableBtn');
+        const verLbl = document.getElementById('dlVersionLabel');
+        const setupSizeEl = document.getElementById('dlSetupSize');
+        const portableSizeEl = document.getElementById('dlPortableSize');
+        const fmtMB = (b) => (b/1024/1024).toFixed(0) + ' MB';
+        if (setup && setupBtn){
+            setupBtn.href = setup.browser_download_url;
+            if (setupSizeEl) setupSizeEl.textContent = `${fmtMB(setup.size)} · Windows x64`;
+        }
+        if (portable && portableBtn){
+            portableBtn.href = portable.browser_download_url;
+            if (portableSizeEl) portableSizeEl.textContent = `${fmtMB(portable.size)} · Windows x64`;
+        }
+        if (verLbl && data.tag_name) verLbl.textContent = data.tag_name;
+    } catch (err) {
+        console.warn('[download] não consegui buscar última versão, usando fallback', err);
+    }
+})();
+</script>
 
 </body>
 </html>
