@@ -1202,8 +1202,21 @@ const DUNGEON_MOB_TARGET = 9;                 // população de mobs no andar 1
 const DUNGEON_MOB_TYPES  = ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // pesos: mais Sombra
 // Mob pode pisar no tile? No andar usa o box da sala (sem PZ, sem grid do
 // overworld). No overworld, regra normal (walkable + fora da PZ).
+// Tiles de transição (escadas + chegada) onde mob NÃO pode ficar — senão bloqueia
+// o player de entrar/sair/subir/descer (não dá pra andar pro tile de um mob).
+function isTransitionTile(floor, x, y){
+    if ((floor || 0) === 0){
+        return (x === DUNGEON_ENTRANCE.x && y === DUNGEON_ENTRANCE.y) ||
+               (x === DUNGEON_RETURN.x   && y === DUNGEON_RETURN.y);
+    }
+    return (x === DUNGEON_EXIT.x  && y === DUNGEON_EXIT.y)  ||
+           (x === DUNGEON_DOWN.x  && y === DUNGEON_DOWN.y)  ||
+           (x === DUNGEON_SPAWN.x && y === DUNGEON_SPAWN.y);
+}
 function mobTileOk(m, x, y){
-    if ((m.floor || 0) >= 1){
+    const f = m.floor || 0;
+    if (isTransitionTile(f, x, y)) return false;   // não fica em cima da escada/chegada
+    if (f >= 1){
         return x >= DUNGEON_ROOM.x0 && x <= DUNGEON_ROOM.x1 && y >= DUNGEON_ROOM.y0 && y <= DUNGEON_ROOM.y1;
     }
     return isWalkable(x, y) && !inSafe(x, y);
@@ -1423,6 +1436,7 @@ function bumpMobAwayFrom(x, y, floor){
 function spawnMob(type, x, y, floor){
     const def = MTYPE[type];
     if (!def) return null;
+    if (isTransitionTile(floor || 0, x, y)) return null;   // nunca spawna em cima de escada/chegada
     // Bosses escalam por nível (cap 10): hp x(1+0.15k), dmg x(1+0.10k), xp x(1+0.20k) com k = lvl-1
     const level = def.unique ? Math.max(1, Math.min(BOSS_LEVEL_CAP, bossLevel.get(type) || 1)) : 1;
     const k = level - 1;
