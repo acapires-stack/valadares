@@ -64,6 +64,15 @@
             background: #000;
         }
         canvas { display: block; }
+        /* Escala visual do canvas — sprites 33% maiores pra leitura confortável
+           em 1080p (TS interno continua 48, render fica em 720×528 e o browser
+           faz upscale nítido via pixelated). Sem mexer em coords/perf. */
+        canvas#canvas {
+            width: 960px;
+            height: 704px;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
 
         /* SIDEBAR */
         .sidebar {
@@ -9804,12 +9813,20 @@ function syncInvHeight(){
 window.addEventListener('resize', syncInvHeight);
 window.addEventListener('load', syncInvHeight);
 
+// Converte coord do mouse pra pixel "interno" do canvas — necessário porque o
+// canvas é renderizado em 720×528 mas exibido em 960×704 via CSS (image-pixelated).
+function canvasMousePx(e){
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    return { cx: (e.clientX - rect.left) * sx, cy: (e.clientY - rect.top) * sy };
+}
+
 // Event delegation — captura clicks mesmo se HTML for re-renderizado entre press/release
 // Click no canvas: trava em player remoto e liga auto-attack
 canvas.addEventListener('click', e => {
     if (!player.pvp) return;
-    const rect = canvas.getBoundingClientRect();
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const { cx, cy } = canvasMousePx(e);
     const cam = getCamera();
     const tileX = Math.floor(cx / TS + cam.x);
     const tileY = Math.floor(cy / TS + cam.y);
@@ -9828,8 +9845,7 @@ canvas.addEventListener('click', e => {
 
 // Right-click no boneco de outro player → menu contextual (Trade / Msg)
 canvas.addEventListener('contextmenu', e => {
-    const rect = canvas.getBoundingClientRect();
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const { cx, cy } = canvasMousePx(e);
     const cam = getCamera();
     const tileX = Math.floor(cx / TS + cam.x);
     const tileY = Math.floor(cy / TS + cam.y);
