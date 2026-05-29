@@ -2401,6 +2401,7 @@ const CHESTS = [
 const TORCHES = [{x:46,y:46},{x:54,y:46},{x:46,y:54},{x:54,y:54}];
 
 function nearestChest(){
+    if ((player.floor || 0) !== 0) return null;   // M4: baús só na cidade
     for (const c of CHESTS){
         if (Math.max(Math.abs(player.x - c.x), Math.abs(player.y - c.y)) <= 1) return c;
     }
@@ -2413,11 +2414,13 @@ const CRAFT_POS = { x: 50, y: 52 };
 // Altar de magias (centro-alto da PZ, entre os baús de cima)
 const ALTAR_POS = { x: 50, y: 48 };
 function atAltar(){
+    if ((player.floor || 0) !== 0) return false;   // M4: altar só na cidade
     return Math.max(Math.abs(player.x - ALTAR_POS.x), Math.abs(player.y - ALTAR_POS.y)) <= 1;
 }
 // Boneco de treino (2 tiles abaixo do Crupiê, canto inferior-esquerdo da PZ)
 const DUMMY_POS = { x: 48, y: 52 };
 function atDummy(){
+    if ((player.floor || 0) !== 0) return false;   // M4: treino só na cidade
     return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
 }
 // ─── NPCs (PZ + mundo) ─────────────────────────────────────────────────────
@@ -2447,6 +2450,7 @@ const NPCS = [
 
 function npcVisible(n){ return !n.hiddenUntil || (player.flags && player.flags[n.hiddenUntil]); }
 function npcAt(x, y){
+    if ((player.floor || 0) !== 0) return null;   // M4: NPCs só na cidade
     for (const n of NPCS){
         if (!npcVisible(n)) continue;
         if (Math.max(Math.abs(x-n.pos.x), Math.abs(y-n.pos.y)) <= 1) return n;
@@ -2454,6 +2458,7 @@ function npcAt(x, y){
     return null;
 }
 function npcOnTile(x, y){
+    if ((player.floor || 0) !== 0) return null;   // M4: NPCs não bloqueiam tile na masmorra
     for (const n of NPCS){
         if (!npcVisible(n)) continue;
         if (n.pos.x === x && n.pos.y === y) return n;
@@ -2466,6 +2471,7 @@ function npcOnTile(x, y){
 const NPC_MINI_PZ_RADIUS = 1;
 const NPC_MINI_PZ_COMBAT_GRACE_MS = 2000;
 function playerNearNpcMiniPZ(){
+    if ((player.floor || 0) !== 0) return false;   // M4: sem mini-PZ de NPC na masmorra
     if (player.lastAttackAt && Date.now() - player.lastAttackAt < NPC_MINI_PZ_COMBAT_GRACE_MS) return false;
     for (const n of NPCS){
         if (!npcVisible(n)) continue;
@@ -2513,6 +2519,7 @@ function interactNpc(npc){
 }
 const TRAINING_TIME = 2000;   // ms por sessão
 function atCraft(){
+    if ((player.floor || 0) !== 0) return false;   // M4: craft só na cidade
     return Math.max(Math.abs(player.x - CRAFT_POS.x), Math.abs(player.y - CRAFT_POS.y)) <= 1;
 }
 
@@ -13812,8 +13819,8 @@ function loop(ts){
         ctx.fillRect(tpx-30, tpy-30, TS+60, TS+60);
     }
 
-    // Boneco de treino
-    if (DUMMY_POS.x >= cam.x-1 && DUMMY_POS.x < cam.x+VP_W+1 && DUMMY_POS.y >= cam.y-1 && DUMMY_POS.y < cam.y+VP_H+1){
+    // Boneco de treino (só na cidade — não vaza pra masmorra)
+    if ((player.floor || 0) === 0 && DUMMY_POS.x >= cam.x-1 && DUMMY_POS.x < cam.x+VP_W+1 && DUMMY_POS.y >= cam.y-1 && DUMMY_POS.y < cam.y+VP_H+1){
         const dpx = (DUMMY_POS.x - cam.x) * TS;
         const dpy = (DUMMY_POS.y - cam.y) * TS;
         // sombra
