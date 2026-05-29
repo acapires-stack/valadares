@@ -79,10 +79,22 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 - Save NÃO lembra o floor — deslogar na masmorra = renasce na cidade (efêmero).
 
 **Plano faseado** (cada fase sobe testada, overworld nunca quebra):
-1. **Infra**: conceito de `floor`, 1 escada entra/sai, 1 andar de teste,
-   broadcast por floor, PvP forçado, render troca mapa. ← FASE ATUAL
-2. **Combate**: mobs novos escalados, loot/gold por profundidade.
-3. **Profundidade**: múltiplos andares, geração procedural, boss no fundo, polish.
+1. ✅ **Infra** (RESOLVIDO 29/05): conceito de `floor`, escada PZ (50,46) → andar 1
+   (sala caverna 40-60), broadcast/tickAI/snapshots filtrados por floor, PvP
+   forçado, cliente troca grid `map`. Objetos da cidade não vazam pro andar
+   (NPCs/altar/craft/baú/dummy/tochas guardados por floor 0). PZ só no floor 0
+   (playerInSafe/playerInSafeZone). Commits 9dd2312, 9f685fd, 13d984e, d2783d4.
+2. ✅ **Combate** (RESOLVIDO 29/05): mobs novos SOMBRA (rápido) + CARRASCO (tanque)
+   no MTYPE server+cliente. spawnDungeonMobs mantém ~9 no andar (tick 8s).
+   mobTileOk prende mobs na sala. Loot escalado, drops com floor. floor persiste
+   no save de mobs. Commits c2d5b30.
+   - **Loot de boss por dano (anti-ninja)** [679f74f, cbe56ee]: bosses unique
+     distribuem loot DIRETO no inv de quem bateu (rastreado em m.damageBy). Solo
+     = proporcional ao dano; em PARTY = divide IGUAL entre membros no andar.
+     NÃO cai no chão. Mobs comuns continuam dropando (espalhado em anel).
+3. 🎯 **Profundidade** (PRÓXIMA): múltiplos andares (escada desce ao 2,3...),
+   geração procedural por andar (server precisa do grid pra spawn — hoje usa
+   bounding box fixo), boss no fundo, loot escala com profundidade, polish visual.
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (50,50) na PZ, 4 slots tingíveis com 12 cores

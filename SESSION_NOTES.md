@@ -5,102 +5,71 @@
 
 ---
 
-## 📅 Sessão 29/05/2026 — dia inteiro (maratona ~10h)
+## 📅 Sessão 29/05/2026 — maratona tarde/noite (continuação do dia)
 
-Sessão extensa motivada por 3 chamados do alcione:
-1. Manhã: P0 da auditoria de 28/05 (5 vulnerabilidades CRITICAL/HIGH)
-2. Tarde: overhaul mobile (esposa achou ruim no celular)
-3. Noite: bugs do desktop reportados via prints (scroll, fullscreen, auto-update)
+> A leva anterior do dia (P0 auditoria, mobile overhaul, desktop v1.0.4→v1.0.8)
+> está nos marcos do ROADMAP. Esta seção cobre o resto do dia: devlog → v1.0.9.
 
-**Commits do dia: 13.** Releases publicadas: v1.0.4 → v1.0.5 → v1.0.6 → v1.0.7 → v1.0.8.
+**~25 commits + 1 release (v1.0.9).** Features grandes: Devlog, M6 Tinturaria,
+M8 Auction House, M4 masmorra (fase 1+2), loot de boss por dano/party.
 
-### 🔒 P0 auditoria — 5 CRITICAL/HIGH (concluído)
+### ✅ Features entregues (em prod)
 
-Todos os 5 itens da auditoria de 28/05 fechados ([commit 58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d72)):
+- **#12 Devlog** [151290d] — `devlog/build.js` (Node puro, zero deps): posts MD
+  + frontmatter → HTML com tema do site. 4 posts. Live em /devlog. Pra novo
+  post: `.md` em `devlog/posts/`, `node devlog/build.js`, commit.
+- **M6 Tinturaria** [e97fbd1] — NPC Tintureira, tinge 4 slots (armor/head/feet/
+  cosmetic) com 12 cores, 5kg/aplicar 1kg/remover, server autoritativo, persiste
+  em acc.save.dyes. Confirm antes de gastar [9532393].
+- **M8 Auction House** [5bb5073] — NPC Leiloeiro, modal BROWSE/MINHAS/VENDER,
+  escrow server-side, 24h/listing, 5% comissão, máx 10. grantGold/ItemByName
+  entregam pra offline.
+- **M4 "As Profundezas" fase 1+2** — masmorra ABERTA (não instanciada — decisão
+  de design anti-pay-to-win). Escada PZ (50,46) → andar 1, PvP forçado, mobs
+  SOMBRA/CARRASCO, loot por dano. Detalhes no ROADMAP.
+- **Loot de boss por dano (anti-ninja)** [679f74f, cbe56ee] — bosses unique vão
+  pro inv de quem bateu; party divide igual. Não cai no chão.
 
-1. `pos` handler aceitava hp/maxHp do cliente — bypassava lockdown N3
-2. Sem `uncaughtException`/`unhandledRejection` global — throw em tickAI matava processo
-3. `ws.on('message')` sem try/catch geral — handler ruim derrubava processo
-4. `pvpAttack` sem cap em amount/range — F12 one-shot
-5. `pvpAttack` sem rate limit — 100 hits/s + farm XP
+### 🩹 Bugs/fixes notáveis
 
-### 📱 Mobile UX overhaul (4 fases — concluído)
+- NPCs reorganizados em layout simétrico 9×9 (PZ raio 3→4) [e187ff5, 40bdf91];
+  dessincronia server↔cliente de TODAS as posições de NPC corrigida [c1ec9fa,
+  110bb46] (shop/casino/dye/auction/quests/atendente).
+- Piso de pedra na PZ [f4aeee1]. Chat: Enter abre + fecha ao enviar [656770c];
+  chat preenche espaço dinâmico (sem overflow) [25e1309].
+- admin /admin destravado — CORS preflight faltava X-Admin-Token [94643a8].
+- Chip de reconexão dourado "ATUALIZANDO" (era vermelho "SEM CONEXÃO"),
+  threshold 15s→60s [43889f1]. Cura HP/MP cheios ao reconectar pós-restart
+  (não morrer/meia-vida no deploy) [b0c28e1]. HP da party no widget via
+  partyUpdate (era pstats stale) [c2d5b30]. Nome do player com fundo pill.
+- **Electron v1.0.9** [b6d616b] — zoom persiste entre reloads (did-finish-load
+  lê prefs atual, não a var capturada no boot). Resolve "regulo, atualiza, volta"
+  e "estoura ao comprar pots" (ambos eram zoom grande resetando).
 
-[Commit b44532a](https://github.com/acapires-stack/valadares/commit/b44532a):
+### ⚙️ Mudança de processo (IMPORTANTE pra próxima)
 
-- **Fase A:** Top-bar mobile fixa (HP/MP bars + gold + nome) + labels PT-BR nos tbtns
-- **Fase B:** Hotbar inferior com 5 slots quadrados (🧪HP, 💧MP, 🍖COMER, ✦MAGIA, ↗LANÇA)
-- **Fase C:** Onboarding mobile substituindo tutorial desktop quando `body.touch`
-- **Fase D:** Orientation lock (portrait → "vire o celular") + zoom Settings UI
-
-### 🖥 Desktop acessibilidade (v1.0.4 → v1.0.8)
-
-Maratona reativa via screenshots:
-
-- **v1.0.4** baseline. Bumps subsequentes resolvem problemas conforme apareciam:
-- **v1.0.5** [commit 17c38a6]: maximize() com `ready-to-show` + zoom auto pra 1080p
-- **v1.0.6** [commit 5c132fd]: setInterval 15min pra auto-update + botão manual + log persistente
-- **v1.0.7** [commit 02c2c17 + ed8a438]: server gate de versão (detecta Electron via UA + clientVersion) + modal "versão antiga"
-- **v1.0.8** [commit a50247c]: F11 com triple backup (menu accelerator + globalShortcut + before-input-event)
-
-### 🧹 Polish
-
-- **Categorias do inv sempre visíveis** [commit b26c59c]: showEmpty=true mostra Armas/Equipamento/etc com contador 0
-- **Site download dinâmico** [commit b26c59c]: index.html fetch GH API → links sempre na última release sem editar HTML
-
-### 🔒 P0.5 auditoria (concluído)
-
-[Commit 0e727c1] — fechou todos os 5 pendentes da auditoria 28/05:
-
-- `permaBuffs` allowlist construída a partir de `TALENT_DEFS` (rejeita keys forjadas)
-- `pkDeath` server-side autônomo (não confia em msg.killerId do cliente)
-- `flags`/`questFlags` allowlist (set de 6 keys conhecidas + validação por chainId)
-- ADMIN_TOKEN: query string → `X-Admin-Token` header em todas chamadas admin.html
-- `broadcastMobs` skip-when-unchanged via signature + snapshot full a cada 10s
-
-### 🔒 Nova auditoria 29/05 (concluído)
-
-[Commit 7bae381] — encontrou 6 novos vetores, todos relacionados a falta de rate limit:
-
-1. **🔴 CRITICAL `announce` sem admin check** — qualquer player podia broadcast spam pra todos. Fix: `isAdmin()` + rate 2s
-2. **🟡 HIGH `auth` sem rate limit** — brute force passwords. Fix: 5 tentativas/30s por conn → fecha
-3. **🟡 HIGH `duelInvite` sem rate limit** — pop-up infinito de assédio. Fix: 3s entre invites
-4. **🟡 HIGH `tradeRequest` sem rate limit** — mesma coisa. Fix: 3s
-5. **🟡 MEDIUM `getRanking` sem rate limit** — CPU spike por scan de rankings. Fix: 1s
-6. **🟡 MEDIUM `passwordResetRequest` sem rate limit** — CPU via `findAccountByEmail` O(N). Fix: 5/min por conn
-
-### 📊 Métricas da sessão
-
-- **13 commits**, ~10h
-- **+1100 / -200** linhas líquidas aproximadas
-- **5 releases Electron** publicadas (v1.0.4 a v1.0.8) em sequência rápida
-- **Builds GH Actions**: 91-150s (consistente)
-- **0 incidentes** em prod com players reais durante a sessão
-- **11 vulnerabilidades** de segurança fechadas (5 P0 + 5 P0.5 + 1 missed pkDeath = 11; + 6 da nova auditoria = 17 total)
+O dono pediu (e foi salvo na memória [[feedback-valadares-deploy]]): **acumular
+mudanças testadas localmente e deployar em LOTES, de tempo em tempo** — NÃO um
+push a cada micro-fix. Cada push → Railway reconecta todos os players. Foram ~25
+deploys hoje e ele reclamou. Regra: testar local (node --check + preview), juntar
+lote, só push quando ele pedir ou ao fechar conjunto, avisando antes.
 
 ### 🎯 Próxima sessão — começar por
 
-1. **Validar com mãe** se v1.0.8 entregou a experiência esperada (janela maximizada + zoom + F11)
-2. **Validar com esposa** o overhaul mobile (top-bar + hotbar + onboarding)
-3. **Escolher P1 feature:**
-   - #12 Devlog/blog (1 sessão, marketing)
-   - M4 Dungeons instanciadas (2-3 sessões grandes — endgame)
-   - M6 Tinturaria/pet (gold sinks, ~60min cada)
-   - M7 Arena PvP (2 sessões — retenção)
-   - M8 Auction house (2 sessões)
+1. **Confirmar v1.0.9** aplicou no app do alcione (zoom -2 grudou, sem estourar).
+2. **Validar em prod** (smoke test): masmorra com mobs (descer, matar Sombra/
+   Carrasco, loot cai), loot de boss em party (matar Orc Líder com 2, divisão
+   igual), nome do player legível.
+3. **M4 fase 3** (Profundidade): múltiplos andares, geração procedural, boss no
+   fundo. OU **M6 Pet** / **M7 Arena PvP** (escolher 1).
 
-### 📌 Pendências de polish técnico (P3)
+### ⚠️ Pendências técnicas (P0.6 — não resolvidas)
 
-- broadcastMobs ainda usa full snapshot — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo
-- Logs do updater em `userData/update.log` sem rotação por tempo — apenas por tamanho (200KB). Considerar rotação diária
-- Versionamento do client (browser) — Vercel sempre serve latest mas não há mecanismo de "force refresh" se HTML estiver cacheado no Electron
-- ALERTA: o GameServer de Railway tem deploy auto-trigger em qualquer push pra main. Se um commit quebrar o server, prod cai. Considerar staging branch ou env de teste
-
-### ⚠️ Hardening que ainda falta (P0.6 — pra próxima auditoria)
-
-Estes ficaram fora do escopo de hoje mas estão na lista:
-
-- Mesmo player 2× simultâneo (mobile + PC) gera 2 entries no `players` Map — pode causar inconsistências
-- `_errorRateMap` leak lento — sem cleanup periódico (pode crescer indefinidamente)
-- Algumas funções server-side ainda assumem `p.inv` existe — risk de TypeError se algum save legado vier sem
-- O `setMenuBarVisibility(false)` no Electron pode não pegar em todos os drivers — testar com mãe
+- Same-player 2× simultâneo (mobile+PC) → 2 entries no `players` Map.
+- `_errorRateMap` leak lento (sem cleanup).
+- Algumas funções assumem `p.inv` existe (TypeError em save legado).
+- broadcastMobs usa full snapshot por floor (ok pra poucos; pra >20 ativos/andar
+  precisa diff real com novo `t`).
+- Morte por DoT em mob NÃO spawna drop no chão (comportamento antigo; só boss via
+  DoT distribui agora). Mobs comuns mortos por DoT não dropam — verificar se
+  incomoda.
