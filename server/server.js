@@ -59,7 +59,7 @@ function httpJson(res, status, body){
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token',
     });
     res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
