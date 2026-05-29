@@ -7,6 +7,31 @@
 
 ---
 
+## 🔬 Sessão 29/05/2026 (cont. 2) — Auditoria COMPLETA do jogo (autônoma)
+
+Dono pediu auditoria do jogo todo pra segurança + "limpar coisas mais velhas". Rodei
+fan-out de 4 agentes (server segurança, server limpeza, cliente, cross-cutting/repo) +
+verifiquei à mão. **Relatório completo e priorizado: [`docs/AUDITORIA_2026-05-29.md`](docs/AUDITORIA_2026-05-29.md).**
+
+**✅ Aplicado + deployado (autônomo):**
+- 🔴 **CRÍTICO — lockdown do save**: `saveUpload` gravava `gold/inv/skills/equipped/chests`
+  do CLIENTE as-is (`setPlayerSave` faz `a.save=data`; só hp/mp/x/y eram sobrescritos), e o
+  join re-hidratava → **gold/itens/skills forjados PERSISTENTES** (furava o lockdown N3 inteiro
+  + a venda de gold MP). O comentário dizia "server descarta" mas o código NÃO descartava. Fix:
+  sobrescreve esses 5 campos com os valores vivos do server antes de persistir (espelha hp/mp/x/y).
+- 🟠 **maxPayload=512KB** no WebSocketServer (frame de 100MB travava o event loop = DoS de todos).
+- Limpeza: removido `FIXED_COSTS` (branch morto); corrigidas posições de NPC no ROADMAP.
+
+**📋 Documentado pra revisar JUNTOS (não blind-deployado — dono fora):** re-claim de daily,
+hash de senha fraco, rate-limits (pos/pix), `_errorRateMap` leak; ~500 linhas de código offline
+(extrair/remover), handlers de protocolo mortos (trainResult/spellResult sem feedback de erro),
+`RECIPES` duplicado index-sensitive, dead code (client `attack()`, CSS órfão), bug do `castSpell`
+sem guard. Tudo no doc da auditoria.
+
+> ⚠️ Testar o **lockdown do save** in-game é o mais importante (forjar saveUpload → confirmar bloqueio).
+
+---
+
 ## 🔒 Sessão 29/05/2026 (cont.) — Auditoria da masmorra + 4 fixes de combate/loot
 
 Pedido do dono: auditar a masmorra Fase 3 antes de seguir. **Descoberta de processo:**

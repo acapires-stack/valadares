@@ -40,6 +40,8 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 
 ### 🔴 P0.6 — Hardening pendente pra próxima auditoria
 
+> **🔬 AUDITORIA COMPLETA DO JOGO (29/05) — relatório priorizado em [`docs/AUDITORIA_2026-05-29.md`](docs/AUDITORIA_2026-05-29.md).** Aplicado+deployado: 🔴 **lockdown do save** (`saveUpload` gravava gold/inv/skills do cliente as-is → forja PERSISTENTE; furava o lockdown N3 + a venda de gold) + 🟠 **maxPayload** (DoS). Pra revisar JUNTOS (com teste in-game): re-claim de daily, hash de senha fraco, rate-limits pos/pix, ~500 linhas de código offline, protocolo morto (trainResult/spellResult sem feedback), `RECIPES` dup index-sensitive, dead code. O `_errorRateMap leak` abaixo está coberto no relatório.
+
 - **✅ AUDITORIA COMPLETA (masmorra Fase 3) — FEITA 29/05.** Manual: os skills `/security-review`+`/code-review` só comparam o branch contra `origin/main`, e a Fase 3 já está shipada (`origin/main`==HEAD) → diff vazio. Achados: 🔴 **crítico** (dano client-side one-shotava o boss 5000hp e roubava 100% do loot via `damageBy` → `MAX_HIT_DMG=600` + rate-limit `ATTACK_MIN_INTERVAL_MS=200` no attackMob), 🟠 **médio** (alts parados em party farmavam loot do boss → só damager divide), 🟡 **baixo** deferido. Detalhes no `SESSION_NOTES.md`.
 - **🔧 Refactor de movimento/combate autoritativo (deferido, do audit)** — `p.x/y` (transição de andar) e `range`/cadência de ataque são client-trusted. Hoje mitigado por clamp de coords + `MAX_HIT_DMG` + rate-limit; o caminho definitivo é o server validar movimento e cadência por arma. Sistêmico — fora de hotfix.
 
@@ -109,7 +111,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
    andar). Polish: tonalidade por profundidade + indicador de andar.
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
-- NPC Tintureira em (50,50) na PZ, 4 slots tingíveis com 12 cores
+- NPC Tintureira em (53,53) na PZ, 4 slots tingíveis com 12 cores
 - 5.000g/aplicação · 1.000g/remover · server autoritativo
 - Detalhes: [commit e97fbd1](https://github.com/acapires-stack/valadares/commit/e97fbd1)
 
@@ -121,7 +123,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 - Recompensa cosmética semanal
 
 **✅ M8 Auction House** (RESOLVIDO sessão 29/05 — 1 sessão, não 2)
-- NPC Leiloeiro em (50, 48). Modal BROWSE/MINHAS/VENDER.
+- NPC Leiloeiro em (53, 47). Modal BROWSE/MINHAS/VENDER.
 - Server escrowa, 24h por listing, 5% comissão, máx 10 ativos.
 - Helpers grantGoldByName/grantItemByName entregam pra offline players.
 - Detalhes: [commit 5bb5073](https://github.com/acapires-stack/valadares/commit/5bb5073)
