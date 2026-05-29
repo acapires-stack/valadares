@@ -150,7 +150,7 @@
             background: #050405;
             border: none;
             padding: 6px 9px;
-            height: 110px;
+            height: 240px;
             overflow-y: auto;
             font-size: 10.5px;
             line-height: 1.4;
@@ -163,7 +163,7 @@
         #chatMessages {
             background: #050405;
             padding: 6px 9px;
-            height: 110px;
+            height: 240px;
             overflow-y: auto;
             font-size: 11px;
             line-height: 1.45;
@@ -186,6 +186,8 @@
         }
         .chat-tabs {
             display: flex;
+            align-items: center;
+            min-height: 28px;
             background: #0a0805;
             border-bottom: 1px solid #2a200a;
             padding: 0 4px;
@@ -9762,8 +9764,25 @@ function renderInventoryIfChanged(){
     syncInvHeight();
 }
 
+// Chat/Combate preenchem dinamicamente o espaço abaixo do canvas — alvo é
+// usar toda altura da viewport menos o canvas e overhead (tabs + input + padding).
+// Mínimo 200px pra não engolir o chat em telas curtas.
+function syncChatHeight(){
+    const log = document.getElementById('log');
+    const chat = document.getElementById('chatMessages');
+    if (!log || !chat) return;
+    // Heights aproximadas dos sticky elements do gameContainer
+    const TABS_H = 28, INPUT_H = 36, PADDING = 28;
+    const canvasEl = document.getElementById('canvas');
+    const canvasH = canvasEl ? canvasEl.getBoundingClientRect().height : 528;
+    const target = Math.max(200, window.innerHeight - canvasH - TABS_H - INPUT_H - PADDING);
+    log.style.height = target + 'px';
+    chat.style.height = target + 'px';
+}
+
 // Alinha altura das 3 sidebars laterais com o game container (canvas + chatPanel)
 function syncInvHeight(){
+    syncChatHeight();   // chat dinâmico primeiro — sidebars seguem
     const wrapper = document.getElementById('gameWrapper');
     const inv = document.getElementById('invSidebar');
     if (!wrapper || !inv) return;
