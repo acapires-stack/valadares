@@ -12,6 +12,11 @@ contextBridge.exposeInMainWorld('electronApi', {
     toggleFullscreen: () => ipcRenderer.invoke('app:toggleFullscreen'),
     // Pega zoom atual (pra preencher UI).
     getZoom: () => ipcRenderer.invoke('app:getZoom'),
+    // Força verificação de update agora (botão manual no Settings).
+    // Retorna { ok: bool, version?: string, reason?: string }.
+    checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+    // Versão atual do app (electron/package.json).
+    getVersion: () => ipcRenderer.invoke('app:getVersion'),
     // Indica que é o desktop oficial (cliente pode mostrar funcionalidades exclusivas).
     isDesktop: true,
 });

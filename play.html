@@ -2113,6 +2113,13 @@
         <button class="chest-btn" style="margin-top:6px" onclick="uiToggleFullscreen()" id="uiFullscreenBtn">⛶ Tela cheia (F11)</button>
         <div style="color:#666;font-size:10px;padding:6px 6px 0;letter-spacing:0.3px">atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia</div>
 
+        <div id="systemSectionHead" class="chest-head" style="margin-top:14px;display:none">SISTEMA (DESKTOP)</div>
+        <div id="systemSection" style="display:none">
+            <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px">Versão instalada: <span id="appVersion" style="color:#ffd060;font-weight:bold">—</span></div>
+            <button class="chest-btn" onclick="checkUpdateNow()">🔄 Verificar atualizações</button>
+            <div id="updateStatus" style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:6px 6px 0;min-height:14px"></div>
+        </div>
+
         <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
         <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
         <button class="chest-btn" onclick="openMobileTut(true)">📱 Ver tutorial mobile (touch)</button>
@@ -12246,6 +12253,46 @@ if (typeof window.electronApi === 'undefined'){
     const z = _getBrowserZoom();
     if (z !== 1) document.body.style.zoom = z;
 }
+
+// Em Electron desktop, mostra seção SISTEMA com versão + botão verificar
+// atualização. Em browser, fica escondida (não tem updater).
+async function _initElectronUI(){
+    if (typeof window.electronApi === 'undefined') return;
+    document.getElementById('systemSectionHead')?.style.setProperty('display', 'block');
+    document.getElementById('systemSection')?.style.setProperty('display', 'block');
+    try {
+        const v = await window.electronApi.getVersion();
+        const el = document.getElementById('appVersion');
+        if (el) el.textContent = 'v' + v;
+    } catch {}
+}
+async function checkUpdateNow(){
+    const status = document.getElementById('updateStatus');
+    if (!status) return;
+    status.style.color = '#ffd060';
+    status.textContent = '🔍 Verificando...';
+    try {
+        const r = await window.electronApi.checkUpdate();
+        if (r.ok) {
+            if (r.version) {
+                status.style.color = '#80ff80';
+                status.textContent = `✓ Atualização disponível: v${r.version} — baixando…`;
+            } else {
+                status.style.color = '#80c8ff';
+                status.textContent = '✓ Você já está na última versão.';
+            }
+        } else {
+            status.style.color = '#ff8080';
+            status.textContent = `Não foi possível verificar (${r.reason || 'erro'}).`;
+        }
+    } catch (e) {
+        status.style.color = '#ff8080';
+        status.textContent = `Erro: ${e.message || e}`;
+    }
+}
+window.checkUpdateNow = checkUpdateNow;
+// Roda no DOMContentLoaded (já carregou quando esse script roda)
+_initElectronUI();
 
 function tutorialKey(name){ return 'valadares:tutSeen:' + (name || ''); }
 // Tutorial mobile-específico (Fase C). Replace do tutorial desktop quando

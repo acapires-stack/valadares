@@ -170,28 +170,76 @@ function createWindow() {
 
     mainWindow.on('closed', () => { mainWindow = null; });
 
-    // Auto-update após 5s do load (não bloqueia inicialização)
+    // ─── Auto-update ────────────────────────────────────────────────────
+    // Antes (v1.0.5 e anteriores): só verificava 1× ao abrir o app. Se uma
+    // release saísse com o app rodando, usuário só descobria reabrindo.
+    // Agora: verifica ao abrir + a cada 15min + botão manual via IPC.
     if (autoUpdater && !IS_DEV) {
-        setTimeout(() => {
+        const checkOnce = (trigger) => {
+            log('updater', `check (${trigger})`);
             autoUpdater.checkForUpdatesAndNotify().catch(err => {
-                console.warn('[updater] erro ao checar update:', err.message);
+                log('updater', `erro: ${err.message || err}`);
             });
-        }, 5000);
+        };
+        setTimeout(() => checkOnce('startup'), 5000);
+        setInterval(() => checkOnce('periodic-15min'), 15 * 60 * 1000);
     }
+
+    // IPC: cliente (Settings UI) pode chamar verificação manual + ver status.
+    ipcMain.handle('app:checkUpdate', async () => {
+        if (!autoUpdater) return { ok: false, reason: 'updater-unavailable' };
+        if (IS_DEV)         return { ok: false, reason: 'dev-mode' };
+        try {
+            log('updater', 'check (manual via IPC)');
+            const r = await autoUpdater.checkForUpdates();
+            return { ok: true, version: r?.updateInfo?.version || null };
+        } catch (err) {
+            log('updater', `erro manual: ${err.message || err}`);
+            return { ok: false, reason: err.message || String(err) };
+        }
+    });
+    ipcMain.handle('app:getVersion', () => app.getVersion());
+}
+
+// ─── Logger persistente do updater ───────────────────────────────────────
+// userData/update.log — diagnóstica problemas de auto-update no campo (user
+// reporta "não atualizou", lemos o log e vemos o que aconteceu). Tail 200 KB.
+const UPDATE_LOG = path.join(app.getPath('userData'), 'update.log');
+function log(scope, msg){
+    const line = `[${new Date().toISOString()}] [${scope}] ${msg}\n`;
+    try {
+        // Tail rotation: se passar de 200 KB, recomeça
+        if (fs.existsSync(UPDATE_LOG) && fs.statSync(UPDATE_LOG).size > 200 * 1024) {
+            fs.writeFileSync(UPDATE_LOG, '', 'utf8');
+        }
+        fs.appendFileSync(UPDATE_LOG, line, 'utf8');
+    } catch {}
+    console.log(line.trim());
 }
 
 // Eventos do auto-updater (somente se carregado)
 if (autoUpdater) {
-    autoUpdater.on('update-downloaded', () => {
+    autoUpdater.on('checking-for-update', () => log('updater', 'checking-for-update'));
+    autoUpdater.on('update-available', (info) => log('updater', `update-available v${info?.version}`));
+    autoUpdater.on('update-not-available', (info) => log('updater', `up-to-date v${info?.version || app.getVersion()}`));
+    autoUpdater.on('error', (err) => log('updater', `error: ${err.message || err}`));
+    autoUpdater.on('download-progress', (p) => log('updater', `download ${Math.round(p.percent)}% (${Math.round(p.bytesPerSecond/1024)} KB/s)`));
+    autoUpdater.on('update-downloaded', (info) => {
+        log('updater', `downloaded v${info?.version} — pedindo confirmação ao usuário`);
         if (!mainWindow) return;
         dialog.showMessageBox(mainWindow, {
             type: 'info',
             title: 'Atualização disponível',
-            message: 'Uma nova versão de Valadares foi baixada. Reiniciar agora pra aplicar?',
+            message: `Valadares ${info?.version || ''} foi baixada. Reiniciar agora pra aplicar?`,
             buttons: ['Reiniciar', 'Depois'],
             defaultId: 0,
         }).then(({ response }) => {
-            if (response === 0) autoUpdater.quitAndInstall();
+            if (response === 0) {
+                log('updater', 'usuário aceitou — quitAndInstall');
+                autoUpdater.quitAndInstall();
+            } else {
+                log('updater', 'usuário adiou — instala no próximo quit');
+            }
         });
     });
 }
