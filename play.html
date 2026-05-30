@@ -13753,9 +13753,12 @@ function applySaveData(d){
             player.quests.completed = d.quests.completed || [];
             if (d.quests.daily) player.quests.daily = d.quests.daily;
         }
-        if (d.flags)       player.flags = d.flags;
-        if (d.questFlags)  player.questFlags = d.questFlags;
-        if (d.permaBuffs)  player.permaBuffs = d.permaBuffs;
+        // Reset EXPLÍCITO: sem o else, trocar de conta sem reload mantinha flags/permaBuffs
+        // da conta anterior. Foi o que fez o claude (zerado) mostrar 6,5% de crit/esquiva —
+        // +5% dos talentos da alcione grudados no client. Conta nova sem o campo → zera.
+        player.flags      = (d.flags && typeof d.flags === 'object') ? d.flags : {};
+        player.questFlags = (d.questFlags && typeof d.questFlags === 'object') ? d.questFlags : {};
+        player.permaBuffs = (d.permaBuffs && typeof d.permaBuffs === 'object') ? d.permaBuffs : {};
         if (Array.isArray(d.friends)) player.friends = d.friends.slice(0, 50);
         else {
             // Migração 1×: save antigo sem `friends` mas localStorage tem
