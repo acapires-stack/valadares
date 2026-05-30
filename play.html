@@ -1822,8 +1822,8 @@
         <div class="s-section">
             <div class="s-label">Ataque <span style="float:right;color:#e0a040" id="atkVal">0</span></div>
             <div class="s-label" style="margin-top:4px">Defesa <span style="float:right;color:#6fa8e8" id="defVal">0</span></div>
-            <div class="s-label" style="margin-top:4px">Crítico <span style="float:right;color:#ffaa20" id="critVal">4%</span></div>
-            <div class="s-label" style="margin-top:4px">Esquiva <span style="float:right;color:#aaffaa" id="dodgeVal">2%</span></div>
+            <div class="s-label" style="margin-top:4px">Crítico <span style="float:right;color:#ffaa20" id="critVal">1.5%</span></div>
+            <div class="s-label" style="margin-top:4px">Esquiva <span style="float:right;color:#aaffaa" id="dodgeVal">1.5%</span></div>
             <div class="s-label" style="margin-top:4px">Velocidade <span style="float:right;color:#8acdef" id="spdVal">—</span></div>
             <div class="s-label" style="margin-top:4px">Vel. ataque <span style="float:right;color:#a0c8ff" id="atkSpdVal">—</span></div>
             <div class="s-label" id="procsRow" style="margin-top:4px;display:none">Procs <span style="float:right" id="procsVal">—</span></div>
@@ -5643,8 +5643,9 @@ function renderCraft(){
 }
 
 // Chances do player derivadas das skills:
-//   crit base 4% + 0.4% por ponto da skill da arma acima de 10 (cap 30%)
-//   dodge base 2% + 0.6% por ponto de Escudo acima de 10 (cap 25%)
+//   crit base 1.5% + 0.4% por ponto da skill da arma acima de 10 (cap TOTAL 25%)
+//   dodge base 1.5% + 0.6% por ponto de Escudo acima de 10 (cap TOTAL 25%)
+//   (cap total = inclui talentos/pvp; o painel nunca mostra acima de 25%)
 // Velocidade efetiva do player.
 // Bônus = soma das skills acima do baseline (60) ÷ 5, cap em 40ms.
 // + bônus das botas. Cap mínimo geral: 100ms.
@@ -5688,15 +5689,15 @@ function playerAttack(){
 function playerCritChance(){
     const w = activeWeapon();
     const sk = player.skills[w.skill];
-    const base = Math.min(0.30, 0.04 + Math.max(0, sk.val - 10) * 0.004);
+    const skillBased = 0.015 + Math.max(0, sk.val - 10) * 0.004;   // base 1.5% + 0.4%/ponto
     const mults = (player.pvp || player.selos > 0) ? pvpMults() : null;
-    const perma = player.permaBuffs?.critBonus || 0;   // talent t_crit
-    return base + (mults ? mults.crit : 0) + perma;
+    const perma = player.permaBuffs?.critBonus || 0;   // talent t_crit (+5%)
+    return Math.min(0.25, skillBased + (mults ? mults.crit : 0) + perma);   // teto TOTAL 25%
 }
 function playerDodgeChance(){
-    const skillBased = 0.02 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;
-    const perma = player.permaBuffs?.dodgeBonus || 0;   // ex: Aura do Vidente +5%
-    return Math.min(0.30, skillBased + perma);
+    const skillBased = 0.015 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;   // base 1.5% + 0.6%/ponto
+    const perma = player.permaBuffs?.dodgeBonus || 0;   // talent/aura (+5%)
+    return Math.min(0.25, skillBased + perma);   // teto TOTAL 25%
 }
 
 function findArrow(){
@@ -6930,6 +6931,14 @@ function handleMP(msg){
         // T2: dano aplicado server-side (vem via pstats). Cliente usa msg.actual
         // pro float/log/FX. Fallback pra cálculo local se server não mandou actual
         // (Electron v1.0.0/v1.0.1 conversando com server novo: server SEMPRE manda).
+        const defName = (MTYPE[msg.mobType] && MTYPE[msg.mobType].name) || msg.mobType;
+        // Esquiva (server-side agora) — sem dano, FX próprio. Antes a esquiva era invisível.
+        if (msg.dodged){
+            addFloat(player.x, player.y, 'Esquivou!', '#80ffd0', true, -8);
+            if (typeof sndDodge === 'function') sndDodge();
+            log(`<span class="log-sys">🌀 Você esquivou de ${defName}!</span>`);
+            return;
+        }
         let actual = (typeof msg.actual === 'number') ? msg.actual : null;
         if (actual == null){
             const amount = msg.dmg | 0;
@@ -6939,11 +6948,11 @@ function handleMP(msg){
             // Sem actual = sem T2 ativo — aplica local pra não bugar
             player.hp = Math.max(0, player.hp - actual);
         }
-        player.hurtTimer = 300;
+        const crit = !!msg.crit;   // crit do mob (server-side agora)
+        player.hurtTimer = crit ? 450 : 300;
         sndDmg();
-        addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
-        const def = MTYPE[msg.mobType];
-        log(`<span class="log-dmg">⚠ ${def?def.name:msg.mobType}: ${actual} dano</span>`);
+        addFloat(player.x, player.y, `${crit ? '★ ' : ''}-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
+        log(`<span class="log-dmg">⚠ ${crit ? '★ CRÍTICO ' : ''}${defName}: ${actual} dano</span>`);
         rollAttackerStatus(msg.mobType);
         // playerDie é disparado via pstats com hp===0 (handler self acima).
         // Fallback pra modo legacy se chegamos aqui sem msg.actual.
@@ -9112,14 +9121,21 @@ function updateSidebar(){
     }
     document.getElementById('atkVal').textContent = playerAttack();
     document.getElementById('defVal').textContent = totalDefense();
-    document.getElementById('critVal').textContent  = (playerCritChance()*100).toFixed(1)+'%';
-    document.getElementById('dodgeVal').textContent = (playerDodgeChance()*100).toFixed(1)+'%';
+    const critEl = document.getElementById('critVal');
+    critEl.textContent = (playerCritChance()*100).toFixed(1)+'%';
+    const cw = activeWeapon(), csk = player.skills[cw.skill];
+    const cTal = Math.round((player.permaBuffs?.critBonus || 0) * 100);
+    critEl.title = `base 1,5% + ${cw.skill} +${Math.round(Math.max(0, csk.val-10)*0.4)}%${cTal?` + talento +${cTal}%`:''} · teto 25%`;
+    const dodgeEl = document.getElementById('dodgeVal');
+    dodgeEl.textContent = (playerDodgeChance()*100).toFixed(1)+'%';
+    const dTal = Math.round((player.permaBuffs?.dodgeBonus || 0) * 100);
+    dodgeEl.title = `base 1,5% + Escudo +${Math.round(Math.max(0, player.skills['Escudo'].val-10)*0.6)}%${dTal?` + talento +${dTal}%`:''} · teto 25%`;
     const skB = playerSpeedBonusFromSkills(), btB = playerSpeedBonusFromBoots();
     const spd = playerMoveDelay();
     const tilesPerSec = (1000 / spd).toFixed(1);
     const spdEl = document.getElementById('spdVal');
     if (spdEl){
-        spdEl.textContent = `${tilesPerSec} tiles/s`;
+        spdEl.textContent = `${tilesPerSec}/s`;   // compacto (tooltip detalha tiles/ms)
         // Tooltip detalhado pra quem quiser ver a quebra
         const breakdown = (skB || btB)
             ? `${spd}ms entre tiles · skill -${skB}ms · botas -${btB}ms`
@@ -9134,7 +9150,7 @@ function updateSidebar(){
     const atkSpdEl = document.getElementById('atkSpdVal');
     if (atkSpdEl){
         const atksPerSec = (1000 / atkDelay).toFixed(2);
-        atkSpdEl.textContent = `${atksPerSec} atk/s`;
+        atkSpdEl.textContent = `${atksPerSec}/s`;   // compacto (tooltip detalha atk/ms + forja)
         atkSpdEl.title = atkSpd
             ? `${atkDelay}ms entre ataques · forja -${Math.round(atkSpd*100)}%`
             : `${atkDelay}ms entre ataques`;

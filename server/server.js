@@ -1203,10 +1203,10 @@ const megaBoss = {
 // Admin: nome do dono (configurável por env ADMIN_NAME) OU flag isAdmin na conta. A flag
 // permite grant granular no futuro; o fallback por nome garante que o dono nunca perde
 // acesso mesmo sem a flag setada. (Audit: tirar o 'alcione' hardcoded como ponto único.)
-const ADMIN_NAME = (process.env.ADMIN_NAME || 'alcione').toLowerCase();
+const ADMIN_NAMES = (process.env.ADMIN_NAME || 'alcione,claude').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 function isAdmin(name){
     const n = String(name || '').toLowerCase();
-    if (n === ADMIN_NAME) return true;
+    if (ADMIN_NAMES.includes(n)) return true;
     const a = getAccount(name);
     return !!(a && a.isAdmin);
 }
@@ -1788,6 +1788,15 @@ function pickSurroundSlot(m, target){
     slots.sort((a,b) => a.score - b.score);
     return slots[0];
 }
+// Esquiva do player SERVER-SIDE (espelha playerDodgeChance do cliente: base 1.5% +
+// 0.6%/ponto de Escudo acima de 10, + talento, teto TOTAL 25%). ANTES só existia no
+// cliente (damagePlayer), que NÃO roda online → a esquiva era MORTA em PvE.
+function playerDodgeChanceServer(p){
+    const esc = (p.skills && p.skills['Escudo'] && p.skills['Escudo'].val) || 10;
+    const skillBased = 0.015 + Math.max(0, esc - 10) * 0.006;
+    const perma = (p.permaBuffs && p.permaBuffs.dodgeBonus) || 0;
+    return Math.min(0.25, skillBased + perma);
+}
 function tickAI(){
     const now = Date.now();
     for (const m of monsters.values()){
@@ -1862,20 +1871,31 @@ function tickAI(){
                     }
                     continue;
                 }
-                // T2: dano aplicado server-side com defesa percentual (espelha cliente).
-                // Cliente recebe mobHit pra FX + recebe pstats com hp novo.
-                const def = totalDefenseServer(target);
-                const reduction = def > 0 ? def / (def + 30) : 0;
-                const actual = Math.max(1, Math.round(m.dmg * (1 - reduction)));
-                if ((target.hp ?? 100) > 0){
-                    target.hp = Math.max(0, (target.hp ?? 100) - actual);
-                    broadcastPstatsAll(target);
-                    // Fase 5: DoT/stun authoritative no server (rollAttackerStatus
-                    // do cliente fica como no-op quando online).
-                    applyAttackerStatus(target, m.type);
-                }
-                if (target.ws.readyState === 1){
-                    target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual }));
+                // Esquiva do player (espelha cliente). ANTES só rodava no cliente offline →
+                // esquiva morta em PvE; o player tomava dano "esquivando". Agora vale aqui.
+                if (Math.random() < playerDodgeChanceServer(target)){
+                    if (target.ws.readyState === 1){
+                        target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual:0, dodged:true }));
+                    }
+                    gainSkillXpServer(target, 'Escudo', 1);   // treina Escudo na esquiva (como o cliente fazia)
+                } else {
+                    // Crit do mob (×2, espelha cliente) + defesa percentual. ANTES o crit do
+                    // mob não era aplicado online (cosmético/a favor do player); agora vale.
+                    const mobCrit = Math.random() < ((MTYPE[m.type] && MTYPE[m.type].crit) || 0);
+                    const raw = mobCrit ? m.dmg * 2 : m.dmg;
+                    const def = totalDefenseServer(target);
+                    const reduction = def > 0 ? def / (def + 30) : 0;
+                    const actual = Math.max(1, Math.round(raw * (1 - reduction)));
+                    if ((target.hp ?? 100) > 0){
+                        target.hp = Math.max(0, (target.hp ?? 100) - actual);
+                        broadcastPstatsAll(target);
+                        // Fase 5: DoT/stun authoritative no server (rollAttackerStatus
+                        // do cliente fica como no-op quando online).
+                        applyAttackerStatus(target, m.type);
+                    }
+                    if (target.ws.readyState === 1){
+                        target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual, crit:mobCrit }));
+                    }
                 }
                 // T3: XP de Escudo se player tem escudo equipado (ganha XP apanhando)
                 if (hasShieldEquipped(target)){
