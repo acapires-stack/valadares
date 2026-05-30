@@ -6365,14 +6365,6 @@ function handleMP(msg){
             _dailyEvent = null;
         }
         renderDailyEventWidget();
-    } else if (msg.t === 'eventReward'){
-        // Legacy: server antigo enviava { kind:'gold', amount } e cliente somava.
-        // Nova versão usa invUpdate.goldDelta (reason:'gold_rain') como fonte única.
-        // Mantém o handler só pra retro-compat: apenas feedback visual, NÃO soma gold.
-        if (msg.kind === 'gold' && typeof msg.amount === 'number'){
-            addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
-            log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
-        }
     } else if (msg.t === 'invUpdate'){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
