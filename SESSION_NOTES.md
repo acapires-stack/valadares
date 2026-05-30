@@ -7,6 +7,68 @@
 
 ---
 
+## ⚔️ Sessão 30/05/2026 (cont. 3) — Rebalance do personagem + correção de PvE + claude admin (`dfe3f9f`)
+
+Dono pediu pra repensar o sistema do personagem. Decisões dele:
+- **Crítico**: base 4%→**1,5%**, teto total 30%→**25%**.
+- **Esquiva**: base 2%→**1,5%**, teto **25%**. (cap TOTAL = inclui talento/pvp; painel nunca > 25%.)
+- Resto inalterado (skills/hp/mp/ataque/defesa/velocidade/vel.ataque/talentos).
+
+**🔧 Bug corrigido — esquiva MORTA em PvE:** dano mob→player é server-side (`tickAI`), que só
+aplicava defesa — **ignorava esquiva e crit do mob**. Esquiva/crit-do-mob só rodavam no
+`damagePlayer` client, que NÃO executa online → Escudo/dodge era decorativo em PvE e o mob
+nunca critava. Agora `tickAI` aplica `playerDodgeChanceServer` (espelha o cliente) + crit do
+mob (×2), mandando `dodged`/`crit` no `mobHit`.
+
+**Visualização:** float verde "Esquivou!" + ★ crit do mob (laranja) com log; painel compacto
+(`Velocidade X/s`, `Vel. ataque X/s`) + tooltip de breakdown nos 4 stats.
+
+**claude vira admin** (`ADMIN_NAMES = alcione,claude`; antes `ADMIN_NAME` singular).
+
+⚠️ **A VERIFICAR (dono testando no celular):** boneco zerado deve mostrar **1,5%/1,5%**. Se vier
+**6,5%**, é `permaBuffs` velho (talentos da alcione) grudado no localStorage ao trocar de conta
+sem reload → bug de reset de permaBuffs no client (fix: resetar player.* / sempre aplicar
+permaBuffs do server mesmo vazio).
+
+---
+
+## 🔴 Sessão 30/05/2026 (cont.) — INCIDENTE: deploy zerou o boneco do dono + blindagem
+
+**O que aconteceu:** pushei o lote de auditoria (`d5aec67`) **direto, com o dono online**,
+SEM usar o `/manutencao` (que ele pediu e construímos no dia anterior, `f493cd1`, justo
+pra isso). O restart forçou reconexão → **sessão fantasma vazia gravou save vazio por cima
+do boneco logado** → conta `alcione` zerada. As tentativas de socorro (clicar "Restaurar
+do backup" + relogar várias vezes, ANTES do fix) corromperam o backup local (manteve skills,
+perdeu gold/itens). **Resultado: ~3-5 dias de itens/loot perdidos (irrecuperável).** Skills
+voltaram (estavam no backup corrompido); gold reposto (478708, sabido pelo ranking); itens não.
+
+**Causa-raiz:** `removeGhostsByName` só removia ghosts JÁ `disconnected` e casava por
+`p.name` (='Anônimo' antes do join) → uma 2ª sessão VIVA escapava, e era ela (p.* vazio) que
+gravava vazio. E `saveUpload`/persistência não tinham NENHUMA rede: sem trava empty-over-full,
+sem escrita atômica, sem backup, e load sem fallback (arquivo corrompido = wipe GERAL).
+
+**Lição de processo (gravada em [[feedback-valadares-deploy]]):** NUNCA pushar `server/**`
+com player online. Sempre `/manutencao` + logout limpo antes. Correção técnica não vale nada
+se zera um player. O dono (com razão): "esse jogo quem joga cuida do boneco, dos itens, da
+progressão".
+
+**Blindagem deployada (`7c97deb` + `2e616c8`):**
+- 🔒 **Trava anti-wipe** (`saveUpload`): save vazio-default NUNCA sobrescreve `acc.save` cheio
+  (`isEmptyDefaultSaveServer`). Mata o vetor.
+- 🔪 **Matar sessão dupla** (no auth): nova conexão derruba QUALQUER outra sessão da mesma
+  conta (viva ou fantasma, por `authedName`). Fecha a causa-raiz.
+- 💾 **Persistência robusta do `accounts.json`**: escrita ATÔMICA (tmp+rename), BACKUPS
+  rotativos (24, `/data/accounts_backups`), load com FALLBACK pro backup válido, trava de
+  arquivo (0 contas não sobrescreve cheio). Testado isolado 7/7 (corrompi arquivo → recuperou
+  com gold intacto).
+- 🚪 **`/manutencao` agora DESLOGA todos** + tranca novas conexões (lock auto-expira) ao fim
+  do countdown — antes só avisava. Cliente trata `authFail reason:maintenance` (retry 8s).
+- 🛟 **Restauração admin** (`7c97deb`): `/allowrestore NOME` → on-join `restoreMode` → cliente
+  manda backup local → server grava `acc.save` (só sobre conta zerada). Usado p/ tentar
+  recuperar (trouxe skills; itens já estavam perdidos no backup corrompido).
+
+---
+
 ## 🚀 Sessão 30/05/2026 — Lote de auditoria: pendentes FECHADOS + deployado
 
 Dono pediu: revisar pendentes da auditoria + reconnect/deploy gracioso + M4 3b.
