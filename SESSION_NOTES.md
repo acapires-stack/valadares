@@ -7,6 +7,32 @@
 
 ---
 
+## 🧹 Sessão 30/05/2026 (cont. 5) — Limpeza de dívida técnica (protocolo + dead code)
+
+Dono pediu pra limpar dívida técnica (offline ~500 linhas + sends de protocolo mortos).
+Mapeei com 2 agentes (offline no cliente; sends mortos cliente↔server) + verifiquei à mão.
+
+**✅ Feito (seguro, verificado — `276f71b` + `c0a155e`):**
+- **Sends/handlers WS mortos:** removidos os handlers de auth `setEmail`/`passwordResetRequest`/
+  `passwordResetConfirm` (fluxo é 100% HTTP — `reset.html` e cliente usam `/api/password-reset/*`,
+  nenhum sender WS no repo); send `spellResult` (cliente não trata); campo `trainResult` do
+  invUpdate (ignorado; erros já viram toast); handler cliente `eventReward` (server migrou pra
+  `invUpdate.goldDelta`).
+- **Dead code cliente:** `function attack()` (morta, virou `engage()`/`doAttack()`); CSS órfão
+  `.po-hp-bar/.po-hp-fill`.
+
+**⏸ ADIADO de propósito — remoção do código offline (~500 linhas):** está **interleaved com o
+MP vivo** (branches `if(serverAuthMobs){...}else{...}` em doAttack/castSpell/throwSpear/
+gainMagiaXp/completeStage/tickRegen + funções `updateMonster`/`spawnInitialMonsters`/etc).
+Riscos: (1) "compila" NÃO prova que o MP funciona, e o caminho WS não é testável local;
+(2) o mapa auto-gerado pra remoção tinha **instrução invertida** (mandava deixar o regen "sempre
+local", o que brigaria com a autoridade server-side de HP/MP) → aplicar cru quebra o jogo.
+**Caminho certo:** passo focado, removido com julgamento por-site (não pelo mapa cru), e
+**validado pelo dono no preview da Vercel** (logar + lutar + magia + lança + quest + regen contra
+o WS de prod) ANTES de promover. Mapa cirúrgico das ~25 ocorrências salvo (agente), pronto pra execução.
+
+---
+
 ## 🕳️ Sessão 30/05/2026 (cont. 4) — M4 3b: masmorra PROCEDURAL (cavernas)
 
 Dono pediu pra "continuar atualizando o jogo" → escolheu o foco definido no roadmap:
