@@ -1262,7 +1262,11 @@ function getDungeonFloor(floor){
     dungeonFloors.set(floor, d);
     return d;
 }
-function dungeonMeta(floor){ return (dungeonFloors.get(floor) || getDungeonFloor(floor)).meta; }
+// NÃO gera: só lê o que já existe. Todo call site de andar ativo (transições,
+// spawn, mobTileOk) já garante o grid carregado via getDungeonFloor antes. Andar
+// não-carregado → {} (eq() abaixo trata ausência → sem regenerar com seed nova,
+// o que desalinharia do grid que o cliente já recebeu).
+function dungeonMeta(floor){ const d = dungeonFloors.get(floor); return d ? d.meta : {}; }
 function dungeonTileIsFloor(floor, x, y){
     const d = dungeonFloors.get(floor);
     return d ? d.floorSet.has(x + ',' + y) : false;

@@ -4862,6 +4862,7 @@ function enterDungeonClient(msg){
         map = genDungeonFloor(player.floor);
         dungeonStairs = { up: { x:50, y:50 }, down: player.floor < 5 ? { x:50, y:57 } : null };
     }
+    _lastStairTrigger = 0;   // zera debounce: escadas mudam de coord por andar, não carrega trigger entre andares
     player.x = msg.x; player.y = msg.y;
     player.renderX = msg.x; player.renderY = msg.y;
     player.prevX = msg.x; player.prevY = msg.y;
@@ -4884,6 +4885,8 @@ function enterDungeonClient(msg){
 function exitDungeonClient(msg){
     player.floor = 0;
     map = overworldMap;                             // restaura o overworld
+    dungeonStairs = { up: null, down: null };       // limpa escadas do andar (estado não fica mentiroso na cidade)
+    _lastStairTrigger = 0;
     player.x = msg.x; player.y = msg.y;
     player.renderX = msg.x; player.renderY = msg.y;
     player.prevX = msg.x; player.prevY = msg.y;
@@ -6208,6 +6211,7 @@ function handleMP(msg){
         if ((player.floor || 0) !== 0){
             player.floor = 0;
             map = overworldMap;
+            dungeonStairs = { up: null, down: null };   // reconectou na cidade: não carrega escadas do andar antigo
             if (_overworldVisited){ player.visited = _overworldVisited; _overworldVisited = null; }
             player.target = null; player.autoAttack = false;
             // PvP foi FORÇADO na masmorra. Ao voltar pra cidade por reconexão (e não

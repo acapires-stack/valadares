@@ -38,6 +38,17 @@ pelo dono: **cavernas orgânicas** (cellular automata).
 limpo** (161 mobs, WS up, SIGTERM gracioso); JS inline do cliente compila (0 erros). Caminho
 WS in-game NÃO testável local.
 
+**🔎 Auto-revisão do diff (`/code-review` + 2 agentes server/cliente) — bugs corrigidos:**
+- 🔴 **CRÍTICO: boss do andar 5 nunca spawnava** (`f5812e9`) — `spawnMob` rejeita tiles de
+  transição e eu pusera `meta.boss` no conjunto de transição, mas o boss é spawnado EM
+  `meta.boss` → `spawnMob` retornava null. Removido o boss do conjunto (regressão testada
+  isolada: boss agora spawna, escadas seguem protegidas).
+- 🟠 `dungeonMeta` deixou de **gerar** andar sob demanda (evita ressuscitar andar morto com
+  seed nova, desalinhando do grid que o cliente já tem) — só lê o carregado.
+- 🟠 `exitDungeon` ganhou guard de `null` no `meta.up` (simetria com `descendDungeon`).
+- 🟡 cliente: reseta `dungeonStairs` ao sair pra cidade / reconectar + zera `_lastStairTrigger`
+  nas transições (escadas mudam de coord por andar — não carregar trigger/estado antigo).
+
 > ⚠️ **DEPLOY (mudança em `server/**` + cliente):** seguir a lição do incidente — **`/manutencao`
 > antes** (desloga todos, força reload do cliente novo). Ordem segura: cliente (Vercel) primeiro
 > com o fallback, depois server (Railway) com `/manutencao`. **TESTAR pós-deploy:** (1) entrar nas
