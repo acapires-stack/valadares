@@ -2472,17 +2472,6 @@ function npcOnTile(x, y){
 // Mini-PZ: player a 1 sqm de NPC é considerado em zona protegida (3×3 ao redor).
 // Quebra por 2s se o player atacar recentemente — fim do exploit de lurar mob
 // perto do NPC pra atirar de graça.
-const NPC_MINI_PZ_RADIUS = 1;
-const NPC_MINI_PZ_COMBAT_GRACE_MS = 2000;
-function playerNearNpcMiniPZ(){
-    if ((player.floor || 0) !== 0) return false;   // M4: sem mini-PZ de NPC na masmorra
-    if (player.lastAttackAt && Date.now() - player.lastAttackAt < NPC_MINI_PZ_COMBAT_GRACE_MS) return false;
-    for (const n of NPCS){
-        if (!npcVisible(n)) continue;
-        if (Math.max(Math.abs(player.x - n.pos.x), Math.abs(player.y - n.pos.y)) <= NPC_MINI_PZ_RADIUS) return true;
-    }
-    return false;
-}
 // Compat: atShop/atQuestNpc agora derivam do array
 function atShop()      { const n = npcAt(player.x, player.y); return n?.action === 'shop'; }
 function atQuestNpc()  { const n = npcAt(player.x, player.y); return n?.action === 'quests'; }
@@ -3865,26 +3854,6 @@ function rollDrops(monsterType, x, y){
 }
 
 const monsters = [];
-let nextMonId = 1;
-
-// Configuração dos anéis de spawn (compartilhada por spawn inicial e respawn)
-const SPAWN_RINGS = [
-    { min:6,  max:14, target:18, types:['RAT','RAT','RAT','RAT','SNAKE'] },
-    { min:14, max:24, target:20, types:['SNAKE','SNAKE','SPIDER','RAT'] },
-    { min:24, max:36, target:16, types:['SPIDER','SPIDER','WOLF'] },
-    { min:36, max:99, target:14, types:['WOLF','WOLF','ORC','ORC'] },
-];
-
-// Spawns exclusivos por bioma — só nascem em tiles do tipo certo
-const BIOME_SPAWNS = [
-    { name:'neve',    tile:7 /*T.SNOW*/, types:['TROLL','TROLL','TROLL'],                        target:10 },
-    { name:'deserto', tile:8 /*T.SAND*/, types:['LIZARD','LIZARD','SCORPION','SCORPION'],        target:12 },
-];
-
-function ringOf(x, y){
-    const d = Math.abs(x - M_W/2) + Math.abs(y - M_H/2);
-    return SPAWN_RINGS.find(r => d >= r.min && d < r.max);
-}
 
 // Highlander Hunt — o trigger é client-side, mas o spawn/tracking/crédito é server-side.
 let hlHuntActive = false;
@@ -4007,48 +3976,6 @@ function drawMonster(m, px, py){
 }
 
 // Escolhe a casa adjacente ao player mais perto deste monstro (cerca + fan-out)
-function pickSurroundSlot(m){
-    const intel = m.intel || 1;
-    const slots = [];
-    for (let dy = -1; dy <= 1; dy++){
-        for (let dx = -1; dx <= 1; dx++){
-            if (!dx && !dy) continue;
-            const x = player.x + dx, y = player.y + dy;
-            if (x<=0 || y<=0 || x>=M_W-1 || y>=M_H-1) continue;
-            if (!walkable(map[y][x])) continue;
-            if (inSafeZone(x, y)) continue;
-            const occ = monsterAt(x, y);
-            if (occ && occ !== m) continue;
-            const d = Math.max(Math.abs(m.x - x), Math.abs(m.y - y));
-            let score = d;
-            // Intel 2+: penaliza vagas próximas a outros mobs aggro (espalha)
-            if (intel >= 2){
-                let cluster = 0;
-                for (const om of monsters){
-                    if (om === m || !om.aggro || om.hp <= 0) continue;
-                    const od = Math.max(Math.abs(om.x - x), Math.abs(om.y - y));
-                    if (od <= 1) cluster++;
-                }
-                score += cluster * 0.8;
-            }
-            // Intel 3: flanco — prefere lado oposto ao que player está olhando
-            if (intel >= 3){
-                const back = {'up':[0,1],'down':[0,-1],'left':[1,0],'right':[-1,0]}[player.dir] || [0,0];
-                // se o slot está atrás do player, dá bônus negativo (preferido)
-                if (Math.sign(dx) === back[0] && Math.sign(dy) === back[1]) score -= 2.0;
-                else if (Math.sign(dx) === back[0] || Math.sign(dy) === back[1]) score -= 0.8;
-            }
-            // Tiebreak determinístico por id
-            const tiebreak = ((m.id * 31 + dx * 7 + dy * 11) % 100) / 1000;
-            slots.push({ x, y, score: score + tiebreak });
-        }
-    }
-    if (!slots.length) return null;
-    slots.sort((a,b) => a.score - b.score);
-    return slots[0];
-}
-
-// IA dos monstros (skip quando server-autoritativo — mob só anima localmente)
 function monsterAt(x,y){
     return monsters.find(m => m.hp>0 && m.x===x && m.y===y);
 }
