@@ -6146,19 +6146,28 @@ function handleMP(msg){
     }
     if (msg.t === 'authFail'){
         const reason = msg.reason || 'desconhecida';
-        log(`<span class="log-dmg">⚠ Autenticação rejeitada (${escapeHtml(reason)}). Voltando ao login…</span>`);
-        showServerToast('admin', '⚠ Senha incorreta no servidor.', null, 4000);
+        const msgs = {
+            maintenance: '🔧 Manutenção em andamento — reconectando em instantes…',
+            rate_limited: '⚠ Muitas tentativas — aguarde um pouco.',
+            bad_password: '⚠ Senha incorreta no servidor.',
+            no_password: '⚠ Senha não informada.',
+            bad_name: '⚠ Nome inválido.',
+        };
+        const txt = msgs[reason] || '⚠ Autenticação rejeitada.';
+        log(`<span class="log-dmg">${txt} (${escapeHtml(reason)})</span>`);
+        showServerToast(reason === 'maintenance' ? 'warn' : 'admin', txt, null, 4000);
         _wsAuthed = false;
         _authPwHash = null;
         try { ws.close(); } catch {}
-        // Limpa credenciais locais erradas (caso o cliente tenha cacheado senha que não bate)
+        // Limpa credenciais locais erradas SÓ em senha incorreta (não em manutenção!)
         if (reason === 'bad_password' && player.name){
             try {
                 localStorage.removeItem('valadares:acc:' + player.name);
                 localStorage.removeItem(SESSION_KEY);
             } catch {}
         }
-        setTimeout(() => window.location.reload(), 1500);
+        // Manutenção: espera mais (lock expira no restart) e tenta de novo, sem voltar ao login.
+        setTimeout(() => window.location.reload(), reason === 'maintenance' ? 8000 : 1500);
         return;
     }
     if (msg.t === 'state'){

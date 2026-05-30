@@ -1434,6 +1434,7 @@ function broadcastMsg(level, text, fromName){
 // isto ANTES de pushar. Ao reiniciar, a janela pós-boot (POST_BOOT_HEAL_MS) cura e
 // joga todo mundo na PZ. Timers one-shot; re-disparar cancela o countdown anterior.
 let _maintenanceTimers = [];
+let _maintenanceLockUntil = 0;   // > now → rejeita novas conexões (janela do deploy); auto-expira
 function startMaintenanceCountdown(mins){
     for (const t of _maintenanceTimers) clearTimeout(t);
     _maintenanceTimers = [];
@@ -1448,6 +1449,20 @@ function startMaintenanceCountdown(mins){
     for (const [at, txt] of marks){
         if (at > 0) _maintenanceTimers.push(setTimeout(() => broadcastMsg('warn', txt), at));
     }
+    // Ao FIM do countdown: tranca novas conexões e DESLOGA todo mundo (clean). Antes só
+    // avisava — por isso a reconexão do deploy ainda criava sessão fantasma. Sem sessão
+    // viva no restart, não há fantasma pra atropelar save. O lock auto-expira (failsafe se
+    // o push não vier); o processo novo nasce com lock=0 → reabre. Pushar dentro da janela.
+    const LOCK_MS = 5 * 60 * 1000;
+    _maintenanceTimers.push(setTimeout(() => {
+        _maintenanceLockUntil = Date.now() + LOCK_MS;
+        let n = 0;
+        for (const [oid, op] of players){
+            try { if (op.ws && op.ws.readyState === 1){ op.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:'🔧 Manutenção — desconectado. Volte em ~1 min; seu progresso está salvo.' })); op.ws.close(4030, 'maintenance'); } } catch {}
+            op.disconnected = true; players.delete(oid); n++;
+        }
+        console.log(`[maintenance] lock ${LOCK_MS/60000}min + ${n} player(s) desconectado(s)`);
+    }, totalMs + 500));
     console.log(`[maintenance] countdown ${m}min disparado`);
 }
 function sendTo(id, msg){
@@ -2865,10 +2880,54 @@ function setPlayerSave(name, data){
     return true;
 }
 let _accountsSaveTimer = null;
+// ─── Persistência robusta do accounts.json (rede de segurança — incidente 30/05) ───
+// Antes: writeFileSync direto (crash no meio = arquivo corrompido), ZERO backup, e load
+// sem fallback (arquivo corrompido no boot = TODAS as contas viram novas = wipe geral).
+// Agora: escrita ATÔMICA (tmp+rename), BACKUPS rotativos com timestamp, load com FALLBACK
+// pro backup mais recente, e trava contra gravar vazio por cima de cheio.
+const ACCOUNTS_BACKUP_DIR = path.join(path.dirname(ACCOUNTS_FILE), 'accounts_backups');
+const ACCOUNTS_BACKUP_KEEP = 24;
+const ACCOUNTS_BACKUP_INTERVAL_MS = 10 * 60 * 1000;   // no máx 1 backup a cada 10min
+let _lastAccountsBackupAt = 0;
+
+// Contagem de contas no arquivo de disco: >0 ok, 0 vazio, -1 ausente/corrompido.
+function _diskAccountsCount(){
+    try {
+        if (!fs.existsSync(ACCOUNTS_FILE)) return -1;
+        const d = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+        return (d && Array.isArray(d.accounts)) ? d.accounts.length : -1;
+    } catch { return -1; }
+}
+// Snapshot do accounts.json ATUAL (se válido e não-vazio) num backup com timestamp.
+function backupAccountsFile(){
+    try {
+        if (!fs.existsSync(ACCOUNTS_FILE)) return;
+        const raw = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
+        const parsed = JSON.parse(raw);   // throws se corrompido → não backupa lixo
+        if (!parsed || !Array.isArray(parsed.accounts) || parsed.accounts.length === 0) return;
+        if (!fs.existsSync(ACCOUNTS_BACKUP_DIR)) fs.mkdirSync(ACCOUNTS_BACKUP_DIR, { recursive: true });
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        fs.writeFileSync(path.join(ACCOUNTS_BACKUP_DIR, `accounts-${stamp}.json`), raw, 'utf8');
+        const files = fs.readdirSync(ACCOUNTS_BACKUP_DIR).filter(f => f.startsWith('accounts-') && f.endsWith('.json')).sort();
+        while (files.length > ACCOUNTS_BACKUP_KEEP){ try { fs.unlinkSync(path.join(ACCOUNTS_BACKUP_DIR, files.shift())); } catch {} }
+    } catch(e){ console.warn('[accounts] backup falhou (segue):', e.message); }
+}
 function flushAccounts(){
     try {
         const out = { v:1, savedAt: Date.now(), accounts: Array.from(accounts.values()) };
-        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(out), 'utf8');
+        // Trava: nunca grava 0 contas sobre um arquivo que TINHA contas (anti-wipe de arquivo).
+        if (out.accounts.length === 0 && _diskAccountsCount() > 0){
+            console.warn('[accounts] BLOQUEADO flush de 0 contas sobre arquivo populado');
+            return;
+        }
+        // Backup rotativo do estado ATUAL antes de sobrescrever (no máx 1/10min).
+        const now = Date.now();
+        if (now - _lastAccountsBackupAt > ACCOUNTS_BACKUP_INTERVAL_MS){ backupAccountsFile(); _lastAccountsBackupAt = now; }
+        // Escrita ATÔMICA: grava no .tmp e renomeia (rename atômico — crash no meio não
+        // corrompe o arquivo bom; o pior caso é perder a última gravação, não tudo).
+        const tmp = ACCOUNTS_FILE + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(out), 'utf8');
+        fs.renameSync(tmp, ACCOUNTS_FILE);
     } catch(e){ console.error('[accounts] erro ao salvar:', e.message); }
 }
 function queueSaveAccounts(){
@@ -2876,22 +2935,33 @@ function queueSaveAccounts(){
     _accountsSaveTimer = setTimeout(() => { _accountsSaveTimer = null; flushAccounts(); }, 2000);
 }
 function loadAccountsFromDisk(){
-    if (!fs.existsSync(ACCOUNTS_FILE)) return;
-    try {
-        const d = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
-        if (!d || d.v !== 1) return;
-        if (Array.isArray(d.accounts)){
-            for (const a of d.accounts){
-                if (!a || !a.name || !a.pwHash) continue;
-                accounts.set(a.name.toLowerCase(), a);
-                // Fase 5.5: reconstrói índice email → conta
-                if (a.email && typeof a.email === 'string'){
-                    emailToAccount.set(a.email.toLowerCase(), a.name.toLowerCase());
+    const tryLoad = (file) => {
+        if (!fs.existsSync(file)) return null;
+        const d = JSON.parse(fs.readFileSync(file, 'utf8'));   // throws se corrompido
+        if (!d || d.v !== 1 || !Array.isArray(d.accounts)) return null;
+        return d.accounts;
+    };
+    let list = null, src = 'principal';
+    try { list = tryLoad(ACCOUNTS_FILE); }
+    catch(e){ console.error('[accounts] arquivo PRINCIPAL corrompido:', e.message); }
+    // Fallback: principal ausente/corrompido/vazio → backup válido mais recente.
+    if (!list || list.length === 0){
+        try {
+            if (fs.existsSync(ACCOUNTS_BACKUP_DIR)){
+                const files = fs.readdirSync(ACCOUNTS_BACKUP_DIR).filter(f => f.startsWith('accounts-') && f.endsWith('.json')).sort().reverse();
+                for (const f of files){
+                    try { const l = tryLoad(path.join(ACCOUNTS_BACKUP_DIR, f)); if (l && l.length){ list = l; src = 'backup ' + f; console.warn(`[accounts] ⚠ RECUPERADO do ${src} (${l.length} contas)`); break; } } catch {}
                 }
             }
-        }
-        console.log(`[accounts] ${accounts.size} contas carregadas de disco (${emailToAccount.size} com email)`);
-    } catch(e){ console.error('[accounts] erro ao carregar:', e.message); }
+        } catch {}
+    }
+    if (!list){ console.log('[accounts] nenhuma conta pra carregar (arquivo novo?)'); return; }
+    for (const a of list){
+        if (!a || !a.name || !a.pwHash) continue;
+        accounts.set(a.name.toLowerCase(), a);
+        if (a.email && typeof a.email === 'string') emailToAccount.set(a.email.toLowerCase(), a.name.toLowerCase());
+    }
+    console.log(`[accounts] ${accounts.size} contas carregadas (fonte: ${src}, ${emailToAccount.size} com email)`);
 }
 loadAccountsFromDisk();
 
@@ -4239,6 +4309,13 @@ wss.on('connection', (ws, request) => {
         // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
         // Cria conta se não existir, devolve save server-side se houver.
         if (msg.t === 'auth') {
+            // Lock de manutenção: rejeita novas conexões na janela do deploy (auto-expira;
+            // o processo novo nasce com lock=0). Evita reconectar no server velho a ser morto.
+            if (Date.now() < _maintenanceLockUntil){
+                ws.send(JSON.stringify({ t:'authFail', reason:'maintenance' }));
+                setTimeout(() => { try { ws.close(4030, 'maintenance'); } catch {} }, 200);
+                return;
+            }
             // Version gate: bloqueia Electron desatualizado. Source of truth é
             // o User-Agent (detectado na connection — `p.isElectronUA`). Não
             // dá pra confiar só em msg.platform porque cliente antigo (v1.0.6-)
@@ -4299,9 +4376,26 @@ wss.on('connection', (ws, request) => {
             p._authAttempts = [];
             p.authed = true;
             p.authedName = acc.name;
-            // Já limpa ghosts antigos no momento do auth — mesmo se o WS cair antes do join,
-            // não acumula corpos órfãos. Importante quando rede do user oscila bastante.
-            removeGhostsByName(acc.name, id);
+            // ★ CAUSA-RAIZ DO WIPE: mata QUALQUER outra sessão da mesma conta (viva OU fantasma).
+            // removeGhostsByName só pegava ghosts JÁ `disconnected` e casava por `op.name` (que é
+            // 'Anônimo' até o join) → uma 2ª sessão VIVA escapava, e era ELA, com p.* vazio, que
+            // gravava save vazio por cima do bom. Aqui casa por authedName e DERRUBA a antiga
+            // (fechar o WS → close handler só deleta quando disconnected, não salva; trava cobre o resto).
+            const _accLower = acc.name.toLowerCase();
+            for (const [oid, op] of players){
+                if (oid === id) continue;
+                const sameAcct = (op.authedName && op.authedName.toLowerCase() === _accLower) || (op.name === acc.name);
+                if (!sameAcct) continue;
+                op.disconnected = true;
+                try {
+                    if (op.ws && op.ws.readyState === 1){
+                        op.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:'Sua conta entrou em outro lugar — esta sessão foi encerrada.' }));
+                        op.ws.close(4031, 'session-replaced');
+                    }
+                } catch {}
+                players.delete(oid);
+                broadcast(null, { t:'leave', id: oid });
+            }
             ws.send(JSON.stringify({
                 t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0,
                 hasEmail: !!acc.email,
