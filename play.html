@@ -6599,6 +6599,15 @@ function handleMP(msg){
     } else if (msg.t === 'dungeonResult'){
         const errs = { not_at_entrance:'Aproxime-se da escada da masmorra.', not_at_exit:'Aproxime-se da escada de saída.' };
         if (msg.error && typeof showServerToast === 'function') showServerToast('warn', errs[msg.error] || 'Falhou', null, 4000);
+    } else if (msg.t === 'restoreMode'){
+        // Server liberou restauração da conta (admin /allowrestore). Manda o backup local.
+        const bkp = (typeof readSaveRaw === 'function') ? readSaveRaw('valadares:save:bkp:' + player.name) : null;
+        if (bkp && typeof isEmptyDefaultSave === 'function' && !isEmptyDefaultSave(bkp)){
+            try { ws.send(JSON.stringify({ t:'restoreUpload', data: bkp })); } catch {}
+            if (typeof showServerToast === 'function') showServerToast('event', '✦ Enviando teu backup pro servidor… aguarde a confirmação.', null, 6000);
+        } else {
+            if (typeof showServerToast === 'function') showServerToast('warn', '⚠ Sem backup neste dispositivo — não há o que restaurar aqui.', null, 7000);
+        }
     } else if (msg.t === 'forceTeleport'){
         // Admin reset: teleporta + re-inicializa renderX/Y pra escapar sprite invisível.
         const tx = (typeof msg.x === 'number') ? msg.x : 50;

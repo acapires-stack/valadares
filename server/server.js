@@ -2670,6 +2670,19 @@ function verifyPwHash(stored, clientHash){
 function validAccountName(n){
     return typeof n === 'string' && n.length >= 1 && n.length <= 14 && /^[A-Za-z0-9_\- ]+$/.test(n);
 }
+// Detecta save "vazio-default": skills base 10, sem inv/gold/equip/baú. Espelha o
+// isEmptyDefaultSave do cliente. Usado pela TRAVA ANTI-WIPE no saveUpload — uma sessão
+// fantasma (p.* vazio) gravava por cima do save cheio e zerava a conta no reconnect.
+function isEmptyDefaultSaveServer(d){
+    if (!d || typeof d !== 'object') return true;
+    const skills = (d.skills && typeof d.skills === 'object') ? d.skills : {};
+    const skillsTen = Object.values(skills).every(s => !s || s.val === 10 || s.val == null);
+    const noInv    = !d.inv || Object.keys(d.inv).length === 0;
+    const noGold   = !d.gold;
+    const noEquip  = !d.equipped || Object.values(d.equipped).every(v => !v);
+    const noChests = !d.chests || Object.values(d.chests).every(c => !c || Object.keys(c).length === 0);
+    return skillsTen && noInv && noGold && noEquip && noChests;
+}
 function getAccount(name){ return accounts.get(String(name || '').toLowerCase()); }
 function createAccount(name, clientHash, email){
     const a = {
@@ -4466,7 +4479,45 @@ wss.on('connection', (ws, request) => {
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
+            // ★ TRAVA ANTI-WIPE: nunca deixa um save vazio-default sobrescrever um acc.save
+            // populado. Foi ISSO que zerou contas — uma sessão fantasma (p.* vazio, ex.: 2ª
+            // conexão no reconnect do deploy) gravava {gold:0, inv:{}, skills base} por cima
+            // do save cheio. `data` aqui já reflete p.* (lockdown acima). Se o que vai gravar
+            // está vazio mas o save guardado está cheio → RECUSA (não persiste).
+            const _accSave = getAccount(p.authedName);
+            if (_accSave && !isEmptyDefaultSaveServer(_accSave.save) && isEmptyDefaultSaveServer(data)){
+                console.warn(`[save] RECUSADO empty-over-full de ${p.authedName} (trava anti-wipe)`);
+                return;
+            }
             setPlayerSave(p.authedName, data);
+            return;
+        }
+
+        // ─── Recuperação one-shot de conta zerada por bug (gated por admin) ───
+        if (msg.t === 'restoreUpload') {
+            if (!p.authed || !p.authedName) return;
+            const acc = getAccount(p.authedName);
+            if (!acc || !(acc._restoreUntil > Date.now())){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Restauração não liberada. Peça ao admin: /allowrestore SEU_NOME' });
+                return;
+            }
+            // Só restaura SOBRE conta zerada — impede forjar por cima de save cheio.
+            if (!isEmptyDefaultSaveServer(acc.save)){
+                acc._restoreUntil = 0;
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Restauração só em conta zerada (a sua não está vazia).' });
+                return;
+            }
+            const data = msg.data;
+            if (!data || typeof data !== 'object'){ sendTo(id, { t:'serverMsg', level:'warn', text:'Backup inválido/ausente.' }); return; }
+            try { if (JSON.stringify(data).length > SAVE_MAX_BYTES){ sendTo(id, { t:'serverMsg', level:'warn', text:'Backup grande demais.' }); return; } } catch { return; }
+            if (isEmptyDefaultSaveServer(data)){ sendTo(id, { t:'serverMsg', level:'warn', text:'O backup também está vazio — nada a restaurar.' }); return; }
+            sanitizeSave(data, p.authedName);   // clampa gold/skills
+            acc.save = data;
+            acc.savedAt = Date.now();
+            acc._restoreUntil = 0;
+            queueSaveAccounts();
+            console.log(`[restore] ${p.authedName}: acc.save gravado do backup (gold=${data.gold || 0})`);
+            sendTo(id, { t:'serverMsg', level:'event', text:`✦ Backup gravado no servidor (${data.gold||0}g)! Saia e entre de novo (SAIR → entrar) pra carregar tudo.` });
             return;
         }
 
@@ -4578,6 +4629,10 @@ wss.on('connection', (ws, request) => {
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
             sendInvUpdate(p, { chests: p.chests, reason:'join' });
+            // Recuperação: se admin liberou (_restoreUntil), pede o backup local do cliente.
+            if (acc && acc._restoreUntil && acc._restoreUntil > Date.now()){
+                sendTo(id, { t:'restoreMode' });
+            }
             // Sincroniza estado da party: cliente pode ter widget stale se perdeu
             // partyUpdate enquanto offline. Garante que após (re)conexão o widget bate
             // com o server (ou some, se ele não está mais em party).
@@ -6323,7 +6378,7 @@ wss.on('connection', (ws, request) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME' });
                     return;
                 }
                 if (cmd === '/deluser'){
@@ -6352,6 +6407,16 @@ wss.on('connection', (ws, request) => {
                     const s = info.save;
                     const o = info.online;
                     sendTo(id, { t:'serverMsg', level:'info', text:`${info.name} ${o?'[online]':'[offline]'} · save: pos=(${s.x},${s.y}) hp=${s.hp}/${s.maxHp} mp=${s.mp}/${s.maxMp} gold=${s.gold}${o?` · live: pos=(${o.x},${o.y}) hp=${o.hp}/${o.maxHp}`:''}` });
+                    return;
+                }
+                if (cmd === '/allowrestore'){
+                    if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /allowrestore NOME' }); return; }
+                    const acc = getAccount(arg);
+                    if (!acc){ sendTo(id, { t:'serverMsg', level:'warn', text:`Conta "${arg}" não existe.` }); return; }
+                    if (!isEmptyDefaultSaveServer(acc.save)){ sendTo(id, { t:'serverMsg', level:'warn', text:`Save de "${arg}" NÃO está zerado — restauração é só pra conta zerada por bug.` }); return; }
+                    acc._restoreUntil = Date.now() + 10 * 60 * 1000;   // janela de 10min
+                    sendTo(id, { t:'serverMsg', level:'info', text:`Restauração liberada pra "${arg}" (10min). Ele deve SAIR e ENTRAR — o cliente manda o backup automático; depois SAIR/ENTRAR de novo pra carregar.` });
+                    console.log(`[restore] admin ${p.name} liberou restore de ${arg}`);
                     return;
                 }
                 if (cmd === '/resetuser'){
