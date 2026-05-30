@@ -589,12 +589,6 @@
         .po-dist.near   { background: rgba(116,209,118,0.15); color: #92e090; }
         .po-dist.mid    { background: rgba(255,170,32,0.15);  color: #ffcc70; }
         .po-dist.far    { background: rgba(100,100,100,0.15); color: #888; }
-        .po-hp-bar {
-            background: #050405; border: 1px solid #1a1408;
-            height: 4px; margin-top: 3px; border-radius: 1px;
-            overflow: hidden;
-        }
-        .po-hp-fill { height: 100%; transition: width 0.2s; }
         .po-actions {
             display: flex; gap: 4px; margin-top: 4px;
         }
@@ -2478,17 +2472,6 @@ function npcOnTile(x, y){
 // Mini-PZ: player a 1 sqm de NPC é considerado em zona protegida (3×3 ao redor).
 // Quebra por 2s se o player atacar recentemente — fim do exploit de lurar mob
 // perto do NPC pra atirar de graça.
-const NPC_MINI_PZ_RADIUS = 1;
-const NPC_MINI_PZ_COMBAT_GRACE_MS = 2000;
-function playerNearNpcMiniPZ(){
-    if ((player.floor || 0) !== 0) return false;   // M4: sem mini-PZ de NPC na masmorra
-    if (player.lastAttackAt && Date.now() - player.lastAttackAt < NPC_MINI_PZ_COMBAT_GRACE_MS) return false;
-    for (const n of NPCS){
-        if (!npcVisible(n)) continue;
-        if (Math.max(Math.abs(player.x - n.pos.x), Math.abs(player.y - n.pos.y)) <= NPC_MINI_PZ_RADIUS) return true;
-    }
-    return false;
-}
 // Compat: atShop/atQuestNpc agora derivam do array
 function atShop()      { const n = npcAt(player.x, player.y); return n?.action === 'shop'; }
 function atQuestNpc()  { const n = npcAt(player.x, player.y); return n?.action === 'quests'; }
@@ -2760,6 +2743,24 @@ function genDungeonFloor(floor){
         for (let x=40; x<=60; x++)
             m[y][x] = T.CAVE;
     _dungeonFloorCache[floor] = m;
+    return m;
+}
+// M4 3b: layout procedural recebido do server (fonte da verdade — server gera a
+// caverna e manda no dungeonEnter). Constrói o grid 100×100 a partir da
+// sub-região (rows: '.'=piso de caverna, '#'=parede; resto do mundo = parede).
+// `dungeonStairs` guarda as escadas do andar atual (também vindas do server).
+let dungeonStairs = { up: null, down: null };
+function buildDungeonMapFromGrid(grid){
+    const m = Array.from({length:M_H}, () => new Uint8Array(M_W).fill(T.CAVE_WALL));
+    if (!grid || !grid.area || !Array.isArray(grid.rows)) return m;
+    const { x0, y0 } = grid.area;
+    for (let ly=0; ly<grid.rows.length; ly++){
+        const row = grid.rows[ly]; const wy = y0 + ly;
+        if (wy < 0 || wy >= M_H) continue;
+        for (let lx=0; lx<row.length; lx++){
+            if (row[lx] === '.'){ const wx = x0 + lx; if (wx>=0 && wx<M_W) m[wy][wx] = T.CAVE; }
+        }
+    }
     return m;
 }
 const VAR = Array.from({length:M_H}, (_,y) =>
@@ -3853,283 +3854,28 @@ function rollDrops(monsterType, x, y){
 }
 
 const monsters = [];
-let nextMonId = 1;
 
-function spawnMonster(type, x, y){
-    const def = MTYPE[type];
-    monsters.push({
-        id: nextMonId++, type, name:def.name, color:def.color, size:def.size,
-        x, y, dir:'down',
-        renderX:x, renderY:y, prevX:x, prevY:y,
-        moveProgress:1, moveDuration:0,
-        hp:def.hp, maxHp:def.hp, dmg:def.dmg, speed:def.speed, xpReward:def.xp,
-        dodge: def.dodge || 0, crit: def.crit || 0,
-        intel: def.intel || 1,
-        moveTimer:0, attackTimer:0, aggro:false,
-        wanderX:x, wanderY:y,
-        unique: !!def.unique,
-    });
-}
-
-// Configuração dos anéis de spawn (compartilhada por spawn inicial e respawn)
-const SPAWN_RINGS = [
-    { min:6,  max:14, target:18, types:['RAT','RAT','RAT','RAT','SNAKE'] },
-    { min:14, max:24, target:20, types:['SNAKE','SNAKE','SPIDER','RAT'] },
-    { min:24, max:36, target:16, types:['SPIDER','SPIDER','WOLF'] },
-    { min:36, max:99, target:14, types:['WOLF','WOLF','ORC','ORC'] },
-];
-
-// Spawns exclusivos por bioma — só nascem em tiles do tipo certo
-const BIOME_SPAWNS = [
-    { name:'neve',    tile:7 /*T.SNOW*/, types:['TROLL','TROLL','TROLL'],                        target:10 },
-    { name:'deserto', tile:8 /*T.SAND*/, types:['LIZARD','LIZARD','SCORPION','SCORPION'],        target:12 },
-];
-
-function ringOf(x, y){
-    const d = Math.abs(x - M_W/2) + Math.abs(y - M_H/2);
-    return SPAWN_RINGS.find(r => d >= r.min && d < r.max);
-}
-
-function countByRing(){
-    const c = new Map(SPAWN_RINGS.map(r => [r, 0]));
-    for (const m of monsters){
-        const r = ringOf(m.x, m.y);
-        if (r) c.set(r, c.get(r) + 1);
-    }
-    return c;
-}
-
-function trySpawnInRing(ring, opts = {}){
-    const { offscreen = false, minDistFromPlayer = 0 } = opts;
-    const cam = offscreen ? getCamera() : null;
-    for (let tries = 0; tries < 200; tries++){
-        const x = 5 + Math.floor(Math.random() * (M_W - 10));
-        const y = 5 + Math.floor(Math.random() * (M_H - 10));
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x, y)) continue;
-        if (inSafeZone(x, y)) continue;
-        const dist = Math.abs(x - M_W/2) + Math.abs(y - M_H/2);
-        if (dist < ring.min || dist >= ring.max) continue;
-        if (minDistFromPlayer > 0){
-            const dp = Math.max(Math.abs(x - player.x), Math.abs(y - player.y));
-            if (dp < minDistFromPlayer) continue;
-        }
-        if (cam && x >= cam.x && x < cam.x + VP_W && y >= cam.y && y < cam.y + VP_H) continue;
-        const type = ring.types[Math.floor(Math.random() * ring.types.length)];
-        spawnMonster(type, x, y);
-        return true;
-    }
-    return false;
-}
-
-function trySpawnInBiome(biome, opts = {}){
-    const { offscreen = false, minDistFromPlayer = 0 } = opts;
-    const cam = offscreen ? getCamera() : null;
-    for (let tries = 0; tries < 200; tries++){
-        const x = 5 + Math.floor(Math.random() * (M_W - 10));
-        const y = 5 + Math.floor(Math.random() * (M_H - 10));
-        if (map[y][x] !== biome.tile) continue;
-        if (monsterAt(x, y)) continue;
-        if (inSafeZone(x, y)) continue;
-        if (inCave(x, y)) continue;
-        if (minDistFromPlayer > 0){
-            const dp = Math.max(Math.abs(x - player.x), Math.abs(y - player.y));
-            if (dp < minDistFromPlayer) continue;
-        }
-        if (cam && x >= cam.x && x < cam.x + VP_W && y >= cam.y && y < cam.y + VP_H) continue;
-        const type = biome.types[Math.floor(Math.random() * biome.types.length)];
-        spawnMonster(type, x, y);
-        return true;
-    }
-    return false;
-}
-
-function countByBiome(){
-    const c = new Map(BIOME_SPAWNS.map(b => [b, 0]));
-    for (const m of monsters){
-        for (const b of BIOME_SPAWNS){
-            if (map[m.y] && map[m.y][m.x] === b.tile){ c.set(b, c.get(b) + 1); break; }
-        }
-    }
-    return c;
-}
-
-function spawnInitialMonsters(){
-    if (serverAuthMobs) return;  // server cuida do spawn quando online
-    for (const ring of SPAWN_RINGS){
-        let placed = 0;
-        while (placed < ring.target){
-            if (!trySpawnInRing(ring)) break;
-            placed++;
-        }
-    }
-    // Cavernas
-    for (const cave of CAVES){
-        let placed = 0;
-        while (placed < cave.target){
-            if (!trySpawnInCave(cave)) break;
-            placed++;
-        }
-    }
-    // Biomas
-    for (const biome of BIOME_SPAWNS){
-        let placed = 0;
-        while (placed < biome.target){
-            if (!trySpawnInBiome(biome)) break;
-            placed++;
-        }
-    }
-    spawnBossAndLair();
-    spawnDrakeBoss();
-    spawnGolemBoss();
-}
-
-// Boss + guardas (Orcs ao redor) — respawna 5 min após morte do boss
-const BOSS_POS      = { x: 46, y: 95 };
-const DRAKE_BOSS_POS = { x: 82, y: 80 };
-const GOLEM_BOSS_POS = { x: 70, y: 90 };
-const BOSS_RESPAWN_MS = 5 * 60 * 1000;
-const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
-const LAIR_OFFSETS = [[-2,-1],[2,-1],[-2,1],[2,1],[0,-3],[0,3]];
-let bossDeathTime = null;
-let drakeBossDeathTime = null;
-let golemBossDeathTime = null;
-
-// Highlander Hunt
+// Highlander Hunt — o trigger é client-side, mas o spawn/tracking/crédito é server-side.
 let hlHuntActive = false;
 let hlHuntTimer = 0;
 const HL_HUNT_DELAY_MS = 3 * 60 * 1000; // 3 min após virar Highlander
-const HL_HUNT_REWARD = () => 200 + Math.floor(Math.random() * 250);
-
-function spawnBossAndLair(){
-    if (!monsters.some(m => m.type === 'ORC_LIDER')){
-        spawnMonster('ORC_LIDER', BOSS_POS.x, BOSS_POS.y);
-    }
-    for (const [dx, dy] of LAIR_OFFSETS){
-        const x = BOSS_POS.x + dx, y = BOSS_POS.y + dy;
-        if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x, y)) continue;
-        spawnMonster('ORC', x, y);
-    }
-}
-
-function spawnDrakeBoss(){
-    if (!monsters.some(m => m.type === 'DRAKE_LIDER')){
-        spawnMonster('DRAKE_LIDER', DRAKE_BOSS_POS.x, DRAKE_BOSS_POS.y);
-    }
-    for (const [dx, dy] of [[-2,0],[2,0],[0,-2],[0,2]]){
-        const x = DRAKE_BOSS_POS.x+dx, y = DRAKE_BOSS_POS.y+dy;
-        if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x,y)) continue;
-        spawnMonster('DRAKE', x, y);
-    }
-}
-
-function spawnGolemBoss(){
-    if (!monsters.some(m => m.type === 'GOLEM_REI')){
-        spawnMonster('GOLEM_REI', GOLEM_BOSS_POS.x, GOLEM_BOSS_POS.y);
-    }
-    for (const [dx, dy] of [[-2,0],[2,0],[0,-2],[0,2]]){
-        const x = GOLEM_BOSS_POS.x+dx, y = GOLEM_BOSS_POS.y+dy;
-        if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x,y)) continue;
-        spawnMonster('GOLEM', x, y);
-    }
-}
-
-function spawnHighlanderHunters(){
-    const spawnPoints = [
-        { x:5, y:5 }, { x:95, y:5 }, { x:5, y:95 }, { x:95, y:95 },
-    ];
-    let spawned = 0;
-    for (const pt of spawnPoints){
-        if (spawned >= 3) break;
-        for (let tries=0; tries<40; tries++){
-            const x = pt.x + Math.floor(Math.random()*6) - 3;
-            const y = pt.y + Math.floor(Math.random()*6) - 3;
-            if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-            if (!walkable(map[y][x])) continue;
-            if (monsterAt(x,y)) continue;
-            const m = spawnMonster('CACADOR', x, y);
-            // marcar como caçador global (vai persistir no objeto)
-            const mo = monsters[monsters.length-1];
-            mo.hunter = true; mo.aggro = true;
-            spawned++; break;
-        }
-    }
-    hlHuntActive = true;
-    log('<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>');
-}
 
 function tickHighlanderHunt(dt){
     if (!player.highlander){ hlHuntActive = false; hlHuntTimer = 0; return; }
-    // T4: online → server controla spawn + tracking + crédito. Cliente só dispara
-    // o trigger uma vez quando o timer vence; server responde com mobs no snapshot
-    // e com 'hlHuntResult' (ok:true) ao último kill.
-    if (serverAuthMobs){
-        if (hlHuntActive) return;          // hunters já estão vivos no mapa (server-side)
-        hlHuntTimer += dt;
-        if (hlHuntTimer >= HL_HUNT_DELAY_MS){
-            hlHuntActive = true;            // evita re-trigger antes do server responder
-            hlHuntTimer = 0;
-            if (ws && ws.readyState === 1 && _wsAuthed){
-                try { ws.send(JSON.stringify({ t:'hlHuntTrigger' })); } catch {}
-                log('<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>');
-            }
+    // T4: server controla spawn + tracking + crédito. O cliente só dispara o
+    // trigger uma vez quando o timer vence; o server responde com os mobs no
+    // snapshot e com 'hlHuntResult' (ok:true) ao último kill.
+    if (hlHuntActive) return;          // hunters já estão vivos no mapa (server-side)
+    hlHuntTimer += dt;
+    if (hlHuntTimer >= HL_HUNT_DELAY_MS){
+        hlHuntActive = true;            // evita re-trigger antes do server responder
+        hlHuntTimer = 0;
+        if (ws && ws.readyState === 1 && _wsAuthed){
+            try { ws.send(JSON.stringify({ t:'hlHuntTrigger' })); } catch {}
+            log('<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>');
         }
-        return;
-    }
-    // Offline / single-player: lógica local (spawn + checagem de mortes + bonus)
-    if (hlHuntActive){
-        for (const m of monsters){
-            if (m.hunter && m.hp > 0){ m.wanderX = player.x; m.wanderY = player.y; m.aggro = true; }
-        }
-        if (!monsters.some(m => m.hunter && m.hp > 0)){
-            hlHuntActive = false;
-            hlHuntTimer = 0;
-            const bonus = HL_HUNT_REWARD();
-            player.gold += bonus;
-            const gEl = document.getElementById('goldVal');
-            if (gEl) gEl.textContent = player.gold + ' g';
-            log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${bonus}g</span>`);
-        }
-    } else {
-        hlHuntTimer += dt;
-        if (hlHuntTimer >= HL_HUNT_DELAY_MS) spawnHighlanderHunters();
     }
 }
-
-function trySpawnInCave(cave){
-    for (let tries = 0; tries < 200; tries++){
-        const dx = Math.floor(Math.random() * (cave.r*2+1)) - cave.r;
-        const dy = Math.floor(Math.random() * (cave.r*2+1)) - cave.r;
-        const x = cave.x + dx, y = cave.y + dy;
-        if (x<=0 || y<=0 || x>=M_W-1 || y>=M_H-1) continue;
-        if (map[y][x] !== T.CAVE) continue;
-        if (monsterAt(x, y)) continue;
-        const type = cave.types[Math.floor(Math.random() * cave.types.length)];
-        const mon = spawnMonster(type, x, y);
-        return true;
-    }
-    return false;
-}
-
-function countByCave(){
-    const c = new Map(CAVES.map(cv => [cv, 0]));
-    for (const m of monsters){
-        const cv = inCave(m.x, m.y);
-        if (cv) c.set(cv, c.get(cv) + 1);
-    }
-    return c;
-}
-
-// Respawn dinâmico — mantém a população viva
-let respawnTimer = 0;
-const RESPAWN_INTERVAL = 900;    // tenta repor a cada 0.9s
-const RESPAWN_PER_TICK = 3;      // até 3 monstros por tick
 
 // Boss heal Lv3+ — bosses regeneram lentamente quando upados
 let bossHealTimer = 0;
@@ -4152,55 +3898,10 @@ function tickBossHeal(dt){
 }
 
 function tickRespawns(dt){
+    // O respawn de mobs é todo server-side. O cliente só roda o heal de boss (cosmético,
+    // reconciliado pelo snapshot) e o trigger da Caçada ao Highlander.
     tickBossHeal(dt);
-    if (serverAuthMobs) { tickHighlanderHunt(dt); return; }  // respawn fica no server
-    if (bossDeathTime !== null && Date.now() - bossDeathTime >= BOSS_RESPAWN_MS){
-        spawnBossAndLair(); bossDeathTime = null;
-        log('<span class="log-up">⚔ O Orc Líder reapareceu!</span>');
-    }
-    if (drakeBossDeathTime !== null && Date.now() - drakeBossDeathTime >= DUNGEON_BOSS_RESPAWN_MS){
-        spawnDrakeBoss(); drakeBossDeathTime = null;
-        log('<span class="log-up">🔥 O Drake Ancião reapareceu no Covil!</span>');
-    }
-    if (golemBossDeathTime !== null && Date.now() - golemBossDeathTime >= DUNGEON_BOSS_RESPAWN_MS){
-        spawnGolemBoss(); golemBossDeathTime = null;
-        log('<span class="log-up">🪨 O Golem Rei reapareceu no Abismo!</span>');
-    }
     tickHighlanderHunt(dt);
-    respawnTimer += dt;
-    if (respawnTimer < RESPAWN_INTERVAL) return;
-    respawnTimer = 0;
-    let spawned = 0;
-    // Anéis externos
-    const counts = countByRing();
-    const deficits = SPAWN_RINGS
-        .map(r => ({ ring: r, deficit: r.target - counts.get(r) }))
-        .filter(d => d.deficit > 0)
-        .sort((a,b) => (b.deficit/b.ring.target) - (a.deficit/a.ring.target));
-    for (const d of deficits){
-        if (spawned >= RESPAWN_PER_TICK) break;
-        if (trySpawnInRing(d.ring, { offscreen: true, minDistFromPlayer: 4 })) spawned++;
-    }
-    // Cavernas
-    const cCounts = countByCave();
-    const cDef = CAVES
-        .map(cv => ({ cave: cv, deficit: cv.target - cCounts.get(cv) }))
-        .filter(d => d.deficit > 0)
-        .sort((a,b) => (b.deficit/b.cave.target) - (a.deficit/a.cave.target));
-    for (const d of cDef){
-        if (spawned >= RESPAWN_PER_TICK) break;
-        if (trySpawnInCave(d.cave)) spawned++;
-    }
-    // Biomas
-    const bCounts = countByBiome();
-    const bDef = BIOME_SPAWNS
-        .map(b => ({ biome: b, deficit: b.target - bCounts.get(b) }))
-        .filter(d => d.deficit > 0)
-        .sort((a,b) => (b.deficit/b.biome.target) - (a.deficit/a.biome.target));
-    for (const d of bDef){
-        if (spawned >= RESPAWN_PER_TICK) break;
-        if (trySpawnInBiome(d.biome, { offscreen: true, minDistFromPlayer: 4 })) spawned++;
-    }
 }
 
 function drawMonster(m, px, py){
@@ -4275,146 +3976,6 @@ function drawMonster(m, px, py){
 }
 
 // Escolhe a casa adjacente ao player mais perto deste monstro (cerca + fan-out)
-function pickSurroundSlot(m){
-    const intel = m.intel || 1;
-    const slots = [];
-    for (let dy = -1; dy <= 1; dy++){
-        for (let dx = -1; dx <= 1; dx++){
-            if (!dx && !dy) continue;
-            const x = player.x + dx, y = player.y + dy;
-            if (x<=0 || y<=0 || x>=M_W-1 || y>=M_H-1) continue;
-            if (!walkable(map[y][x])) continue;
-            if (inSafeZone(x, y)) continue;
-            const occ = monsterAt(x, y);
-            if (occ && occ !== m) continue;
-            const d = Math.max(Math.abs(m.x - x), Math.abs(m.y - y));
-            let score = d;
-            // Intel 2+: penaliza vagas próximas a outros mobs aggro (espalha)
-            if (intel >= 2){
-                let cluster = 0;
-                for (const om of monsters){
-                    if (om === m || !om.aggro || om.hp <= 0) continue;
-                    const od = Math.max(Math.abs(om.x - x), Math.abs(om.y - y));
-                    if (od <= 1) cluster++;
-                }
-                score += cluster * 0.8;
-            }
-            // Intel 3: flanco — prefere lado oposto ao que player está olhando
-            if (intel >= 3){
-                const back = {'up':[0,1],'down':[0,-1],'left':[1,0],'right':[-1,0]}[player.dir] || [0,0];
-                // se o slot está atrás do player, dá bônus negativo (preferido)
-                if (Math.sign(dx) === back[0] && Math.sign(dy) === back[1]) score -= 2.0;
-                else if (Math.sign(dx) === back[0] || Math.sign(dy) === back[1]) score -= 0.8;
-            }
-            // Tiebreak determinístico por id
-            const tiebreak = ((m.id * 31 + dx * 7 + dy * 11) % 100) / 1000;
-            slots.push({ x, y, score: score + tiebreak });
-        }
-    }
-    if (!slots.length) return null;
-    slots.sort((a,b) => a.score - b.score);
-    return slots[0];
-}
-
-// IA dos monstros (skip quando server-autoritativo — mob só anima localmente)
-function updateMonster(m, dt){
-    if (serverAuthMobs) return;
-    // DoT ticks (veneno/sangra/fogo). Pode matar o mob.
-    if (tickMobDots(m, Date.now())) return;
-    m.moveTimer  = Math.max(0, m.moveTimer-dt);
-    m.attackTimer = Math.max(0, m.attackTimer-dt);
-    const distChase = Math.abs(m.x-player.x)+Math.abs(m.y-player.y);
-    const distHit   = melee(m, player);
-
-    // Aggro: range maior, esquece se player muito longe OU dentro da PZ ou perto de NPC
-    const safeNow = playerInSafeZone() || playerNearNpcMiniPZ();
-    if (safeNow) m.aggro = false;
-    else if (distChase <= 10) m.aggro = true;
-    else if (distChase > 22) m.aggro = false;
-
-    if (m.attackTimer<=0 && distHit<=1 && !safeNow){
-        damagePlayer(m.dmg, m.name, m);
-        m.attackTimer = 1200;
-    }
-
-    if (m.moveTimer>0) return;
-
-    // Helper: tenta um deslocamento; retorna true se moveu
-    const tryMove = (dx, dy) => {
-        if (!dx && !dy) return false;
-        const nx = m.x + dx, ny = m.y + dy;
-        if (nx<=0 || ny<=0 || nx>=M_W-1 || ny>=M_H-1) return false;
-        if (!walkable(map[ny][nx])) return false;
-        if (monsterAt(nx, ny)) return false;
-        if (nx===player.x && ny===player.y) return false;
-        if (inSafeZone(nx, ny)) return false;
-        m.prevX = m.x; m.prevY = m.y;
-        m.x = nx; m.y = ny;
-        m.moveDuration = (dx && dy) ? m.speed * 1.5 : m.speed;
-        m.moveProgress = 0;
-        m.dir = dx>0?'right':dx<0?'left':dy>0?'down':'up';
-        return true;
-    };
-
-    if (m.aggro && distHit > 1){
-        // Intel 1 (burro): vai direto pro player, faz fila
-        // Intel 2+ (cerca/flanco): pega vaga adjacente otimizada
-        let tx, ty;
-        if (m.intel >= 2){
-            const slot = pickSurroundSlot(m);
-            tx = slot ? slot.x : player.x;
-            ty = slot ? slot.y : player.y;
-        } else {
-            tx = player.x; ty = player.y;
-        }
-        const ddx = tx - m.x, ddy = ty - m.y;
-        const sx = ddx > 0 ? 1 : ddx < 0 ? -1 : 0;
-        const sy = ddy > 0 ? 1 : ddy < 0 ? -1 : 0;
-        // Prioridade: diagonal direta → eixo dominante → secundário → diagonais alternativas
-        const moves = [];
-        if (sx && sy) moves.push([sx, sy]);              // diagonal direta
-        if (Math.abs(ddx) >= Math.abs(ddy)){
-            if (sx) moves.push([sx, 0]);
-            if (sy) moves.push([0, sy]);
-        } else {
-            if (sy) moves.push([0, sy]);
-            if (sx) moves.push([sx, 0]);
-        }
-        // Fallbacks diagonais quando um eixo é zero (contorna obstáculo)
-        if (sx && !sy) moves.push([sx, 1], [sx, -1], [0, 1], [0, -1]);
-        if (sy && !sx) moves.push([1, sy], [-1, sy], [1, 0], [-1, 0]);
-        let moved = false;
-        for (const [dx, dy] of moves){ if (tryMove(dx, dy)){ moved = true; break; } }
-        // Diagonal custa 1.4× tempo (mesma lógica do player)
-        const wasDiag = moved && Math.abs(sx) === 1 && Math.abs(sy) === 1;
-        m.moveTimer = m.speed * (moved ? (wasDiag ? 1.2 : 0.85) : 0.6);
-        // Anti-kite: mobs intel≥2 e bosses sprintam quando perseguindo a distância
-        // (counter pra spear/arco; ratos e cobras ficam dumb como antes)
-        if (distChase > 1 && (m.intel >= 2 || m.unique)){
-            m.moveTimer *= 0.6;
-        }
-    } else if (!m.aggro){
-        // Se está longe de casa (spawn), volta. Senão, vagueia leve.
-        const dxh = m.wanderX - m.x, dyh = m.wanderY - m.y;
-        const distHome = Math.max(Math.abs(dxh), Math.abs(dyh));
-        if (distHome > 6 && Math.random() < 0.7){
-            const sx = dxh > 0 ? 1 : dxh < 0 ? -1 : 0;
-            const sy = dyh > 0 ? 1 : dyh < 0 ? -1 : 0;
-            const dominant = Math.abs(dxh) >= Math.abs(dyh);
-            const moves = dominant ? [[sx,0],[0,sy]] : [[0,sy],[sx,0]];
-            for (const [dx,dy] of moves){ if (tryMove(dx,dy)) break; }
-        } else if (Math.random() < 0.3){
-            const d = Math.floor(Math.random()*4);
-            const dx = d===2 ? -1 : d===3 ? 1 : 0;
-            const dy = d===0 ? -1 : d===1 ? 1 : 0;
-            tryMove(dx, dy);
-        }
-        m.moveTimer = m.speed;
-    } else {
-        m.moveTimer = m.speed;
-    }
-}
-
 function monsterAt(x,y){
     return monsters.find(m => m.hp>0 && m.x===x && m.y===y);
 }
@@ -4449,25 +4010,6 @@ function applyMobDot(m, type, spec){
     } else {
         m.dots.push({ type, dmg: spec.dmg, ticksLeft: spec.ticks, nextTickAt: Date.now() + DOT_INTERVAL_MS });
     }
-}
-// Roda os ticks de DoT do mob. Retorna true se o mob morreu por DoT.
-function tickMobDots(m, now){
-    if (!m.dots || !m.dots.length) return false;
-    for (let i = m.dots.length - 1; i >= 0; i--){
-        const d = m.dots[i];
-        if (now < d.nextTickAt) continue;
-        const dmg = d.dmg;
-        m.hp = Math.max(0, m.hp - dmg);
-        addFloat(m.x, m.y, `-${dmg}`, DOT_COLOR[d.type] || '#aaa', false);
-        d.ticksLeft--;
-        if (d.ticksLeft <= 0) m.dots.splice(i, 1);
-        else d.nextTickAt = now + DOT_INTERVAL_MS;
-        if (m.hp === 0){
-            if (!serverAuthMobs) killMonster(m);
-            return true;
-        }
-    }
-    return false;
 }
 // Tenta aplicar os procs do weapon equipado contra mob (chama applyMobDot
 // pra cada status disponível com roll). Retorna lista de procs aplicados.
@@ -4625,41 +4167,6 @@ function snapshotDeathReplay(){
     player._lastDeathReplay = _deathReplayBuffer.slice();
     _deathReplayBuffer = [];
 }
-function damagePlayer(amount, source, attacker){
-    if (_isUpdating) return;   // janela de auto-update — combate pausado
-    // Marca último atacante pra spectator pós-morte
-    if (attacker && attacker.id != null){
-        _lastHitBy = { kind: 'mob', id: attacker.id, name: attacker.name || source || 'mob' };
-    } else if (source){
-        _lastHitBy = { kind: 'mob', id: null, name: source };
-    }
-    if (Math.random() < playerDodgeChance()){
-        log(`<span class="log-sys">Você esquivou de ${source}.</span>`);
-        gainSkillXpLocal('Escudo', 1);
-        return;
-    }
-    const crit = attacker && Math.random() < (attacker.crit || 0);
-    let raw = amount;
-    if (crit) raw *= 2;
-    // Defesa percentual (diminishing returns): def/(def+30). 30=50%, 60=67%, 90=75%
-    const def = totalDefense();
-    const reduction = def > 0 ? def / (def + 30) : 0;
-    const actual  = Math.max(1, Math.round(raw * (1 - reduction)));
-    const blocked = raw - actual;
-    player.hp = Math.max(0, player.hp - actual);
-    sndDmg();
-    addFloat(player.x, player.y, `-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
-    player.hurtTimer = crit ? 450 : 300;
-    recordReplay('hit', `${crit?'★ ':''}${source}: -${actual}`, crit ? '#ff6020' : '#ff3030');
-    const dt = blocked > 0 ? ` (${blocked} bloq · ${Math.round(reduction*100)}%)` : '';
-    log(`<span class="log-dmg">⚠ ${crit?'★ ':''}${source}: ${actual}${dt}</span>`);
-    // Skill Escudo só treina se realmente está usando um (server credita em MP)
-    if (hasShield()) gainSkillXpLocal('Escudo', 1);
-    // Status effects do atacante
-    rollAttackerStatus(attacker ? attacker.type : null);
-    if (player.hp === 0) playerDie();
-}
-
 // Centraliza as regras de status: cada mob tem chance/efeito ao bater
 function rollAttackerStatus(mobType){
     // Fase 5: server roda applyAttackerStatus em tickAI mob attack. Cliente
@@ -4836,7 +4343,15 @@ let _overworldVisited = null;   // guarda o fog do overworld enquanto na masmorr
 function enterDungeonClient(msg){
     const fromFloor = (player.floor || 0);
     player.floor = msg.floor || 1;
-    map = genDungeonFloor(player.floor);            // troca o grid ativo
+    if (msg.grid){
+        map = buildDungeonMapFromGrid(msg.grid);    // layout procedural do server (fonte da verdade)
+        dungeonStairs = { up: (msg.stairs && msg.stairs.up) || null, down: (msg.stairs && msg.stairs.down) || null };
+    } else {
+        // Fallback (server antigo, sem grid): sala fixa 40-60 + escadas em x=50 — sobrevive à janela de deploy.
+        map = genDungeonFloor(player.floor);
+        dungeonStairs = { up: { x:50, y:50 }, down: player.floor < 5 ? { x:50, y:57 } : null };
+    }
+    _lastStairTrigger = 0;   // zera debounce: escadas mudam de coord por andar, não carrega trigger entre andares
     player.x = msg.x; player.y = msg.y;
     player.renderX = msg.x; player.renderY = msg.y;
     player.prevX = msg.x; player.prevY = msg.y;
@@ -4859,6 +4374,8 @@ function enterDungeonClient(msg){
 function exitDungeonClient(msg){
     player.floor = 0;
     map = overworldMap;                             // restaura o overworld
+    dungeonStairs = { up: null, down: null };       // limpa escadas do andar (estado não fica mentiroso na cidade)
+    _lastStairTrigger = 0;
     player.x = msg.x; player.y = msg.y;
     player.renderX = msg.x; player.renderY = msg.y;
     player.prevX = msg.x; player.prevY = msg.y;
@@ -4874,61 +4391,9 @@ function exitDungeonClient(msg){
     log('<span class="log-sys">Você voltou à superfície.</span>');
 }
 
-function killMonster(m){
-    const idx = monsters.indexOf(m);
-    if (idx>=0) monsters.splice(idx,1);
-    statsRecordMobKill(m.type, m.unique);
-    notifyMobKilledForQuests(m.type);
-    sndKill();
-    log(`<span class="log-kill">Você matou ${m.name}</span>`);
-    // drops
-    const before = groundItems.length;
-    rollDrops(m.type, m.x, m.y);
-    const dropped = groundItems.slice(before);
-    if (dropped.length){
-        const txt = dropped.map(d => `${d.qty}× ${ITEMS[d.type].name}`).join(', ');
-        log(`<span class="log-xp">Dropou: ${txt}</span>`);
-    }
-    if (player.target === m.id){
-        player.target = null;
-    }
-    if (m.type === 'ORC_LIDER'){
-        bossDeathTime = Date.now();
-        log(`<span class="log-up">⚔ Orc Líder caiu! Volta em 5 min.</span>`);
-    }
-    if (m.type === 'DRAKE_LIDER'){
-        drakeBossDeathTime = Date.now();
-        log(`<span class="log-up">🔥 Drake Ancião abatido! Volta em 8 min.</span>`);
-    }
-    if (m.type === 'GOLEM_REI'){
-        golemBossDeathTime = Date.now();
-        log(`<span class="log-up">🪨 Golem Rei destruído! Volta em 8 min.</span>`);
-    }
-    saveState();
-}
 
 // Distância Chebyshev = melee (8 tiles em volta, incluindo diagonais)
 const melee = (a, b) => Math.max(Math.abs(a.x-b.x), Math.abs(a.y-b.y));
-
-function attack(){
-    if (player.attackTimer > 0) return;
-    if (isStunned()) return;
-    // alvo na direção que está olhando
-    let tx = player.x, ty = player.y;
-    if (player.dir==='up') ty--; else if (player.dir==='down') ty++;
-    else if (player.dir==='left') tx--; else tx++;
-    let m = monsterAt(tx,ty);
-    if (!m){
-        // qualquer um nos 8 tiles ao redor
-        for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){
-            if (!dx && !dy) continue;
-            const c = monsterAt(player.x+dx, player.y+dy);
-            if (c){ doAttack(c); return; }
-        }
-        return;
-    }
-    doAttack(m);
-}
 
 // Se nada equipado, luta com Punho (base 3, sobe skill Punho).
 const PUNHO = { skill:'Punho', base:2 };
@@ -5745,12 +5210,9 @@ function throwSpear(){
         addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#cce0a0', crit, crit ? -10 : 0);
         log(`<span class="log-dmg">${crit?'★ ':''}${wItem.name} arremessada: -${dmg} em ${m.name}</span>`);
         gainSkillXpLocal('Distância', 1);
-        if (serverAuthMobs && ws && ws.readyState === 1){
+        if (ws && ws.readyState === 1){
             // server aplica dano + consome a lança equipada (throwSpear:true)
             ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit, throwSpear:true }));
-        } else {
-            m.hp = Math.max(0, m.hp - dmg);
-            if (m.hp === 0) killMonster(m);
         }
     }
     // projétil rotacionado
@@ -5866,13 +5328,9 @@ function doAttack(m){
         player.attackTimer = effectiveAttackDelay();
         // DoT procs (veneno/sangra/fogo do weapon +N)
         const procsR = rollWeaponStatusOnMob(wItem, m);
-        if (serverAuthMobs && ws && ws.readyState === 1){
+        if (ws && ws.readyState === 1){
             ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
             player.target = m.id; m.aggro = true;
-        } else {
-            m.hp = Math.max(0, m.hp - dmgR);
-            if (m.hp === 0) killMonster(m);
-            else { player.target = m.id; m.aggro = true; }
         }
         return;
     }
@@ -5911,15 +5369,11 @@ function doAttack(m){
     player.attackTimer = effectiveAttackDelay();
     // DoT procs do weapon equipado (veneno/sangra/fogo)
     const procs = rollWeaponStatusOnMob(wItem, m);
-    if (serverAuthMobs && ws && ws.readyState === 1){
+    if (ws && ws.readyState === 1){
         // Lança 1H tem meleeRange (até 3 sqm); demais armas melee usam 1
         const attackRange = (wItem && wItem.meleeRange) || 1;
         ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:attackRange, crit, dots: procs }));
         player.target = m.id; m.aggro = true;
-    } else {
-        m.hp = Math.max(0, m.hp - dmg);
-        if (m.hp===0) killMonster(m);
-        else { player.target = m.id; m.aggro = true; }
     }
 }
 
@@ -5934,38 +5388,8 @@ function armorHpRegenBonus(){
     return bonus;
 }
 function tickRegen(dt){
-    // T2: regen autoritativo no server quando online (`serverAuthMobs && _wsAuthed`).
-    // Server broadcasta pstats com hp/mp atualizado — cliente só renderiza.
-    // manaBuff (POTION_MP que dá +80 MP em 10s) ainda é local pra UI snappy
-    // — não é vetor crítico, e o cap em maxMp é validado server-side a cada pstats.
-    const serverRegenActive = (typeof serverAuthMobs !== 'undefined' && serverAuthMobs) && _wsAuthed;
-    if (!serverRegenActive){
-        // Offline / single-player: regen local (lógica antiga)
-        if (typeof document !== 'undefined' && document.hidden){
-            player.hpRegenTimer = 0;
-            player.mpRegenTimer = 0;
-        } else {
-            player.hpRegenTimer += dt;
-            player.mpRegenTimer += dt;
-            const m = pvpMults();
-            const inPz = playerInSafeZone();
-            const pzHp = inPz ? 4 : 1;
-            const pzMp = inPz ? 3 : 1;
-            const hpInterval = 4000 / (m.regenHp * pzHp);
-            const mpInterval = 2000 / (m.regenMp * pzMp);
-            const talentRegen = player.permaBuffs?.regenBonus || 0;
-            if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
-                const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0) + talentRegen;
-                player.hp = Math.min(player.maxHp, player.hp + heal);
-                player.hpRegenTimer = 0;
-            }
-            if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
-                const mpGain = (inPz ? 2 : 1) + talentRegen;
-                player.mp = Math.min(player.maxMp, player.mp + mpGain);
-                player.mpRegenTimer = 0;
-            }
-        }
-    }
+    // Regen de HP/MP é autoritativo no server: ele broadcasta pstats com hp/mp
+    // atualizado e o cliente só renderiza (mutação local some no próximo snapshot).
     // Pot de mana: UI-only countdown. MP é aplicado pelo server (tickPlayerRegen) e chega
     // via broadcastPstatsAll, então o cliente NÃO soma local pra evitar conflito com lockdown.
     if (player.manaBuff && player.manaBuff.life > 0){
@@ -6183,6 +5607,7 @@ function handleMP(msg){
         if ((player.floor || 0) !== 0){
             player.floor = 0;
             map = overworldMap;
+            dungeonStairs = { up: null, down: null };   // reconectou na cidade: não carrega escadas do andar antigo
             if (_overworldVisited){ player.visited = _overworldVisited; _overworldVisited = null; }
             player.target = null; player.autoAttack = false;
             // PvP foi FORÇADO na masmorra. Ao voltar pra cidade por reconexão (e não
@@ -6336,14 +5761,6 @@ function handleMP(msg){
             _dailyEvent = null;
         }
         renderDailyEventWidget();
-    } else if (msg.t === 'eventReward'){
-        // Legacy: server antigo enviava { kind:'gold', amount } e cliente somava.
-        // Nova versão usa invUpdate.goldDelta (reason:'gold_rain') como fonte única.
-        // Mantém o handler só pra retro-compat: apenas feedback visual, NÃO soma gold.
-        if (msg.kind === 'gold' && typeof msg.amount === 'number'){
-            addFloat(player.x, player.y, '+' + msg.amount + 'g', '#ffcc40', false, -28);
-            log(`<span class="log-up">💰 Chuva de Ouro: +${msg.amount}g</span>`);
-        }
     } else if (msg.t === 'invUpdate'){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
@@ -8031,33 +7448,11 @@ function startStage(chainId, stage){
     saveState();
 }
 function completeStage(chainId, stage){
-    // N3 fase 3: online → server valida + aplica reward. Cliente só dispara intent.
+    // N3 fase 3: server valida + aplica o reward. Cliente só dispara o intent.
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id })); } catch {}
         log(`<span class="log-sys">Entregando: ${stage.name}…</span>`);
-        return;
     }
-    // Offline fallback (single-player)
-    if (stage.kind === 'item'){
-        const have = player.inv[stage.type] || 0;
-        const take = Math.min(have, stage.count);
-        player.inv[stage.type] = have - take;
-        if (player.inv[stage.type] <= 0) delete player.inv[stage.type];
-        invSignature = null;
-    } else if (stage.kind === 'multiItem'){
-        for (const [k, n] of Object.entries(stage.items)){
-            const have = player.inv[k] || 0;
-            const take = Math.min(have, n);
-            player.inv[k] = have - take;
-            if (player.inv[k] <= 0) delete player.inv[k];
-        }
-        invSignature = null;
-    }
-    applyReward(stage.reward, chainId);
-    player.questFlags[chainId][stage.id] = true;
-    log(`<span class="log-up">★ Etapa concluída: ${stage.name}</span>`);
-    if (typeof showServerToast === 'function') showServerToast('event', `★ ${stage.name}`, null, 4000);
-    saveState();
 }
 function applyReward(reward, chainId){
     if (!reward) return;
@@ -9349,9 +8744,9 @@ function renderBossesWidget(){
     const el = document.getElementById('bossesWidget');
     if (!el) return;
     const list = [
-        { type:'ORC_LIDER',   name:'Orc Líder',     deathT: (typeof bossDeathTime!=='undefined'?bossDeathTime:null),         respawn: BOSS_RESPAWN_MS },
-        { type:'DRAKE_LIDER', name:'Drake Ancião',  deathT: (typeof drakeBossDeathTime!=='undefined'?drakeBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
-        { type:'GOLEM_REI',   name:'Golem Rei',     deathT: (typeof golemBossDeathTime!=='undefined'?golemBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
+        { type:'ORC_LIDER',   name:'Orc Líder',     deathT: null, respawn: 0 },
+        { type:'DRAKE_LIDER', name:'Drake Ancião',  deathT: null, respawn: 0 },
+        { type:'GOLEM_REI',   name:'Golem Rei',     deathT: null, respawn: 0 },
     ];
     el.innerHTML = list.map(b => {
         const aliveMob = monsters.find(m => m.type === b.type);
@@ -10918,13 +10313,9 @@ function castSpell(spellKey){
             if (!hasLineOfSight(player.x, player.y, m.x, m.y)) continue;   // explosão não passa parede
             let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
             dmg = Math.max(1, Math.floor(dmg * buffMult().dmg));
-            if (serverAuthMobs && ws && ws.readyState === 1){
+            if (ws && ws.readyState === 1){
                 ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false }));
                 m.aggro = true;
-            } else {
-                m.hp = Math.max(0, m.hp - dmg);
-                if (m.hp === 0) killMonster(m);
-                else m.aggro = true;
             }
             addFloat(m.x, m.y, `-${dmg}`, sp.glow, true);
             hits++;
@@ -11056,19 +10447,12 @@ function castSpell(spellKey){
         life: 0, duration: sp.projType === 'beam' ? Math.max(80, dist * 18) : Math.max(120, dist * 35),
     });
     gainMagiaXp(spellKey, 1);   // → spellCast (mana + XP de Magia, server-side)
-    if (serverAuthMobs && ws && ws.readyState === 1){
-        // Online: server é autoritativo no dano/morte/loot (igual EXORI/doAttack). O dano
-        // de magia é processado via attackMob (vide handler spellCast: "dmg é processado em
-        // attackMob/aoe"). Sem este guard, o killMonster local criava "mob zumbi" (server
-        // seguia com o mob vivo) e o dano local sumia no próximo snapshot — FIREBALL/RAIO
-        // não causavam dano real online.
+    if (ws && ws.readyState === 1){
+        // Server é autoritativo no dano/morte/loot. O dano de magia é processado
+        // via attackMob (vide handler spellCast).
         ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false }));
         m.aggro = true;
         log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name}</span>`);
-    } else {
-        m.hp = Math.max(0, m.hp - dmg);
-        log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
-        if (m.hp === 0) killMonster(m);
     }
 }
 
@@ -11827,9 +11211,9 @@ function handleMovement(dt){
 
 // M4: pisar na escada dispara a transição de andar (server valida adjacência).
 // Debounce 1.2s pra não re-disparar enquanto o server processa/teleporta.
+// Entrada é fixa (Antro); subida/descida do andar são PROCEDURAIS (dungeonStairs,
+// recebidas do server no dungeonEnter — variam por andar, M4 3b).
 const DUNGEON_STAIR_IN   = { x: 83, y: 17 };   // entrada no Antro do Minotauro (bate com DUNGEON_ENTRANCE do server)
-const DUNGEON_STAIR_UP   = { x: 50, y: 50 };   // escada de SUBIDA no andar (bate com DUNGEON_EXIT do server)
-const DUNGEON_STAIR_DOWN = { x: 50, y: 57 };   // escada de DESCIDA no andar (bate com DUNGEON_DOWN do server)
 const DUNGEON_MAX_FLOOR_C = 5;                 // último andar sem escada de descida (bate com DUNGEON_MAX_FLOOR)
 let _lastStairTrigger = 0;
 function checkDungeonStairs(x, y){
@@ -11843,10 +11227,11 @@ function checkDungeonStairs(x, y){
             try { ws.send(JSON.stringify({ t:'enterDungeon' })); } catch {}
         }
     } else {
-        if (x === DUNGEON_STAIR_UP.x && y === DUNGEON_STAIR_UP.y){
+        const up = dungeonStairs.up, down = dungeonStairs.down;   // escadas procedurais do andar (do server)
+        if (up && x === up.x && y === up.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}     // sobe 1 andar
-        } else if (f < DUNGEON_MAX_FLOOR_C && x === DUNGEON_STAIR_DOWN.x && y === DUNGEON_STAIR_DOWN.y){
+        } else if (f < DUNGEON_MAX_FLOOR_C && down && x === down.x && y === down.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'descendDungeon' })); } catch {}   // desce 1 andar
         }
@@ -13379,7 +12764,6 @@ function logout(){
     floatTexts.length = 0;
     Object.keys(remotePlayers).forEach(k => delete remotePlayers[k]);
     if (ws){ try { ws.close(); } catch{} ws = null; }
-    bossDeathTime = null;
     // reset do player ao baseline (próximo login carrega só o que tiver save)
     Object.assign(player, {
         x: spawn.x, y: spawn.y,
@@ -13476,21 +12860,9 @@ function startGame(multiplayer, name){
     buildSkillList();
     ensureVisited();
     revealAround(player.x, player.y);
-    if (multiplayer){
-        // Não spawna local — espera snapshot do server (sem flicker)
-        showLoadingOverlay(true);
-        connectMP();
-        // Fallback: se WS não responder em 6s, gera mundo local
-        setTimeout(() => {
-            if (!serverAuthMobs && monsters.length === 0){
-                log('<span class="log-sys">Servidor lento — gerando mundo local.</span>');
-                spawnInitialMonsters();
-                showLoadingOverlay(false);
-            }
-        }, 6000);
-    } else {
-        spawnInitialMonsters();
-    }
+    // Mundo é 100% server-side: espera o snapshot do server (sem flicker local).
+    showLoadingOverlay(true);
+    connectMP();
     log('<span class="log-sys">Bem-vindo a Valadares, '+player.name+'!</span>');
     if (restored) log('<span class="log-sys">Progresso restaurado.</span>');
     log('Use WASD para mover, ESPAÇO para atacar.');
@@ -13835,7 +13207,6 @@ function loop(ts){
     updateAmbient();
     tickStatusEffects();
     tickTraining(dt);
-    monsters.forEach(m => updateMonster(m, dt));
     // interpolação visual (depois das mudanças de pos)
     tickRender(player, dt);
     monsters.forEach(m => tickRender(m, dt));
@@ -13932,6 +13303,15 @@ function loop(ts){
                 drawTile(map[my][mx], sx, sy, mx, my);
             }
         }
+
+    // M4 3b: tonalidade por profundidade — quanto mais fundo, mais escura/fria a
+    // caverna. Overlay só sobre o TERRENO (entidades são desenhadas depois → seguem
+    // legíveis, efeito de pouca luz). andar 1 ~0.06 → andar 5 ~0.42.
+    if ((player.floor || 0) >= 1){
+        const a = Math.min(0.42, 0.06 + ((player.floor || 1) - 1) * 0.09);
+        ctx.fillStyle = `rgba(6, 4, 20, ${a})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     // 4 Baús do DP (só na cidade — no andar da masmorra não existem)
     const nearC = nearestChest();
@@ -14214,8 +13594,8 @@ function loop(ts){
     }
 
     // M4: escadas da masmorra. Overworld (floor 0): entrada descendo no Antro do
-    // Minotauro (83,17). Andar N: escada de SUBIDA (50,50) + DESCIDA (50,57, exceto
-    // no último andar). Buraco escuro com degraus; label/glow ao aproximar.
+    // Minotauro (83,17). Andar N: subida + descida PROCEDURAIS (dungeonStairs, do
+    // server; descida ausente no último andar). Buraco escuro com degraus; label/glow ao aproximar.
     {
         const onFloor = (player.floor || 0);
         const drawStair = (stair, descending, label) => {
@@ -14243,8 +13623,8 @@ function loop(ts){
         if (onFloor === 0){
             drawStair(DUNGEON_STAIR_IN, true, '⬇ As Profundezas');
         } else {
-            drawStair(DUNGEON_STAIR_UP, false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
-            if (onFloor < DUNGEON_MAX_FLOOR_C) drawStair(DUNGEON_STAIR_DOWN, true, '⬇ Descer');
+            if (dungeonStairs.up) drawStair(dungeonStairs.up, false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
+            if (onFloor < DUNGEON_MAX_FLOOR_C && dungeonStairs.down) drawStair(dungeonStairs.down, true, '⬇ Descer');
         }
     }
 
@@ -14401,6 +13781,23 @@ function loop(ts){
     // vignette
     ctx.fillStyle = vigGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // M4 3b: indicador de andar (só na masmorra) — pill no topo-centro, sempre
+    // visível (independe do painel lateral, que some no mobile).
+    if ((player.floor || 0) >= 1){
+        const label = `⛏ AS PROFUNDEZAS · Andar ${player.floor}/${DUNGEON_MAX_FLOOR_C}`;
+        ctx.save();
+        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const w = ctx.measureText(label).width + 26, cx = canvas.width / 2, py = 17;
+        ctx.fillStyle = 'rgba(10, 8, 20, 0.78)';
+        ctx.fillRect(cx - w/2, py - 12, w, 24);
+        ctx.strokeStyle = 'rgba(180, 120, 220, 0.7)'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(cx - w/2, py - 12, w, 24);
+        ctx.fillStyle = '#ecdcff';
+        ctx.fillText(label, cx, py + 1);
+        ctx.restore();
+    }
 
     drawMinimap();
 

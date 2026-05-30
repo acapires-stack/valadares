@@ -5,15 +5,17 @@
 
 ---
 
-## 🟢 Estado em 28/05/2026
+## 🟢 Estado em 30/05/2026
 
 - Cliente: https://valadares.app.br/jogar (Vercel)
 - Server WS: wss://ws.valadares.app.br (Railway, Volume `/data`)
 - Electron desktop: v1.0.3 (auto-update via electron-updater)
 - Monetização: MercadoPago Checkout Pro (PIX + Cartão)
-- Anti-cheat: lockdown N3 FULL — gold/inv/equipped/chests/skills/hp/mp 100% server-side
-- Auth: email + reset de senha (Resend)
-- Mobile playable, season system, talent tree
+- Anti-cheat: lockdown N3 FULL — gold/inv/equipped/chests/skills/hp/mp 100% server-side; save com trava anti-wipe + escrita atômica + backups rotativos
+- Auth: email + reset de senha (Resend); hash **scrypt** (salt por conta, rehash transparente no login)
+- Personagem: crit/esquiva base **1,5%** / teto TOTAL **25%**, valendo em PvE (mob critando + esquiva server-side)
+- Mobile playable, season system, talent tree, masmorra M4 (5 andares + boss)
+- Admins in-game: `alcione`, `claude` (`ADMIN_NAMES`)
 
 ---
 
@@ -42,12 +44,16 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 
 > **✅ 30/05 deployado:** re-claim daily (server-autoritativo + cap 3/dia), hash scrypt (salt por conta + rehash transparente), rate-limits (pos 40ms/pix 3s), `_errorRateMap` leak (IP real XFF + TTL), float/guild caps, isAdmin por flag/env, castSpell guard (FIREBALL/RAIO online), train/spell/talent → toast. **Deferido:** remover offline (~500 linhas) + sends de protocolo residuais (precisam validar contra server vivo), M4 3b. Detalhes no `SESSION_NOTES.md` (30/05). O bloco abaixo é o histórico 29/05.
 
+> **🔴 30/05 (cont.) — INCIDENTE + blindagem (`7c97deb` + `2e616c8`):** deploy direto com dono online (sem `/manutencao`) → sessão fantasma gravou save vazio → conta `alcione` zerada (itens irrecuperáveis). **Blindagem deployada:** trava anti-wipe no `saveUpload` (vazio nunca sobrescreve cheio), matar sessão dupla por `authedName` no auth, persistência atômica do `accounts.json` (tmp+rename + 24 backups rotativos + load com fallback), `/manutencao` agora DESLOGA todos, restauração admin (`/allowrestore`). **Lição (em [[feedback-valadares-deploy]]):** NUNCA pushar `server/**` com player online. Detalhes no `SESSION_NOTES.md`.
+
+> **⚔️ 30/05 (cont.) — Rebalance do personagem (`dfe3f9f` + `9b948b6`):** crit base 1,5% / teto TOTAL 25%, esquiva base 1,5% / teto 25% (cap inclui talento/pvp). Bug corrigido: esquiva/crit do mob estavam MORTOS em PvE (`tickAI` só aplicava defesa) — agora espelha o cliente. Fix do bug de `permaBuffs`/flags grudados no localStorage ao trocar de conta sem reload (`applySaveData` resetava só com `if`, sem else). Vale pra TODOS no próximo login (fórmula ao vivo, sem migração).
+
 > **🔬 AUDITORIA COMPLETA DO JOGO (29/05) — relatório priorizado em [`docs/AUDITORIA_2026-05-29.md`](docs/AUDITORIA_2026-05-29.md).** Aplicado+deployado: 🔴 **lockdown do save** (`saveUpload` gravava gold/inv/skills do cliente as-is → forja PERSISTENTE; furava o lockdown N3 + a venda de gold) + 🟠 **maxPayload** (DoS). Pra revisar JUNTOS (com teste in-game): re-claim de daily, hash de senha fraco, rate-limits pos/pix, ~500 linhas de código offline, protocolo morto (trainResult/spellResult sem feedback), `RECIPES` dup index-sensitive, dead code. O `_errorRateMap leak` abaixo está coberto no relatório.
 
 - **✅ AUDITORIA COMPLETA (masmorra Fase 3) — FEITA 29/05.** Manual: os skills `/security-review`+`/code-review` só comparam o branch contra `origin/main`, e a Fase 3 já está shipada (`origin/main`==HEAD) → diff vazio. Achados: 🔴 **crítico** (dano client-side one-shotava o boss 5000hp e roubava 100% do loot via `damageBy` → `MAX_HIT_DMG=600` + rate-limit `ATTACK_MIN_INTERVAL_MS=200` no attackMob), 🟠 **médio** (alts parados em party farmavam loot do boss → só damager divide), 🟡 **baixo** deferido. Detalhes no `SESSION_NOTES.md`.
 - **🔧 Refactor de movimento/combate autoritativo (deferido, do audit)** — `p.x/y` (transição de andar) e `range`/cadência de ataque são client-trusted. Hoje mitigado por clamp de coords + `MAX_HIT_DMG` + rate-limit; o caminho definitivo é o server validar movimento e cadência por arma. Sistêmico — fora de hotfix.
 
-- **Same-player 2× simultâneo** (mobile + PC) cria 2 entries no `players` Map → state inconsistency
+- **✅ Same-player 2× simultâneo — FECHADO 30/05** (nova conexão derruba QUALQUER outra sessão da mesma conta por `authedName`; era a causa-raiz do wipe)
 - **✅ `_errorRateMap` leak — FECHADO 30/05** (IP real do XFF + TTL/evict de 5min)
 - **Algumas funções server-side assumem `p.inv` existe** — TypeError potencial em save legado
 - **broadcastMobs ainda usa full snapshot** quando muda — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo
@@ -69,7 +75,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] 🎯 EM ANDAMENTO (3a descida + 3c boss ✅; falta 3b procedural)
+**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] ✅ COMPLETO (3a descida + 3b procedural + 3c boss) — calibrar balanceamento pós-playtest
 > Decisão de design (29/05): NÃO instanciada. Insight do dono: instância
 > fechada = farm seguro = pay-to-win fácil num jogo PvP. Em vez disso,
 > masmorra aberta e mortal estilo Tibia — melhor loot, maior perigo (mobs
@@ -107,10 +113,18 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 4. ✅ **3c — Boss do andar 5** (RESOLVIDO 29/05, cae70b8): **O Senhor das
    Profundezas** (5000hp/110dmg, intel 3, spawn 50,42), loot top-tier por dano,
    respawna Lv1 fresco a cada delve (isolado do leveling dos bosses do mundo).
-5. 🎯 **3b — Geração procedural por andar** (PRÓXIMA SESSÃO): cada andar com
-   layout/sala diferente. Server precisa do **grid real** (hoje usa bounding box
-   fixo 40-60) pra spawn/colisão. Resolve as "escadas em linha" (posições por
-   andar). Polish: tonalidade por profundidade + indicador de andar.
+5. ✅ **3b — Geração procedural por andar** (RESOLVIDO 30/05): cada andar é uma
+   **caverna procedural** (cellular automata + flood-fill de conectividade) gerada
+   no **server** (`server/dungeon-gen.js`) e ENVIADA pro cliente no `dungeonEnter`
+   (fonte da verdade única — nada de replicar gerador nos 2 lados). Escadas/chegada/
+   boss posicionados em tiles acessíveis e variam por andar → resolve "escadas em
+   linha". Andar efêmero (seed nova a cada abertura). `spawnDungeonMobs`/`mobTileOk`/
+   transições usam o grid real (não mais a box 40-60). Gerador testado isolado
+   (25/25 conectividade OK). **Polish (30/05):** tonalidade por profundidade (overlay
+   por andar, só no terreno) + indicador de andar no canvas (pill topo-centro).
+   **Deferido:** validação de movimento server-side na caverna (player ainda
+   client-trusted, como o resto do jogo — vetor pré-existente); IA greedy pode
+   emperrar em caverna torta (pickSurroundSlot sem pathfinding real).
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (53,53) na PZ, 4 slots tingíveis com 12 cores
@@ -159,7 +173,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 - 28/05 tarde: privacy/terms, ranking público, cassino, fase 5.5 auth+email+reset
 - 28/05 ~13h+: pots curando (fix lockdown), party UX (right-click + modal), admin UI completo (`/deluser` `/checkuser` `/resetuser`), boneco repositionado, hardening de save (clamp x/y, force hp/mp server-side no save)
 
-> Histórico cronológico detalhado: `SESSION_NOTES.md` (sessão atual) e `docs/archive/sessions-pre-may28.md` (sessões anteriores).
+> Histórico cronológico detalhado: `SESSION_NOTES.md` (sessão atual) e `docs/archive/sessions-pre-may30.md` (sessões anteriores).
 
 ---
 
