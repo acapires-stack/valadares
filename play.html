@@ -2566,7 +2566,9 @@ function recipeGold(r){
     return itemGoldCost(r.out);
 }
 
-// Receitas: materiais consumidos + ouro pago à bancada
+// Receitas: materiais consumidos + ouro pago à bancada.
+// ⚠️ INDEX-SENSITIVE — o craft cruza por POSIÇÃO no array. Editar/reordenar aqui SEM
+// espelhar em server/server.js (e vice-versa) quebra o craft silenciosamente. Manter em sync.
 const RECIPES = [
     { out:'POTION',         in:{ SILK:2, ASA_MORCEGO:1 }, name:'Poção de vida' },
     { out:'POTION_MP',      in:{ SILK:3, ASA_MORCEGO:2 }, name:'Poção de mana' },
@@ -4902,7 +4904,6 @@ function killMonster(m){
         golemBossDeathTime = Date.now();
         log(`<span class="log-up">🪨 Golem Rei destruído! Volta em 8 min.</span>`);
     }
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'kill', id:m.id}));
     saveState();
 }
 
@@ -5875,7 +5876,7 @@ function doAttack(m){
         return;
     }
 
-    // MELEE (lógica antiga)
+    // MELEE — caminho ativo de corpo-a-corpo (online manda attackMob; offline aplica local)
     // Lança 1H com meleeRange > 1: exige linha de visão (sem atravessar parede)
     if (wItem && wItem.meleeRange > 1){
         const distM = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
@@ -6496,6 +6497,11 @@ function handleMP(msg){
         if (msg.quests && typeof msg.quests === 'object'){
             player.quests.active    = msg.quests.active    || {};
             player.quests.completed = msg.quests.completed || [];
+            // Daily: sincroniza só o `claimed` do server (anti-replay autoritativo) pra UI
+            // marcar a diária como entregue. list/progress seguem client-side.
+            if (msg.quests.daily && Array.isArray(msg.quests.daily.claimed) && player.quests.daily){
+                player.quests.daily.claimed = msg.quests.daily.claimed;
+            }
         }
         if (msg.questFlags && typeof msg.questFlags === 'object') player.questFlags = msg.questFlags;
         if (msg.flags && typeof msg.flags === 'object') player.flags = msg.flags;
@@ -11006,9 +11012,7 @@ function castSpell(spellKey){
     const crit = Math.random() < playerCritChance();
     if (crit) dmg *= 2;
     dmg = Math.floor(dmg * buffMult().dmg);
-    m.hp = Math.max(0, m.hp - dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : sp.glow, true, crit ? -10 : 0);
-    log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
     projectiles.push({
         x: player.renderX, y: player.renderY,
         startX: player.renderX, startY: player.renderY,
@@ -11017,8 +11021,21 @@ function castSpell(spellKey){
         beam: sp.projType === 'beam',
         life: 0, duration: sp.projType === 'beam' ? Math.max(80, dist * 18) : Math.max(120, dist * 35),
     });
-    gainMagiaXp(spellKey, 1);
-    if (m.hp === 0) killMonster(m);
+    gainMagiaXp(spellKey, 1);   // → spellCast (mana + XP de Magia, server-side)
+    if (serverAuthMobs && ws && ws.readyState === 1){
+        // Online: server é autoritativo no dano/morte/loot (igual EXORI/doAttack). O dano
+        // de magia é processado via attackMob (vide handler spellCast: "dmg é processado em
+        // attackMob/aoe"). Sem este guard, o killMonster local criava "mob zumbi" (server
+        // seguia com o mob vivo) e o dano local sumia no próximo snapshot — FIREBALL/RAIO
+        // não causavam dano real online.
+        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false }));
+        m.aggro = true;
+        log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name}</span>`);
+    } else {
+        m.hp = Math.max(0, m.hp - dmg);
+        log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
+        if (m.hp === 0) killMonster(m);
+    }
 }
 
 function tickAuras(dt){

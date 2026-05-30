@@ -102,7 +102,7 @@ const STATE_FILE = process.env.STATE_FILE_PATH || path.join(__dirname, 'state.js
 - [x] URL Railway funciona (`wss://valadares-production.up.railway.app`)
 - [x] Cliente apontando pra Railway em produção
 - [x] Commit + push pro GitHub
-- [x] **Deploy cliente no Vercel** — `valadares-xi.vercel.app` ✅
+- [x] **Deploy cliente no Vercel** — `valadares.app.br` ✅ (domínio antigo `valadares-xi.vercel.app` redireciona via vercel.json)
 - [x] **Railway Volume montado** — `/data/state.json` ✅ (state persiste entre deploys)
 - [x] **vercel.json no-cache** — reload simples já pega versão nova
 - [x] **Auto-update silencioso** — cliente recarrega sozinho ao detectar deploy novo

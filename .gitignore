@@ -2,3 +2,5 @@ server/node_modules/
 server/package-lock.json
 server/state.json
 server/accounts.json
+electron/node_modules/
+electron/dist/

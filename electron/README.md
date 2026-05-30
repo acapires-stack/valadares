@@ -1,6 +1,6 @@
 # Valadares Desktop (Electron)
 
-Wrapper desktop do site oficial em `https://valadares-xi.vercel.app`.
+Wrapper desktop do site oficial em `https://valadares.app.br`.
 
 ## Por que existe
 

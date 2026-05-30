@@ -57,6 +57,24 @@ const mpPayments = new Map();
 
 // ─── HTTP handlers ──────────────────────────────────────────────────────
 const _errorRateMap = new Map();   // ip → lastErrorAt (anti-flood do /api/error)
+const _pixRateMap   = new Map();   // ip → lastCreateAt (anti-flood do /api/pix/create)
+// IP do cliente atrás do proxy do Railway. O ÚLTIMO item do X-Forwarded-For é o que o
+// proxy confiável anexou (os primeiros são injetáveis pelo cliente). Pegar split[0] era
+// spoofável → permitia burlar rate-limit E inflar o Map indefinidamente (memory leak).
+function clientIp(req){
+    const xff = (req.headers['x-forwarded-for'] || '').toString();
+    if (xff){
+        const parts = xff.split(',').map(s => s.trim()).filter(Boolean);
+        if (parts.length) return parts[parts.length - 1].slice(0, 45);
+    }
+    return ((req.socket && req.socket.remoteAddress) || '').toString().slice(0, 45);
+}
+// Evict entradas velhas dos rate-maps (TTL 5min). Sem isto os Maps crescem ilimitado.
+setInterval(() => {
+    const cutoff = Date.now() - 5 * 60_000;
+    for (const [k, t] of _errorRateMap) if (t < cutoff) _errorRateMap.delete(k);
+    for (const [k, t] of _pixRateMap)   if (t < cutoff) _pixRateMap.delete(k);
+}, 5 * 60_000);
 function httpJson(res, status, body){
     res.writeHead(status, {
         'Content-Type': 'application/json',
@@ -118,7 +136,7 @@ async function handleHttpRequest(req, res){
             if (!acc || !acc.resetToken || acc.resetToken.expiresAt < Date.now()){
                 return httpJson(res, 400, { ok:false, error:'invalid_or_expired' });
             }
-            acc.pwHash = hashPwServer(pwHash);
+            acc.pwHash = hashPwScrypt(pwHash);
             acc.resetToken = null;
             queueSaveAccounts();
             console.log(`[reset http] senha trocada pra conta ${acc.name}`);
@@ -145,6 +163,11 @@ async function handleHttpRequest(req, res){
         });
     }
     if (req.method === 'POST' && req.url === '/api/pix/create'){
+        // Rate-limit por IP: cada create gera uma preference na conta MP real (custo +
+        // risco de ban do merchant se floodar). 1 a cada 3s é folgado pro fluxo legítimo.
+        const ip = clientIp(req);
+        if ((_pixRateMap.get(ip) || 0) > Date.now() - 3000) return httpJson(res, 429, { error:'rate_limited' });
+        _pixRateMap.set(ip, Date.now());
         try {
             const body = await readBody(req);
             return handleCreatePix(body, res);
@@ -162,18 +185,17 @@ async function handleHttpRequest(req, res){
     if (req.method === 'POST' && req.url === '/api/error'){
         try {
             const body = await readBody(req);
-            const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+            const ip = clientIp(req);
             // Rate limit: 1 erro/segundo por IP. Dropa silenciosamente se floodar.
             const now = Date.now();
-            _errorRateMap.set(ip, (_errorRateMap.get(ip) || 0));
-            if (_errorRateMap.get(ip) > now - 1000) return httpJson(res, 200, { ok:true, dropped:true });
+            if ((_errorRateMap.get(ip) || 0) > now - 1000) return httpJson(res, 200, { ok:true, dropped:true });
             _errorRateMap.set(ip, now);
             recordError({
                 kind: 'js_error',
                 player: body.player || null,
                 msg: body.msg || '',
                 stack: body.stack || null,
-                meta: { url: body.url, userAgent: (req.headers['user-agent'] || '').slice(0, 200) },
+                meta: { url: body.url ? String(body.url).slice(0, 300) : null, userAgent: (req.headers['user-agent'] || '').slice(0, 200) },
             });
             return httpJson(res, 200, { ok:true });
         } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
@@ -276,14 +298,10 @@ async function handleCreatePix(body, res){
     if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
     if (!_isValidEmail(email)){ return httpJson(res, 400, { error:'invalid_email' }); }
     const pkg = GOLD_PACKAGES[packageId];
-    // Persiste email no save da conta — próxima compra desse player vem pré-preenchida
-    try {
-        const acc = typeof getAccount === 'function' ? getAccount(playerName) : null;
-        if (acc && acc.save && acc.save.email !== email){
-            acc.save.email = email;
-            if (typeof flushAccounts === 'function') flushAccounts();
-        }
-    } catch (e){ /* não bloqueia compra se o save falhar */ }
+    // NÃO persiste o email na conta aqui: este endpoint HTTP não tem sessão autenticada,
+    // então `playerName` é arbitrário — gravar o email permitiria envenenar o save de
+    // qualquer conta. O email segue só pro MP (payer/metadata) desta compra; o cliente
+    // já guarda o email digitado localmente pra pré-preencher a próxima.
     // Checkout Pro (Preference API) — abre página do MP onde o player paga via PIX.
     // Mais robusto que Payment API: não exige homologação da conta.
     try {
@@ -310,9 +328,9 @@ async function handleCreatePix(body, res){
                 external_reference: `${playerName}|${packageId}`,
                 metadata: { playerName, packageId, gold: pkg.gold, email },
                 back_urls: {
-                    success: `https://valadares-xi.vercel.app/?pix=success`,
-                    failure: `https://valadares-xi.vercel.app/?pix=failure`,
-                    pending: `https://valadares-xi.vercel.app/?pix=pending`,
+                    success: `${SITE_BASE_URL}/?pix=success`,
+                    failure: `${SITE_BASE_URL}/?pix=failure`,
+                    pending: `${SITE_BASE_URL}/?pix=pending`,
                 },
             },
         });
@@ -599,7 +617,9 @@ function sellPriceFor(key){
     return 1;
 }
 
-// Receitas (espelho de RECIPES do cliente, exceto display name)
+// Receitas (espelho de RECIPES do cliente, exceto display name).
+// ⚠️ INDEX-SENSITIVE — o craft cruza por POSIÇÃO no array. Editar/reordenar aqui SEM
+// espelhar em play.html (e vice-versa) quebra o craft silenciosamente. Manter em sync.
 const RECIPES = [
     { out:'POTION',         in:{ SILK:2, ASA_MORCEGO:1 } },
     { out:'POTION_MP',      in:{ SILK:3, ASA_MORCEGO:2 } },
@@ -1180,7 +1200,16 @@ const megaBoss = {
 };
 
 // Admin: travado em 'alcione' (não usa env, segurança extra)
-function isAdmin(name){ return String(name || '').toLowerCase() === 'alcione'; }
+// Admin: nome do dono (configurável por env ADMIN_NAME) OU flag isAdmin na conta. A flag
+// permite grant granular no futuro; o fallback por nome garante que o dono nunca perde
+// acesso mesmo sem a flag setada. (Audit: tirar o 'alcione' hardcoded como ponto único.)
+const ADMIN_NAME = (process.env.ADMIN_NAME || 'alcione').toLowerCase();
+function isAdmin(name){
+    const n = String(name || '').toLowerCase();
+    if (n === ADMIN_NAME) return true;
+    const a = getAccount(name);
+    return !!(a && a.isAdmin);
+}
 
 // MOTD via env (mensagem do dia, aparece pra todos ao conectar)
 const SERVER_MOTD = process.env.SERVER_MOTD || '';
@@ -1928,6 +1957,7 @@ setInterval(safeTick('broadcastMobsFull', broadcastMobsFull), 10_000);
 // Persiste em state.json. Estrutura: { name, leader, members:[names], createdAt }
 const guilds = new Map();   // name → guild
 const guildInvites = new Map();  // toName → { guildName, fromName, expiresAt }
+const GUILD_MAX_MEMBERS = 30;
 function findGuildOfPlayer(name){
     for (const g of guilds.values()) if (g.members.includes(name)) return g;
     return null;
@@ -1954,6 +1984,11 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
         if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
         if (myGuild.leader !== p.name){ sendToFn({ t:'serverMsg', level:'warn', text:'Só o líder convida.' }); return; }
         if (!arg){ sendToFn({ t:'serverMsg', level:'warn', text:'Uso: /guild invite NOME' }); return; }
+        if (!validAccountName(arg)){ sendToFn({ t:'serverMsg', level:'warn', text:'Nome inválido.' }); return; }
+        if (myGuild.members.length >= GUILD_MAX_MEMBERS){ sendToFn({ t:'serverMsg', level:'warn', text:`Guild cheia (máx ${GUILD_MAX_MEMBERS}).` }); return; }
+        // Evict convites expirados antes de inserir (chave crua antes crescia o Map sem limite)
+        const _tnow = Date.now();
+        for (const [k, v] of guildInvites) if (v.expiresAt < _tnow) guildInvites.delete(k);
         guildInvites.set(arg, { guildName: myGuild.name, fromName: p.name, expiresAt: Date.now() + 60_000 });
         // Avisa o alvo se online
         for (const pp of players.values()){
@@ -1974,6 +2009,8 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
         }
         const g = guilds.get(inv.guildName);
         if (!g){ sendToFn({ t:'serverMsg', level:'warn', text:'Guild não existe mais.' }); guildInvites.delete(p.name); return; }
+        if (g.members.includes(p.name)){ guildInvites.delete(p.name); return; }   // dedup: já é membro
+        if (g.members.length >= GUILD_MAX_MEMBERS){ sendToFn({ t:'serverMsg', level:'warn', text:`Guild cheia (máx ${GUILD_MAX_MEMBERS}).` }); return; }
         g.members.push(p.name);
         guildInvites.delete(p.name);
         sendToFn({ t:'serverMsg', level:'event', text:`✦ Você entrou na guild "${g.name}"!` });
@@ -2600,8 +2637,35 @@ function sanitizeSave(data, ownerName){
     return data;
 }
 
-function hashPwServer(clientHash){
+// Hash de senha. Contas novas/migradas usam scrypt (deliberadamente lento) com salt
+// ALEATÓRIO POR CONTA, no formato `scrypt$<saltHex>$<hashHex>`. O sha256 legado (salt
+// global ACCOUNTS_SALT) só verifica contas antigas pra migrá-las no login. scrypt NÃO
+// depende de ACCOUNTS_SALT → mudar a env não quebra contas já migradas (só travaria
+// as legadas ainda não migradas — por isso ACCOUNTS_SALT deve permanecer estável).
+// scryptSync bloqueia ~15ms, mas só roda em login/registro/reset (eventos raros).
+const SCRYPT_KEYLEN = 32;
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
+function hashPwLegacy(clientHash){
     return crypto.createHash('sha256').update(ACCOUNTS_SALT + ':' + String(clientHash || '')).digest('hex');
+}
+function hashPwScrypt(clientHash){
+    const salt = crypto.randomBytes(16).toString('hex');
+    const derived = crypto.scryptSync(String(clientHash || ''), salt, SCRYPT_KEYLEN, SCRYPT_PARAMS).toString('hex');
+    return `scrypt$${salt}$${derived}`;
+}
+// Verifica em tempo constante. Detecta o formato: scrypt$… (novo) vs hex 64 (sha256 legado).
+function verifyPwHash(stored, clientHash){
+    if (typeof stored !== 'string' || !stored) return false;
+    if (stored.startsWith('scrypt$')){
+        const parts = stored.split('$');   // ['scrypt', saltHex, hashHex]
+        if (parts.length !== 3 || !parts[1] || !parts[2]) return false;
+        const calc = crypto.scryptSync(String(clientHash || ''), parts[1], SCRYPT_KEYLEN, SCRYPT_PARAMS).toString('hex');
+        const a = Buffer.from(calc, 'hex'), b = Buffer.from(parts[2], 'hex');
+        return a.length === b.length && crypto.timingSafeEqual(a, b);
+    }
+    const calc = hashPwLegacy(clientHash);
+    const a = Buffer.from(calc, 'hex'), b = Buffer.from(stored, 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 function validAccountName(n){
     return typeof n === 'string' && n.length >= 1 && n.length <= 14 && /^[A-Za-z0-9_\- ]+$/.test(n);
@@ -2609,7 +2673,7 @@ function validAccountName(n){
 function getAccount(name){ return accounts.get(String(name || '').toLowerCase()); }
 function createAccount(name, clientHash, email){
     const a = {
-        name, pwHash: hashPwServer(clientHash),
+        name, pwHash: hashPwScrypt(clientHash),
         save: null, savedAt: 0, createdAt: Date.now(),
         email: null, emailVerified: false, resetToken: null,
     };
@@ -2624,7 +2688,13 @@ function createAccount(name, clientHash, email){
 function verifyAccount(name, clientHash){
     const a = getAccount(name);
     if (!a) return false;
-    return a.pwHash === hashPwServer(clientHash);
+    if (!verifyPwHash(a.pwHash, clientHash)) return false;
+    // Rehash transparente: migra conta legada (sha256) pra scrypt no login bem-sucedido.
+    if (!String(a.pwHash || '').startsWith('scrypt$')){
+        a.pwHash = hashPwScrypt(clientHash);
+        queueSaveAccounts();
+    }
+    return true;
 }
 // Admin: lê estado salvo + online de um player. Retorna null se conta não existe.
 function adminCheckUser(rawName){
@@ -4037,17 +4107,12 @@ function megaBossIsAlive(){
     return false;
 }
 function checkMegaBossSpawn(){
-    if (megaBoss.spawnedAt){ console.log('[mega] skip: já vivo'); return; }
-    if (!allBossesAtMaxLevel()){
-        const levels = BOSSES.map(b => `${b.type}=${bossLevel.get(b.type) || 1}`).join(' ');
-        console.log(`[mega] skip: bosses não estão maxados — ${levels}`);
-        return;
-    }
+    // Estados de "skip" são esperados (boss vivo / não maxado / cooldown) — sem log
+    // pra não floodar a cada morte de boss. Só o spawn de fato é logado abaixo.
+    if (megaBoss.spawnedAt) return;
+    if (!allBossesAtMaxLevel()) return;
     const cdLeft = MEGA_BOSS_COOLDOWN_MS - (Date.now() - megaBoss.lastResolvedAt);
-    if (cdLeft > 0){
-        console.log(`[mega] skip: cooldown ${Math.floor(cdLeft/60000)}min restantes`);
-        return;
-    }
+    if (cdLeft > 0) return;
     // Spawn!
     const m = spawnMob(MEGA_BOSS_TYPE, MEGA_BOSS_POS.x, MEGA_BOSS_POS.y);
     if (!m) return;
@@ -4313,7 +4378,7 @@ wss.on('connection', (ws, request) => {
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'passwordResetConfirmResult', ok:false, reason:'invalid_or_expired' }));
                 return;
             }
-            acc.pwHash = hashPwServer(newPwHash);
+            acc.pwHash = hashPwScrypt(newPwHash);
             acc.resetToken = null;
             queueSaveAccounts();
             console.log(`[reset] senha trocada pra conta ${acc.name}`);
@@ -4398,6 +4463,9 @@ wss.on('connection', (ws, request) => {
             if (p.skills && typeof p.skills === 'object') data.skills = p.skills;
             if (p.equipped && typeof p.equipped === 'object') data.equipped = p.equipped;
             if (p.chests && typeof p.chests === 'object') data.chests = p.chests;
+            // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
+            // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
+            data.dailyClaim = p.dailyClaim || null;
             setPlayerSave(p.authedName, data);
             return;
         }
@@ -4409,7 +4477,6 @@ wss.on('connection', (ws, request) => {
             } else {
                 // Cliente legado (sem auth) — aceita pelo nome cru por compat, mas não persiste save
                 p.name = String(msg.name || 'Anônimo').substring(0, 14);
-                p.legacy = true;
             }
             p.x     = msg.x ?? 50;
             p.y     = msg.y ?? 50;
@@ -4440,6 +4507,8 @@ wss.on('connection', (ws, request) => {
                         daily: (acc.save.quests.daily && typeof acc.save.quests.daily === 'object') ? acc.save.quests.daily : null,
                     };
                 }
+                // Anti-replay de daily: hidrata SÓ do save server-side (nunca de data do saveUpload)
+                if (acc.save.dailyClaim && typeof acc.save.dailyClaim === 'object') p.dailyClaim = acc.save.dailyClaim;
                 if (acc.save.questFlags && typeof acc.save.questFlags === 'object') p.questFlags = acc.save.questFlags;
                 if (acc.save.flags && typeof acc.save.flags === 'object') p.flags = acc.save.flags;
                 if (acc.save.permaBuffs && typeof acc.save.permaBuffs === 'object') p.permaBuffs = acc.save.permaBuffs;
@@ -4525,6 +4594,13 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'pos') {
+            // Rate-limit anti-flood: cada pos re-broadcasta pro andar inteiro. O cliente
+            // legítimo anda no máximo 1 tile/80ms (playerMoveDelay tem piso Math.max(80,…)),
+            // então 40ms dá 2× de folga — nunca dropa movimento real (mesmo com jitter) e
+            // corta o flood de milhares/s. Campo dedicado pra não colidir com outros gates.
+            const _now = Date.now();
+            if (p._lastPosAt && _now - p._lastPosAt < 40) return;
+            p._lastPosAt = _now;
             // Sanitiza/clampa coords antes de aceitar (cliente malicioso poderia
             // enviar {x:99999, y:99999} e quebrar tickAI/inCave/tileAt)
             const nx = Math.max(0, Math.min(M_W - 1, Math.floor(Number(msg.x)) || 0));
@@ -4563,7 +4639,12 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'float') {
-            broadcast(id, { t:'float', id, text:msg.text, color:msg.color, big:!!msg.big });
+            // Cap text/color do cliente: sem isto propaga string ilimitada pro andar
+            // inteiro (custo de banda). Não é XSS (renderiza em canvas), só limita abuso.
+            const text = typeof msg.text === 'string' ? msg.text.slice(0, 48) : '';
+            if (!text) return;
+            const color = typeof msg.color === 'string' ? msg.color.slice(0, 16) : '#ffffff';
+            broadcast(id, { t:'float', id, text, color, big:!!msg.big });
             return;
         }
 
@@ -5052,22 +5133,32 @@ wss.on('connection', (ws, request) => {
 
             const kind = msg.kind;
             if (kind === 'daily'){
-                // Cliente envia { kind:'daily', dailyId }. Server lê a entry do save do player
-                // (cliente é a fonte da lista do dia), valida no pool, usa reward DA TABELA.
+                // Cliente envia { kind:'daily', dailyId }. Server lê a entry do save do
+                // player (cliente é a fonte da lista do dia) só pra achar o goal, e valida
+                // no pool usando a reward DA TABELA. ANTI-REPLAY é server-autoritativo via
+                // p.dailyClaim — NÃO via daily.claimed do cliente, que era forjável: um
+                // saveUpload com claimed:[] resetava → re-claim infinito de gold+XP.
                 if (!isAdjacentTo(p, QUEST_NPCS.atendente)) return reject('not_at_npc');
                 p.quests = p.quests || { active:{}, completed:[] };
                 const daily = p.quests.daily || { list:[], claimed:[] };
                 const dailyId = String(msg.dailyId || '');
+                // id legítimo = d_<hoje>_<0..2> (espelha rollDailyQuests no cliente: 3/dia).
+                // Limita a 3 claims/dia mesmo que o cliente forje a lista com N entries.
+                const today = new Date().toISOString().slice(0, 10);
+                const idm = /^d_(\d{4}-\d{2}-\d{2})_([0-2])$/.exec(dailyId);
+                if (!idm || idm[1] !== today) return reject('unknown_quest');
+                if (!p.dailyClaim || p.dailyClaim.day !== today) p.dailyClaim = { day: today, ids: [] };
+                if (p.dailyClaim.ids.includes(dailyId)) return reject('already_done');
                 const entry = (daily.list || []).find(q => q && q.id === dailyId);
                 if (!entry || !entry.goal) return reject('unknown_quest');
-                if ((daily.claimed || []).includes(dailyId)) return reject('already_done');
                 const pool = findDailyPoolEntry(entry.goal.kind, entry.goal.type, entry.goal.count);
                 if (!pool) return reject('bad_daily');   // cliente forjou entry fake
                 // valida items se kind='item'
                 if (pool.kind === 'item' && !hasInv(p, pool.type, pool.count)) return reject('no_items');
                 if (pool.kind === 'item') incInv(p, pool.type, -pool.count);
+                p.dailyClaim.ids.push(dailyId);   // anti-replay autoritativo (persistido no lockdown)
                 daily.claimed = daily.claimed || [];
-                daily.claimed.push(dailyId);
+                if (!daily.claimed.includes(dailyId)) daily.claimed.push(dailyId);   // cosmético p/ UI
                 p.quests.daily = daily;
                 const reward = { gold: pool.gold, xp: pool.xp || {} };
                 const delta = applyQuestReward(p, reward);
@@ -5152,9 +5243,7 @@ wss.on('connection', (ws, request) => {
         // Cliente envia { t:'hlHuntTrigger' } quando timer de 3min vence após virar
         // Highlander. Server spawna 3 CACADOR hunters perto do player, autoritativos
         // (visíveis pra todos via mobs snapshot/batch). Crédito é automático quando
-        // o último cair em handleMobDeath. Compat: legacy hlHuntClaim vira no-op
-        // pra clients antigos (server passa a creditar via mob kill, não claim).
-        if (msg.t === 'hlHuntClaim') return;
+        // o último cair em handleMobDeath (crédito via mob kill, não claim).
         if (msg.t === 'hlHuntTrigger') {
             const COOLDOWN_MS = 5 * 60 * 1000;
             const now = Date.now();
@@ -5220,7 +5309,13 @@ wss.on('connection', (ws, request) => {
         // (TRAINING_TIME no cliente é 2000ms — margem).
         if (msg.t === 'trainAttempt') {
             const reject = (reason) => {
-                if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'trainResult', ok:false, reason }));
+                // ok:false não era tratado no cliente (falha silenciosa). serverMsg já renderiza.
+                const txt = {
+                    unknown_skill:'Skill desconhecida.', too_fast:'Calma — espere entre treinos.',
+                    not_at_altar:'Treine Magia no Altar.', not_at_dummy:'Aproxime-se do Boneco de treino.',
+                    no_gold:'Gold insuficiente pra treinar.',
+                }[reason] || 'Não foi possível treinar.';
+                sendTo(id, { t:'serverMsg', level:'warn', text: txt });
             };
             const skill = String(msg.skill || '');
             if (!p.skills || !p.skills[skill]) return reject('unknown_skill');
@@ -5276,7 +5371,7 @@ wss.on('connection', (ws, request) => {
             p._lastSpellAt = now;
             // Mana check + aplicar custo
             if ((p.mp ?? 0) < sp.manaCost){
-                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'spellResult', ok:false, reason:'low_mana', spellKey }));
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Sem mana suficiente.' });   // antes: spellResult ok:false (silencioso)
                 return;
             }
             p.mp = Math.max(0, (p.mp ?? 0) - sp.manaCost);
@@ -5328,7 +5423,12 @@ wss.on('connection', (ws, request) => {
         // ponto disponível (earned-used > 0), aplica permaBuff e devolve estado.
         if (msg.t === 'talentAlloc') {
             const reject = (reason) => {
-                if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'talentResult', ok:false, reason }));
+                // ok:false não era tratado no cliente (falha silenciosa). serverMsg já renderiza.
+                const txt = {
+                    unknown_talent:'Talento desconhecido.', already_owned:'Você já tem esse talento.',
+                    no_points:'Sem pontos de talento disponíveis.',
+                }[reason] || 'Não foi possível alocar o talento.';
+                sendTo(id, { t:'serverMsg', level:'warn', text: txt });
             };
             const tid = String(msg.talentId || '');
             const def = TALENT_DEFS[tid];
@@ -5981,11 +6081,6 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
-        if (msg.t === 'kill') {
-            // legado (mob local). Ignora.
-            return;
-        }
-
         // ─── TRADE ─────────────────────────────────────────────────────
         if (msg.t === 'tradeRequest') {
             // Rate limit (audit 29/05): trade request spam = pop-up infinito
@@ -6418,7 +6513,6 @@ wss.on('connection', (ws, request) => {
         broadcast(id, { t:'ghost', id, name:p.name }, p.floor);
     });
 
-    ws.on('error', (e) => console.error(`[!] ${id}:`, e.message));
 });
 
 console.log(`╔══════════════════════════════════════╗`);
