@@ -75,7 +75,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] 🎯 EM ANDAMENTO (3a descida + 3c boss ✅; falta 3b procedural)
+**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] ✅ COMPLETO (3a descida + 3b procedural + 3c boss) — calibrar balanceamento pós-playtest
 > Decisão de design (29/05): NÃO instanciada. Insight do dono: instância
 > fechada = farm seguro = pay-to-win fácil num jogo PvP. Em vez disso,
 > masmorra aberta e mortal estilo Tibia — melhor loot, maior perigo (mobs
@@ -113,10 +113,17 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 4. ✅ **3c — Boss do andar 5** (RESOLVIDO 29/05, cae70b8): **O Senhor das
    Profundezas** (5000hp/110dmg, intel 3, spawn 50,42), loot top-tier por dano,
    respawna Lv1 fresco a cada delve (isolado do leveling dos bosses do mundo).
-5. 🎯 **3b — Geração procedural por andar** (PRÓXIMA SESSÃO): cada andar com
-   layout/sala diferente. Server precisa do **grid real** (hoje usa bounding box
-   fixo 40-60) pra spawn/colisão. Resolve as "escadas em linha" (posições por
-   andar). Polish: tonalidade por profundidade + indicador de andar.
+5. ✅ **3b — Geração procedural por andar** (RESOLVIDO 30/05): cada andar é uma
+   **caverna procedural** (cellular automata + flood-fill de conectividade) gerada
+   no **server** (`server/dungeon-gen.js`) e ENVIADA pro cliente no `dungeonEnter`
+   (fonte da verdade única — nada de replicar gerador nos 2 lados). Escadas/chegada/
+   boss posicionados em tiles acessíveis e variam por andar → resolve "escadas em
+   linha". Andar efêmero (seed nova a cada abertura). `spawnDungeonMobs`/`mobTileOk`/
+   transições usam o grid real (não mais a box 40-60). Gerador testado isolado
+   (25/25 conectividade OK). **Deferido:** validação de movimento server-side na
+   caverna (player ainda client-trusted, como o resto do jogo — vetor pré-existente);
+   IA greedy pode emperrar em caverna torta (pickSurroundSlot sem pathfinding real);
+   polish de tonalidade por profundidade + indicador de andar.
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (53,53) na PZ, 4 slots tingíveis com 12 cores

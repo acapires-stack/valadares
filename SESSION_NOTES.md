@@ -7,6 +7,50 @@
 
 ---
 
+## 🕳️ Sessão 30/05/2026 (cont. 4) — M4 3b: masmorra PROCEDURAL (cavernas)
+
+Dono pediu pra "continuar atualizando o jogo" → escolheu o foco definido no roadmap:
+**M4 3b**. Antes de codar, mapeei a masmorra nos 2 lados (server + cliente) com agentes.
+
+**Decisão de arquitetura:** o **server gera o grid e MANDA pro cliente** no `dungeonEnter`
+(fonte da verdade única). A alternativa — replicar o mesmo gerador nos 2 lados por seed —
+é frágil (qualquer divergência = player vê chão onde o server tem parede). Estilo escolhido
+pelo dono: **cavernas orgânicas** (cellular automata).
+
+**Implementado:**
+- 🆕 `server/dungeon-gen.js` — gerador puro/determinístico: cellular automata (área 36-64,
+  29×29) + flood-fill que mantém só o maior componente conectado + posiciona chegada/subida/
+  descida/boss em tiles acessíveis e distantes. Regenera (até 24×) se a caverna sair pequena/
+  dobrada. **Testável standalone com node** (o caminho WS não roda local) — 25/25 OK
+  (conectividade garantida em 5 andares × 5 seeds).
+- **server.js**: `dungeonFloors` Map por andar (efêmero — gera no 1º player com seed nova,
+  some ao esvaziar → caverna nova a cada abertura). `isTransitionTile`/`mobTileOk`/
+  `spawnDungeonMobs`/`bumpMobAwayFrom`/transições (`descend`/`exit`)/spawn do boss agora usam
+  o **grid real + meta por andar** (não mais a box fixa 40-60 nem as escadas em x=50).
+  `dungeonEnter` carrega `grid` (sub-região compacta) + `stairs`. Removidas constantes mortas
+  (`DUNGEON_SPAWN/EXIT/DOWN/BOSS_SPAWN/ROOM`).
+- **play.html**: `buildDungeonMapFromGrid` monta o `map` do grid recebido; `dungeonStairs`
+  (escadas vêm do server); `checkDungeonStairs`/`drawStair` usam as escadas dinâmicas.
+  **Fallback** pro layout antigo se o server não mandar `grid` (sobrevive à janela de deploy).
+- `.gitignore`: ignora `node_modules/` + `package-lock.json` da raiz (server roda da raiz).
+
+**Verificação:** `node --check` server OK; gerador 25/25 conectividade; **server bootou local
+limpo** (161 mobs, WS up, SIGTERM gracioso); JS inline do cliente compila (0 erros). Caminho
+WS in-game NÃO testável local.
+
+> ⚠️ **DEPLOY (mudança em `server/**` + cliente):** seguir a lição do incidente — **`/manutencao`
+> antes** (desloga todos, força reload do cliente novo). Ordem segura: cliente (Vercel) primeiro
+> com o fallback, depois server (Railway) com `/manutencao`. **TESTAR pós-deploy:** (1) entrar nas
+> Profundezas → caverna irregular, escada de subida ao lado da chegada; (2) achar a descida (longe)
+> → andar 2 com layout DIFERENTE; (3) mobs só no piso (não atravessam parede / não somem na
+> parede); (4) andar 5 → boss longe da chegada; (5) sair/reentrar → caverna nova.
+
+**Deferido (anotado no ROADMAP):** validação de movimento server-side na caverna (player ainda
+client-trusted, igual ao resto do jogo); IA greedy emperra em caverna muito torta (sem pathfinding
+real); polish visual (tonalidade por profundidade + indicador de andar).
+
+---
+
 ## ⚔️ Sessão 30/05/2026 (cont. 3) — Rebalance do personagem + correção de PvE + claude admin (`dfe3f9f`)
 
 Dono pediu pra repensar o sistema do personagem. Decisões dele:

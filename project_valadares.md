@@ -55,8 +55,9 @@ Server-autoritativo: `gold`, `inv`, `equipped`, `chests`, `skills`, `hp`, `mp`, 
   player esquiva, ambos espelhados no `tickAI` server-side).
 - **Masmorra M4 "As Profundezas"** (aberta, mortal, estilo Tibia — NÃO instanciada): 5 andares,
   entrada no Antro do Minotauro (83,17), PvP forçado, mobs escalam +60%/andar. Boss andar 5
-  = "O Senhor das Profundezas" (5000hp), loot top-tier por dano. **Falta: 3b procedural**
-  (grid real por andar; hoje usa bounding box fixo 40-60).
+  = "O Senhor das Profundezas" (5000hp), loot top-tier por dano. **3b procedural feito (30/05):**
+  cada andar é uma caverna procedural (cellular automata) gerada no server (`server/dungeon-gen.js`)
+  e enviada pro cliente no `dungeonEnter`; escadas/chegada/boss variam por andar; andar efêmero.
 - **Economia/social**: ranking público, amigos, trade, guild, eventos diários, season +
   leaderboard mensal (Coroa de Temporada), talent tree (6 passivos), cassino.
 - **Gold sinks**: Tinturaria (cosmético), Auction House (NPC Leiloeiro, escrow 24h, 5% comissão).
@@ -90,7 +91,9 @@ padrão (nada que credita gold/inv/XP fica só no cliente). 4. Verifica antes de
 
 ## 🎯 Foco da próxima sessão
 
-1. **M4 3b — geração procedural por andar** (grid real p/ spawn/colisão; resolve "escadas em linha").
+1. **Testar/calibrar M4 3b in-game** (feito 30/05, não testável local): conectividade in-game,
+   mobs presos ao piso, IA em caverna torta, balanceamento. Polish: tonalidade por profundidade
+   + indicador de andar.
 2. Smoke tests P0.5 (webhook MP credita 1×, T4 Caçadores HL, bot 007 1h).
 3. Deferidos do audit: remover ~500 linhas de código offline + sends de protocolo residuais
    (precisam de server vivo pra validar). Refactor de movimento autoritativo (sistêmico).

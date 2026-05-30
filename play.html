@@ -2762,6 +2762,24 @@ function genDungeonFloor(floor){
     _dungeonFloorCache[floor] = m;
     return m;
 }
+// M4 3b: layout procedural recebido do server (fonte da verdade — server gera a
+// caverna e manda no dungeonEnter). Constrói o grid 100×100 a partir da
+// sub-região (rows: '.'=piso de caverna, '#'=parede; resto do mundo = parede).
+// `dungeonStairs` guarda as escadas do andar atual (também vindas do server).
+let dungeonStairs = { up: null, down: null };
+function buildDungeonMapFromGrid(grid){
+    const m = Array.from({length:M_H}, () => new Uint8Array(M_W).fill(T.CAVE_WALL));
+    if (!grid || !grid.area || !Array.isArray(grid.rows)) return m;
+    const { x0, y0 } = grid.area;
+    for (let ly=0; ly<grid.rows.length; ly++){
+        const row = grid.rows[ly]; const wy = y0 + ly;
+        if (wy < 0 || wy >= M_H) continue;
+        for (let lx=0; lx<row.length; lx++){
+            if (row[lx] === '.'){ const wx = x0 + lx; if (wx>=0 && wx<M_W) m[wy][wx] = T.CAVE; }
+        }
+    }
+    return m;
+}
 const VAR = Array.from({length:M_H}, (_,y) =>
     Float32Array.from({length:M_W}, (_,x) => (Math.sin(x*127.1+y*311.7)*43758.5453)%1));
 const vr = (tx,ty) => Math.abs(VAR[ty]?.[tx] ?? 0.5);
@@ -4836,7 +4854,14 @@ let _overworldVisited = null;   // guarda o fog do overworld enquanto na masmorr
 function enterDungeonClient(msg){
     const fromFloor = (player.floor || 0);
     player.floor = msg.floor || 1;
-    map = genDungeonFloor(player.floor);            // troca o grid ativo
+    if (msg.grid){
+        map = buildDungeonMapFromGrid(msg.grid);    // layout procedural do server (fonte da verdade)
+        dungeonStairs = { up: (msg.stairs && msg.stairs.up) || null, down: (msg.stairs && msg.stairs.down) || null };
+    } else {
+        // Fallback (server antigo, sem grid): sala fixa 40-60 + escadas em x=50 — sobrevive à janela de deploy.
+        map = genDungeonFloor(player.floor);
+        dungeonStairs = { up: { x:50, y:50 }, down: player.floor < 5 ? { x:50, y:57 } : null };
+    }
     player.x = msg.x; player.y = msg.y;
     player.renderX = msg.x; player.renderY = msg.y;
     player.prevX = msg.x; player.prevY = msg.y;
@@ -11827,9 +11852,9 @@ function handleMovement(dt){
 
 // M4: pisar na escada dispara a transição de andar (server valida adjacência).
 // Debounce 1.2s pra não re-disparar enquanto o server processa/teleporta.
+// Entrada é fixa (Antro); subida/descida do andar são PROCEDURAIS (dungeonStairs,
+// recebidas do server no dungeonEnter — variam por andar, M4 3b).
 const DUNGEON_STAIR_IN   = { x: 83, y: 17 };   // entrada no Antro do Minotauro (bate com DUNGEON_ENTRANCE do server)
-const DUNGEON_STAIR_UP   = { x: 50, y: 50 };   // escada de SUBIDA no andar (bate com DUNGEON_EXIT do server)
-const DUNGEON_STAIR_DOWN = { x: 50, y: 57 };   // escada de DESCIDA no andar (bate com DUNGEON_DOWN do server)
 const DUNGEON_MAX_FLOOR_C = 5;                 // último andar sem escada de descida (bate com DUNGEON_MAX_FLOOR)
 let _lastStairTrigger = 0;
 function checkDungeonStairs(x, y){
@@ -11843,10 +11868,11 @@ function checkDungeonStairs(x, y){
             try { ws.send(JSON.stringify({ t:'enterDungeon' })); } catch {}
         }
     } else {
-        if (x === DUNGEON_STAIR_UP.x && y === DUNGEON_STAIR_UP.y){
+        const up = dungeonStairs.up, down = dungeonStairs.down;   // escadas procedurais do andar (do server)
+        if (up && x === up.x && y === up.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}     // sobe 1 andar
-        } else if (f < DUNGEON_MAX_FLOOR_C && x === DUNGEON_STAIR_DOWN.x && y === DUNGEON_STAIR_DOWN.y){
+        } else if (f < DUNGEON_MAX_FLOOR_C && down && x === down.x && y === down.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'descendDungeon' })); } catch {}   // desce 1 andar
         }
@@ -14214,8 +14240,8 @@ function loop(ts){
     }
 
     // M4: escadas da masmorra. Overworld (floor 0): entrada descendo no Antro do
-    // Minotauro (83,17). Andar N: escada de SUBIDA (50,50) + DESCIDA (50,57, exceto
-    // no último andar). Buraco escuro com degraus; label/glow ao aproximar.
+    // Minotauro (83,17). Andar N: subida + descida PROCEDURAIS (dungeonStairs, do
+    // server; descida ausente no último andar). Buraco escuro com degraus; label/glow ao aproximar.
     {
         const onFloor = (player.floor || 0);
         const drawStair = (stair, descending, label) => {
@@ -14243,8 +14269,8 @@ function loop(ts){
         if (onFloor === 0){
             drawStair(DUNGEON_STAIR_IN, true, '⬇ As Profundezas');
         } else {
-            drawStair(DUNGEON_STAIR_UP, false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
-            if (onFloor < DUNGEON_MAX_FLOOR_C) drawStair(DUNGEON_STAIR_DOWN, true, '⬇ Descer');
+            if (dungeonStairs.up) drawStair(dungeonStairs.up, false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
+            if (onFloor < DUNGEON_MAX_FLOOR_C && dungeonStairs.down) drawStair(dungeonStairs.down, true, '⬇ Descer');
         }
     }
 

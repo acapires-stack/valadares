@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { genCaveFloor } = require('./dungeon-gen');   // M4 3b: gerador procedural de caverna por andar
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 // Token de admin pro painel web (env var). Sem isso, /api/admin/* rejeita 401.
@@ -1228,45 +1229,64 @@ const SERVER_BOOT_TIME = Date.now();
 const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 
 // ─── M4 "As Profundezas" — masmorra aberta vertical ───────────────────────
-// Andar é compartilhado e perigoso (PvP forçado). Pro MVP: 1 andar, sala de
-// caverna 100×100 gerada pelo cliente (determinística). Server só rastreia
-// p.floor + posição + força PvP. Sem mobs ainda (Fase 2).
-// Escada de entrada na PZ (50,46), topo. Player desce → spawn (50,52) no andar.
-// Escada de saída no andar (50,50) → volta pra cidade (50,47).
+// Andar compartilhado e perigoso (PvP forçado). 5 andares + boss no 5. Cada
+// andar é uma CAVERNA PROCEDURAL (M4 3b): o server gera o grid (cellular
+// automata, `server/dungeon-gen.js`), posiciona escadas/chegada/boss em tiles
+// acessíveis e MANDA o layout pro cliente no dungeonEnter. Chegada/subida/
+// descida/boss variam por andar (resolve as "escadas em linha"). Entrada fixa
+// no Antro do Minotauro (overworld).
 const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
 const DUNGEON_RETURN   = { x: 83, y: 18 };   // reaparece 1 tile ao lado da escada, dentro do antro (cuidado: minotauros)
-const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada ao entrar/trocar de andar (ao lado da escada de subida)
-const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de SUBIDA (volta 1 andar; do andar 1 = cidade)
-const DUNGEON_DOWN     = { x: 50, y: 57 };   // escada de DESCIDA (vai pro próximo andar; não existe no último)
-const DUNGEON_MAX_FLOOR = 5;                  // Fase 3: 5 andares (boss no 5 — slice 3c)
+const DUNGEON_MAX_FLOOR = 5;                  // 5 andares (boss no 5 — slice 3c)
 const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
-const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c)
-const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fundo da sala (longe da chegada 50,52; > aggro 9 → dorme até você chegar perto)
-// Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
-// Box = sala visível INTEIRA (CAVE 40-60) pra mobs usarem a beirada também.
-// Antes era 41-59 (1 tile menor): no canto/beirada só 1-2 mobs alcançavam o
-// player → o resto enfileirava. Com 40-60 alcançam até 3 no canto / 5 na borda.
-const DUNGEON_ROOM = { x0: 40, y0: 40, x1: 60, y1: 60 };
-const DUNGEON_MOB_TARGET = 9;                 // população de mobs no andar 1
+const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c); spawna no meta.boss do andar
+const DUNGEON_MOB_TARGET = 9;                 // população de mobs por andar
 const DUNGEON_MOB_TYPES  = ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // pesos: mais Sombra
-// Mob pode pisar no tile? No andar usa o box da sala (sem PZ, sem grid do
-// overworld). No overworld, regra normal (walkable + fora da PZ).
-// Tiles de transição (escadas + chegada) onde mob NÃO pode ficar — senão bloqueia
-// o player de entrar/sair/subir/descer (não dá pra andar pro tile de um mob).
+
+// M4 3b: cada andar tem um layout de caverna PROCEDURAL gerado pelo server
+// (`server/dungeon-gen.js`) e enviado pro cliente no dungeonEnter (fonte da
+// verdade única). O andar é efêmero: gera quando o 1º player entra (seed nova)
+// e some quando esvazia → próxima descida = caverna nova. Mapa por andar:
+//   floor → { seed, area, rows[], meta:{spawn,up,down,boss}, floorSet:Set("x,y"), floorTiles[] }
+const dungeonFloors = new Map();
+
+// Gera (ou retorna) o layout do andar. Idempotente enquanto o andar está vivo.
+function getDungeonFloor(floor){
+    let d = dungeonFloors.get(floor);
+    if (d) return d;
+    const seed = (Math.random() * 0xFFFFFFFF) >>> 0;
+    const gen = genCaveFloor(floor, seed, floor === DUNGEON_MAX_FLOOR);
+    const floorSet = new Set();
+    for (const t of gen.floorTiles) floorSet.add(t.x + ',' + t.y);
+    d = { seed, area: gen.area, rows: gen.rows, meta: gen.meta, floorSet, floorTiles: gen.floorTiles };
+    dungeonFloors.set(floor, d);
+    return d;
+}
+function dungeonMeta(floor){ return (dungeonFloors.get(floor) || getDungeonFloor(floor)).meta; }
+function dungeonTileIsFloor(floor, x, y){
+    const d = dungeonFloors.get(floor);
+    return d ? d.floorSet.has(x + ',' + y) : false;
+}
+
+// Tiles de transição (escadas + chegada + spawn do boss) onde mob NÃO pode ficar
+// — senão bloqueia o player de entrar/sair/subir/descer. No andar, vêm do meta
+// procedural; no overworld, são a entrada/retorno fixos do Antro.
 function isTransitionTile(floor, x, y){
     if ((floor || 0) === 0){
         return (x === DUNGEON_ENTRANCE.x && y === DUNGEON_ENTRANCE.y) ||
                (x === DUNGEON_RETURN.x   && y === DUNGEON_RETURN.y);
     }
-    return (x === DUNGEON_EXIT.x  && y === DUNGEON_EXIT.y)  ||
-           (x === DUNGEON_DOWN.x  && y === DUNGEON_DOWN.y)  ||
-           (x === DUNGEON_SPAWN.x && y === DUNGEON_SPAWN.y);
+    const m = dungeonMeta(floor);
+    const eq = (p) => p && p.x === x && p.y === y;
+    return eq(m.spawn) || eq(m.up) || eq(m.down) || eq(m.boss);
 }
+// Mob pode pisar no tile? No andar = tile de PISO da caverna gerada (não parede,
+// não escada/chegada). No overworld, regra normal (walkable + fora da PZ).
 function mobTileOk(m, x, y){
     const f = m.floor || 0;
     if (isTransitionTile(f, x, y)) return false;   // não fica em cima da escada/chegada
     if (f >= 1){
-        return x >= DUNGEON_ROOM.x0 && x <= DUNGEON_ROOM.x1 && y >= DUNGEON_ROOM.y0 && y <= DUNGEON_ROOM.y1;
+        return dungeonTileIsFloor(f, x, y);
     }
     return isWalkable(x, y) && !inSafe(x, y);
 }
@@ -1510,8 +1530,7 @@ function bumpMobAwayFrom(x, y, floor){
     for (const [dx, dy] of dirs){
         const nx = m.x + dx, ny = m.y + dy;
         if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
-        if (!isWalkable(nx, ny)) continue;
-        if (inSafe(nx, ny)) continue;
+        if (!mobTileOk(m, nx, ny)) continue;   // floor-aware: caverna gerada (andar) ou walkable+fora-PZ (overworld)
         if (mobAt(nx, ny, f)) continue;
         if (playerAt(nx, ny, f)) continue;
         m.x = nx; m.y = ny;
@@ -1605,31 +1624,37 @@ function spawnDungeonMobs(){
     for (const m of Array.from(monsters.values())){
         if ((m.floor || 0) >= 1 && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
     }
+    // Andar vazio: descarta o layout procedural → próxima visita = caverna nova (efêmero).
+    for (const floor of Array.from(dungeonFloors.keys())){
+        if (!floorsWithPlayers.has(floor)) dungeonFloors.delete(floor);
+    }
     for (const floor of floorsWithPlayers){
+        const d = getDungeonFloor(floor);
+        const boss = d.meta.boss;
         // ★ Boss do último andar: 1 por vez, com cooldown de respawn pós-morte (anti-farm)
-        if (floor === DUNGEON_MAX_FLOOR){
+        if (floor === DUNGEON_MAX_FLOOR && boss){
             const hasBoss = Array.from(monsters.values()).some(mm => mm.type === DUNGEON_BOSS_TYPE && (mm.floor||0) === floor && mm.hp > 0);
             // Cooldown anti-farm: só repõe o boss DUNGEON_BOSS_RESPAWN_MS (8min) após a
             // última morte. Sem isso, matar e ficar no andar 5 = respawn no tick (8s).
             // 1ª descida (sem morte registrada) → deadAt 0 → spawna na hora. OK.
             const deadAt = dungeonBossDeath.get(floor) || 0;
             if (!hasBoss && Date.now() - deadAt >= DUNGEON_BOSS_RESPAWN_MS){
-                spawnMob(DUNGEON_BOSS_TYPE, DUNGEON_BOSS_SPAWN.x, DUNGEON_BOSS_SPAWN.y, floor);
+                spawnMob(DUNGEON_BOSS_TYPE, boss.x, boss.y, floor);
                 dungeonBossDeath.delete(floor);   // respawnou: zera o cooldown pro próximo ciclo
             }
         }
         let count = 0;
         for (const m of monsters.values()) if ((m.floor || 0) === floor && m.hp > 0 && !m.unique) count++;
+        const tiles = d.floorTiles;
         let tries = 0;
-        while (count < DUNGEON_MOB_TARGET && tries < 120){
+        while (count < DUNGEON_MOB_TARGET && tries < 200){
             tries++;
-            const x = DUNGEON_ROOM.x0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.x1 - DUNGEON_ROOM.x0 - 1));
-            const y = DUNGEON_ROOM.y0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.y1 - DUNGEON_ROOM.y0 - 1));
-            // não nasce nas escadas (subida 50,50 / descida 50,57) nem na chegada (50,52)
-            if (Math.abs(x - 50) <= 1 && ((y >= 49 && y <= 53) || (y >= 56 && y <= 58))) continue;
-            if (mobAt(x, y, floor)) continue;
+            const t = tiles[Math.floor(Math.random() * tiles.length)];
+            if (!t) break;
+            if (isTransitionTile(floor, t.x, t.y)) continue;   // não nasce na escada/chegada/boss
+            if (mobAt(t.x, t.y, floor)) continue;
             const type = DUNGEON_MOB_TYPES[Math.floor(Math.random() * DUNGEON_MOB_TYPES.length)];
-            const mob = spawnMob(type, x, y, floor);
+            const mob = spawnMob(type, t.x, t.y, floor);
             if (mob) count++;
         }
     }
@@ -1640,11 +1665,14 @@ function spawnDungeonMobs(){
 // só rotula a direção no cliente (log/toast).
 function enterDungeonFloor(p, id, floor, dir){
     p.floor = floor;
-    p.x = DUNGEON_SPAWN.x; p.y = DUNGEON_SPAWN.y;
+    const d = getDungeonFloor(floor);          // gera (ou reusa) o layout procedural do andar
+    p.x = d.meta.spawn.x; p.y = d.meta.spawn.y;
     spawnDungeonMobs();
     if (p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
             t:'dungeonEnter', floor, dir: dir || 'down', x: p.x, y: p.y,
+            grid: { area: d.area, rows: d.rows },               // layout da caverna (sub-região; resto = parede)
+            stairs: { up: d.meta.up, down: d.meta.down || null },  // down=null no último andar
             players: snapshotPlayers(floor).filter(sp => sp.id !== id),
             mobs: snapshotMobs(floor),
         }));
@@ -5831,7 +5859,8 @@ wss.on('connection', (ws, request) => {
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
             if (cur < 1 || cur >= DUNGEON_MAX_FLOOR) return;   // precisa estar num andar e não no último
-            if (chebyshev(p.x, p.y, DUNGEON_DOWN.x, DUNGEON_DOWN.y) > 1){
+            const down = dungeonMeta(cur).down;
+            if (!down || chebyshev(p.x, p.y, down.x, down.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
                 return;
             }
@@ -5848,7 +5877,8 @@ wss.on('connection', (ws, request) => {
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
             if (cur === 0) return;                      // já está na cidade
-            if (chebyshev(p.x, p.y, DUNGEON_EXIT.x, DUNGEON_EXIT.y) > 1){
+            const up = dungeonMeta(cur).up;
+            if (chebyshev(p.x, p.y, up.x, up.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
                 return;
             }
