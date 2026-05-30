@@ -1268,9 +1268,11 @@ function dungeonTileIsFloor(floor, x, y){
     return d ? d.floorSet.has(x + ',' + y) : false;
 }
 
-// Tiles de transição (escadas + chegada + spawn do boss) onde mob NÃO pode ficar
-// — senão bloqueia o player de entrar/sair/subir/descer. No andar, vêm do meta
-// procedural; no overworld, são a entrada/retorno fixos do Antro.
+// Tiles de transição (escadas + chegada) onde mob comum NÃO pode ficar — senão
+// bloqueia o player de entrar/sair/subir/descer. No andar, vêm do meta procedural;
+// no overworld, são a entrada/retorno fixos do Antro. NÃO inclui o tile do boss:
+// o próprio boss é spawnado lá (spawnMob rejeita tiles de transição) e ele já
+// ocupa/limpa a vizinhança quando vivo.
 function isTransitionTile(floor, x, y){
     if ((floor || 0) === 0){
         return (x === DUNGEON_ENTRANCE.x && y === DUNGEON_ENTRANCE.y) ||
@@ -1278,7 +1280,7 @@ function isTransitionTile(floor, x, y){
     }
     const m = dungeonMeta(floor);
     const eq = (p) => p && p.x === x && p.y === y;
-    return eq(m.spawn) || eq(m.up) || eq(m.down) || eq(m.boss);
+    return eq(m.spawn) || eq(m.up) || eq(m.down);
 }
 // Mob pode pisar no tile? No andar = tile de PISO da caverna gerada (não parede,
 // não escada/chegada). No overworld, regra normal (walkable + fora da PZ).
