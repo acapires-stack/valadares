@@ -120,10 +120,11 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
    boss posicionados em tiles acessíveis e variam por andar → resolve "escadas em
    linha". Andar efêmero (seed nova a cada abertura). `spawnDungeonMobs`/`mobTileOk`/
    transições usam o grid real (não mais a box 40-60). Gerador testado isolado
-   (25/25 conectividade OK). **Deferido:** validação de movimento server-side na
-   caverna (player ainda client-trusted, como o resto do jogo — vetor pré-existente);
-   IA greedy pode emperrar em caverna torta (pickSurroundSlot sem pathfinding real);
-   polish de tonalidade por profundidade + indicador de andar.
+   (25/25 conectividade OK). **Polish (30/05):** tonalidade por profundidade (overlay
+   por andar, só no terreno) + indicador de andar no canvas (pill topo-centro).
+   **Deferido:** validação de movimento server-side na caverna (player ainda
+   client-trusted, como o resto do jogo — vetor pré-existente); IA greedy pode
+   emperrar em caverna torta (pickSurroundSlot sem pathfinding real).
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (53,53) na PZ, 4 slots tingíveis com 12 cores

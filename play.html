@@ -13959,6 +13959,15 @@ function loop(ts){
             }
         }
 
+    // M4 3b: tonalidade por profundidade — quanto mais fundo, mais escura/fria a
+    // caverna. Overlay só sobre o TERRENO (entidades são desenhadas depois → seguem
+    // legíveis, efeito de pouca luz). andar 1 ~0.06 → andar 5 ~0.42.
+    if ((player.floor || 0) >= 1){
+        const a = Math.min(0.42, 0.06 + ((player.floor || 1) - 1) * 0.09);
+        ctx.fillStyle = `rgba(6, 4, 20, ${a})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     // 4 Baús do DP (só na cidade — no andar da masmorra não existem)
     const nearC = nearestChest();
     if ((player.floor || 0) === 0) for (const c of CHESTS){
@@ -14427,6 +14436,23 @@ function loop(ts){
     // vignette
     ctx.fillStyle = vigGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // M4 3b: indicador de andar (só na masmorra) — pill no topo-centro, sempre
+    // visível (independe do painel lateral, que some no mobile).
+    if ((player.floor || 0) >= 1){
+        const label = `⛏ AS PROFUNDEZAS · Andar ${player.floor}/${DUNGEON_MAX_FLOOR_C}`;
+        ctx.save();
+        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const w = ctx.measureText(label).width + 26, cx = canvas.width / 2, py = 17;
+        ctx.fillStyle = 'rgba(10, 8, 20, 0.78)';
+        ctx.fillRect(cx - w/2, py - 12, w, 24);
+        ctx.strokeStyle = 'rgba(180, 120, 220, 0.7)'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(cx - w/2, py - 12, w, 24);
+        ctx.fillStyle = '#ecdcff';
+        ctx.fillText(label, cx, py + 1);
+        ctx.restore();
+    }
 
     drawMinimap();
 

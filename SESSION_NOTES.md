@@ -45,9 +45,13 @@ WS in-game NÃO testável local.
 > → andar 2 com layout DIFERENTE; (3) mobs só no piso (não atravessam parede / não somem na
 > parede); (4) andar 5 → boss longe da chegada; (5) sair/reentrar → caverna nova.
 
+**Polish incluído (cliente-only, deployável só pelo Vercel sem `/manutencao`):** tonalidade por
+profundidade (overlay escuro/frio por andar, só sobre o terreno → mobs/player seguem legíveis,
+andar 1 ~0.06 → andar 5 ~0.42) + indicador de andar (pill "⛏ AS PROFUNDEZAS · Andar X/5" no
+topo-centro do canvas, sempre visível, independe do painel lateral que some no mobile).
+
 **Deferido (anotado no ROADMAP):** validação de movimento server-side na caverna (player ainda
-client-trusted, igual ao resto do jogo); IA greedy emperra em caverna muito torta (sem pathfinding
-real); polish visual (tonalidade por profundidade + indicador de andar).
+client-trusted, igual ao resto do jogo); IA greedy emperra em caverna muito torta (sem pathfinding real).
 
 ---
 
