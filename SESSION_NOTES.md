@@ -7,6 +7,56 @@
 
 ---
 
+## 🚀 Sessão 30/05/2026 — Lote de auditoria: pendentes FECHADOS + deployado
+
+Dono pediu: revisar pendentes da auditoria + reconnect/deploy gracioso + M4 3b.
+Revisão feita JUNTOS (decisões dele): offline = **remover de vez**; hash = **scrypt no lote**.
+
+**✅ Deployado (commit `d5aec67`, push direto p/ main — dono autorizou "faço tudo"):**
+- **Re-claim de daily TRAVADO** 🔴 — anti-replay era `daily.claimed` do save do cliente
+  → forjava `claimed:[]` via saveUpload → re-claim infinito de gold+XP. Agora
+  `p.dailyClaim` server-autoritativo (lockdown no persist, igual gold/inv) + id válido
+  só `d_<hoje>_[0-2]` (= cap 3/dia mesmo forjando a lista). Cliente sincroniza o
+  `claimed` cosmético do server pra UI cinza.
+- **Hash scrypt** 🟠 — sha256(salt global) → `scrypt$<salt aleatório por conta>$<hash>`
+  com **rehash transparente** no login das contas legadas (verifyPwHash detecta formato).
+  **scrypt NÃO depende de ACCOUNTS_SALT** → mudar a env não quebra contas migradas
+  (só travaria legadas não migradas — preservar o valor atual). Testado isolado (10/10).
+- **Rate-limits + caps** — `pos` 40ms (piso legítimo é 80ms → 2× folga, sem rubber-band);
+  `/api/pix/create` 3s/IP; `_errorRateMap` usa último item do XFF (não spoofável) + TTL
+  evict (era leak ilimitado); `float` cap 48/16; `/guild join` dedup+cap 30+nome válido;
+  pix não grava email em conta arbitrária; back_urls → SITE_BASE_URL.
+- **castSpell guard** 🐛 — FIREBALL/RAIO faziam dano LOCAL + killMonster sem guard
+  → "mob zumbi" e **nenhum dano real online** (server processa dano de magia via
+  attackMob — vide comentário do handler spellCast). Agora espelha EXORI/doAttack:
+  online manda attackMob, offline mata local. Mana/XP seguem via gainMagiaXp→spellCast.
+- **train/spell/talent `ok:false` → toast** — eram mensagens de topo SEM handler no
+  cliente (falha silenciosa). Convertidos pra `serverMsg` (cliente já renderiza).
+- **isAdmin** por flag/env (`ADMIN_NAME`) com fallback por nome (dono nunca perde acesso).
+- **Limpeza**: handlers mortos `kill`/`hlHuntClaim` (2 lados), `ws.on('error')` duplicado,
+  `p.legacy`, logs `[mega] skip`; RECIPES marcado INDEX-SENSITIVE; `.gitignore` electron;
+  docs com URL antiga (electron/README, deployment.md).
+
+**Verificação:** `node --check` server OK; JS inline do cliente compila (0 erros);
+`hashPwServer` 100% removido sem dangling; **server bootou local limpo** (4 contas, 252 mobs).
+Caminho online não testável local → checklist pro dono.
+
+> ⚠️ **TESTAR PÓS-DEPLOY:** (1) 🔴 LOGIN (conta existente loga c/ rehash; nova; reset).
+> Se quebrar = scrypt → rollback. (2) 🔴 daily não re-claima ao forjar `claimed:[]`.
+> (3) FIREBALL/RAIO causam dano online. (4) treinar sem gold / talento sem ponto = toast.
+
+**#9 (reconnect→PZ + countdown `/manutencao`) já estava commitado/live** (`f493cd1`) — nada a fazer.
+
+### ⏸ Deferido (com motivo)
+- **Remover offline (~500 linhas)** + **sends de protocolo residuais**: não dá pra
+  verificar local (remover offline quebra o teste em preview; precisa server vivo).
+  500 linhas interligadas no deploy de segurança = risco evitável. Passo próprio focado.
+- **M4 3b procedural**: feature grande, precisa decidir abordagem de geração. Próxima sessão.
+- **itch-wrapper.html**: untracked, sem referência — decisão do dono (commitar/gitignore/apagar).
+- Dedups de constante do audit (`_isValidEmail`, `dotColor`, `COOLDOWN_MS`) — churn de baixo valor.
+
+---
+
 ## 🔬 Sessão 29/05/2026 (cont. 2) — Auditoria COMPLETA do jogo (autônoma)
 
 Dono pediu auditoria do jogo todo pra segurança + "limpar coisas mais velhas". Rodei

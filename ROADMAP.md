@@ -38,7 +38,9 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 [7bae381](https://github.com/acapires-stack/valadares/commit/7bae381),
 [ed8a438](https://github.com/acapires-stack/valadares/commit/ed8a438)).
 
-### 🔴 P0.6 — Hardening pendente pra próxima auditoria
+### 🟢 P0.6 — Pendentes da auditoria FECHADOS (30/05, commit d5aec67)
+
+> **✅ 30/05 deployado:** re-claim daily (server-autoritativo + cap 3/dia), hash scrypt (salt por conta + rehash transparente), rate-limits (pos 40ms/pix 3s), `_errorRateMap` leak (IP real XFF + TTL), float/guild caps, isAdmin por flag/env, castSpell guard (FIREBALL/RAIO online), train/spell/talent → toast. **Deferido:** remover offline (~500 linhas) + sends de protocolo residuais (precisam validar contra server vivo), M4 3b. Detalhes no `SESSION_NOTES.md` (30/05). O bloco abaixo é o histórico 29/05.
 
 > **🔬 AUDITORIA COMPLETA DO JOGO (29/05) — relatório priorizado em [`docs/AUDITORIA_2026-05-29.md`](docs/AUDITORIA_2026-05-29.md).** Aplicado+deployado: 🔴 **lockdown do save** (`saveUpload` gravava gold/inv/skills do cliente as-is → forja PERSISTENTE; furava o lockdown N3 + a venda de gold) + 🟠 **maxPayload** (DoS). Pra revisar JUNTOS (com teste in-game): re-claim de daily, hash de senha fraco, rate-limits pos/pix, ~500 linhas de código offline, protocolo morto (trainResult/spellResult sem feedback), `RECIPES` dup index-sensitive, dead code. O `_errorRateMap leak` abaixo está coberto no relatório.
 
@@ -46,7 +48,7 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 - **🔧 Refactor de movimento/combate autoritativo (deferido, do audit)** — `p.x/y` (transição de andar) e `range`/cadência de ataque são client-trusted. Hoje mitigado por clamp de coords + `MAX_HIT_DMG` + rate-limit; o caminho definitivo é o server validar movimento e cadência por arma. Sistêmico — fora de hotfix.
 
 - **Same-player 2× simultâneo** (mobile + PC) cria 2 entries no `players` Map → state inconsistency
-- **`_errorRateMap` leak lento** — sem cleanup periódico, cresce indefinidamente
+- **✅ `_errorRateMap` leak — FECHADO 30/05** (IP real do XFF + TTL/evict de 5min)
 - **Algumas funções server-side assumem `p.inv` existe** — TypeError potencial em save legado
 - **broadcastMobs ainda usa full snapshot** quando muda — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo
 
