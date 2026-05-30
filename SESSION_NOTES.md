@@ -25,10 +25,14 @@ mob (×2), mandando `dodged`/`crit` no `mobHit`.
 
 **claude vira admin** (`ADMIN_NAMES = alcione,claude`; antes `ADMIN_NAME` singular).
 
-⚠️ **A VERIFICAR (dono testando no celular):** boneco zerado deve mostrar **1,5%/1,5%**. Se vier
-**6,5%**, é `permaBuffs` velho (talentos da alcione) grudado no localStorage ao trocar de conta
-sem reload → bug de reset de permaBuffs no client (fix: resetar player.* / sempre aplicar
-permaBuffs do server mesmo vazio).
+**✅ CONFIRMADO + CORRIGIDO (`9b948b6`):** o claude zerado mostrava 6,5% = 1,5% (base nova, ok)
++ 5% de `permaBuffs` velho (talentos da alcione) grudado no localStorage ao trocar de conta sem
+reload. `applySaveData` resetava flags/questFlags/permaBuffs só com `if (d.X)` (sem else) → herdava
+da conta anterior. Fix: reset explícito (`= d.X || {}`). Cliente-only (Vercel, sem reconexão).
+
+**Vale pra TODOS os players** (fórmula ao vivo, não valor salvo): no próximo login, crit/esquiva de
+todos recalculam com base 1,5% / teto TOTAL 25%. Builds de crit antigas sentem o nerf — o teto
+total 25% inclui talento (antes o talento somava por cima do cap 30%, dava ~32%). Sem migração.
 
 ---
 
