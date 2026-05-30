@@ -21,15 +21,20 @@ Mapeei com 2 agentes (offline no cliente; sends mortos cliente↔server) + verif
 - **Dead code cliente:** `function attack()` (morta, virou `engage()`/`doAttack()`); CSS órfão
   `.po-hp-bar/.po-hp-fill`.
 
-**⏸ ADIADO de propósito — remoção do código offline (~500 linhas):** está **interleaved com o
-MP vivo** (branches `if(serverAuthMobs){...}else{...}` em doAttack/castSpell/throwSpear/
-gainMagiaXp/completeStage/tickRegen + funções `updateMonster`/`spawnInitialMonsters`/etc).
-Riscos: (1) "compila" NÃO prova que o MP funciona, e o caminho WS não é testável local;
-(2) o mapa auto-gerado pra remoção tinha **instrução invertida** (mandava deixar o regen "sempre
-local", o que brigaria com a autoridade server-side de HP/MP) → aplicar cru quebra o jogo.
-**Caminho certo:** passo focado, removido com julgamento por-site (não pelo mapa cru), e
-**validado pelo dono no preview da Vercel** (logar + lutar + magia + lança + quest + regen contra
-o WS de prod) ANTES de promover. Mapa cirúrgico das ~25 ocorrências salvo (agente), pronto pra execução.
+**✅ FEITO — remoção do código offline (~550 linhas, `540c61e`):** removido com julgamento
+**por-site** (NÃO pelo mapa do agente, que tinha 2 instruções erradas: regen "sempre local" e
+deletar `hlHuntActive`/`hlHuntTimer` que o MP usa). Descoberta-chave: o offline é um **módulo
+auto-contido** — `killMonster` (com loot/saveState locais) só tinha callers offline, então toda a
+cadeia (spawn*/updateMonster/tickMobDots/damagePlayer/killMonster) caiu junto. Funções
+compartilhadas colapsadas pro caminho MP (preserva o `send attackMob`, remove o `else` local):
+doAttack/throwSpear/castSpell/tickRegen/completeStage/tickRespawns/tickHighlanderHunt/startGame.
+Preservado: `serverAuthMobs`, `hlHuntActive/timer`, `gainSkillXpLocal/gainMagiaXp` (já no-op em MP),
+`renderBossesWidget` (mostra boss vivo via snapshot). **Verificação:** compila, **zero refs órfãs**
+(grep), 5 sends `attackMob` do MP intactos. **⚠️ Caminho WS não testável local → VALIDAR no preview
+da Vercel** (logar + lutar + magia + lança + quest + regen) ANTES de promover.
+
+> Resíduo (def-only, dead mas inofensivo, deixado pra não arriscar): `SPAWN_RINGS`/`BIOME_SPAWNS`/
+> `ringOf` (dados), `rollAttackerStatus` e helpers de kill (`statsRecordMobKill`/`notifyMobKilledForQuests`).
 
 ---
 
