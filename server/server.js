@@ -1270,6 +1270,43 @@ const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fundo da sala (longe da ch
 // Antes era 41-59 (1 tile menor): no canto/beirada só 1-2 mobs alcançavam o
 // player → o resto enfileirava. Com 40-60 alcançam até 3 no canto / 5 na borda.
 const DUNGEON_ROOM = { x0: 40, y0: 40, x1: 60, y1: 60 };
+
+// ─── M4 3b: grid do andar (server = DONO do layout) ────────────────────────
+// O server gera o grid WALL/FLOOR de cada andar e o transmite ao cliente no
+// dungeonEnter; mobs/spawn/colisão passam a usar ESTE grid (não o bounding box).
+// Fase 1: layout = a sala cheia 40-60 de sempre → comportamento IDÊNTICO.
+// Fase 2 (próximo deploy): cellular automata por andar. Determinístico por floor;
+// cache efêmero (descartado quando o andar esvazia → regenera igual).
+const DUNGEON_REGION = DUNGEON_ROOM;     // região coberta pelo grid (40..60 = 21×21)
+const dungeonFloors = new Map();          // floor → { region, rows, walkable:Set, floorTiles:[], stairs }
+function genDungeonGrid(floor){
+    const { x0, y0, x1, y1 } = DUNGEON_REGION;
+    const rows = [], walkable = new Set(), floorTiles = [];
+    for (let y = y0; y <= y1; y++){
+        let row = '';
+        for (let x = x0; x <= x1; x++){
+            const isFloor = true;          // Fase 1: tudo chão (= sala 40-60 de hoje)
+            row += isFloor ? '1' : '0';
+            if (isFloor){ walkable.add(x + ',' + y); floorTiles.push({ x, y }); }
+        }
+        rows.push(row);
+    }
+    const stairs = {
+        spawn: { x: DUNGEON_SPAWN.x, y: DUNGEON_SPAWN.y },
+        up:    { x: DUNGEON_EXIT.x,  y: DUNGEON_EXIT.y },
+        down:  floor < DUNGEON_MAX_FLOOR ? { x: DUNGEON_DOWN.x, y: DUNGEON_DOWN.y } : null,
+        boss:  floor === DUNGEON_MAX_FLOOR ? { x: DUNGEON_BOSS_SPAWN.x, y: DUNGEON_BOSS_SPAWN.y } : null,
+    };
+    return { floor, region: { x0, y0, x1, y1 }, rows, walkable, floorTiles, stairs };
+}
+function getDungeonFloor(floor){
+    if (!dungeonFloors.has(floor)) dungeonFloors.set(floor, genDungeonGrid(floor));
+    return dungeonFloors.get(floor);
+}
+function dungeonTileWalkable(floor, x, y){
+    const g = dungeonFloors.get(floor);
+    return !!g && g.walkable.has(x + ',' + y);
+}
 const DUNGEON_MOB_TARGET = 9;                 // população de mobs no andar 1
 const DUNGEON_MOB_TYPES  = ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // pesos: mais Sombra
 // Mob pode pisar no tile? No andar usa o box da sala (sem PZ, sem grid do
@@ -1289,7 +1326,7 @@ function mobTileOk(m, x, y){
     const f = m.floor || 0;
     if (isTransitionTile(f, x, y)) return false;   // não fica em cima da escada/chegada
     if (f >= 1){
-        return x >= DUNGEON_ROOM.x0 && x <= DUNGEON_ROOM.x1 && y >= DUNGEON_ROOM.y0 && y <= DUNGEON_ROOM.y1;
+        return dungeonTileWalkable(f, x, y);   // M4 3b: grid real do andar (não mais só o box)
     }
     return isWalkable(x, y) && !inSafe(x, y) && !inSanctuary(x, y);
 }
@@ -1628,7 +1665,10 @@ function spawnDungeonMobs(){
     for (const m of Array.from(monsters.values())){
         if ((m.floor || 0) >= 1 && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
     }
+    // M4 3b: descarta o grid de andares vazios (efêmero; regenera ao reentrar)
+    for (const f of [...dungeonFloors.keys()]){ if (!floorsWithPlayers.has(f)) dungeonFloors.delete(f); }
     for (const floor of floorsWithPlayers){
+        const g = getDungeonFloor(floor);   // M4 3b: grid do andar (layout/escadas/floor tiles)
         // ★ Boss do último andar: 1 por vez, com cooldown de respawn pós-morte (anti-farm)
         if (floor === DUNGEON_MAX_FLOOR){
             const hasBoss = Array.from(monsters.values()).some(mm => mm.type === DUNGEON_BOSS_TYPE && (mm.floor||0) === floor && mm.hp > 0);
@@ -1636,20 +1676,25 @@ function spawnDungeonMobs(){
             // última morte. Sem isso, matar e ficar no andar 5 = respawn no tick (8s).
             // 1ª descida (sem morte registrada) → deadAt 0 → spawna na hora. OK.
             const deadAt = dungeonBossDeath.get(floor) || 0;
+            const bs = g.stairs.boss || DUNGEON_BOSS_SPAWN;
             if (!hasBoss && Date.now() - deadAt >= DUNGEON_BOSS_RESPAWN_MS){
-                spawnMob(DUNGEON_BOSS_TYPE, DUNGEON_BOSS_SPAWN.x, DUNGEON_BOSS_SPAWN.y, floor);
+                spawnMob(DUNGEON_BOSS_TYPE, bs.x, bs.y, floor);
                 dungeonBossDeath.delete(floor);   // respawnou: zera o cooldown pro próximo ciclo
             }
         }
         let count = 0;
         for (const m of monsters.values()) if ((m.floor || 0) === floor && m.hp > 0 && !m.unique) count++;
+        // não nasce em cima das escadas/chegada/boss (3×3 ao redor de cada uma)
+        const stairTiles = new Set();
+        for (const s of [g.stairs.spawn, g.stairs.up, g.stairs.down, g.stairs.boss]){
+            if (s) for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) stairTiles.add((s.x+dx)+','+(s.y+dy));
+        }
         let tries = 0;
-        while (count < DUNGEON_MOB_TARGET && tries < 120){
+        while (count < DUNGEON_MOB_TARGET && tries < 120 && g.floorTiles.length){
             tries++;
-            const x = DUNGEON_ROOM.x0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.x1 - DUNGEON_ROOM.x0 - 1));
-            const y = DUNGEON_ROOM.y0 + 1 + Math.floor(Math.random() * (DUNGEON_ROOM.y1 - DUNGEON_ROOM.y0 - 1));
-            // não nasce nas escadas (subida 50,50 / descida 50,57) nem na chegada (50,52)
-            if (Math.abs(x - 50) <= 1 && ((y >= 49 && y <= 53) || (y >= 56 && y <= 58))) continue;
+            const t = g.floorTiles[Math.floor(Math.random() * g.floorTiles.length)];
+            const x = t.x, y = t.y;
+            if (stairTiles.has(x + ',' + y)) continue;   // longe das escadas/chegada
             if (mobAt(x, y, floor)) continue;
             const type = DUNGEON_MOB_TYPES[Math.floor(Math.random() * DUNGEON_MOB_TYPES.length)];
             const mob = spawnMob(type, x, y, floor);
@@ -1663,11 +1708,14 @@ function spawnDungeonMobs(){
 // só rotula a direção no cliente (log/toast).
 function enterDungeonFloor(p, id, floor, dir){
     p.floor = floor;
-    p.x = DUNGEON_SPAWN.x; p.y = DUNGEON_SPAWN.y;
+    const g = getDungeonFloor(floor);          // M4 3b: server é dono do layout do andar
+    p.x = g.stairs.spawn.x; p.y = g.stairs.spawn.y;
     spawnDungeonMobs();
     if (p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
             t:'dungeonEnter', floor, dir: dir || 'down', x: p.x, y: p.y,
+            grid: { region: g.region, rows: g.rows },   // M4 3b: cliente desenha ESTE grid
+            stairs: g.stairs,
             players: snapshotPlayers(floor).filter(sp => sp.id !== id),
             mobs: snapshotMobs(floor),
         }));
