@@ -5964,8 +5964,17 @@ wss.on('connection', (ws, request) => {
             // mataria o boss 5000hp num piscar. Campo dedicado p/ não colidir com
             // lastAttackAt (que serve à mini-PZ do NPC).
             const nowAtk = Date.now();
-            if (nowAtk - (p._lastAttackMobAt || 0) < ATTACK_MIN_INTERVAL_MS) return;
-            p._lastAttackMobAt = nowAtk;
+            // Rate-limit POR MOB (não por player): o Exori (AoE) dispara vários attackMob no
+            // mesmo tick — um por mob no raio. Um rate-limit por player deixava passar só o 1º
+            // e o resto sumia ("dano aparece mas o mob não morre"). Por-mob permite o AoE
+            // acertar todos, mas mantém a trava contra rajada de hits forjados no MESMO mob
+            // (one-shot de boss). Limpeza preguiçosa evita o Map crescer.
+            p._lastHitMob = p._lastHitMob || new Map();
+            if (nowAtk - (p._lastHitMob.get(msg.monsterId) || 0) < ATTACK_MIN_INTERVAL_MS) return;
+            p._lastHitMob.set(msg.monsterId, nowAtk);
+            if (p._lastHitMob.size > 64){
+                for (const [mid, t] of p._lastHitMob){ if (nowAtk - t > 5000) p._lastHitMob.delete(mid); }
+            }
             const range = msg.range || 1;
             if (chebyshev(p.x, p.y, m.x, m.y) > range) return;
             p.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s

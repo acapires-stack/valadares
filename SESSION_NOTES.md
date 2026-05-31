@@ -7,6 +7,22 @@
 
 ---
 
+## 🩹 Sessão 31/05/2026 (cont. 2) — EXORI (AoE) sem dano + botão reset quests
+
+**EXORI/AoE não aplicava dano online** (reportado matando o Senhor de Valadares). O Exori dispara
+1 `attackMob` por mob no raio, todos no mesmo tick. O rate-limit do `attackMob` (200ms, anti-rajada
+forjada) era POR PLAYER → só o 1º hit passava, o resto sumia silenciosamente ("o dano aparece mas o
+mob não morre"). Fix: rate-limit POR MOB (`p._lastHitMob` Map) — o AoE acerta todos os mobs do raio,
+mas a trava contra rajada de hits forjados no MESMO mob (one-shot de boss) continua igual. Limpeza
+preguiçosa do Map (>64 entradas, evict >5s). NÃO piora o boss (1 mob segue a 1 hit/200ms).
+
+**Botão "reset quests"** no painel admin (GERENCIAR PLAYER, ao lado de check/reset pos) → manda
+`/resetquests NOME` (campo vazio = a própria conta). O dono procurou o botão; só existia o comando.
+
+⚠️ O fix do EXORI mexe no server → deploy com /manutencao.
+
+---
+
 ## 🩹 Sessão 31/05/2026 (cont.) — fixes pós-deploy: HP/MP do /skill, vazamento de quests, /resetquests
 
 Testando o lote anterior in-game, surgiram 2 bugs + 1 comando novo:
