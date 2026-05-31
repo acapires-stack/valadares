@@ -7,6 +7,28 @@
 
 ---
 
+## 🛡️ Sessão 31/05/2026 (cont. 5) — santuário 5×5 nos NPCs de mundo (ler diálogo sem apanhar)
+
+Queixa do dono: parar pra falar com os NPCs externos (Eremita/Ferreiro/Caçadora/Mineiro/Crepúsculo/
+Vohrim) = tomar porrada enquanto lê. A mini-PZ 3×3 (`playerNearNpc`) já cobria esses NPCs, mas (a) só
+bloqueia a AQUISIÇÃO de alvo e (b) é cancelada por 2s a cada ataque seu — e como esses NPCs ficam no
+meio dos mobs, você chega lutando e lê dentro da janela de grace → apanha. Os NPCs da cidade não
+sofrem disso (PZ 9×9 forte e marcada). Escolha do dono: **santuário visível + leash, 5×5, mob larga na borda.**
+
+- **Server** (`server.js`): `inSanctuary()` + `SANCTUARY_NPCS` raio 2 (5×5) ao redor dos 6 NPCs de
+  mundo. `playerNearNpc` passa a cobrir o santuário (mob não mira quem está dentro, respeitando a grace
+  de 2s anti-cheese). `mobTileOk` + os 6 spawns de overworld excluem o santuário → mob não pisa nem
+  nasce lá (clareira = leash natural: quem perseguia para na borda e larga). Vendedor de Almas
+  (oculto/sinistro) fica DE FORA, de propósito.
+- **Cliente** (`play.html`): `sanctuary:true` nos 6 NPCs + helper `inSanctuary` espelhando o server.
+  Render pinta tom verde + contorno (mantém o piso do bioma) pra mostrar a zona. Mob-step alinhado.
+
+Resultado: pare de atacar perto do NPC → em ≤2s os mobs largam e você lê em paz; revidar reativa a
+grace. Verificado: `node --check` server ✓ + JS inline cliente ✓. Não testável local (precisa server
+vivo + login) → checklist in-game. ⚠️ Mexe no server → deploy com /manutencao.
+
+---
+
 ## 🩹 Sessão 31/05/2026 (cont. 4) — aviso de manutenção robusto (/api/status)
 
 O aviso de manutenção (`8237598`) dependia de flag `sessionStorage` + reload, rodando no cliente

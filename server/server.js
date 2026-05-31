@@ -1185,9 +1185,27 @@ const NPC_POSITIONS = [
 ];
 const NPC_PROTECT_RADIUS = 1;   // 3×3 ao redor do NPC (suficiente pra ler modal)
 const NPC_PROTECT_COMBAT_GRACE_MS = 2000;   // ao atacar, perde proteção por 2s
+
+// Santuário dos NPCs de MUNDO (fora da PZ da cidade): zona segura MAIOR (5×5) e
+// visível, pra dar espaço de ler o diálogo sem apanhar. Diferente da mini-PZ 3×3,
+// aqui o mob também NÃO pisa (vira clareira, ver mobTileOk/spawns) → quem te
+// perseguia para na borda e, como você não é mirado dentro, larga (leash natural).
+// Os NPCs da cidade já têm a PZ 9×9; o Vendedor (oculto/sinistro) fica de fora.
+const SANCTUARY_RADIUS = 2;   // 5×5
+const SANCTUARY_NPCS = [
+    QUEST_NPCS.eremita, QUEST_NPCS.ferreiro, QUEST_NPCS.cacadora,
+    QUEST_NPCS.mineiro, QUEST_NPCS.crepusculo, QUEST_NPCS.vohrim,
+];
+function inSanctuary(x, y){
+    for (const n of SANCTUARY_NPCS){
+        if (Math.max(Math.abs(x - n.x), Math.abs(y - n.y)) <= SANCTUARY_RADIUS) return true;
+    }
+    return false;
+}
 function playerNearNpc(p){
-    // Mini-PZ é cancelada se o player atacou recentemente (anti-cheese)
+    // Mini-PZ / santuário cancelados se o player atacou recentemente (anti-cheese)
     if (p.lastAttackAt && Date.now() - p.lastAttackAt < NPC_PROTECT_COMBAT_GRACE_MS) return false;
+    if (inSanctuary(p.x, p.y)) return true;   // santuário 5×5 dos NPCs de mundo
     for (const n of NPC_POSITIONS){
         if (Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)) <= NPC_PROTECT_RADIUS) return true;
     }
@@ -1273,7 +1291,7 @@ function mobTileOk(m, x, y){
     if (f >= 1){
         return x >= DUNGEON_ROOM.x0 && x <= DUNGEON_ROOM.x1 && y >= DUNGEON_ROOM.y0 && y <= DUNGEON_ROOM.y1;
     }
-    return isWalkable(x, y) && !inSafe(x, y);
+    return isWalkable(x, y) && !inSafe(x, y) && !inSanctuary(x, y);
 }
 
 // ─── M8 Auction House — state global ──────────────────────────────────────
@@ -1560,7 +1578,7 @@ function spawnInitial(){
             const x = 5 + Math.floor(Math.random() * (M_W - 10));
             const y = 5 + Math.floor(Math.random() * (M_H - 10));
             if (!isWalkable(x, y)) continue;
-            if (inSafe(x, y) || inCave(x, y) || mobAt(x, y)) continue;
+            if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
             const d = manhattan(x, y, M_W/2, M_H/2);
             if (d < ring.min || d >= ring.max) continue;
             spawnMob(ring.types[Math.floor(Math.random() * ring.types.length)], x, y);
@@ -1589,7 +1607,7 @@ function spawnInitial(){
             const y = 5 + Math.floor(Math.random() * (M_H - 10));
             if (!b.inBounds(x, y)) continue;
             if (!isWalkable(x, y)) continue;
-            if (inSafe(x, y) || inCave(x, y) || mobAt(x, y)) continue;
+            if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
             spawnMob(b.types[Math.floor(Math.random() * b.types.length)], x, y);
             placed++;
         }
@@ -1695,7 +1713,7 @@ function tickRespawns(){
                 const x = 5 + Math.floor(Math.random() * (M_W - 10));
                 const y = 5 + Math.floor(Math.random() * (M_H - 10));
                 if (!isWalkable(x, y)) continue;
-                if (inSafe(x, y) || inCave(x, y) || mobAt(x, y)) continue;
+                if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
                 const d = manhattan(x, y, M_W/2, M_H/2);
                 if (d < ring.min || d >= ring.max) continue;
                 if (tooClose(x, y, 8)) continue;
@@ -1740,7 +1758,7 @@ function tickRespawns(){
                 const y = 5 + Math.floor(Math.random() * (M_H - 10));
                 if (!b.inBounds(x, y)) continue;
                 if (!isWalkable(x, y)) continue;
-                if (inSafe(x, y) || inCave(x, y) || mobAt(x, y)) continue;
+                if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
                 if (tooClose(x, y, 8)) continue;
                 spawnMob(b.types[Math.floor(Math.random() * b.types.length)], x, y);
                 break;
@@ -3871,7 +3889,7 @@ function applyDailyEventTick(){
                 const y = Math.round(50 + Math.sin(ang) * r);
                 if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
                 if (!isWalkable(x, y)) continue;
-                if (inSafe(x, y) || inCave(x, y)) continue;
+                if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y)) continue;
                 if (mobAt(x, y) || playerAt(x, y)) continue;
                 sx = x; sy = y; found = true; break;
             }
@@ -5469,7 +5487,7 @@ wss.on('connection', (ws, request) => {
                     const y = c.y + Math.floor(Math.random()*6) - 3;
                     if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
                     if (!isWalkable(x, y)) continue;
-                    if (inSafe(x, y) || inCave(x, y)) continue;
+                    if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y)) continue;
                     if (mobAt(x, y) || playerAt(x, y)) continue;
                     const mob = spawnMob('CACADOR', x, y);
                     if (mob){

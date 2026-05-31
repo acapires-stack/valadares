@@ -2444,12 +2444,12 @@ const NPCS = [
     { id:'atendente', name:'Atendente',    pos:{x:47,y:53}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
     { id:'tintureira',name:'Tintureira',   pos:{x:53,y:53}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
     // Mundo — chains narrativas (cada um tem seu local temático)
-    { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', chain:'cripta' },
-    { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', chain:'forja'  },
-    { id:'cacadora',  name:'Caçadora de Drakes', pos:{x:76,y:78}, body:'#3a5a3a', hat:'#80aa40', action:'chain', chain:'drake' },
-    { id:'mineiro',   name:'Mineiro Perdido',  pos:{x:66,y:90}, body:'#5a3a18', hat:'#9a9a9a', action:'chain', chain:'mina'   },
-    { id:'crepusculo',name:'Madame Crepúsculo',pos:{x:28,y:75}, body:'#3a204a', hat:'#7040aa', action:'chain', chain:'crepusculo' },
-    { id:'vohrim',    name:'Embaixador Vohrim', pos:{x:15,y:50}, body:'#2a1a3a', hat:'#5a3030', action:'chain', chain:'vohrim' },
+    { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', sanctuary:true, chain:'cripta' },
+    { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', sanctuary:true, chain:'forja'  },
+    { id:'cacadora',  name:'Caçadora de Drakes', pos:{x:76,y:78}, body:'#3a5a3a', hat:'#80aa40', action:'chain', sanctuary:true, chain:'drake' },
+    { id:'mineiro',   name:'Mineiro Perdido',  pos:{x:66,y:90}, body:'#5a3a18', hat:'#9a9a9a', action:'chain', sanctuary:true, chain:'mina'   },
+    { id:'crepusculo',name:'Madame Crepúsculo',pos:{x:28,y:75}, body:'#3a204a', hat:'#7040aa', action:'chain', sanctuary:true, chain:'crepusculo' },
+    { id:'vohrim',    name:'Embaixador Vohrim', pos:{x:15,y:50}, body:'#2a1a3a', hat:'#5a3030', action:'chain', sanctuary:true, chain:'vohrim' },
     // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
     { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
 ];
@@ -2625,6 +2625,18 @@ function inSafeZone(x, y){
 // com a PZ, mas lá é perigoso. Use onde a segurança depende de ONDE o player está.
 function playerInSafeZone(){
     return (player.floor || 0) === 0 && inSafeZone(player.x, player.y);
+}
+// Santuário dos NPCs de mundo (espelha SANCTUARY_* do server): zona segura 5×5 ao
+// redor de cada NPC de chain, pra ler o diálogo sem apanhar. Render pinta um tom
+// verde + borda; mob não anda pra dentro (igual à PZ). Vendedor (oculto) fica fora.
+const SANCTUARY_RADIUS = 2;   // 5×5 — bate com o server
+function inSanctuary(x, y){
+    if ((player.floor || 0) !== 0) return false;   // NPCs de mundo só no overworld
+    for (const n of NPCS){
+        if (!n.sanctuary) continue;
+        if (Math.max(Math.abs(x - n.pos.x), Math.abs(y - n.pos.y)) <= SANCTUARY_RADIUS) return true;
+    }
+    return false;
 }
 
 const canvas = document.getElementById('canvas');
@@ -4343,7 +4355,7 @@ function updateMonster(m, dt){
         if (!walkable(map[ny][nx])) return false;
         if (monsterAt(nx, ny)) return false;
         if (nx===player.x && ny===player.y) return false;
-        if (inSafeZone(nx, ny)) return false;
+        if (inSafeZone(nx, ny) || inSanctuary(nx, ny)) return false;
         m.prevX = m.x; m.prevY = m.y;
         m.x = nx; m.y = ny;
         m.moveDuration = (dx && dy) ? m.speed * 1.5 : m.speed;
@@ -13970,6 +13982,19 @@ function loop(ts){
                     if (my-SAFE_CY === -SAFE_RADIUS) { ctx.beginPath(); ctx.moveTo(sx, sy+1); ctx.lineTo(sx+TS, sy+1); ctx.stroke(); }
                     if (my-SAFE_CY ===  SAFE_RADIUS) { ctx.beginPath(); ctx.moveTo(sx, sy+TS-1); ctx.lineTo(sx+TS, sy+TS-1); ctx.stroke(); }
                 }
+            } else if (inSanctuary(mx, my)){
+                // Santuário do NPC de mundo: mantém o piso natural do bioma, sobrepõe
+                // um tom verde + contorno só na borda externa (checa os 4 vizinhos,
+                // lida com zonas que se sobreponham).
+                drawTile(map[my][mx], sx, sy, mx, my);
+                ctx.fillStyle = 'rgba(120, 210, 130, 0.13)';
+                ctx.fillRect(sx, sy, TS, TS);
+                ctx.strokeStyle = 'rgba(140, 235, 150, 0.6)';
+                ctx.lineWidth = 2;
+                if (!inSanctuary(mx-1, my)) { ctx.beginPath(); ctx.moveTo(sx+1, sy); ctx.lineTo(sx+1, sy+TS); ctx.stroke(); }
+                if (!inSanctuary(mx+1, my)) { ctx.beginPath(); ctx.moveTo(sx+TS-1, sy); ctx.lineTo(sx+TS-1, sy+TS); ctx.stroke(); }
+                if (!inSanctuary(mx, my-1)) { ctx.beginPath(); ctx.moveTo(sx, sy+1); ctx.lineTo(sx+TS, sy+1); ctx.stroke(); }
+                if (!inSanctuary(mx, my+1)) { ctx.beginPath(); ctx.moveTo(sx, sy+TS-1); ctx.lineTo(sx+TS, sy+TS-1); ctx.stroke(); }
             } else {
                 drawTile(map[my][mx], sx, sy, mx, my);
             }
