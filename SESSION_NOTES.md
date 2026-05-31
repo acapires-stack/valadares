@@ -7,6 +7,41 @@
 
 ---
 
+## 🛠️ Sessão 31/05/2026 — Admin edita char (server-side) + restore só admin + mobs no lago (`1f41f52`)
+
+Deployado via `/manutencao` + logout (fluxo correto — sem repetir o wipe de 30/05).
+
+**1. Admin edita char de verdade (server-autoritativo).** O painel admin (gold/skills/HP-MP)
+mexia só no `player.*` do cliente → o lockdown N3 sobrescrevia com o valor vivo do server no
+próximo sync → "edito e some em ~1min". Sintoma in-game: ouro 15000 no display mas Mercador
+respondia "Sem ouro (1000g)" (server via o gold real <1000). Fix: 3 comandos no roteador admin
+(`/gold N`, `/skill NOME N`, `/heal`) que aplicam em `p.*` vivo + gravam no `acc.save`
+(`flushAccounts`) + empurram via `invUpdate`/`pstats`. O painel manda esses comandos via
+`_adminSendChat` (otimista no cliente + autoritativo no server; quando o invUpdate volta, bate).
+`/help` atualizado. Skills: Punho/Espada/Machado/Clava/Distância/Escudo/Magia.
+
+**2. Restaurar backup → SÓ admin.** O botão "Restaurar do backup" estava no menu de Opções
+(qualquer player) → permitia auto-restauração/rollback. Movido pro painel admin; `tryRestoreBackup`
+E `restoreFromBackup` checam `isAdmin` (fecha até o vetor `window.restoreFromBackup` via console).
+
+**3. Monstros nascendo no lago.** O evento `siege` (cerco) spawnava ORC/SKELETON/WOLF/SPIDER por
+ângulo+raio ao redor do centro SEM validar o tile (`server.js` ~3850) → nasciam dentro do lago
+(WATER não-walkable). Todos os outros spawns validavam; só o siege não. Fix: acha posição walkable
+no anel (fora de PZ/caverna, sem sobrepor). Bônus: `loadStateFromDisk` descarta mob comum do
+overworld preso em tile não-walkable (uniques/masmorra preservados) → limpa os já presos no boot.
+`mapSeed=42` é fixo, então o mapa não muda entre deploys — era puramente o siege.
+
+**4. Login automático removido** (cliente-only — push separado, não reconecta Railway). `tryAutoLogin`
+entrava direto via `SESSION_KEY` (nome+hash no localStorage), pulando a tela. Agora só pré-preenche o
+último nome usado; o player digita a senha e confirma (foco vai pro campo de senha). Ajuda a testar
+conta comum vs admin sem deslogar/relogar.
+
+**A testar no login:** (a) painel → ouro → comprar no Mercador → relogar (persiste); (b) player
+comum não vê mais o botão de restore nas Opções; (c) cerco nasce em terra + log
+`[state] … N presos em água descartados`.
+
+---
+
 ## ⚔️ Sessão 30/05/2026 (cont. 3) — Rebalance do personagem + correção de PvE + claude admin (`dfe3f9f`)
 
 Dono pediu pra repensar o sistema do personagem. Decisões dele:

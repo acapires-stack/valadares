@@ -13294,17 +13294,18 @@ window.closeForgotPwd = closeForgotPwd;
 window.submitForgotPwd = submitForgotPwd;
 
 // Auto-login se sessão válida existir no localStorage
+// Login automático REMOVIDO (a pedido do dono): o jogo nunca entra sozinho — sempre
+// mostra a tela de login. Aqui só pré-preenchemos o último nome usado por conveniência;
+// o player digita a senha e confirma. (SESSION_KEY segue gravado no tryLogin só pra isto.)
 function tryAutoLogin(){
     try {
         const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-        if (!s || !s.name) return false;
-        const acc = getAccount(s.name);
-        if (!acc || acc.pw !== s.pw) return false;
-        // s.pw já é o hashPw — reusa direto pra auth do WS
-        _authPwHash = s.mp === false ? null : s.pw;
-        startGame(s.mp !== false, s.name);
-        return true;
-    } catch { return false; }
+        if (s && s.name){
+            const ci = document.getElementById('charInput');
+            if (ci && !ci.value) ci.value = s.name;
+        }
+    } catch {}
+    return false;   // sempre cai na tela de login
 }
 
 function deleteAccount(){
@@ -13452,8 +13453,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Bloqueia keyup também
         chatIn.addEventListener('keyup', e => e.stopPropagation());
     }
-    // Auto-login: tenta entrar com a sessão guardada
-    if (!tryAutoLogin()) name?.focus();
+    // Login automático removido — tryAutoLogin() só pré-preenche o nome (não entra).
+    // Foca na senha se o nome já veio preenchido; senão no campo de nome.
+    tryAutoLogin();
+    if (name && name.value){ document.getElementById('pwdInput')?.focus(); }
+    else { name?.focus(); }
 });
 
 // Salva ao fechar/recarregar pra não perder progresso do último segundo
