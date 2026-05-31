@@ -4343,6 +4343,10 @@ wss.on('connection', (ws, request) => {
     const electronMatch = ua.match(/Electron\/(\d+\.\d+\.\d+)/i);
     const isElectronUA = !!electronMatch;
     const p  = { ws, id, name:'Anônimo', x:50, y:50, dir:'down', floor:0, hp:100, maxHp:100, connectedAt: Date.now(), isElectronUA, electronVer: electronMatch?.[1] || null };
+    // Inicializa inv/equipped/chests/gold/skills JÁ na conexão (não só no join). Sem isto, um
+    // player conectado-mas-não-joinado fica no Map com p.inv=undefined → um tick/handler que
+    // itere `players` e toque p.inv sem guarda (ex.: pkDeath drop) dava TypeError. (audit 29/05)
+    ensurePlayerInvSlots(p);
     players.set(id, p);
     counters.connections_total++;
     console.log(`[+] ${id} conectou (${players.size} online)${isElectronUA ? ` electron/${p.electronVer}` : ''}`);
