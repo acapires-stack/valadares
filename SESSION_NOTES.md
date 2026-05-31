@@ -7,6 +7,27 @@
 
 ---
 
+## 🧹 Sessão 31/05/2026 (cont. 7) — varredura do backlog (dívida técnica) + fix p.inv
+
+Dono pediu pra atacar os 3 grupos (dívida técnica/segurança, housekeeping, P2+) enquanto saía. Varri:
+- **Segurança da auditoria 29/05 = 100% fechada** já no `d5aec67` (30/05): re-claim daily, scrypt,
+  rate-limits pos/pix, `_errorRateMap`, float/guild caps, isAdmin flag, castSpell guard, train/spell/
+  talent→toast. ROADMAP/auditoria estavam desatualizados → corrigidos.
+- **✅ Same-player 2× simultâneo**: confirmado FECHADO pela blindagem de 30/05 (auth derruba outra
+  sessão da mesma conta por `authedName` + `players.delete`, server.js:4437). Marcado no ROADMAP.
+- **✅ p.inv TypeError (FIX desta sessão)**: o player entra no `players` Map na CONEXÃO (4346) SEM
+  inv; `ensurePlayerInvSlots` só rodava no join (4691) → janela onde um tick que itere `players` e
+  toque `p.inv` sem guarda (ex.: pkDeath drop) dava TypeError. Fix: `ensurePlayerInvSlots(p)` já na
+  conexão. Bot 007 já tinha inv. **Server → vai no lote do próximo deploy com /manutencao.**
+- **itch-wrapper.html**: commitado (wrapper iframe do itch.io → valadares.app.br/jogar; ligado ao P2 itch).
+
+**NÃO feito (precisa de você ou teste in-game, não dá AFK):** refactor movimento/combate autoritativo
+(grande/sistêmico), remover offline ~500 linhas (decisão de produto + precisa server vivo), broadcastMobs
+diff (escala), marketing/comercialização (ações suas), balanceamento boss (playtest), churn de baixo
+valor (dead code `attack()`, dedups, comentários stale — verificar combate antes).
+
+---
+
 ## 🎨 Sessão 31/05/2026 (cont. 6) — tela de login: fundo opaco (HUD não vaza mais)
 
 Dono: "essa tela ficou torta". Diagnóstico no preview: o card de login JÁ estava perfeitamente

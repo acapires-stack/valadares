@@ -47,10 +47,10 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 - **✅ AUDITORIA COMPLETA (masmorra Fase 3) — FEITA 29/05.** Manual: os skills `/security-review`+`/code-review` só comparam o branch contra `origin/main`, e a Fase 3 já está shipada (`origin/main`==HEAD) → diff vazio. Achados: 🔴 **crítico** (dano client-side one-shotava o boss 5000hp e roubava 100% do loot via `damageBy` → `MAX_HIT_DMG=600` + rate-limit `ATTACK_MIN_INTERVAL_MS=200` no attackMob), 🟠 **médio** (alts parados em party farmavam loot do boss → só damager divide), 🟡 **baixo** deferido. Detalhes no `SESSION_NOTES.md`.
 - **🔧 Refactor de movimento/combate autoritativo (deferido, do audit)** — `p.x/y` (transição de andar) e `range`/cadência de ataque são client-trusted. Hoje mitigado por clamp de coords + `MAX_HIT_DMG` + rate-limit; o caminho definitivo é o server validar movimento e cadência por arma. Sistêmico — fora de hotfix.
 
-- **Same-player 2× simultâneo** (mobile + PC) cria 2 entries no `players` Map → state inconsistency
+- **✅ Same-player 2× simultâneo — FECHADO 30/05** (auth derruba QUALQUER outra sessão da mesma conta por `authedName` + `players.delete`, [server.js:4437](server/server.js)). Era a causa-raiz do wipe.
 - **✅ `_errorRateMap` leak — FECHADO 30/05** (IP real do XFF + TTL/evict de 5min)
-- **Algumas funções server-side assumem `p.inv` existe** — TypeError potencial em save legado
-- **broadcastMobs ainda usa full snapshot** quando muda — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo
+- **✅ `p.inv` TypeError em save legado — FECHADO 31/05** (`ensurePlayerInvSlots` agora roda na CONEXÃO, não só no join → todo player no Map já tem inv/equipped/chests/gold/skills; bot 007 já tinha)
+- **broadcastMobs ainda usa full snapshot** quando muda — pra >20 players ativos, precisa diff verdadeiro com novo `t` no protocolo (só importa em escala — baixa prioridade)
 
 ### 🟢 P0.5 — Verificações de smoke test antes de feature
 
