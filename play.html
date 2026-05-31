@@ -13641,32 +13641,45 @@ function showLoadingOverlay(show, title, desc, hint){
 
 // ─── Auto-update: detecta nova versão do cliente e recarrega ──────────────
 // Checa a cada 60s o ETag/Last-Modified do HTML. Se mudou, salva e recarrega.
-// Roda só após 30s de jogo (evita reload em loop se algo der ruim no primeiro check).
+// Guardas anti-loop ("só fica atualizando", relatado no mobile):
+//  1. SÓ roda em jogo (started) — na tela de login nunca recarrega sozinho.
+//  2. NÃO usa content-length: a compressão (gzip/br) varia por request/nó de CDN
+//     → o tamanho oscilava → falso positivo → reload em loop. Só validador forte.
+//  3. Exige a MESMA versão nova em 2 checks seguidos antes de recarregar — debounce
+//     contra ETag que oscila entre PoPs de CDN (comum em rede móvel).
+//  4. Pula aba em background (document.hidden) e quando offline.
 let _lastHtmlVersion = null;
+let _pendingHtmlVersion = null;   // candidata: precisa confirmar em 2 checks pra valer
 let _autoUpdateStarted = Date.now();
 let _isUpdating = false;   // true durante a janela de reload (bloqueia damage)
 async function checkClientUpdate(){
     if (_isUpdating) return;
-    if (Date.now() - _autoUpdateStarted < 30000) return;  // grace period
+    if (!started) return;                                  // só em jogo — login não recarrega sozinho
+    if (document.hidden) return;                           // aba em background: não recarrega
+    if (!navigator.onLine) return;                         // offline: HEAD vai falhar/oscilar
+    if (Date.now() - _autoUpdateStarted < 30000) return;   // grace period
     try {
         const res = await fetch(window.location.pathname || '/', { method:'HEAD', cache:'no-store' });
-        const sig = res.headers.get('etag') || res.headers.get('last-modified') || res.headers.get('content-length') || '';
+        if (!res.ok) return;
+        // Só validadores fortes (ETag / Last-Modified). content-length removido de propósito.
+        const sig = res.headers.get('etag') || res.headers.get('last-modified') || '';
         if (!sig) return;
-        if (_lastHtmlVersion === null){ _lastHtmlVersion = sig; return; }
-        if (sig !== _lastHtmlVersion){
-            console.log('[autoupdate] nova versão detectada, recarregando em 1.5s…');
-            _isUpdating = true;
-            // Overlay unificado — fase 1: atualizando
-            showLoadingOverlay(true, 'ATUALIZANDO', 'Nova versão do jogo detectada…', 'Salvando progresso · combate pausado');
-            // Fecha WS imediato pra parar mobHit (servidor para de mandar dano)
-            if (ws){ try { ws.close(); } catch{} ws = null; }
-            // Cancela targets/auto-attack que poderiam roubar mais um tick
-            player.autoAttack = false;
-            player.target = null;
-            if (typeof saveState === 'function') saveState();
-            // Delay generoso pra save flushar + frame final do overlay aparecer
-            setTimeout(() => window.location.reload(), 1500);
-        }
+        if (_lastHtmlVersion === null){ _lastHtmlVersion = sig; return; }   // baseline
+        if (sig === _lastHtmlVersion){ _pendingHtmlVersion = null; return; }  // estável: limpa candidata
+        // Mudou: exige a MESMA versão nova em 2 checks seguidos (debounce de CDN flapping)
+        if (_pendingHtmlVersion !== sig){ _pendingHtmlVersion = sig; return; }
+        console.log('[autoupdate] nova versão confirmada, recarregando em 1.5s…');
+        _isUpdating = true;
+        // Overlay unificado — fase 1: atualizando
+        showLoadingOverlay(true, 'ATUALIZANDO', 'Nova versão do jogo detectada…', 'Salvando progresso · combate pausado');
+        // Fecha WS imediato pra parar mobHit (servidor para de mandar dano)
+        if (ws){ try { ws.close(); } catch{} ws = null; }
+        // Cancela targets/auto-attack que poderiam roubar mais um tick
+        player.autoAttack = false;
+        player.target = null;
+        if (typeof saveState === 'function') saveState();
+        // Delay generoso pra save flushar + frame final do overlay aparecer
+        setTimeout(() => window.location.reload(), 1500);
     } catch (e) { /* sem conexão / ignora */ }
 }
 setInterval(checkClientUpdate, 60 * 1000);
