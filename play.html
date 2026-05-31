@@ -12900,7 +12900,7 @@ function renderAdminPanel(){
             <button class="chest-qty-btn" onclick="adminResetUser()">reset pos</button>
             <button class="chest-qty-btn" onclick="adminResetQuests()">reset quests</button>
         </div>
-        <div style="color:#888;font-size:9px;padding:0 2px">check: mostra save+live. reset pos: sprite invisível (50,50). reset quests: zera principais (preserva diária; vazio = sua conta).</div>
+        <div style="color:#888;font-size:9px;padding:0 2px">check: mostra save+live. reset pos: sprite invisível (50,50). reset quests: zera Atendente + chains do mapa (preserva diária; vazio = sua conta).</div>
 
         <div style="color:#cc4040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">EXCLUIR CONTA</div>
         <div style="display:flex;gap:4px;align-items:center;margin:3px 0;font-size:11px">
@@ -12979,7 +12979,7 @@ function adminResetUser(){
 function adminResetQuests(){
     const name = (document.getElementById('admUserName').value || '').trim();
     const target = name || player.name;
-    if (!confirm(`Resetar quests (principais + ativas) de "${target}"? A diária é preservada.`)) return;
+    if (!confirm(`Resetar quests (Atendente + chains do mapa) de "${target}"? A diária é preservada.`)) return;
     _adminSendChat('/resetquests ' + target);
 }
 window.adminBroadcast = adminBroadcast;

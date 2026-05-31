@@ -7,6 +7,17 @@
 
 ---
 
+## 🩹 Sessão 31/05/2026 (cont. 3) — /resetquests agora limpa as chains do mapa
+
+O `/resetquests` (cont. 2) só zerava `quests.active/completed` (quests da **Atendente**, na PZ).
+As **chains narrativas do mapa** (Eremita/Ferreiro/Caçadora/Mineiro/Crepúsculo/Vohrim) guardam o
+progresso em `questFlags` — estrutura à parte que o comando não tocava → continuavam "concluídas"
+no claude (vazaram da alcione antes do 9b948b6). Agora o `/resetquests` também zera `questFlags`
+(save + estado vivo `p.questFlags` + empurra pro cliente via `invUpdate`). Diária e flags-de-mundo
+preservados. Mexe no server → deploy com /manutencao.
+
+---
+
 ## 🩹 Sessão 31/05/2026 (cont. 2) — EXORI (AoE) sem dano + botão reset quests
 
 **EXORI/AoE não aplicava dano online** (reportado matando o Senhor de Valadares). O Exori dispara
