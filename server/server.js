@@ -6507,7 +6507,7 @@ wss.on('connection', (ws, request) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /heal' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /heal · /resetquests NOME' });
                     return;
                 }
                 if (cmd === '/deluser'){
@@ -6656,11 +6656,17 @@ wss.on('connection', (ws, request) => {
                     p.skills[skName].val = val;
                     p.skills[skName].xp = 0;
                     p.skills[skName].xpNext = Math.floor(50 * Math.pow(1.15, val - 10));
+                    recomputeMaxStatsServer(p);   // recalcula maxHp/maxMp pelas skills novas (senão ficam no valor antigo até relogar)
                     const acc = getAccount(p.name);
-                    if (acc && acc.save) acc.save.skills = p.skills;
+                    if (acc && acc.save){
+                        acc.save.skills = p.skills;
+                        acc.save.maxHp = p.maxHp; acc.save.maxMp = p.maxMp;
+                        acc.save.hp = p.hp; acc.save.mp = p.mp;
+                    }
                     if (typeof flushAccounts === 'function') flushAccounts();
                     sendInvUpdate(p, { skills: p.skills });
-                    sendTo(id, { t:'serverMsg', level:'info', text:`${skName} = ${val}` });
+                    broadcastPstatsAll(p);   // empurra maxHp/maxMp/hp/mp novos pro cliente na hora
+                    sendTo(id, { t:'serverMsg', level:'info', text:`${skName} = ${val} (maxHP ${p.maxHp}/maxMP ${p.maxMp})` });
                     return;
                 }
                 if (cmd === '/heal'){
@@ -6668,6 +6674,30 @@ wss.on('connection', (ws, request) => {
                     p.mp = p.maxMp;
                     broadcastPstatsAll(p);
                     sendTo(id, { t:'serverMsg', level:'info', text:'❤ HP/MP cheios' });
+                    return;
+                }
+                if (cmd === '/resetquests'){
+                    const target = arg || p.name;
+                    const acc = getAccount(target);
+                    if (!acc){ sendTo(id, { t:'serverMsg', level:'warn', text:`Conta "${target}" não existe.` }); return; }
+                    // Zera active+completed no save (preserva a diária — progresso diário é legítimo).
+                    if (acc.save){
+                        acc.save.quests = acc.save.quests || {};
+                        acc.save.quests.active = {};
+                        acc.save.quests.completed = [];
+                    }
+                    // Se online, zera o estado vivo e empurra pro cliente.
+                    let online = false;
+                    for (const [, op] of players){
+                        if (op.name && op.name.toLowerCase() === target.toLowerCase() && op.quests){
+                            op.quests.active = {};
+                            op.quests.completed = [];
+                            sendInvUpdate(op, { quests: op.quests });
+                            online = true;
+                        }
+                    }
+                    if (typeof flushAccounts === 'function') flushAccounts();
+                    sendTo(id, { t:'serverMsg', level:'info', text:`Quests de ${target} resetadas (active+completed; diária preservada)${online ? ' [online]' : ''}.` });
                     return;
                 }
                 sendTo(id, { t:'serverMsg', level:'warn', text:`Comando desconhecido: ${cmd}. /help pra ver lista` });

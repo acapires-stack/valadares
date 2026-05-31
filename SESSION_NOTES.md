@@ -7,6 +7,30 @@
 
 ---
 
+## 🩹 Sessão 31/05/2026 (cont.) — fixes pós-deploy: HP/MP do /skill, vazamento de quests, /resetquests
+
+Testando o lote anterior in-game, surgiram 2 bugs + 1 comando novo:
+
+**1. HP/MP não recalculavam ao editar skill via admin.** O `/skill` que adicionei mudava a skill mas
+não chamava `recomputeMaxStatsServer` → maxHp/maxMp ficavam no valor antigo (boneco mostrava 122/111
+de quando sumSkills=82, mesmo após editar pra 336 → o certo é 376/238). Relogar corrigia (login
+recalcula em `:4722`). Fix: `/skill` agora chama `recomputeMaxStatsServer(p)` + `broadcastPstatsAll`
++ grava maxHp/maxMp/hp/mp no save → recalcula na hora.
+
+**2. Vazamento de quests entre contas.** `applySaveData` resetava flags/questFlags/permaBuffs (fix
+9b948b6) mas ESQUECEU `quests.active/completed` — ainda usava `if (d.quests)` sem else. Trocar de
+conta sem F5 (alcione → claude) mantinha o `completed` da anterior → boneco novo aparecia com as
+quests principais "concluídas". (As principais exigem aceitar+entregar no NPC, não auto-completam
+por kill → era vazamento, não progresso.) Fix: reset explícito de active+completed (mesmo padrão do
+flags/permaBuffs). Impede vazar de novo; saves já contaminados precisam de /resetquests.
+
+**3. `/resetquests [NOME]`** (novo comando admin): zera active+completed da conta (online ou offline),
+preserva a diária. Pra limpar contas que já pegaram o vazamento (ex: o claude).
+
+⚠️ Lote mexe no server → deploy com /manutencao.
+
+---
+
 ## 🛠️ Sessão 31/05/2026 — Admin edita char (server-side) + restore só admin + mobs no lago (`1f41f52`)
 
 Deployado via `/manutencao` + logout (fluxo correto — sem repetir o wipe de 30/05).

@@ -13748,11 +13748,12 @@ function applySaveData(d){
             player.stats.bossKills = d.stats.bossKills || 0;
             player.stats.startedAt = d.stats.startedAt || Date.now();
         }
-        if (d.quests && typeof d.quests === 'object'){
-            player.quests.active    = d.quests.active    || {};
-            player.quests.completed = d.quests.completed || [];
-            if (d.quests.daily) player.quests.daily = d.quests.daily;
-        }
+        // Reset EXPLÍCITO de quests (mesmo bug do flags/permaBuffs abaixo — o fix 9b948b6
+        // esqueceu as quests): sem isto, trocar de conta sem reload mantinha completed/active
+        // da conta anterior → boneco novo aparecia com as quests principais já "concluídas".
+        player.quests.active    = (d.quests && d.quests.active && typeof d.quests.active === 'object') ? d.quests.active : {};
+        player.quests.completed = (d.quests && Array.isArray(d.quests.completed)) ? d.quests.completed : [];
+        if (d.quests && d.quests.daily) player.quests.daily = d.quests.daily;
         // Reset EXPLÍCITO: sem o else, trocar de conta sem reload mantinha flags/permaBuffs
         // da conta anterior. Foi o que fez o claude (zerado) mostrar 6,5% de crit/esquiva —
         // +5% dos talentos da alcione grudados no client. Conta nova sem o campo → zera.
