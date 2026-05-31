@@ -629,7 +629,10 @@
 
         #login {
             position: fixed; inset: 0;
-            background: radial-gradient(ellipse at center, rgba(20,15,10,0.92) 0%, rgba(0,0,0,0.97) 80%);
+            /* Fundo OPACO: esconde o HUD do jogo que renderiza atrás enquanto conecta.
+               Antes era semi-transparente (0.92→0.97) e o painel/chat/online vazavam,
+               dando aspecto "torto"/bagunçado — pior em tela cheia com dados reais. */
+            background: radial-gradient(ellipse at center, #15110b 0%, #000 80%);
             display: flex; align-items: center; justify-content: center;
             z-index: 100;
         }

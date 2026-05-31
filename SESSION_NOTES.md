@@ -7,6 +7,18 @@
 
 ---
 
+## 🎨 Sessão 31/05/2026 (cont. 6) — tela de login: fundo opaco (HUD não vaza mais)
+
+Dono: "essa tela ficou torta". Diagnóstico no preview: o card de login JÁ estava perfeitamente
+centralizado (boundingBox = centro do viewport nos 2 eixos) — o "torto" era o overlay `#login` com
+fundo semi-transparente (radial 0.92→0.97), deixando o HUD do jogo (painel de personagem, chat,
+"online/conectando") vazar atrás do card enquanto conecta → composição assimétrica, pior em tela
+cheia com dados reais. Fix: fundo **OPACO** (`#15110b → #000`). 1 linha de CSS, cliente-only (Vercel;
+`play.html` não está nos watch paths do Railway → não reconecta ninguém, sem `/manutencao`).
+Verificado no preview (HUD some, card limpo, 0 erros no console).
+
+---
+
 ## 🛡️ Sessão 31/05/2026 (cont. 5) — santuário 5×5 nos NPCs de mundo (ler diálogo sem apanhar)
 
 Queixa do dono: parar pra falar com os NPCs externos (Eremita/Ferreiro/Caçadora/Mineiro/Crepúsculo/
