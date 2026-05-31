@@ -10856,7 +10856,7 @@ const SPELLS = {
         tauntRange: 5,
         color: '#aa3030', glow: '#ff8080',
         switchCost: 350,
-        desc: 'Força todos mobs em 5 tiles a focar em você. Sem dano — útil pra puxar agro em grupo.',
+        desc: 'Força mobs em volta a focar em você (range 5 + Magia). Sem dano — útil pra puxar agro em grupo.',
     },
     FURIA: {
         name: 'Fúria',
@@ -10864,7 +10864,7 @@ const SPELLS = {
         buff: { dmg: 0.25, spd: 0.25, duration: 12000 },
         color: '#cc4040', glow: '#ff6060',
         switchCost: 450,
-        desc: 'Buff temporário: +25% dano e +25% velocidade por 12s. Cooldown 30s.',
+        desc: 'Buff temporário: +25% dano e +25% velocidade. Duração 12s + Magia. Cooldown 30s.',
     },
 };
 const auraEffects = [];   // { entity, color, life, duration }
@@ -10953,18 +10953,20 @@ function castSpell(spellKey){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
         sndSpell();
+        // Escala com Magia: +1 de range a cada 25 de Magia (5 base → 13 no cap 200).
+        const tauntRange = sp.tauntRange + Math.floor(sk.val / 25);
         let count = 0;
         for (const m of monsters){
             if (m.hp <= 0) continue;
             const d = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
-            if (d > sp.tauntRange) continue;
+            if (d > tauntRange) continue;
             m.aggro = true;
             m.wanderX = player.x;
             m.wanderY = player.y;
             count++;
         }
         // Visual AoE: anel grande do raio de provocação
-        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.tauntRange * TS });
+        auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: tauntRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
         log(`<span class="log-sys">${sp.name}: provocou ${count} mob(s)</span>`);
         gainMagiaXp(spellKey, Math.max(1, count));
@@ -10976,15 +10978,17 @@ function castSpell(spellKey){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
         sndSpell();
+        // Escala com Magia: +1s de duração a cada 10 de Magia (12s base → ~32s no cap 200).
+        const buffDur = sp.buff.duration + Math.floor(sk.val / 10) * 1000;
         player.buff = {
             dmg: sp.buff.dmg,
             spd: sp.buff.spd,
-            expiresAt: Date.now() + sp.buff.duration,
+            expiresAt: Date.now() + buffDur,
             color: sp.glow,
             name: sp.name,
         };
         addFloat(player.x, player.y, `★ ${sp.name}`, sp.glow, true, -10);
-        log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(sp.buff.duration/1000)}s</span>`);
+        log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(buffDur/1000)}s</span>`);
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
         gainMagiaXp(spellKey, 2);
         return;

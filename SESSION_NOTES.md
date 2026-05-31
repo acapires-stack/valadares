@@ -19,6 +19,11 @@ preguiçosa do Map (>64 entradas, evict >5s). NÃO piora o boss (1 mob segue a 1
 **Botão "reset quests"** no painel admin (GERENCIAR PLAYER, ao lado de check/reset pos) → manda
 `/resetquests NOME` (campo vazio = a própria conta). O dono procurou o botão; só existia o comando.
 
+**Escalonamento de magias por `Magia`.** Confirmado: dano (Fireball/Raio/Exori = base + Magia/3) e
+cura (Cura/Cura-Grupo = base + Magia/2) JÁ escalavam. As 2 utilitárias eram FIXAS → agora escalam
+também (pedido do dono): **Fúria** duração = 12s + Magia/10s (cap 200 → 32s); **Provocação** range =
+5 + Magia/25 (cap 200 → 13). Cliente-side (onde essas magias são processadas). Descs atualizadas.
+
 ⚠️ O fix do EXORI mexe no server → deploy com /manutencao.
 
 ---
