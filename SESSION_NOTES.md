@@ -7,6 +7,37 @@
 
 ---
 
+## 🐛 Sessão 31/05/2026 (cont. 9) — hotfixes pós-deploy da Fase 1 (bugs reportados in-game)
+
+Testando o lote anterior in-game, o dono pegou bugs sérios na masmorra + 1 de mecânica. Corrigidos:
+
+**1. "Subia sozinho de andar" + "morria ao sair da masmorra".** As escadas colavam na chegada:
+chegada (50,52) e subida (50,50) a 2 tiles → andar 1 tile pro norte pisava na escada de subida sem
+querer. E a SAÍDA do andar 1 cuspia em (83,18) = **dentro do Antro do Minotauro** (covil com ~12 mobs)
+→ cercado e morto em segundos ao sair. Hotfix (server.js, constantes DUNGEON_*):
+- `DUNGEON_RETURN` 83,18 → **(50,50) PZ da cidade** (saída segura, não no meio dos minotauros).
+- `DUNGEON_EXIT` (subida) 50,50 → **(43,43) canto NO**; `DUNGEON_DOWN` (descida) 50,57 → **(57,43)
+  canto NE**. ~9 tiles da chegada (50,52) → não pisa sem querer. (Hotfix dentro da sala 40-60 atual;
+  a Fase 2 procedural com escadas naturalmente espalhadas fica pro próximo deploy.)
+
+**2. Morrer "cercado" (várias mortes do dono).** NÃO é hit kill nem bug de dano — confirmado nos
+números: morcego dá ~2 com a def dele, nenhum mob one-shota 340 HP. É o ENXAME (8+ mobs fracos batendo
+no mesmo tick somam rápido) agravado pela saída no covil. A saída segura (item 1) mitiga muito. Balance
+do dano-cercado (cap por tick / nerf crit do mob) ficou EM ABERTO — perguntei ao dono, ele vai decidir.
+
+**3. Fúria não acelerava o ataque (só o movimento).** `effectiveAttackDelay` usava só o `atkSpd` da
+arma, ignorava `player.buff.spd`. Fix (play.html): aplica `d * (1 - buff.spd)` — mesma fórmula da arma
+e do `playerMoveDelay`. Verificado no preview: 800ms→600ms = +25% (1.25→1.67 atk/s); o painel "Vel.
+ataque" passa a refletir o buff. O dano online já passava (rate-limit attackMob 200ms < 600ms, com folga).
+
+**EM ABERTO (dono vai investigar pra ajudar a reproduzir):** "piscada" ao lutar + tela "desloca e volta"
++ loot de boss "bagunça a tela". No preview, encher a sidebar NÃO move o canvas (layout robusto) → causa
+ainda não cravada. Fora deste deploy.
+
+**Pendência operacional:** repor via admin (/skill) as skills que o dono perdeu nas mortes (Espada 69, etc.).
+
+---
+
 ## 🏗️ Sessão 31/05/2026 (cont. 8) — M4 3b Fase 1 (grid server-autoritativo) + 2 fixes de UI
 
 Dono pediu o M4 3b (masmorra procedural). Decisões dele: **cavernas orgânicas** + **entrega incremental (2 deploys)**.

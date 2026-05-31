@@ -4973,7 +4973,13 @@ function effectiveAttackDelay(){
     const wK = player.equipped.weapon;
     const wI = wK ? ITEMS[wK] : null;
     const atk = (wI && wI.atkSpd) || 0;
-    return Math.max(150, Math.floor(player.attackDelay * (1 - atk)));
+    let d = player.attackDelay * (1 - atk);
+    // Fúria: buff.spd (0.25 = +25%) acelera o ATAQUE também. Antes só o atkSpd da arma
+    // entrava aqui, então a Fúria mexia só no movimento (bug reportado). Mesma fórmula
+    // (1 - spd) usada pela arma e pelo movimento (playerMoveDelay), então empilha igual.
+    const bspd = (player.buff && player.buff.spd) || 0;
+    if (bspd > 0) d = d * (1 - bspd);
+    return Math.max(150, Math.floor(d));
 }
 function activeWeapon(){
     const k = player.equipped.weapon;

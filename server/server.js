@@ -1254,13 +1254,15 @@ const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 // Andar é compartilhado e perigoso (PvP forçado). Pro MVP: 1 andar, sala de
 // caverna 100×100 gerada pelo cliente (determinística). Server só rastreia
 // p.floor + posição + força PvP. Sem mobs ainda (Fase 2).
-// Escada de entrada na PZ (50,46), topo. Player desce → spawn (50,52) no andar.
-// Escada de saída no andar (50,50) → volta pra cidade (50,47).
+// Entrada: Antro do Minotauro (83,17). Player desce → chega em (50,52) no andar.
+// Hotfix: escadas do andar AFASTADAS da chegada (subida canto NO 43,43 / descida
+// canto NE 57,43) — antes subida 50,50 colava na chegada 50,52 → o player subia
+// sem querer ao andar pro norte. Saída do andar 1 volta pra PZ da cidade (50,50).
 const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
-const DUNGEON_RETURN   = { x: 83, y: 18 };   // reaparece 1 tile ao lado da escada, dentro do antro (cuidado: minotauros)
-const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada ao entrar/trocar de andar (ao lado da escada de subida)
-const DUNGEON_EXIT     = { x: 50, y: 50 };   // escada de SUBIDA (volta 1 andar; do andar 1 = cidade)
-const DUNGEON_DOWN     = { x: 50, y: 57 };   // escada de DESCIDA (vai pro próximo andar; não existe no último)
+const DUNGEON_RETURN   = { x: 50, y: 50 };   // SAÍDA SEGURA: PZ da cidade (antes 83,18 = no meio dos minotauros = morte ao sair)
+const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada ao entrar/trocar de andar (centro; escadas ficam nos cantos)
+const DUNGEON_EXIT     = { x: 43, y: 43 };   // escada de SUBIDA — canto NO, ~9 tiles da chegada (não pisa sem querer)
+const DUNGEON_DOWN     = { x: 57, y: 43 };   // escada de DESCIDA — canto NE, ~9 tiles da chegada
 const DUNGEON_MAX_FLOOR = 5;                  // Fase 3: 5 andares (boss no 5 — slice 3c)
 const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
 const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c)
