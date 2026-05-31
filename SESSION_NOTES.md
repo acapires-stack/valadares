@@ -7,6 +7,39 @@
 
 ---
 
+## 🛟 Sessão 31/05/2026 (cont. 9) — "servidor offline" reportado por player + 2 fixes de cliente
+
+**Contexto:** player reportou o jogo "só fica atualizando" (loop de reload), print mostrava o badge
+**OFFLINE** no topo com o mundo rodando normal. Dono estava no celular → pediu pra resolver.
+
+**Diagnóstico:**
+- O **"OFFLINE"** do topo é só o badge de conexão do cliente (`#connStatus`): em SOLO, ou quando o WS cai,
+  o jogo degrada pra simulação local — por isso o mundo renderiza. **Não** é o servidor caído.
+- O **"só fica atualizando"** era o **auto-updater do cliente** (`checkClientUpdate`) recarregando em loop.
+- **Causa real do player (confirmada pelo dono):** ele estava num **Electron desatualizado**. O gate de
+  versão (`server.js`, só pra Electron via User-Agent) bloqueia app sem versão (v1.0.6-) ou < `MIN_CLIENT_VERSION`
+  (padrão **1.0.7**) → manda `versionTooOld` → modal "VERSÃO DESATUALIZADA". Release publicada = **v1.0.9**.
+  Player atualizou pra v1.0.9 → **resolveu**. ✔
+
+**Fix 1 (PR #2, MERGEADO `cadc8d5`) — mata o loop de auto-reload (`play.html`):**
+O `checkClientUpdate` recarregava quando o "fingerprint" do HTML mudava, mas: (1) rodava **até na tela de
+login** (preso recarregando antes de entrar); (2) usava **`content-length`** como fingerprint → compressão
+gzip/br varia por request/nó de CDN (Vercel) → falso positivo → reload; (3) recarregava no 1º sinal, sem
+debounce. **Agora:** só checa em jogo (`started`), pula background/offline, usa só ETag/Last-Modified, e exige
+a **mesma versão nova em 2 checks seguidos** antes de recarregar. Auto-update real (deploy) segue funcionando.
+
+**Fix 2 (este commit) — detecção PROATIVA de versão no login (defesa em profundidade):**
+- `server.js /api/status` agora devolve `minClientVersion` + `clientDownloadUrl`.
+- `play.html`: helper `_cmpSemver` + no fetch de `/api/status` do login, se for **desktop** (`window.electronApi`)
+  e `CLIENT_VERSION < minClientVersion` → abre o `showVersionTooOldModal` **já no login**, sem depender do
+  bloqueio só na hora de conectar. Browser ignora (Vercel = sempre a última).
+- Verificado: `node --check server` ✓; scripts inline do `play.html` ✓ (0 erros de sintaxe).
+
+> ⚠️ Limite do ambiente: o sandbox bloqueia o host de produção (`host_not_allowed`), então não dá pra
+> medir o Railway daqui. Se um player ficar OFFLINE mesmo atualizado, o próximo passo é o **log do Railway**.
+
+---
+
 ## 🏗️ Sessão 31/05/2026 (cont. 8) — M4 3b Fase 1 (grid server-autoritativo) + 2 fixes de UI
 
 Dono pediu o M4 3b (masmorra procedural). Decisões dele: **cavernas orgânicas** + **entrega incremental (2 deploys)**.

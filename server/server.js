@@ -98,7 +98,13 @@ async function handleHttpRequest(req, res){
     if (req.method === 'GET' && req.url === '/api/status'){
         // Tela de login consulta isto pra avisar manutenção de forma confiável (sem depender
         // de flag/reload no cliente). maintenance = lock do deploy ainda ativo.
-        return httpJson(res, 200, { maintenance: Date.now() < _maintenanceLockUntil });
+        // minClientVersion/clientDownloadUrl: deixam o DESKTOP detectar versão velha já no
+        // login (proativo), sem depender do bloqueio só na hora de conectar.
+        return httpJson(res, 200, {
+            maintenance: Date.now() < _maintenanceLockUntil,
+            minClientVersion: MIN_CLIENT_VERSION,
+            clientDownloadUrl: CLIENT_DOWNLOAD_URL,
+        });
     }
     if (req.method === 'GET' && req.url === '/api/packages'){
         return httpJson(res, 200, { packages: GOLD_PACKAGES });
