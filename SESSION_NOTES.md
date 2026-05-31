@@ -7,6 +7,17 @@
 
 ---
 
+## 🩹 Sessão 31/05/2026 (cont. 4) — aviso de manutenção robusto (/api/status)
+
+O aviso de manutenção (`8237598`) dependia de flag `sessionStorage` + reload, rodando no cliente
+**em memória** — frágil: se o cliente estava numa versão antiga na hora do deploy, não gravava a
+flag e caía numa tela de login sem aviso (o dono pegou isso). Agora: endpoint `GET /api/status` no
+server retorna `{maintenance: lock ativo}`; a tela de login consulta via
+`fetch(SERVER_HTTP_BASE+'/api/status')` e mostra o aviso pelo **estado real** — não depende de
+flag/timing/cache. CORS já liberado (`*`). A flag+reload fica como 1ª camada; o fetch cobre o resto.
+
+---
+
 ## 🩹 Sessão 31/05/2026 (cont. 3) — /resetquests agora limpa as chains do mapa
 
 O `/resetquests` (cont. 2) só zerava `quests.active/completed` (quests da **Atendente**, na PZ).

@@ -95,6 +95,11 @@ function readBody(req){
 async function handleHttpRequest(req, res){
     if (req.method === 'OPTIONS'){ return httpJson(res, 204, ''); }
     if (req.method === 'GET' && req.url === '/health'){ return httpJson(res, 200, { ok:true }); }
+    if (req.method === 'GET' && req.url === '/api/status'){
+        // Tela de login consulta isto pra avisar manutenção de forma confiável (sem depender
+        // de flag/reload no cliente). maintenance = lock do deploy ainda ativo.
+        return httpJson(res, 200, { maintenance: Date.now() < _maintenanceLockUntil });
+    }
     if (req.method === 'GET' && req.url === '/api/packages'){
         return httpJson(res, 200, { packages: GOLD_PACKAGES });
     }
