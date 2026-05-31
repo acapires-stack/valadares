@@ -6144,7 +6144,7 @@ function handleMP(msg){
     if (msg.t === 'authFail'){
         const reason = msg.reason || 'desconhecida';
         const msgs = {
-            maintenance: '🔧 Manutenção em andamento — reconectando em instantes…',
+            maintenance: '🔧 Servidor em manutenção — volte em ~2 min. Seu personagem está salvo.',
             rate_limited: '⚠ Muitas tentativas — aguarde um pouco.',
             bad_password: '⚠ Senha incorreta no servidor.',
             no_password: '⚠ Senha não informada.',
@@ -6163,8 +6163,12 @@ function handleMP(msg){
                 localStorage.removeItem(SESSION_KEY);
             } catch {}
         }
-        // Manutenção: espera mais (lock expira no restart) e tenta de novo, sem voltar ao login.
-        setTimeout(() => window.location.reload(), reason === 'maintenance' ? 8000 : 1500);
+        if (reason === 'maintenance'){
+            // Marca pra tela de login (pós-reload) exibir o aviso — sem isto, com o auto-login
+            // removido o player cai numa tela de login "nua" e acha que perdeu o personagem.
+            try { sessionStorage.setItem('valadares:maintNotice', String(Date.now())); } catch {}
+        }
+        setTimeout(() => window.location.reload(), reason === 'maintenance' ? 6000 : 1500);
         return;
     }
     if (msg.t === 'state'){
@@ -13458,6 +13462,15 @@ document.addEventListener('DOMContentLoaded', () => {
     tryAutoLogin();
     if (name && name.value){ document.getElementById('pwdInput')?.focus(); }
     else { name?.focus(); }
+    // Aviso de manutenção pós-reload (flag setada no authFail) — evita o "parece que resetou".
+    try {
+        const _mt = parseInt(sessionStorage.getItem('valadares:maintNotice') || '0', 10);
+        if (_mt && Date.now() - _mt < 5 * 60 * 1000){
+            const le = document.getElementById('loginError');
+            if (le){ le.style.color = '#e0b040'; le.textContent = '🔧 Servidor em manutenção — volte em ~2 min. Seu personagem está salvo (nada foi perdido).'; }
+        }
+        sessionStorage.removeItem('valadares:maintNotice');
+    } catch {}
 });
 
 // Salva ao fechar/recarregar pra não perder progresso do último segundo

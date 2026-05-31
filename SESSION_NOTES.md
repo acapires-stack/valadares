@@ -27,7 +27,15 @@ flags/permaBuffs). Impede vazar de novo; saves já contaminados precisam de /res
 **3. `/resetquests [NOME]`** (novo comando admin): zera active+completed da conta (online ou offline),
 preserva a diária. Pra limpar contas que já pegaram o vazamento (ex: o claude).
 
-⚠️ Lote mexe no server → deploy com /manutencao.
+(Itens 1-3 deployados no `33754d4`, via /manutencao — mexem no server.)
+
+**4. Aviso de manutenção na tela de login** (cliente-only, push à parte — não reconecta Railway).
+O `authFail reason:'maintenance'` recarregava a página; com o auto-login removido, isso caía numa
+tela de login "nua" → o player achava que tinha perdido o personagem (foi o que confundiu o dono).
+Agora grava flag em `sessionStorage` antes do reload e a tela de login exibe, persistente,
+"🔧 Servidor em manutenção — volte em ~2 min. Seu personagem está salvo". Mensagem do toast também
+melhorada. (Ideia do dono. A 2ª ideia — Claude rodar comandos via conta admin — fica pra depois:
+o certo é via API admin HTTP, não logar como player, senão vira a sessão-fantasma do deploy.)
 
 ---
 
