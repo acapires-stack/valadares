@@ -7,6 +7,32 @@
 
 ---
 
+## 🏗️ Sessão 31/05/2026 (cont. 8) — M4 3b Fase 1 (grid server-autoritativo) + 2 fixes de UI
+
+Dono pediu o M4 3b (masmorra procedural). Decisões dele: **cavernas orgânicas** + **entrega incremental (2 deploys)**.
+
+**Fase 1 (commit 0f4b188) — server vira DONO do grid (layout idêntico, baixo risco):** hoje o cliente
+gerava o andar mas IGNORAVA o floor (toda masmorra = sala vazia 40-60, escadas fixas em x=50). Agora o
+server gera o grid WALL/FLOOR (`genDungeonGrid`/`getDungeonFloor`/`dungeonTileWalkable`), transmite no
+`dungeonEnter` (grid+stairs) e usa nele mob/spawn/colisão (mobTileOk, spawnDungeonMobs sorteia floorTiles,
+boss usa stairs.boss). Cliente desenha o grid recebido (`applyDungeonGrid`) + escadas do server
+(`dunStairUp/Down`, fallback pras constantes). Cache efêmero (`dungeonFloors`) descartado quando o andar
+esvazia. Fase 1 mantém a sala cheia 40-60 → **comportamento IDÊNTICO**. Verificado local (node --check ✓,
+applyDungeonGrid=441 tiles ✓, boot do cliente limpo ✓). ⚠️ Caminho in-game só testável pós-deploy.
+**Fase 2 (próximo deploy): cellular automata + escadas variáveis + polish.**
+
+**2 fixes de UI (cliente):**
+- **Chat/Combate bagunçava o layout**: o input do chat sumia no modo COMBATE → o `#chatPanel` encolhia
+  ~37px e empurrava o layout do jogo ao alternar abas. Input agora SEMPRE visível (altura constante 318px
+  nas 2 abas, medido no preview).
+- **Quest vh3 "Selo Antigo do Antro"**: objetivo `visit` movido de (82,18) r3 → **(78,18) r3**. A área
+  antiga englobava a porta do M4 (escada 83,17); agora chega só até x=81, longe da entrada. Cliente-only
+  (server não valida a posição da visit, só o reward).
+
+⚠️ O lote tem server (p.inv + Fase 1) → **NÃO pushado** (dono fora, sem `/manutencao`). Deploy quando voltar.
+
+---
+
 ## 🧹 Sessão 31/05/2026 (cont. 7) — varredura do backlog (dívida técnica) + fix p.inv
 
 Dono pediu pra atacar os 3 grupos (dívida técnica/segurança, housekeeping, P2+) enquanto saía. Varri:

@@ -7946,8 +7946,8 @@ const QUEST_CHAINS = {
               kind:'mob', type:'SPIDER', count:5,
               reward:{ gold:600, xp:{Espada:80} } },
             { id:'vh3', name:'Selo Antigo do Antro',
-              desc:'Vohrim quer um selo perdido — visite o Antro do Minotauro (82, 18) e veja o que sobrou.',
-              kind:'visit', x:82, y:18, radius:3,
+              desc:'Vohrim quer um selo perdido — vasculhe o lado OESTE do Antro do Minotauro (78, 18) e veja o que sobrou.',
+              kind:'visit', x:78, y:18, radius:3,
               reward:{ gold:800, xp:{Distância:80} } },
             { id:'vh4', name:'Tributo Final',
               desc:'Vohrim quer 1 Coração do Highlander pra "selar a aliança". Algo cheira mal nessa exigência.',
@@ -13482,7 +13482,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('log').style.display      = isChat ? 'none' : '';
             document.getElementById('logFilters').style.display = isChat ? 'none' : '';
             document.getElementById('chatMessages').style.display = isChat ? '' : 'none';
-            document.getElementById('chatInputRow').style.display = isChat ? '' : 'none';
+            // Input do chat fica SEMPRE visível: escondê-lo no modo COMBATE encolhia o
+            // #chatPanel em ~37px e empurrava o layout do jogo ao alternar abas (bug reportado).
             if (isChat) document.getElementById('chatInput')?.focus();
         });
     });
