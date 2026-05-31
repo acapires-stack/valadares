@@ -2257,10 +2257,6 @@
         <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
         <button class="chest-btn" onclick="openMobileTut(true)">📱 Ver tutorial mobile (touch)</button>
 
-        <div class="chest-head" style="margin-top:14px">SAVE</div>
-        <div id="backupInfo" style="color:#998040;font-size:10px;letter-spacing:0.5px;padding:4px 6px;margin-bottom:4px"></div>
-        <button class="chest-btn" onclick="tryRestoreBackup()">↺ Restaurar do backup</button>
-
         <div class="chest-head" style="margin-top:14px">TECLAS</div>
         <div class="key-grid" id="keyGrid"></div>
 
@@ -12308,20 +12304,6 @@ function openSettings(){
     document.getElementById('setVolMasterVal').textContent  = settings.volMaster;
     document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
     document.getElementById('setVolMusicVal').textContent   = settings.volAmbient;
-    // Info do backup
-    const info = document.getElementById('backupInfo');
-    if (info && player.name){
-        const bkp = (typeof readSaveRaw === 'function') ? readSaveRaw('valadares:save:bkp:' + player.name) : null;
-        if (bkp && bkp.savedAt){
-            const ageMin = Math.floor((Date.now() - bkp.savedAt) / 60000);
-            const ageTxt = ageMin < 1 ? 'agora há pouco' : ageMin < 60 ? `${ageMin}min atrás` : `${Math.floor(ageMin/60)}h atrás`;
-            info.textContent = `Backup: ${ageTxt} · ${bkp.gold||0} g · skills L${Math.max(...Object.values(bkp.skills||{}).map(s=>s.val||10))}`;
-        } else if (bkp){
-            info.textContent = 'Backup: disponível (sem data)';
-        } else {
-            info.textContent = 'Sem backup ainda.';
-        }
-    }
     // Lista de teclas
     const grid = document.getElementById('keyGrid');
     grid.innerHTML = KEY_HELP.map(([k, desc]) =>
@@ -12814,6 +12796,7 @@ window.closeRanking = closeRanking;
 window.switchRankingTab = switchRankingTab;
 
 function tryRestoreBackup(){
+    if (!player.isAdmin){ log('<span class="log-sys">Só admin pode restaurar backup. Fale com o gestor.</span>'); return; }
     if (!confirm('Restaurar do backup? O save atual será sobrescrito.')) return;
     if (typeof restoreFromBackup === 'function') restoreFromBackup();
 }
@@ -12834,6 +12817,15 @@ function renderAdminPanel(){
     const snapAge = _preDeathSnapshot
         ? `há ${Math.max(0, Math.floor((Date.now() - _preDeathSnapshot.savedAt) / 1000))}s`
         : 'nenhum';
+    let bkpTxt = 'sem backup neste dispositivo';
+    try {
+        const _bkp = (typeof readSaveRaw === 'function' && player.name) ? readSaveRaw('valadares:save:bkp:' + player.name) : null;
+        if (_bkp && _bkp.savedAt){
+            const _min = Math.floor((Date.now() - _bkp.savedAt) / 60000);
+            const _age = _min < 1 ? 'agora há pouco' : _min < 60 ? `${_min}min atrás` : `${Math.floor(_min/60)}h atrás`;
+            bkpTxt = `${_age} · ${_bkp.gold||0} g`;
+        } else if (_bkp){ bkpTxt = 'disponível (sem data)'; }
+    } catch {}
     el.innerHTML = `
         <div style="background:#1a0808;border:1px solid #3a1818;padding:8px;margin-bottom:8px;font-size:10px;color:#cc8060">
             ⚠ Painel restrito ao admin. Mudanças persistem no save.
@@ -12912,6 +12904,10 @@ function renderAdminPanel(){
         <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">SNAPSHOT PRÉ-MORTE</div>
         <div style="color:#666;font-size:10px;padding:2px 6px">Capturado automaticamente antes de processar cada morte: ${snapAge}</div>
         <button class="chest-btn" ${_preDeathSnapshot ? '' : 'disabled'} onclick="adminRestoreSnapshot()">↺ Restaurar último snapshot</button>
+
+        <div style="color:#998040;font-size:10px;margin:14px 0 4px 0;letter-spacing:0.5px">BACKUP LOCAL (deste dispositivo)</div>
+        <div style="color:#666;font-size:10px;padding:2px 6px">${bkpTxt}</div>
+        <button class="chest-btn" onclick="tryRestoreBackup()">↺ Restaurar do backup local</button>
     `;
 }
 
@@ -12983,29 +12979,29 @@ function adminApplySkill(name){
     const input = document.getElementById('admSk_' + name);
     const val = Math.max(10, Math.min(200, parseInt(input.value, 10) || 10));
     const sk = player.skills[name]; if (!sk) return;
-    sk.val = val;
+    sk.val = val;                           // otimista — server confirma/persiste via invUpdate
     sk.xp = 0;
     sk.xpNext = Math.floor(50 * Math.pow(1.15, val - 10));
     recomputeStats();
     buildSkillList();
-    saveState();
+    _adminSendChat('/skill ' + name + ' ' + val);   // autoritativo (o client-only era revertido pelo lockdown N3)
     log(`<span class="log-up">[admin] ${name} = ${val}</span>`);
     renderAdminPanel();
 }
 function adminApplyGold(){
     if (!player.isAdmin) return;
     const v = Math.max(0, parseInt(document.getElementById('admGold').value, 10) || 0);
-    player.gold = v;
-    saveState();
-    log(`<span class="log-up">[admin] gold = ${v}</span>`);
+    player.gold = v;                        // otimista — server confirma/persiste via invUpdate
+    _adminSendChat('/gold ' + v);           // autoritativo (o client-only era revertido pelo lockdown N3)
     const gEl = document.getElementById('goldVal');
     if (gEl) gEl.textContent = player.gold + ' g';
+    log(`<span class="log-up">[admin] gold = ${v}</span>`);
 }
 function adminFullHeal(){
     if (!player.isAdmin) return;
-    player.hp = player.maxHp;
+    player.hp = player.maxHp;               // otimista — server confirma via pstats
     player.mp = player.maxMp;
-    saveState();
+    _adminSendChat('/heal');                // autoritativo
     log('<span class="log-up">[admin] HP/MP cheios</span>');
 }
 function adminRestoreSnapshot(){
@@ -13796,6 +13792,7 @@ window.wipeSave = wipeSave;
 
 // Restaura manualmente a partir do backup (via botão no settings)
 function restoreFromBackup(){
+    if (!player.isAdmin){ log('<span class="log-sys">Só admin pode restaurar backup.</span>'); return false; }
     if (!player.name) return false;
     const bkp = readSaveRaw(backupKey());
     if (!bkp){

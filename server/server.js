@@ -2419,8 +2419,12 @@ function loadStateFromDisk(){
             }
         }
         monsters.clear();
+        let _stuckInWater = 0;
         if (Array.isArray(d.monsters)){
             for (const m of d.monsters){
+                // Saneamento: descarta mob comum do overworld preso em tile não-walkable
+                // (ex: lago) — respawna limpo pelo ciclo normal. Uniques/masmorra preservados.
+                if (!m.unique && (m.floor||0) === 0 && !isWalkable(m.x, m.y)){ _stuckInWater++; continue; }
                 monsters.set(m.id, {
                     id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir||'down',
                     hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
@@ -2431,7 +2435,7 @@ function loadStateFromDisk(){
             }
         }
         const ageMs = Date.now() - (d.savedAt || 0);
-        console.log(`[state] carregado de disco — ${monsters.size} mobs, salvo há ${(ageMs/60000).toFixed(1)}min`);
+        console.log(`[state] carregado de disco — ${monsters.size} mobs${_stuckInWater?`, ${_stuckInWater} presos em água descartados`:''}, salvo há ${(ageMs/60000).toFixed(1)}min`);
         return true;
     } catch(e){
         console.error('[state] erro ao carregar:', e.message);
@@ -3852,11 +3856,22 @@ function applyDailyEventTick(){
         const count = 3 + Math.floor(Math.random() * 2);
         for (let i = 0; i < count; i++){
             const type = siegeMobs[Math.floor(Math.random() * siegeMobs.length)];
-            const ang = Math.random() * Math.PI * 2;
-            const r = 12 + Math.random() * 13;
-            const x = Math.round(50 + Math.cos(ang) * r);
-            const y = Math.round(50 + Math.sin(ang) * r);
-            const m = spawnMob(type, x, y);
+            // Acha posição walkable no anel (raio 12-25). ANTES spawnava direto na coord
+            // do ângulo/raio sem validar → mobs nasciam dentro do lago (tile WATER).
+            let sx = 0, sy = 0, found = false;
+            for (let tries = 0; tries < 30; tries++){
+                const ang = Math.random() * Math.PI * 2;
+                const r = 12 + Math.random() * 13;
+                const x = Math.round(50 + Math.cos(ang) * r);
+                const y = Math.round(50 + Math.sin(ang) * r);
+                if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
+                if (!isWalkable(x, y)) continue;
+                if (inSafe(x, y) || inCave(x, y)) continue;
+                if (mobAt(x, y) || playerAt(x, y)) continue;
+                sx = x; sy = y; found = true; break;
+            }
+            if (!found) continue;
+            const m = spawnMob(type, sx, sy);
             if (m){
                 m.fromEvent = true;
                 dailyEventState.extraMobIds.push(m.id);
@@ -6492,7 +6507,7 @@ wss.on('connection', (ws, request) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /heal' });
                     return;
                 }
                 if (cmd === '/deluser'){
@@ -6613,6 +6628,46 @@ wss.on('connection', (ws, request) => {
                         return;
                     }
                     sendTo(id, { t:'serverMsg', level:'info', text:'Uso: /megaboss status | spawn | reset' });
+                    return;
+                }
+                // ─── Edição de char (admin) — autoritativo + persiste. Substitui o painel
+                //     client-only (adminApplyGold/Skill/FullHeal) que o lockdown N3 revertia:
+                //     o cliente forjava no display, mas o server re-hidratava o valor real
+                //     no próximo sync. Agora a mudança é aplicada no `p` vivo + gravada no save.
+                if (cmd === '/gold'){
+                    const v = Math.max(0, Math.min(100000000, parseInt(arg, 10) || 0));
+                    p.gold = v;
+                    const acc = getAccount(p.name);
+                    if (acc && acc.save) acc.save.gold = v;
+                    syncGoldRank(p.name, p.gold);
+                    if (typeof flushAccounts === 'function') flushAccounts();
+                    sendInvUpdate(p, {});
+                    sendTo(id, { t:'serverMsg', level:'info', text:`💰 Gold = ${v.toLocaleString('pt-BR')}` });
+                    return;
+                }
+                if (cmd === '/skill'){
+                    const sp = arg.split(/\s+/);
+                    const skName = sp[0] || '';
+                    const val = Math.max(10, Math.min(200, parseInt(sp[1], 10) || 10));
+                    if (!p.skills || !p.skills[skName]){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:`Skill inválida. Use: ${Object.keys(p.skills || {}).join(', ')}` });
+                        return;
+                    }
+                    p.skills[skName].val = val;
+                    p.skills[skName].xp = 0;
+                    p.skills[skName].xpNext = Math.floor(50 * Math.pow(1.15, val - 10));
+                    const acc = getAccount(p.name);
+                    if (acc && acc.save) acc.save.skills = p.skills;
+                    if (typeof flushAccounts === 'function') flushAccounts();
+                    sendInvUpdate(p, { skills: p.skills });
+                    sendTo(id, { t:'serverMsg', level:'info', text:`${skName} = ${val}` });
+                    return;
+                }
+                if (cmd === '/heal'){
+                    p.hp = p.maxHp;
+                    p.mp = p.maxMp;
+                    broadcastPstatsAll(p);
+                    sendTo(id, { t:'serverMsg', level:'info', text:'❤ HP/MP cheios' });
                     return;
                 }
                 sendTo(id, { t:'serverMsg', level:'warn', text:`Comando desconhecido: ${cmd}. /help pra ver lista` });
