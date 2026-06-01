@@ -2433,16 +2433,17 @@ function hasShieldEquipped(p){
 }
 
 // ─── Talents (M5) ──────────────────────────────────────────────────────────
-// Talents são single-rank passivos que aplicam permaBuffs ao serem comprados.
-// 1 ponto a cada 10 levels totais (sum of skill.val - 10 across all skills).
-// Server é autoritativo: handler talentAlloc valida pontos + aplica permaBuff.
+// Talents passivos que aplicam permaBuffs. MULTI-RANK (Fase 1): cada talento pode ser
+// comprado até `max` vezes e o buff SOMA por rank. 1 ponto a cada 10 levels totais.
+// Server é autoritativo: handler talentAlloc valida pontos + rank + aplica permaBuff.
+// (crit/dodge ainda respeitam o teto de segurança 50% no cálculo do stat.)
 const TALENT_DEFS = {
-    t_crit:  { name:'Olho de Águia',         desc:'+5% chance crítica',         buff:{ critBonus:  0.05 } },
-    t_dodge: { name:'Reflexos Felinos',      desc:'+5% chance de esquiva',      buff:{ dodgeBonus: 0.05 } },
-    t_hp:    { name:'Constituição',          desc:'+30 HP máximo',              buff:{ hpBonus:    30   } },
-    t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills', buff:{ xpBonus:    0.10 } },
-    t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen', buff:{ regenBonus: 1    } },
-    t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob',  buff:{ lootBonus:  0.15 } },
+    t_crit:  { name:'Olho de Águia',         desc:'+5% chance crítica',         buff:{ critBonus:  0.05 }, max:5 },
+    t_dodge: { name:'Reflexos Felinos',      desc:'+5% chance de esquiva',      buff:{ dodgeBonus: 0.05 }, max:5 },
+    t_hp:    { name:'Constituição',          desc:'+30 HP máximo',              buff:{ hpBonus:    30   }, max:5 },
+    t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills', buff:{ xpBonus:    0.10 }, max:5 },
+    t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen', buff:{ regenBonus: 1    }, max:5 },
+    t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob',  buff:{ lootBonus:  0.15 }, max:5 },
 };
 function totalLevelsAbove10(p){
     if (!p.skills) return 0;
@@ -2457,7 +2458,8 @@ function talentPointsUsed(p){
     if (!p.talents) return 0;
     let n = 0;
     for (const id of Object.keys(p.talents)){
-        if (p.talents[id] && TALENT_DEFS[id]) n++;
+        // multi-rank: soma os ranks. Legado boolean `true` → Number(true)=1 (rank 1).
+        if (TALENT_DEFS[id]) n += Math.max(0, Math.floor(Number(p.talents[id]) || 0));
     }
     return n;
 }
@@ -2808,15 +2810,19 @@ function sanitizeSave(data, ownerName){
     // então cap = valor do buff. xpBonus mantém SAVE_CAPS.xpBonus (2.0) como
     // margem pra futuros talents/eventos. Keys desconhecidas: deletadas.
     if (data.permaBuffs && typeof data.permaBuffs === 'object'){
-        // Constrói tabela de allowlist a partir de TALENT_DEFS
+        // Constrói tabela de allowlist a partir de TALENT_DEFS. Multi-rank: cap = max
+        // rank × valor do buff (somado, caso 2 talentos futuros compartilhem a key).
         const allowed = {};
         for (const def of Object.values(TALENT_DEFS)){
             if (!def.buff) continue;
+            const ranks = def.max || 1;
             for (const [bk, bv] of Object.entries(def.buff)){
-                allowed[bk] = Math.max(allowed[bk] || 0, bv);
+                allowed[bk] = (allowed[bk] || 0) + bv * ranks;
             }
         }
-        allowed.xpBonus = SAVE_CAPS.xpBonus;   // margem pra eventos futuros
+        // auras de quest somam POR CIMA do talento (Aura do Vidente +5% esquiva; Vendedor +5% xp)
+        allowed.dodgeBonus = (allowed.dodgeBonus || 0) + 0.05;
+        allowed.xpBonus = Math.max((allowed.xpBonus || 0) + 0.05, SAVE_CAPS.xpBonus);   // margem pra eventos futuros
         for (const k of Object.keys(data.permaBuffs)){
             if (!(k in allowed)){
                 log(`permaBuffs.${k}`, data.permaBuffs[k], '(deletado: key não-allowlisted)');
@@ -2831,6 +2837,17 @@ function sanitizeSave(data, ownerName){
             }
             const v = clampNumber(orig, allowed[k], 0);
             if (v !== orig){ log(`permaBuffs.${k}`, orig, v); data.permaBuffs[k] = v; }
+        }
+    }
+    // talents — multi-rank: clampa cada um a [0, max] inteiro; remove keys desconhecidas
+    // (o buff em si já é capado em permaBuffs acima; isto mantém o contador de pontos honesto).
+    if (data.talents && typeof data.talents === 'object'){
+        for (const k of Object.keys(data.talents)){
+            if (!TALENT_DEFS[k]){ log(`talents.${k}`, data.talents[k], '(deletado: id desconhecido)'); delete data.talents[k]; continue; }
+            const max = TALENT_DEFS[k].max || 1;
+            const v = Math.max(0, Math.min(max, Math.floor(Number(data.talents[k]) || 0)));   // legado boolean true → 1
+            if (v === 0){ delete data.talents[k]; }
+            else if (v !== data.talents[k]){ log(`talents.${k}`, data.talents[k], v); data.talents[k] = v; }
         }
     }
     // Stats — cap quantidade de keys + valores (evita DoS por save gigante de mobKills fake)
@@ -5896,7 +5913,7 @@ wss.on('connection', (ws, request) => {
             const reject = (reason) => {
                 // ok:false não era tratado no cliente (falha silenciosa). serverMsg já renderiza.
                 const txt = {
-                    unknown_talent:'Talento desconhecido.', already_owned:'Você já tem esse talento.',
+                    unknown_talent:'Talento desconhecido.', max_rank:'Esse talento já está no rank máximo.',
                     no_points:'Sem pontos de talento disponíveis.',
                 }[reason] || 'Não foi possível alocar o talento.';
                 sendTo(id, { t:'serverMsg', level:'warn', text: txt });
@@ -5905,21 +5922,23 @@ wss.on('connection', (ws, request) => {
             const def = TALENT_DEFS[tid];
             if (!def) return reject('unknown_talent');
             p.talents = p.talents || {};
-            if (p.talents[tid]) return reject('already_owned');
+            const cur = Math.max(0, Math.floor(Number(p.talents[tid]) || 0));   // legado boolean → 1
+            const max = def.max || 1;
+            if (cur >= max) return reject('max_rank');
             if (talentPointsAvailable(p) < 1) return reject('no_points');
-            // Aplica permaBuff
+            // Aplica permaBuff (soma por rank)
             p.permaBuffs = p.permaBuffs || {};
             for (const [k, v] of Object.entries(def.buff)){
                 p.permaBuffs[k] = (p.permaBuffs[k] || 0) + v;
             }
-            p.talents[tid] = true;
+            p.talents[tid] = cur + 1;
             // Fase 5: hpBonus (Constituição) altera maxHp — recalcula server-side.
             if (def.buff && typeof def.buff.hpBonus === 'number'){
                 recomputeMaxStatsServer(p);
                 broadcastPstatsAll(p);
             }
             sendInvUpdate(p, {
-                talentResult:{ ok:true, talentId: tid },
+                talentResult:{ ok:true, talentId: tid, rank: cur + 1, max },
                 talents: p.talents,
                 permaBuffs: p.permaBuffs,
             });

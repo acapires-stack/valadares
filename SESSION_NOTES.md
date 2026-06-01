@@ -7,6 +7,31 @@
 
 ---
 
+## ⚜️ Sessão 01/06/2026 (cont. 5) — Talentos MULTI-RANK (Fase 1 da expansão de endgame)
+
+Dono aprovou a proposta de expandir os talentos (o print dele mostrou os 6 talentos single-rank **todos
+maxados** + **24 pontos parados** — sem onde investir no endgame). **Fase 1:** dar RANKS aos 6 atuais
+(**max 5** cada → 30 de capacidade, = os pontos atuais do dono).
+
+**Server (`server.js`):** `TALENT_DEFS` ganha `max:5`/talento; `talentPointsUsed` SOMA os ranks (legado boolean
+`true`→1 via `Number()`); `talentAlloc` valida `rank<max` + soma o buff por rank (reject `max_rank`); sanitize:
+allowlist de permaBuffs agora = `max_rank × buff` (+ headroom das auras de quest: dodgeBonus +0.05 Aura do
+Vidente, xpBonus +0.05 Vendedor); + clamp NOVO de `talents` (`[0,max]` inteiro, anti-forja do contador).
+Modelo **ADITIVO** (permaBuffs += por rank) — sem derive/respec ainda, então **sem risco de apagar auras de quest**.
+
+**Cliente (`play.html`):** `TALENT_DEFS_CLIENT` com `max:5`; `talentPointsUsed` soma ranks; `renderTalents` mostra
+"RANK n/5" + botão "subir rank" / "✓ MÁX (5/5)"; `buyTalent` sobe até o max; log mostra o rank. Typo pré-existente
+do resumo corrigido ("disponíveleis"→"disponíveis").
+
+**Verificado no preview:** earned 18 / used 9 (t_crit 3 + dodge legado→1 + hp 5) / avail 9; render mostra RANK 3/5,
+RANK 1/5 (legado boolean), ✓ MÁX (5/5), botão "subir rank"; **boot 0 erros**. `node --check` server ✓; `vm.Script` cliente ✓.
+
+⚠️ **Mexe em `server/**` → deploy só com `/manutencao` + logout** (dono estava online). Crit/dodge seguem o teto de
+segurança 50% no cálculo do stat, então ranquear não estoura. **Fase 2 (talentos NOVOS + gating + decisão PvP +
+respec/derive-permaBuffs que mata a classe do vazamento) = próxima.**
+
+---
+
 ## 🎯 Sessão 01/06/2026 (cont. 4) — Battle List (lista de combate clicável) no lugar da janela de alvo
 
 Dono: contra o bot **007** o alvo só aparecia na janela, não no mundo; e com **boss no meio da multidão**

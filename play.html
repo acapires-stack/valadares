@@ -6048,7 +6048,7 @@ function handleMP(msg){
         if (msg.talentResult && msg.talentResult.ok){
             const def = TALENT_DEFS_CLIENT[msg.talentResult.talentId];
             if (def){
-                log(`<span class="log-up">⚜ ${def.name} adquirido! (${def.desc})</span>`);
+                log(`<span class="log-up">⚜ ${def.name}${msg.talentResult.rank?` — rank ${msg.talentResult.rank}${msg.talentResult.max?'/'+msg.talentResult.max:''}`:''} adquirido!</span>`);
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, '⚜ ' + def.name, '#ffd060', true, -20);
             }
@@ -12012,12 +12012,12 @@ function closeRanking(){
 // Espelho do TALENT_DEFS do server. Cliente renderiza UI; toda compra passa
 // por talentAlloc no server (autoritativo). Bônus aplicam via permaBuffs.
 const TALENT_DEFS_CLIENT = {
-    t_crit:  { name:'Olho de Águia',         desc:'+5% chance crítica',         icon:'🎯', cat:'Ofensivo' },
-    t_dodge: { name:'Reflexos Felinos',      desc:'+5% chance de esquiva',      icon:'💨', cat:'Defensivo' },
-    t_hp:    { name:'Constituição',          desc:'+30 HP máximo',              icon:'❤', cat:'Defensivo' },
-    t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills', icon:'📚', cat:'Utilidade' },
-    t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen', icon:'✚', cat:'Defensivo' },
-    t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob',  icon:'💰', cat:'Utilidade' },
+    t_crit:  { name:'Olho de Águia',         desc:'+5% chance crítica (por rank)',         icon:'🎯', cat:'Ofensivo', max:5 },
+    t_dodge: { name:'Reflexos Felinos',      desc:'+5% chance de esquiva (por rank)',      icon:'💨', cat:'Defensivo', max:5 },
+    t_hp:    { name:'Constituição',          desc:'+30 HP máximo (por rank)',              icon:'❤', cat:'Defensivo', max:5 },
+    t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills (por rank)', icon:'📚', cat:'Utilidade', max:5 },
+    t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen (por rank)', icon:'✚', cat:'Defensivo', max:5 },
+    t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob (por rank)',  icon:'💰', cat:'Utilidade', max:5 },
 };
 function totalLevelsAbove10(){
     if (!player.skills) return 0;
@@ -12028,7 +12028,12 @@ function totalLevelsAbove10(){
 function talentPointsEarned(){ return Math.floor(totalLevelsAbove10() / 10); }
 function talentPointsUsed(){
     if (!player.talents) return 0;
-    return Object.keys(player.talents).filter(id => player.talents[id] && TALENT_DEFS_CLIENT[id]).length;
+    let n = 0;
+    for (const id of Object.keys(player.talents)){
+        // multi-rank: soma os ranks (legado boolean true → 1)
+        if (TALENT_DEFS_CLIENT[id]) n += Math.max(0, Math.floor(Number(player.talents[id]) || 0));
+    }
+    return n;
 }
 function talentPointsAvailable(){ return Math.max(0, talentPointsEarned() - talentPointsUsed()); }
 function openTalents(){
@@ -12047,7 +12052,7 @@ function renderTalents(){
     const avail = earned - used;
     const totalLv = totalLevelsAbove10();
     summary.innerHTML = `
-        <div style="font-size:18px;color:#ffd060;font-weight:bold">${avail} ponto${avail===1?'':'s'} disponível${avail===1?'':'eis'}</div>
+        <div style="font-size:18px;color:#ffd060;font-weight:bold">${avail} ponto${avail===1?'':'s'} disponíve${avail===1?'l':'is'}</div>
         <div style="font-size:11px;color:#888;margin-top:4px">${used}/${earned} usados · ${totalLv} níveis totais (próximo ponto em ${10 - (totalLv % 10)} levels)</div>`;
     const byCat = { Ofensivo:[], Defensivo:[], Utilidade:[] };
     for (const [id, def] of Object.entries(TALENT_DEFS_CLIENT)){
@@ -12056,18 +12061,21 @@ function renderTalents(){
     list.innerHTML = Object.entries(byCat).map(([cat, talents]) => `
         <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:10px 4px 4px 4px;border-bottom:1px solid #1a1408;margin-top:6px">${cat.toUpperCase()}</div>
         ${talents.map(({id, def}) => {
-            const owned = !!(player.talents && player.talents[id]);
-            const canBuy = !owned && avail > 0;
-            const btn = owned
-                ? `<span style="color:#74d176;font-size:11px;font-weight:700">✓ ADQUIRIDO</span>`
+            const rank = Math.max(0, Math.floor(Number(player.talents && player.talents[id]) || 0));
+            const max = def.max || 1;
+            const maxed = rank >= max;
+            const canBuy = !maxed && avail > 0;
+            const rankTag = rank > 0 ? `<span style="color:#74d176;font-size:10px;font-weight:700;white-space:nowrap;margin-left:6px">RANK ${rank}/${max}</span>` : '';
+            const btn = maxed
+                ? `<span style="color:#74d176;font-size:11px;font-weight:700">✓ MÁX (${max}/${max})</span>`
                 : canBuy
-                    ? `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px" onclick="buyTalent('${id}')">comprar (1 pt)</button>`
+                    ? `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px" onclick="buyTalent('${id}')">${rank>0?'subir rank':'comprar'} (1 pt)</button>`
                     : `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px;opacity:0.4;cursor:not-allowed" disabled>sem pontos</button>`;
             return `
-                <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid #1a1408;${owned ? 'background:#0a1a0a' : ''}">
+                <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid #1a1408;${rank>0 ? 'background:#0a1a0a' : ''}">
                     <span style="font-size:22px;width:32px;text-align:center">${def.icon}</span>
                     <div style="flex:1">
-                        <div style="color:${owned ? '#74d176' : '#ffd060'};font-weight:600;font-size:13px">${def.name}</div>
+                        <div style="color:${rank>0 ? '#74d176' : '#ffd060'};font-weight:600;font-size:13px">${def.name}${rankTag}</div>
                         <div style="color:#888;font-size:11px;margin-top:2px">${def.desc}</div>
                     </div>
                     ${btn}
@@ -12075,12 +12083,14 @@ function renderTalents(){
         }).join('')}`).join('');
 }
 function buyTalent(id){
-    if (!TALENT_DEFS_CLIENT[id]) return;
-    if (player.talents && player.talents[id]){ log('<span class="log-sys">Talento já adquirido.</span>'); return; }
+    const def = TALENT_DEFS_CLIENT[id];
+    if (!def) return;
+    const rank = Math.max(0, Math.floor(Number(player.talents && player.talents[id]) || 0));
+    if (rank >= (def.max || 1)){ log('<span class="log-sys">Talento já está no rank máximo.</span>'); return; }
     if (talentPointsAvailable() < 1){ log('<span class="log-sys">Sem pontos disponíveis.</span>'); return; }
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'talentAlloc', talentId:id })); } catch {}
-        log(`<span class="log-sys">Adquirindo ${TALENT_DEFS_CLIENT[id].name}…</span>`);
+        log(`<span class="log-sys">${rank>0?'Subindo':'Adquirindo'} ${def.name}…</span>`);
     }
 }
 window.openTalents = openTalents;
