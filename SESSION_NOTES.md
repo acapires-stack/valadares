@@ -31,6 +31,13 @@ alto) nunca era pego.
 (id+aggro) ✓; ciclo anda+wrap ✓; `.active`+AUTO ✓; **boot 0 erros** ✓. **Falta in-game:** anel no player alvo,
 clique-no-mundo, teclas Espaço/Tab, e o feel com mobs reais.
 
+**Follow-up (pós-teste do dono, mesmo dia):** dono notou "às vezes a lista não pega os mais próximos, pela
+velocidade/transição". Causa: `getBattleList` usava pos **LÓGICA**, mas `getCamera` segue `player.renderX/Y` e o
+mob é desenhado em renderX/Y → no deslize (~280ms) a lógica "pula" 1 tile antes do visual. Fix: a lista usa pos
+**VISUAL (render)** — `vis` espelha o culling do desenho (`cam-1..cam+VP+1`), e a `dist` usa render **arredondado**
+(ordem inteira estável, alinhada ao que se vê). Verificado no preview (mob lógico-longe/visual-perto sobe pro topo;
+0 erros). Cliente-only.
+
 ---
 
 ## 🔒 Sessão 01/06/2026 (cont. 3) — loot do mob comum TRAVADO por dano (anti-ninja) + fix DoT-loot

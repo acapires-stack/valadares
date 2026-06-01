@@ -8631,19 +8631,27 @@ function updateMobileHotbar(){
 // pular sob você). Cada entry: {id, type:'monster'|'player', ref, name, hp, maxHp, dist, ...}.
 function getBattleList(){
     const cam = getCamera();
-    const inView = (x,y) => x>=cam.x && x<cam.x+VP_W && y>=cam.y && y<cam.y+VP_H;
+    // Usa a posição VISUAL (render): a câmera segue player.renderX/Y e o mob é desenhado em
+    // renderX/Y. Com a pos LÓGICA, a lista dessincronizava no movimento — a lógica "pula" 1
+    // tile na hora, mas o boneco/mob ainda desliza ~280ms (o "pela velocidade/transição" que
+    // o dono pegou). `vis` espelha o culling do desenho (cam-1..cam+VP+1 = o que aparece);
+    // a distância usa render ARREDONDADO → ordem estável (inteira) e alinhada ao que se vê.
+    const prx = Math.round(player.renderX ?? player.x), pry = Math.round(player.renderY ?? player.y);
+    const vis = (rx, ry) => rx >= cam.x-1 && rx < cam.x+VP_W+1 && ry >= cam.y-1 && ry < cam.y+VP_H+1;
     const out = [];
     for (const m of monsters){
-        if (!inView(m.x, m.y)) continue;
-        const dist = Math.max(Math.abs(m.x-player.x), Math.abs(m.y-player.y));
+        const rx = m.renderX ?? m.x, ry = m.renderY ?? m.y;
+        if (!vis(rx, ry)) continue;
+        const dist = Math.max(Math.abs(Math.round(rx)-prx), Math.abs(Math.round(ry)-pry));
         out.push({ id:m.id, type:'monster', ref:m, name:m.name, hp:m.hp, maxHp:m.maxHp, dist, color:m.color||'#aaa', unique:!!m.unique, level:m.level });
     }
     if (player.pvp){
         for (const idK in remotePlayers){
             const rp = remotePlayers[idK];
             if (!rp || !rp.pvp || rp.ghost) continue;
-            if (!inView(rp.x, rp.y)) continue;
-            const dist = Math.max(Math.abs(rp.x-player.x), Math.abs(rp.y-player.y));
+            const rx = rp.renderX ?? rp.x, ry = rp.renderY ?? rp.y;
+            if (!vis(rx, ry)) continue;
+            const dist = Math.max(Math.abs(Math.round(rx)-prx), Math.abs(Math.round(ry)-pry));
             out.push({ id:parseInt(idK,10), type:'player', ref:rp, name:rp.name||'Player', hp:rp.hp??100, maxHp:rp.maxHp??100, dist, color:'#ff8060', isPlayer:true });
         }
     }
