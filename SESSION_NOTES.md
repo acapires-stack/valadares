@@ -7,6 +7,38 @@
 
 ---
 
+## 🔒 Sessão 01/06/2026 (cont. 3) — loot do mob comum TRAVADO por dano (anti-ninja) + fix DoT-loot
+
+Dono escolheu, de 3 opções, a **"bag travada por dano, depois libera"** (mantém o feel Tibia de loot no
+chão; protege no multiplayer). Insight dele: como o boneco já cata tudo no chão (raio 2 + pickup-ao-matar),
+"concentrar o drop no tile" não mudaria nada — o problema real é **de quem é o loot** quando 2+ players
+batem no mesmo mob (ninja).
+
+**Server (`server.js`):**
+- `damageBy` agora em **TODOS** os mobs (hit + DoT), não só `unique` (era a infra que já existia pro boss).
+- Helpers `lootOwnerOf` (top-damager, fallback killer) + `dropMobLoot` (espalha 3×3 + carimba
+  `owner/ownerName/ownerUntil`, `LOOT_LOCK_MS=15s`) — extraído do `attackMob`, reusado nos 2 caminhos de morte.
+- `groundPickup`: durante a janela, só o dono + a **party dele** (`findPartyOfPlayer`) catam; depois, livre.
+  O ouro também trava (principal alvo de ninja).
+- **Bônus — bug latente FECHADO:** mob morto por **DoT** (`handleMobDeath`) mandava só `loot` sem `drops`
+  server-side → o cliente criava drop com id LOCAL (numérico) que o `groundPickup` nunca catava (só envia
+  ids `g…`) = **loot perdido online**. Agora `handleMobDeath` também usa `dropMobLoot` + broadcast `groundSpawn`
+  (caminho idêntico ao `attackMob`); aplica de quebra o t_loot (+15% gold) que faltava no DoT.
+
+**Cliente (`play.html`):** `groundItems` carregam `owner/ownerName/ownerUntil` (5 pushes: snapshot,
+groundSpawn, mobKill, 2× dungeon). `lootLockedToOther(it)` (nunca trava pra mim/minha party via `isPartyMate`)
+filtra o auto-pickup (`pickupAt`) e pinta 🔒 + escurece em `drawGroundItem`. Clock skew afeta só o visual —
+o server é autoritativo no pickup.
+
+**Verificado local:** `node --check` server ✓; `vm.Script` do JS inline ✓; **boot do cliente 0 erros** no preview;
+`lootLockedToOther` nos 5 ramos ✓ (trava só pra outro com janela ativa; libera mim/expirado/sem-dono/sem-lock).
+
+⚠️ **Mexe em `server/**` → deploy só com `/manutencao` + logout.** **Checklist in-game (2 contas):** (1) solo:
+bag cai e cata na hora (sem regressão); (2) solo com arma de DoT: bag agora aparece/cata; (3) multiplayer:
+top-damager cata, o outro vê 🔒 e só após 15s; (4) party do dono cata no lock; (5) boss inalterado (direto no inv).
+
+---
+
 ## ✅ Sessão 01/06/2026 (cont. 2) — fix de mana + LOTE de 7 bugs do .docx (2 deploys via /manutencao)
 
 **1) Mana cliente×server (commit `644921f`, deployado):** o `SPELLS_META` do server tinha custos

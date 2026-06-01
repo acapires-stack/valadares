@@ -971,19 +971,23 @@ const CHEST_POS = {
     b3: { x:47, y:52 }, b4: { x:53, y:52 },
 };
 // N3 fase 2: groundItems autoritativos
-const groundDrops = new Map();   // id -> { id, x, y, type, qty, spawnedAt }
+const groundDrops = new Map();   // id -> { id, x, y, type, qty, floor, spawnedAt, owner, ownerName, ownerUntil }
 let _nextGroundId = 1;
 const GROUND_TTL_MS = 5 * 60 * 1000;  // 5min — após isso, despawna
-function spawnGroundDrop(x, y, type, qty, floor){
+// Anti-ninja: a bag de mob comum fica RESERVADA a quem deu mais dano (+ party dele)
+// por esta janela; depois vira livre pra qualquer um. owner=null → sem trava (PK/etc).
+const LOOT_LOCK_MS = 15 * 1000;
+function spawnGroundDrop(x, y, type, qty, floor, owner, ownerName, ownerUntil){
     const id = 'g' + (_nextGroundId++);
-    const drop = { id, x, y, type, qty, floor: floor || 0, spawnedAt: Date.now() };
+    const drop = { id, x, y, type, qty, floor: floor || 0, spawnedAt: Date.now(),
+                   owner: owner ?? null, ownerName: ownerName ?? null, ownerUntil: ownerUntil || 0 };
     groundDrops.set(id, drop);
     return drop;
 }
 function snapshotGroundDrops(floor){
     return Array.from(groundDrops.values())
       .filter(d => floor === undefined || (d.floor || 0) === floor)
-      .map(d => ({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }));
+      .map(d => ({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }));
 }
 function tickGroundDespawn(){
     const now = Date.now();
@@ -3502,6 +3506,44 @@ setInterval(safeTick('tickImpostorBot', tickImpostorBot), 250);
 setInterval(safeTick('spawnImpostorBot', spawnImpostorBot), BOT_SPAWN_INTERVAL_MS);
 setInterval(safeTick('tickBencaoTempCleanup', tickBencaoTempCleanup), 60 * 1000);
 
+// Anti-ninja (mob comum): "dono" do loot = quem deu mais dano (fallback = killer).
+// Online → null se nem o top-damager nem o killer estão presentes (bag fica livre).
+function lootOwnerOf(m, killer){
+    const dmgBy = m.damageBy || {};
+    let bestId = null, best = 0;
+    for (const pid in dmgBy){ if (dmgBy[pid] > best){ best = dmgBy[pid]; bestId = Number(pid); } }
+    const top = bestId != null ? players.get(bestId) : null;
+    if (top && !top.disconnected) return top;
+    if (killer && !killer.disconnected) return killer;
+    return null;
+}
+// Espalha o loot do mob comum no chão (3×3 quando há vários itens) e CARIMBA o dono
+// + janela de lock (LOOT_LOCK_MS) em cada drop. Retorna o payload pros clientes
+// (mobKill.drops / groundSpawn). Extraído do handler de attackMob; reusado também na
+// morte por DoT (handleMobDeath) — antes o DoT mandava só `loot` e o drop se perdia.
+const MOB_DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];   // só 3×3: loot perto da morte (coletar não puxa mais mob)
+function dropMobLoot(m, loot, killer){
+    const owner = lootOwnerOf(m, killer);
+    const ownerId = owner ? owner.id : null;
+    const ownerName = owner ? owner.name : null;
+    const ownerUntil = owner ? (Date.now() + LOOT_LOCK_MS) : 0;
+    const spawned = [];
+    let spreadIdx = 0;
+    for (const it of loot){
+        if (!it || !it.type) continue;
+        let dx = 0, dy = 0;
+        if (loot.length > 2){
+            for (let t = 0; t < MOB_DROP_SPREAD.length; t++){
+                const o = MOB_DROP_SPREAD[(spreadIdx + t) % MOB_DROP_SPREAD.length];
+                if (mobTileOk(m, m.x + o[0], m.y + o[1])){ dx = o[0]; dy = o[1]; spreadIdx = (spreadIdx + t + 1) % MOB_DROP_SPREAD.length; break; }
+            }
+        }
+        const d = spawnGroundDrop(m.x + dx, m.y + dy, it.type, it.qty | 0 || 1, m.floor, ownerId, ownerName, ownerUntil);
+        spawned.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:ownerId, ownerName, ownerUntil });
+    }
+    return spawned;
+}
+
 // M4 anti-ninja: distribui o loot de um boss unique entre quem deu dano.
 // Gold = proporcional à contribuição; itens = sorteio ponderado pelo dano
 // (quem bateu mais tem mais chance de cada item). Vai DIRETO pro inventário —
@@ -3605,11 +3647,19 @@ function handleMobDeath(m, killerId){
     monsters.delete(m.id);
     const killer = players.get(killerId);
     const loot = rollLoot(m.type);
-    // M4 anti-ninja: boss unique distribui loot por dano (direto no inv). Mobs
-    // comuns mandam loot no mobKill (fallback). Boss → loot:[] pro cliente não
-    // criar drops no chão.
     const isBoss = !!m.unique;
+    // M5 talent t_loot (+15% gold) — espelha o caminho do attackMob.
+    if (!isBoss && killer){
+        const lootBonus = killer.permaBuffs?.lootBonus || 0;
+        if (lootBonus > 0){ for (const it of loot){ if (it && it.type === 'GOLD' && it.qty > 0) it.qty = Math.max(1, Math.round(it.qty * (1 + lootBonus))); } }
+    }
+    // M4 anti-ninja: boss distribui por dano (direto no inv); mob comum cai no chão
+    // com dono+lock (dropMobLoot). Antes a morte por DoT mandava só `loot` sem `drops`
+    // server-side → o cliente criava drop com id local que o groundPickup nunca catava
+    // = loot perdido online. Agora o caminho do DoT é igual ao do attackMob.
+    let spawnedDrops = [];
     if (isBoss) distributeBossLoot(m, loot, killer);
+    else spawnedDrops = dropMobLoot(m, loot, killer);
     // T1: XP authoritative na skill da arma equipada do killer
     let xpGained = 0, skillUsed = null;
     if (killer){
@@ -3620,12 +3670,14 @@ function handleMobDeath(m, killerId){
     if (killer && killer.ws.readyState === 1){
         killer.ws.send(JSON.stringify({
             t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot,
-            skill: skillUsed, xpGained,
+            drops: spawnedDrops, skill: skillUsed, xpGained,
         }));
         // Envia skills atualizadas (autoritativo)
         sendInvUpdate(killer, { skills: killer.skills, reason:'mobKill' });
     }
     broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
+    // outros veem a bag aparecer (mesma do attackMob); scoped no andar
+    if (!isBoss && spawnedDrops.length) broadcast(killerId, { t:'groundSpawn', drops: spawnedDrops }, m.floor);
     if (killer){
         bumpMobKill(killer.name, !!m.unique);
         sharePartyKill(killer, m);
@@ -3648,8 +3700,8 @@ function tickMobDots(){
             if (now < d.nextTickAt) continue;
             const dmg = d.dmg;
             m.hp = Math.max(0, m.hp - dmg);
-            // M4: dano de DoT conta pro loot por contribuição (boss unique)
-            if (m.unique && d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dmg; }
+            // Anti-ninja: dano de DoT conta pro dono do loot (todos os mobs agora)
+            if (d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dmg; }
             floats.push({ mobId: m.id, text: `-${dmg}`, color: DOT_COLORS[d.type] || '#aaa' });
             d.ticksLeft--;
             if (d.ticksLeft <= 0) m.dots.splice(i, 1);
@@ -5256,6 +5308,13 @@ wss.on('connection', (ws, request) => {
                 // era ≤1, mas o drop 3×3 do mob + você atacando a 1 tile deixava o loot de trás
                 // (a 2 tiles) inalcançável até andar pra lá.
                 if (Math.max(Math.abs(p.x - d.x), Math.abs(p.y - d.y)) > 2) continue;
+                // Anti-ninja: durante a janela de lock, só o dono (top-damager) + a party
+                // dele catam. Depois de ownerUntil, vira livre pra qualquer um.
+                if (d.ownerUntil && Date.now() < d.ownerUntil && d.owner != null && d.owner !== p.id){
+                    const op = d.ownerName ? findPartyOfPlayer(d.ownerName) : null;
+                    const sameParty = !!(op && op.members.some(n => n.toLowerCase() === p.name.toLowerCase()));
+                    if (!sameParty) continue;   // ainda travado pra esse player
+                }
                 groundDrops.delete(dropId);
                 if (d.type === 'GOLD'){
                     p.gold = (p.gold | 0) + (d.qty | 0);
@@ -6254,10 +6313,10 @@ wss.on('connection', (ws, request) => {
             // MAX_HIT_DMG fica como teto absoluto de segurança (>372 legítimo → nunca clipa).
             const dmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
             m.hp = Math.max(0, m.hp - dmg);
-            // M4: rastreia dano por player em bosses unique — pro loot ser
-            // distribuído por contribuição (anti-ninja). Só unique (sem overhead
-            // em mob comum). damageBy some quando o mob é deletado na morte.
-            if (m.unique){ m.damageBy = m.damageBy || {}; m.damageBy[id] = (m.damageBy[id] || 0) + dmg; }
+            // Anti-ninja: rastreia dano por player em TODOS os mobs — o dono do loot
+            // (boss = direto no inv; mob comum = bag no chão) é quem deu mais dano.
+            // damageBy some quando o mob é deletado na morte (sem leak).
+            m.damageBy = m.damageBy || {}; m.damageBy[id] = (m.damageBy[id] || 0) + dmg;
             // T1/T3: XP de skill por hit (não só por kill).
             // - Melee (range≤1, sem ammo, sem spear): +1 na skill da arma
             // - Distância (range>1 OU ammo OU throwSpear): +1 em Distância
@@ -6329,29 +6388,16 @@ wss.on('connection', (ws, request) => {
                         }
                     }
                 }
-                const spawnedDrops = [];
+                let spawnedDrops = [];
                 const isBoss = !!m.unique;
                 if (isBoss){
                     // M4 anti-ninja: boss unique distribui o loot por dano, direto
                     // no inventário de quem bateu. NÃO cai no chão.
                     distributeBossLoot(m, loot, p);
                 } else {
-                    // Mob comum: espalha em anel quando há vários itens (senão tudo
-                    // empilha num tile e some). 1-2 itens ficam no tile. Valida tile.
-                    const DROP_SPREAD = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];   // só 3x3: loot perto da morte (coletar não puxa mais mob)
-                    let spreadIdx = 0;
-                    for (const it of loot){
-                        if (!it || !it.type) continue;
-                        let dx = 0, dy = 0;
-                        if (loot.length > 2){
-                            for (let t = 0; t < DROP_SPREAD.length; t++){
-                                const o = DROP_SPREAD[(spreadIdx + t) % DROP_SPREAD.length];
-                                if (mobTileOk(m, m.x + o[0], m.y + o[1])){ dx = o[0]; dy = o[1]; spreadIdx = (spreadIdx + t + 1) % DROP_SPREAD.length; break; }
-                            }
-                        }
-                        const d = spawnGroundDrop(m.x + dx, m.y + dy, it.type, it.qty | 0 || 1, m.floor);
-                        spawnedDrops.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty });
-                    }
+                    // Mob comum: cai no chão (3×3) com dono+lock (anti-ninja). dropMobLoot
+                    // carimba owner/ownerUntil = top-damager (+ party dele) por LOOT_LOCK_MS.
+                    spawnedDrops = dropMobLoot(m, loot, p);
                 }
                 // T1: XP authoritative na skill da arma equipada
                 const skillUsed = weaponSkillOf(p);

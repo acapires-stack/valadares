@@ -3604,6 +3604,13 @@ function drawGroundItem(it, px, py){
         ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(it.qty, cx+12, cy+12);
         ctx.fillStyle = '#fff'; ctx.fillText(it.qty, cx+11, cy+11);
     }
+    // Anti-ninja: bag reservada a outro player → escurece + cadeado (cosmético; o server enforce o lock)
+    if (lootLockedToOther(it)){
+        ctx.fillStyle = 'rgba(10,6,20,0.5)';
+        ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI*2); ctx.fill();
+        ctx.font = '10px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('🔒', cx, cy - 9);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4398,7 +4405,7 @@ function enterDungeonClient(msg){
     monsters.length = 0;
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot não vaza entre andares
-    if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }); }
+    if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }); }
     const goingDown = msg.dir !== 'up';
     if (typeof showServerToast === 'function') showServerToast('warn', goingDown ? `⬇ Andar ${player.floor} das Profundezas — PvP FORÇADO. Cuidado.` : `⬆ Subiu pro Andar ${player.floor}.`, null, 4500);
     log(`<span class="log-die">━━ AS PROFUNDEZAS · Andar ${player.floor} ━━</span>`);
@@ -4418,7 +4425,7 @@ function exitDungeonClient(msg){
     monsters.length = 0;
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot do andar não vaza pra cidade
-    if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }); }
+    if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }); }
     if (typeof showServerToast === 'function') showServerToast('event', '⬆ De volta à cidade.', null, 4000);
     log('<span class="log-sys">Você voltou à superfície.</span>');
 }
@@ -5707,7 +5714,7 @@ function handleMP(msg){
             groundItems.length = 0;
             for (const d of msg.groundDrops){
                 if (!ITEMS[d.type] && d.type !== 'GOLD') continue;
-                groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty });
+                groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty, owner: d.owner, ownerName: d.ownerName, ownerUntil: d.ownerUntil });
             }
         }
     } else if (msg.t === 'groundSpawn'){
@@ -5716,7 +5723,7 @@ function handleMP(msg){
             for (const d of msg.drops){
                 if (!ITEMS[d.type] && d.type !== 'GOLD') continue;
                 if (groundItems.find(g => g.id === d.id)) continue;
-                groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty });
+                groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty, owner: d.owner, ownerName: d.ownerName, ownerUntil: d.ownerUntil });
             }
         }
     } else if (msg.t === 'groundRemove'){
@@ -6501,7 +6508,7 @@ function mobKilledByServer(m, serverLoot, serverDrops){
             }
             // Evita duplicata se groundSpawn chegou primeiro (no nosso fluxo, mobKill é direto, sem race)
             if (groundItems.find(g => g.id === d.id)) continue;
-            groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty | 0 || 1 });
+            groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty | 0 || 1, owner: d.owner, ownerName: d.ownerName, ownerUntil: d.ownerUntil });
         }
     } else if (Array.isArray(serverLoot)){
         // Compat com server antigo (Hardening N2): só tem {type, qty}; gera id local
@@ -11178,6 +11185,15 @@ function checkDungeonStairs(x, y){
     }
 }
 
+// Anti-ninja: bag de mob comum fica reservada ao dono (top-damager) + party dele por
+// alguns segundos (server carimba owner/ownerUntil). Pra MIM nunca trava (minha bag ou
+// da minha party). Usado no filtro do auto-pickup e no visual (cadeado em drawGroundItem).
+function lootLockedToOther(it){
+    if (!it || !it.ownerUntil || Date.now() >= it.ownerUntil) return false;
+    if (!it.ownerName || it.ownerName === player.name) return false;
+    return !isPartyMate(it.ownerName);
+}
+
 // ─── Itens: pickup automático no raio 2 (5×5) ─────────────────────────────────
 function pickupAt(x, y){
     // N3 fase 2: se conectado ao server, envia ids pro server processar.
@@ -11189,6 +11205,7 @@ function pickupAt(x, y){
             // raio 2: o drop do mob é 3×3 ao redor DELE e você ataca a 1 tile → com raio 1 os
             // itens do lado oposto ficavam a 2 tiles e não eram pegos ("loot de trás"). #3/#6
             if (Math.abs(it.x - x) > 2 || Math.abs(it.y - y) > 2) continue;
+            if (lootLockedToOther(it)) continue;   // bag travada pra outro durante o lock — não tenta catar (server rejeitaria)
             // Só envia ids server-side (g123). Ids locais (number) são de single-player offline.
             if (typeof it.id === 'string' && it.id[0] === 'g') ids.push(it.id);
         }
