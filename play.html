@@ -2448,7 +2448,7 @@ const NPCS = [
     { id:'crepusculo',name:'Madame Crepúsculo',pos:{x:28,y:75}, body:'#3a204a', hat:'#7040aa', action:'chain', sanctuary:true, chain:'crepusculo' },
     { id:'vohrim',    name:'Embaixador Vohrim', pos:{x:15,y:50}, body:'#2a1a3a', hat:'#5a3030', action:'chain', sanctuary:true, chain:'vohrim' },
     // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
-    { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
+    { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', sanctuary:true, chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
 ];
 
 function npcVisible(n){ return !n.hiddenUntil || (player.flags && player.flags[n.hiddenUntil]); }
@@ -2625,7 +2625,7 @@ function playerInSafeZone(){
 }
 // Santuário dos NPCs de mundo (espelha SANCTUARY_* do server): zona segura 5×5 ao
 // redor de cada NPC de chain, pra ler o diálogo sem apanhar. Render pinta um tom
-// verde + borda; mob não anda pra dentro (igual à PZ). Vendedor (oculto) fica fora.
+// verde + borda; mob não anda pra dentro (igual à PZ). Vendedor (75,20) também tem (#11).
 const SANCTUARY_RADIUS = 2;   // 5×5 — bate com o server
 function inSanctuary(x, y){
     if ((player.floor || 0) !== 0) return false;   // NPCs de mundo só no overworld
@@ -3712,6 +3712,10 @@ const ITEMS = {
     SABRE:         { name:'Sabre',            color:'#c0d0a0', kind:'weapon', hand:'1h', skill:'Espada',  base:6, def:2 },
     ADAGA_DUPLA:   { name:'Adaga dupla',      color:'#d0c8b0', kind:'weapon', hand:'1h', skill:'Espada',  base:5, def:1 },
     BORDAO:        { name:'Bordão de pedra',  color:'#9090a8', kind:'weapon', hand:'1h', skill:'Clava',   base:6, def:2 },
+    // 1H de tier médio/alto pra build de escudo (sempre < a 2H de tier equivalente)
+    ESPADA_ACO:      { name:'Espada de Aço',        color:'#b8c4d8', kind:'weapon', hand:'1h', skill:'Espada', base:9,  def:3 },
+    LAMINA_DRACO_1H: { name:'Lâmina Dracônica',     color:'#e87850', kind:'weapon', hand:'1h', skill:'Espada', base:12, def:4 },
+    ESPADA_GUARDIAO: { name:'Espada do Guardião ★', color:'#e8d878', kind:'weapon', hand:'1h', skill:'Espada', base:16, def:6 },
     // armas novas — 2H endgame
     ESPADA_DRACO:  { name:'Espada Dracônica', color:'#ff6040', kind:'weapon', hand:'2h', skill:'Espada',  base:14, def:5 },
     MARTELO_GOLEM: { name:'Martelo do Golem', color:'#6888a8', kind:'weapon', hand:'2h', skill:'Clava',   base:13, def:6 },
@@ -3726,6 +3730,7 @@ const ITEMS = {
     // armaduras endgame
     ARMADURA_ESCAMA:{ name:'Armadura de Escamas', color:'#cc5040', kind:'armor',   def:9 },
     ESCUDO_PEDRA:  { name:'Escudo de Pedra',  color:'#7888a0', kind:'offhand', def:8 },
+    ESCUDO_GUARDIAO: { name:'Escudo do Guardião ★', color:'#e8d878', kind:'offhand', def:12 },
     ELMO_DRACO:    { name:'Elmo Dracônico',   color:'#cc4030', kind:'head',    def:4 },
     // munições (ammo)
     CORACAO_HL:    { name:'Coração do Highlander', color:'#cc1010', kind:'neck' },
@@ -4334,6 +4339,15 @@ async function playerDie(){
     else log(`<span class="log-die">Sem perdas de skill (nada treinado).</span>`);
     recomputeStats();
     buildSkillList();
+    // #5: morreu na masmorra → sai pro overworld localmente (o server manda dungeonExit
+    // logo depois, mas isto evita 1 frame renascendo colado no boss dentro do andar).
+    if ((player.floor || 0) > 0){
+        player.floor = 0;
+        map = overworldMap;
+        if (_overworldVisited){ player.visited = _overworldVisited; _overworldVisited = null; }
+        monsters.length = 0;
+        groundItems.length = 0;
+    }
     player.hp = player.maxHp;
     player.mp = player.maxMp;
     player.x = spawn.x; player.y = spawn.y;
@@ -4373,6 +4387,8 @@ function enterDungeonClient(msg){
     if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = sp; }
     monsters.length = 0;
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
+    groundItems.length = 0;   // #5: loot não vaza entre andares
+    if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }); }
     const goingDown = msg.dir !== 'up';
     if (typeof showServerToast === 'function') showServerToast('warn', goingDown ? `⬇ Andar ${player.floor} das Profundezas — PvP FORÇADO. Cuidado.` : `⬆ Subiu pro Andar ${player.floor}.`, null, 4500);
     log(`<span class="log-die">━━ AS PROFUNDEZAS · Andar ${player.floor} ━━</span>`);
@@ -4391,6 +4407,8 @@ function exitDungeonClient(msg){
     if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = sp; }
     monsters.length = 0;
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
+    groundItems.length = 0;   // #5: loot do andar não vaza pra cidade
+    if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty }); }
     if (typeof showServerToast === 'function') showServerToast('event', '⬆ De volta à cidade.', null, 4000);
     log('<span class="log-sys">Você voltou à superfície.</span>');
 }
@@ -12715,6 +12733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatIn.value = '';
                 chatIn.blur();
                 clearAllKeys();
+                if (player.target || player.autoAttack) clearTarget();   // #10: ESC para o ataque mesmo com foco no chat
             }
         });
         // Bloqueia keyup também

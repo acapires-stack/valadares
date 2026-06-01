@@ -545,6 +545,10 @@ const ITEM_META = {
     ADAGA_DUPLA:  { kind:'weapon', hand:'1h', base:5, def:1 },
     BORDAO:       { kind:'weapon', hand:'1h', base:6, def:2 },
     ESPADA_OSSO:  { kind:'weapon', hand:'1h', base:5, def:2 },
+    // novas 1H (build de escudo) — sempre < a 2H de tier equivalente
+    ESPADA_ACO:      { kind:'weapon', hand:'1h', base:9,  def:3 },
+    LAMINA_DRACO_1H: { kind:'weapon', hand:'1h', base:12, def:4 },
+    ESPADA_GUARDIAO: { kind:'weapon', hand:'1h', base:16, def:6 },
     LANCA:        { kind:'weapon', hand:'1h', base:4, def:1, throwable:5 },
     LANCA_LONGA:  { kind:'weapon', hand:'1h', base:5, def:2, throwable:6 },
     // armas 2H
@@ -567,6 +571,7 @@ const ITEM_META = {
     ESCUDO_FERRO: { kind:'offhand', def:6 },
     ESCUDO_OSSO:  { kind:'offhand', def:5 },
     ESCUDO_PEDRA: { kind:'offhand', def:8 },
+    ESCUDO_GUARDIAO: { kind:'offhand', def:12 },   // ★ par defensivo das 1H lendárias
     COURO:           { kind:'armor', def:2 },
     ARMADURA:        { kind:'armor', def:5 },
     ARMADURA_OSSO:   { kind:'armor', def:7 },
@@ -1089,6 +1094,8 @@ const LOOT = {
         ['MACHADO_MINO', 0.15, 1, 1], ['BOTAS_VENTO', 0.10, 1, 1],
         ['CAPA_SOMBRA', 0.15, 1, 1], ['TRAIL_GELO', 0.10, 1, 1],
         ['ESPADA_ETERNA', 0.05, 1, 1], ['ARMADURA_TRONO', 0.08, 1, 1],
+        // novas 1H + escudo — viabilizam o build de escudo (#7/#8). Aço comum (porta de entrada), Guardião raro.
+        ['ESPADA_ACO', 0.40, 1, 1], ['LAMINA_DRACO_1H', 0.25, 1, 1], ['ESPADA_GUARDIAO', 0.12, 1, 1], ['ESCUDO_GUARDIAO', 0.12, 1, 1],
     ],
     SENHOR_VALADARES: [
         ['GOLD', 1.00, 5000, 10000], ['ESSENCIA', 1.00, 5, 10], ['CORACAO_HL', 1.00, 3, 5],
@@ -1190,11 +1197,12 @@ const NPC_PROTECT_COMBAT_GRACE_MS = 2000;   // ao atacar, perde proteção por 2
 // visível, pra dar espaço de ler o diálogo sem apanhar. Diferente da mini-PZ 3×3,
 // aqui o mob também NÃO pisa (vira clareira, ver mobTileOk/spawns) → quem te
 // perseguia para na borda e, como você não é mirado dentro, larga (leash natural).
-// Os NPCs da cidade já têm a PZ 9×9; o Vendedor (oculto/sinistro) fica de fora.
+// Os NPCs da cidade já têm a PZ 9×9. O Vendedor (75,20) cola no Ferreiro (78,22) e
+// também ganha santuário → vira uma zona contígua protegida (#11).
 const SANCTUARY_RADIUS = 2;   // 5×5
 const SANCTUARY_NPCS = [
     QUEST_NPCS.eremita, QUEST_NPCS.ferreiro, QUEST_NPCS.cacadora,
-    QUEST_NPCS.mineiro, QUEST_NPCS.crepusculo, QUEST_NPCS.vohrim,
+    QUEST_NPCS.mineiro, QUEST_NPCS.crepusculo, QUEST_NPCS.vohrim, QUEST_NPCS.vendedor,
 ];
 function inSanctuary(x, y){
     for (const n of SANCTUARY_NPCS){
@@ -1203,9 +1211,12 @@ function inSanctuary(x, y){
     return false;
 }
 function playerNearNpc(p){
-    // Mini-PZ / santuário cancelados se o player atacou recentemente (anti-cheese)
+    // Santuário 5×5 (NPCs de mundo): abrigo TOTAL — o mob larga o alvo mesmo se você
+    // atacou de dentro. Sem isto a grace abaixo reativava o alvo e os mobs empilhavam
+    // na borda tentando entrar (não pisam no santuário). #9
+    if (inSanctuary(p.x, p.y)) return true;
+    // Mini-PZ 3×3: cancelada se o player atacou recentemente (anti-cheese de NPC-escudo)
     if (p.lastAttackAt && Date.now() - p.lastAttackAt < NPC_PROTECT_COMBAT_GRACE_MS) return false;
-    if (inSanctuary(p.x, p.y)) return true;   // santuário 5×5 dos NPCs de mundo
     for (const n of NPC_POSITIONS){
         if (Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)) <= NPC_PROTECT_RADIUS) return true;
     }
@@ -1839,9 +1850,31 @@ function enterDungeonFloor(p, id, floor, dir){
             stairs: g.stairs,
             players: snapshotPlayers(floor).filter(sp => sp.id !== id),
             mobs: snapshotMobs(floor),
+            groundDrops: snapshotGroundDrops(floor),   // #5: cliente limpa/repopula loot do andar (não vaza entre andares)
         }));
     }
     broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+}
+
+// Tira o player da masmorra e o devolve pra cidade (overworld): restaura o PvP,
+// zera o floor, teleporta pra saída segura (PZ) e manda o snapshot da cidade
+// (players/mobs/loot). Usado ao sair pela escada (andar 1) E ao MORRER na masmorra
+// — sem isto a morte só teleportava x/y pra (50,50) mantendo p.floor no andar, então
+// o player renascia DENTRO da masmorra colado no boss e o AI do andar seguia batendo. (#5)
+function returnPlayerToTown(p, id){
+    if ((p.floor || 0) > 0) broadcast(id, { t:'leave', id }, p.floor);   // some do andar
+    p.pvp = !!p._pvpBeforeDungeon;
+    p.floor = 0;
+    p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
+    if (p.ws && p.ws.readyState === 1){
+        p.ws.send(JSON.stringify({
+            t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
+            players: snapshotPlayers(0).filter(sp => sp.id !== id),
+            mobs: snapshotMobs(0),
+            groundDrops: snapshotGroundDrops(0),
+        }));
+    }
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
 }
 
 function tickRespawns(){
@@ -2088,7 +2121,12 @@ function tickAI(){
                         applyAttackerStatus(target, m.type);
                         // Morreu → o cliente respawna no spawn (playerDie manda pos pro
                         // outro lado do mapa). Libera 1 pos não-adjacente (anti-teleporte).
-                        if (target.hp === 0) target._posGraceUntil = Date.now() + 60000;
+                        if (target.hp === 0){
+                            target._posGraceUntil = Date.now() + 60000;
+                            // #5: morrer na masmorra devolve pra cidade. Sem isto o floor
+                            // não zerava → renascia colado no boss e o AI do andar seguia.
+                            if ((target.floor || 0) > 0) returnPlayerToTown(target, target.id);
+                        }
                     }
                     if (target.ws.readyState === 1){
                         target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual, crit:mobCrit }));
@@ -2366,6 +2404,7 @@ const WEAPON_SKILL = {
     // Espada
     ADAGA:'Espada', ADAGA_DUPLA:'Espada', ESPADA:'Espada', ESPADA_DRACO:'Espada',
     ESPADA_ETERNA:'Espada', ESPADA_HL:'Espada', ESPADA_LONGA:'Espada', ESPADA_OSSO:'Espada', SABRE:'Espada',
+    ESPADA_ACO:'Espada', LAMINA_DRACO_1H:'Espada', ESPADA_GUARDIAO:'Espada',
     // Distância (arcos + lanças arremessáveis)
     ARCO:'Distância', ARCO_CACA:'Distância', BESTA:'Distância',
     LANCA:'Distância', LANCA_LONGA:'Distância',
@@ -2851,15 +2890,25 @@ function sanitizeSave(data, ownerName){
                 delete data.questFlags[chainId];
                 continue;
             }
-            const validStages = new Set(chain.stages.map(s => s.id));
-            for (const stageId of Object.keys(progress)){
-                if (!validStages.has(stageId)){
-                    log(`questFlags.${chainId}.${stageId}`, progress[stageId], '(deletado: stage desconhecido)');
-                    delete progress[stageId];
+            // Allowlist POR STAGE: o id puro (= stage completo) + as flags de progresso
+            // (_started/_visited = bool; _kills = número clampado em stage.count). ANTES o
+            // validStages só tinha os ids puros → o sanitize DELETAVA _started/_kills/_visited
+            // a cada save → o player perdia o progresso da chain ("tinha que pegar a quest de
+            // novo"). O turn-in valida tudo server-side e nunca confiou nessas flags. #2
+            const stageById = new Map(chain.stages.map(s => [s.id, s]));
+            for (const key of Object.keys(progress)){
+                const baseId = key.replace(/_(started|kills|visited)$/, '');
+                const st = stageById.get(baseId);
+                if (!st){
+                    log(`questFlags.${chainId}.${key}`, progress[key], '(deletado: stage desconhecido)');
+                    delete progress[key];
                     continue;
                 }
-                if (progress[stageId] !== true && progress[stageId] !== false){
-                    progress[stageId] = !!progress[stageId];
+                if (key.endsWith('_kills')){
+                    const n = Math.floor(Number(progress[key]));
+                    progress[key] = isFinite(n) ? Math.max(0, Math.min(st.count || 9999, n)) : 0;
+                } else if (progress[key] !== true && progress[key] !== false){
+                    progress[key] = !!progress[key];
                 }
             }
         }
@@ -3943,6 +3992,7 @@ function tickPlayerDots(){
             if (p.hp === 0){
                 // Morte por DoT → cliente respawna no spawn. Libera 1 pos não-adjacente.
                 p._posGraceUntil = Date.now() + 60000;
+                if ((p.floor || 0) > 0) returnPlayerToTown(p, p.id);   // #5: DoT na masmorra também devolve pra cidade
                 p.dots.length = 0;
                 break;
             }
@@ -6046,22 +6096,12 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             p._lastFloorAt = now;
-            broadcast(id, { t:'leave', id }, cur);      // some do andar atual
             if (cur === 1){
-                // andar 1 → cidade (overworld): restaura PvP e volta pro Antro
-                p.pvp = !!p._pvpBeforeDungeon;
-                p.floor = 0;
-                p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
-                if (p.ws.readyState === 1){
-                    p.ws.send(JSON.stringify({
-                        t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
-                        players: snapshotPlayers(0).filter(sp => sp.id !== id),
-                        mobs: snapshotMobs(0),
-                    }));
-                }
-                broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+                // andar 1 → cidade (overworld): mesmo flow da morte na masmorra (#5)
+                returnPlayerToTown(p, id);
                 console.log(`[dungeon] ${p.name} voltou pra cidade`);
             } else {
+                broadcast(id, { t:'leave', id }, cur);      // some do andar atual
                 // sobe 1 andar (continua na masmorra, PvP segue forçado)
                 enterDungeonFloor(p, id, cur - 1, 'up');
                 console.log(`[dungeon] ${p.name} subiu pro andar ${cur - 1}`);
