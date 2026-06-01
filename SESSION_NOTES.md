@@ -57,6 +57,20 @@ ao trocar de aba.
   redor do MOB e você ataca a 1 tile → os itens do lado oposto ficavam a 2 tiles. Fix: raio 2 (5×5) no
   `pickupAt` (cliente) + `groundPickup` (server, valida proximidade) — os dois lados.
 
+**Pós-deploy — CACHE DO ELECTRON (lição cara):** o dono reportou #1 e #2b "ainda quebrados" depois do
+deploy — eram AMBOS **cache do Electron** (relogar reconecta o WS mas mantém o `play.html` cacheado em
+disco; reiniciar o PC tb não resolve). **`Ctrl+Shift+R` (Forçar Recarregamento)** consertou os dois de
+uma vez. Gravado em [[feedback-valadares-deploy]] — SUSPEITAR DE CACHE (e conferir o Vercel via `curl |
+grep <string do fix>`) ANTES de re-investigar o código. Gastei vários ciclos "consertando" o que já
+estava certo. **#1 e #2b CONFIRMADOS OK** pós hard reload. Também subiu **pickup-ao-matar** (`a1fcf16`,
+cliente-only): coleta o loot na hora da morte (raio 2) sem precisar andar.
+
+**⏳ PENDENTE → próxima sessão:** o dono disse que **o loot ainda ficou "estranho"** (NÃO detalhou o quê)
+e deixou pra depois. No início da próxima, **pedir o detalhe**. Opções: o teu **#3/#6 "cair junto"**
+(drop CONCENTRADO no tile do mob em vez de espalhar 3×3 — server, precisa /manutencao; com IDs
+server-autoritativos não "some" ao empilhar) e/ou revisar o pickup-ao-matar / o raio. Commits do dia:
+mana `644921f`, lote `c432609`, #1-altura `a20cfc1`, #2b+loot `84ae225`, #1-CSS `0e094ed`, pickup `a1fcf16`.
+
 **Deploys:** ambos via /manutencao. O `c432609` teve confirmação SÓLIDA — monitor pegou a janela de
 restart do Railway (`true`→DOWN→`false`) + Vercel servindo `ESCUDO_GUARDIAO`. Dono valida in-game
 pelo checklist (morte na masmorra, drop do boss, ESC, santuário, quest de chain).
