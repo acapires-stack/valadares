@@ -1433,6 +1433,17 @@ function mobTileOk(m, x, y){
     }
     return isWalkable(x, y) && !inSafe(x, y) && !inSanctuary(x, y);
 }
+// Player pode pisar no tile? (movimento autoritativo do handler `pos`). Floor>=1
+// usa o grid real do andar; floor 0 usa o terreno do overworld. AO CONTRÁRIO de
+// mobTileOk, NÃO exclui PZ/santuário (o player FICA lá). E NÃO checa ocupação por
+// mob/NPC/outro player: isso é nicety de colisão do cliente, não exploit, e validar
+// arriscaria desync (server e cliente nem sempre concordam quem ocupa um tile no
+// mesmo instante → snap-back indevido). Só valida terreno: fecha teleporte/parede/água.
+function playerTileWalkable(p, x, y){
+    const f = p.floor || 0;
+    if (f >= 1) return dungeonTileWalkable(f, x, y);
+    return isWalkable(x, y);
+}
 
 // ─── M8 Auction House — state global ──────────────────────────────────────
 // Trade assíncrono via NPC Leiloeiro em (50, 48). Server escrowa o item
@@ -2068,6 +2079,9 @@ function tickAI(){
                         // Fase 5: DoT/stun authoritative no server (rollAttackerStatus
                         // do cliente fica como no-op quando online).
                         applyAttackerStatus(target, m.type);
+                        // Morreu → o cliente respawna no spawn (playerDie manda pos pro
+                        // outro lado do mapa). Libera 1 pos não-adjacente (anti-teleporte).
+                        if (target.hp === 0) target._posGraceUntil = Date.now() + 60000;
                     }
                     if (target.ws.readyState === 1){
                         target.ws.send(JSON.stringify({ t:'mobHit', mobId:m.id, mobType:m.type, dmg:m.dmg, actual, crit:mobCrit }));
@@ -3646,6 +3660,10 @@ function totalDefenseServer(p){
 // + 1 selo pro killer + ranking. Tudo autoritativo.
 function processPkDeathServerSide(killer, victim){
     if (!killer || !victim) return;
+    // Morte PvP: o cliente respawna no spawn local (bloco "Respawn no spawn") e pode
+    // nem mandar pos até o 1º movimento. Libera 1 pos não-adjacente pra reconciliar a
+    // posição autoritativa sem snap-back. Concedido só na morte → não vira fuga de PvP.
+    victim._posGraceUntil = Date.now() + 60000;
     // Duelo: usa endDuel em vez do flow normal (não dá selo, não dropa)
     if (killer.duel && killer.duel.opponentId === victim.id && victim.duel && victim.duel.opponentId === killer.id){
         endDuel(killer, victim, false);
@@ -3880,6 +3898,8 @@ function tickPlayerDots(){
                 d.nextTickAt = now + d.intervalMs;
             }
             if (p.hp === 0){
+                // Morte por DoT → cliente respawna no spawn. Libera 1 pos não-adjacente.
+                p._posGraceUntil = Date.now() + 60000;
                 p.dots.length = 0;
                 break;
             }
@@ -4877,7 +4897,24 @@ wss.on('connection', (ws, request) => {
             // enviar {x:99999, y:99999} e quebrar tickAI/inCave/tileAt)
             const nx = Math.max(0, Math.min(M_W - 1, Math.floor(Number(msg.x)) || 0));
             const ny = Math.max(0, Math.min(M_H - 1, Math.floor(Number(msg.y)) || 0));
-            p.x = nx; p.y = ny;
+            // ── Movimento autoritativo (anti-teleporte) ──────────────────────────
+            // O cliente legítimo anda 1 tile/vez pra tile caminhável (mapa determinístico
+            // + walkable IDÊNTICO ao server; na masmorra, o grid veio do server). Forjar
+            // {t:'pos', x, y} pulava pra QUALQUER lugar — parede/água, rush da masmorra
+            // 1→5, fuga instantânea de PvP. Agora exige adjacência (cheby ≤1) + tile
+            // caminhável; senão NÃO move e devolve posCorrect (snap-back). EXCEÇÃO: respawn
+            // (morte/bênção) teleporta pro spawn — _posGraceUntil (setado nos sites de
+            // morte) libera UM pos não-adjacente. Como só nasce APÓS morrer de verdade, o
+            // player vivo não foge nem rusha por aqui (e o morto já pagou a penalidade).
+            if (p._posGraceUntil && _now < p._posGraceUntil){
+                p._posGraceUntil = 0;   // one-shot
+                p.x = nx; p.y = ny;
+            } else if (chebyshev(p.x, p.y, nx, ny) <= 1 && playerTileWalkable(p, nx, ny)){
+                p.x = nx; p.y = ny;
+            } else {
+                sendTo(id, { t:'posCorrect', x: p.x, y: p.y, dir: p.dir });
+                return;
+            }
             p.dir = (typeof msg.dir === 'string' && msg.dir.length < 8) ? msg.dir : p.dir;
             // Lockdown N3: hp/maxHp são server-authoritative. msg.hp/msg.maxHp do
             // cliente NUNCA são aceitos aqui (F12 `{t:'pos',hp:99999}` virava invencível).
@@ -6241,6 +6278,11 @@ wss.on('connection', (ws, request) => {
                 console.warn(`[pkDeath] rejeitado: ${p.name} claimou killer ${msg.killerId} mas último atacante foi ${p._lastPvpAttackerId} (${Math.floor((Date.now() - (p._lastPvpAttackAt||0))/1000)}s atrás)`);
                 return;
             }
+            // Fallback (a detecção autônoma no pvpAttack já cobre o caminho normal e
+            // setou grace). Aqui cobre o caso de race/duelo: a vítima respawna no spawn
+            // → libera 1 pos não-adjacente. DEPOIS da validação anti-forja acima, então
+            // não dá pra forjar pkDeath e se auto-conceder teleporte sem morrer de verdade.
+            p._posGraceUntil = Date.now() + 60000;
             // Se ambos estavam num duelo entre si, processa como vitória de duel (sem selo, sem drop)
             if (killer && p.duel && p.duel.opponentId === killer.id && killer.duel && killer.duel.opponentId === id){
                 endDuel(killer, p, false);

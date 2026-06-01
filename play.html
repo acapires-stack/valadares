@@ -5726,6 +5726,15 @@ function handleMP(msg){
                 spawnTrailAt(prevX, prevY, trailCol);
             }
         }
+    } else if (msg.t === 'posCorrect'){
+        // Server recusou um movimento (anti-teleporte) e devolve a posição autoritativa.
+        // Em jogo limpo NUNCA dispara (cada passo = 1 tile pra tile caminhável, mesmo
+        // grid do server). Snap sem lerp pra não "escorregar" de volta.
+        if (typeof msg.x === 'number' && isFinite(msg.x)) player.x = msg.x;
+        if (typeof msg.y === 'number' && isFinite(msg.y)) player.y = msg.y;
+        if (typeof msg.dir === 'string') player.dir = msg.dir;
+        snapRender(player);
+        player.moveTimer = 0;
     } else if (msg.t === 'pvp'){
         if (remotePlayers[msg.id]) remotePlayers[msg.id].pvp = msg.pvp;
     } else if (msg.t === 'ranking'){
