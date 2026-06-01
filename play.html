@@ -3522,17 +3522,22 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
     }
     // mpPct presente = player local → mostra HP/MP sempre. Sem mpPct = mob/remote → HP só quando ferido.
     const isLocal = mpPct != null;
+    // Barras HP/MP. SEM nameTag (player local) elas sobem mais — antes ficavam
+    // coladas na cabeça/elmo (py-1) e tapavam o item equipado. COM nome (remotos)
+    // o nome ocupa o topo (py-13), então mantém perto pra não invadir o nome.
+    const _hpBarY = nameTag ? py - 5 : py - 9;
+    const _mpBarY = nameTag ? py - 1 : py - 5;
     // hp bar (em cima)
     if (hpPct != null && (isLocal || hpPct < 1)){
-        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(px+6, py-5, 36, 3);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(px+6, _hpBarY, 36, 3);
         ctx.fillStyle = hpPct>0.5 ? '#4caf50' : hpPct>0.25 ? '#ffaa00' : '#cc3030';
-        ctx.fillRect(px+6, py-5, 36*hpPct, 3);
+        ctx.fillRect(px+6, _hpBarY, 36*hpPct, 3);
     }
     // mp bar (embaixo — só desenhada quando é player local)
     if (isLocal){
-        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(px+6, py-1, 36, 3);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(px+6, _mpBarY, 36, 3);
         ctx.fillStyle = '#4a78dd';
-        ctx.fillRect(px+6, py-1, 36*mpPct, 3);
+        ctx.fillRect(px+6, _mpBarY, 36*mpPct, 3);
     }
 }
 
@@ -6420,7 +6425,12 @@ function handleMP(msg){
             if (parts.length){
                 const bossName = (MTYPE[bl.boss] && MTYPE[bl.boss].name) || 'boss';
                 log(`<span class="log-up">🏆 Sua parte do loot de ${escapeHtml(bossName)}: ${parts.join(', ')}</span>`);
-                if (typeof showServerToast === 'function') showServerToast('event', `🏆 Loot: ${parts.join(', ')}`, null, 6500);
+                // Toast COMPACTO (resumo). A lista completa fica no log. Antes o toast listava
+                // tudo + um 2º toast de "ouro creditado" empilhavam 2 banners gigantes na tela.
+                const _nItems = Object.values(bl.items || {}).reduce((a, b) => a + b, 0);
+                const _sum = [bl.gold > 0 ? `${bl.gold.toLocaleString('pt-BR')}g` : null,
+                              _nItems > 0 ? `${_nItems} ${_nItems === 1 ? 'item' : 'itens'}` : null].filter(Boolean).join(' + ');
+                if (typeof showServerToast === 'function') showServerToast('event', `🏆 Loot de ${bossName}: ${_sum}`, null, 5000);
                 if (typeof sndLevelUp === 'function') sndLevelUp();
             }
         }
@@ -6476,7 +6486,8 @@ function handleMP(msg){
                 log(`<span class="log-up">💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados (${reason})!</span>`);
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, `+${msg.goldDelta.amount}g`, '#ffcc40', true, -20);
-                if (typeof showServerToast === 'function') showServerToast('event', `💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados!`);
+                // Não duplica banner quando o ouro já veio no toast de loot de boss (mesma msg).
+                if (typeof showServerToast === 'function' && !msg.bossLoot) showServerToast('event', `💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados!`);
                 // Fecha modal de loja se aberto (PIX confirmou)
                 if (reason === 'pix'){
                     const m = document.getElementById('goldShopModal');
@@ -9171,14 +9182,18 @@ function updateSidebar(){
     const skB = playerSpeedBonusFromSkills(), btB = playerSpeedBonusFromBoots();
     const spd = playerMoveDelay();
     const tilesPerSec = (1000 / spd).toFixed(1);
+    // Fúria (buff.spd) acelera movimento E ataque — destaca os dois no painel (cor + ▲)
+    // enquanto ativo, pra deixar claro que o buff entrou (era o "não subiu a vel. ataque").
+    const _spdBuffed = !!(player.buff && player.buff.spd > 0);
+    const _buffPct = _spdBuffed ? Math.round(player.buff.spd * 100) : 0;
     const spdEl = document.getElementById('spdVal');
     if (spdEl){
-        spdEl.textContent = `${tilesPerSec}/s`;   // compacto (tooltip detalha tiles/ms)
-        // Tooltip detalhado pra quem quiser ver a quebra
+        spdEl.textContent = `${tilesPerSec}/s${_spdBuffed ? ' ▲' : ''}`;
+        spdEl.style.color = _spdBuffed ? '#ff9a4a' : '#8acdef';
         const breakdown = (skB || btB)
             ? `${spd}ms entre tiles · skill -${skB}ms · botas -${btB}ms`
             : `${spd}ms entre tiles`;
-        spdEl.title = breakdown;
+        spdEl.title = _spdBuffed ? `${breakdown} · Fúria +${_buffPct}%` : breakdown;
     }
     // Vel. ataque — converte ms→atk/seg, breakdown vai pro tooltip
     const wK = player.equipped.weapon;
@@ -9188,10 +9203,12 @@ function updateSidebar(){
     const atkSpdEl = document.getElementById('atkSpdVal');
     if (atkSpdEl){
         const atksPerSec = (1000 / atkDelay).toFixed(2);
-        atkSpdEl.textContent = `${atksPerSec}/s`;   // compacto (tooltip detalha atk/ms + forja)
-        atkSpdEl.title = atkSpd
+        atkSpdEl.textContent = `${atksPerSec}/s${_spdBuffed ? ' ▲' : ''}`;
+        atkSpdEl.style.color = _spdBuffed ? '#ff9a4a' : '#a0c8ff';
+        const _atkTip = atkSpd
             ? `${atkDelay}ms entre ataques · forja -${Math.round(atkSpd*100)}%`
             : `${atkDelay}ms entre ataques`;
+        atkSpdEl.title = _spdBuffed ? `${_atkTip} · Fúria +${_buffPct}%` : _atkTip;
     }
     // Procs da arma equipada (veneno/sangra/fogo) — mostra ou esconde a linha
     const procsRow = document.getElementById('procsRow');
@@ -10917,6 +10934,7 @@ function tickSpellCooldowns(dt){
     if (player.buff && Date.now() >= player.buff.expiresAt){
         log(`<span class="log-sys">${player.buff.name} acabou.</span>`);
         player.buff = null;
+        if (typeof updateSidebar === 'function') updateSidebar();   // tira o destaque do painel ao expirar
     }
 }
 // Retorna multiplicadores do buff ativo (1 / 0 quando inativo)
@@ -11025,6 +11043,7 @@ function castSpell(spellKey){
             color: sp.glow,
             name: sp.name,
         };
+        if (typeof updateSidebar === 'function') updateSidebar();   // painel reflete +spd na hora (Vel. ataque/Velocidade)
         addFloat(player.x, player.y, `★ ${sp.name}`, sp.glow, true, -10);
         log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(buffDur/1000)}s</span>`);
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
@@ -11870,14 +11889,14 @@ function handleMovement(dt){
 // M4: pisar na escada dispara a transição de andar (server valida adjacência).
 // Debounce 1.2s pra não re-disparar enquanto o server processa/teleporta.
 const DUNGEON_STAIR_IN   = { x: 83, y: 17 };   // entrada no Antro do Minotauro (bate com DUNGEON_ENTRANCE do server)
-const DUNGEON_STAIR_UP   = { x: 50, y: 50 };   // escada de SUBIDA no andar (bate com DUNGEON_EXIT do server)
-const DUNGEON_STAIR_DOWN = { x: 50, y: 57 };   // escada de DESCIDA no andar (bate com DUNGEON_DOWN do server)
 const DUNGEON_MAX_FLOOR_C = 5;                 // último andar sem escada de descida (bate com DUNGEON_MAX_FLOOR)
-// M4 3b: escadas do andar atual vindas do server (null no overworld). Fallback pras
-// constantes acima quando ausente (compat). STAIR_IN é overworld → sempre fixa.
+// M4 3b Fase 2: escadas do andar (subida/descida) são PROCEDURAIS e vêm do server
+// (dungeonEnter.stairs → dungeonStairs). SEM fallback de tile fixo: se ausentes,
+// dunStair* retornam null e a transição não dispara — em vez de chutar 50,50/50,57
+// (era o que confundia: mandava exitDungeon no tile errado → caía na cidade).
 let dungeonStairs = null;
-function dunStairUp(){   return (dungeonStairs && dungeonStairs.up)   || DUNGEON_STAIR_UP; }
-function dunStairDown(){ return dungeonStairs ? dungeonStairs.down : DUNGEON_STAIR_DOWN; }
+function dunStairUp(){   return (dungeonStairs && dungeonStairs.up)   || null; }
+function dunStairDown(){ return (dungeonStairs && dungeonStairs.down) || null; }
 let _lastStairTrigger = 0;
 function checkDungeonStairs(x, y){
     if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
@@ -11891,9 +11910,9 @@ function checkDungeonStairs(x, y){
         }
     } else {
         const sUp = dunStairUp(), sDown = dunStairDown();
-        if (x === sUp.x && y === sUp.y){
+        if (sUp && x === sUp.x && y === sUp.y){
             _lastStairTrigger = now;
-            try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}     // sobe 1 andar
+            try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}     // sobe 1 andar (andar 1 → cidade)
         } else if (sDown && f < DUNGEON_MAX_FLOOR_C && x === sDown.x && y === sDown.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'descendDungeon' })); } catch {}   // desce 1 andar
@@ -14327,8 +14346,10 @@ function loop(ts){
     }
 
     // M4: escadas da masmorra. Overworld (floor 0): entrada descendo no Antro do
-    // Minotauro (83,17). Andar N: escada de SUBIDA (50,50) + DESCIDA (50,57, exceto
-    // no último andar). Buraco escuro com degraus; label/glow ao aproximar.
+    // Minotauro (83,17). Andar N (procedural): escada de SUBIDA + DESCIDA (esta só
+    // até o penúltimo andar), posições vindas do server (dungeonStairs). Buraco com
+    // degraus + glifo ▲/▼ e rótulo VISÍVEIS de longe (não só colado); anel ao
+    // aproximar. Escada fora da tela → SETA na borda apontando a direção.
     {
         const onFloor = (player.floor || 0);
         const drawStair = (stair, descending, label) => {
@@ -14344,21 +14365,54 @@ function loop(ts){
                 const yy = descending ? (sy + 12 + i*6) : (sy + 30 - i*6);
                 ctx.fillRect(sx+12, yy, TS-24, 4);
             }
-            const near = Math.max(Math.abs(player.x - stair.x), Math.abs(player.y - stair.y)) <= 1;
-            if (near){
-                ctx.strokeStyle = descending ? 'rgba(200,80,200,0.7)' : 'rgba(120,200,255,0.7)';
+            // glifo persistente ▲ (sobe/sai, azul) / ▼ (desce, roxo) — distingue de longe
+            ctx.fillStyle = descending ? '#f070f0' : '#70c0ff';
+            ctx.font = 'bold 18px "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(descending ? '▼' : '▲', sx+TS/2, sy+TS/2+1);
+            ctx.textBaseline = 'alphabetic';
+            // rótulo sempre que a escada está na tela (não só a 1 tile)
+            ctx.fillStyle = '#ffd060';
+            ctx.font = 'bold 10px "Segoe UI", sans-serif';
+            ctx.fillText(label, sx+TS/2, sy-3);
+            // anel ao aproximar (≤1 tile = pode usar agora)
+            if (Math.max(Math.abs(player.x - stair.x), Math.abs(player.y - stair.y)) <= 1){
+                ctx.strokeStyle = descending ? 'rgba(240,80,240,0.85)' : 'rgba(120,200,255,0.85)';
                 ctx.lineWidth = 2; ctx.strokeRect(sx+4, sy+4, TS-8, TS-8);
-                ctx.fillStyle = '#ffd060';
-                ctx.font = 'bold 10px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
-                ctx.fillText(label, sx+TS/2, sy-3);
             }
+        };
+        // Seta na borda da tela apontando uma escada fora de vista (acha a descida).
+        const drawEdgeArrow = (stair, col, glyph) => {
+            const cw = VP_W*TS, ch = VP_H*TS;
+            const tx = (stair.x - cam.x)*TS + TS/2, ty = (stair.y - cam.y)*TS + TS/2;
+            if (tx >= 0 && tx <= cw && ty >= 0 && ty <= ch) return;   // na tela → drawStair cuida
+            const px = (player.renderX - cam.x)*TS + TS/2, py = (player.renderY - cam.y)*TS + TS/2;
+            const dx = tx - px, dy = ty - py;
+            const m = 22, minX = m, maxX = cw - m, minY = m, maxY = ch - m;
+            let t = Infinity;
+            if (dx > 0) t = Math.min(t, (maxX - px)/dx); else if (dx < 0) t = Math.min(t, (minX - px)/dx);
+            if (dy > 0) t = Math.min(t, (maxY - py)/dy); else if (dy < 0) t = Math.min(t, (minY - py)/dy);
+            if (!isFinite(t) || t < 0) return;
+            const ax = px + dx*t, ay = py + dy*t, ang = Math.atan2(dy, dx);
+            ctx.save();
+            ctx.translate(ax, ay); ctx.rotate(ang);
+            ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.moveTo(13,0); ctx.lineTo(-7,-9); ctx.lineTo(-7,9); ctx.closePath(); ctx.fill();
+            ctx.restore();
+            ctx.fillStyle = col; ctx.font = 'bold 13px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(glyph, ax - Math.cos(ang)*20, ay - Math.sin(ang)*20);
+            ctx.textBaseline = 'alphabetic';
         };
         if (onFloor === 0){
             drawStair(DUNGEON_STAIR_IN, true, '⬇ As Profundezas');
         } else {
-            drawStair(dunStairUp(), false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
-            const _sd = dunStairDown();
-            if (_sd && onFloor < DUNGEON_MAX_FLOOR_C) drawStair(_sd, true, '⬇ Descer');
+            const su = dunStairUp(), sd = dunStairDown();
+            if (su) drawStair(su, false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
+            if (sd && onFloor < DUNGEON_MAX_FLOOR_C) drawStair(sd, true, '⬇ Descer');
+            // setas de borda: descida em destaque (roxo), subida discreta (azul)
+            if (sd && onFloor < DUNGEON_MAX_FLOOR_C) drawEdgeArrow(sd, '#f070f0', '▼');
+            if (su) drawEdgeArrow(su, '#70c0ff', '▲');
         }
     }
 

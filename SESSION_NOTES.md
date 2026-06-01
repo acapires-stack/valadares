@@ -7,6 +7,82 @@
 
 ---
 
+## 🩹 Sessão 31/05/2026 (cont. 11) — 3 bugs in-game (cliente): loot de boss, Fúria, barras HP/MP
+
+Dono testando PRODUÇÃO (não o lote M4 da cont.10, que nem foi deployado) reportou 3 bugs — todos cliente (`play.html`):
+
+**1. Loot de boss "bagunça a tela".** Matar boss disparava 2 banners gigantes empilhados: o toast 🏆 listando TODO
+o loot (228g + 7 tipos → 2 linhas) + um 2º toast 💰 "+228 de ouro creditados" (o MESMO ouro, redundante, do
+`goldDelta` da mesma msg). Fix: o toast de loot virou RESUMO compacto ("🏆 Loot de {boss}: 228g + 22 itens"; a
+lista completa segue no log de combate) + suprime o toast de ouro quando a msg já traz `bossLoot`. 1 banner curto
+no lugar de 2 gigantes.
+
+**2. Fúria não subia a Vel. ataque (no painel).** Verificado EMPIRICAMENTE no preview: `effectiveAttackDelay` JÁ
+aplica o buff (800→600ms) — o ataque REAL acelera. O bug era só DISPLAY: `updateSidebar()` não rodava ao cast/expirar,
+então o painel ficava no valor velho (a diferença de Velocidade que o dono viu entre telas foi a RECONEXÃO da ss3,
+não a Fúria). Fix: `updateSidebar()` no cast e na expiração + destaque (cor laranja + ▲) na Velocidade e Vel. ataque
+enquanto a Fúria está ativa. Testado no DOM: sem buff `1.25/s` azul → com Fúria `1.67/s ▲` laranja; Velocidade `4.6→6.1/s`.
+
+**3. Barras HP/MP coladas na cabeça.** As barras flutuantes ficavam em py-5 (HP) / py-1 (MP) — praticamente na
+cabeça/elmo, tapando o item. Fix em `drawCharacter`: SEM nameTag (player local) sobem pra py-9/py-5 (folga acima da
+cabeça); COM nome (remotos) mantêm a posição pra não invadir o nome.
+
+Verificado: boot do cliente limpo (0 erros no console), bugs 1 e 2 testados no preview. **Os 3 são CLIENTE (play.html)
+→ Vercel, NÃO reconecta (sem /manutencao).** ⚠️ Mas o `play.html` também já carrega as mudanças de cliente do M4
+(cont.10) — pushar o cliente sobe as duas coisas juntas (é compatível com o server Fase-1 atual: o cliente desenha as
+escadas que o server manda, então o M4-cliente roda mesmo antes do M4-server; as cavernas procedurais só aparecem
+quando o server for deployado).
+
+---
+
+## 🗺️ Sessão 31/05/2026 (cont. 10) — M4 3b Fase 2: masmorra PROCEDURAL + navegação (⚠️ não deployado)
+
+Dono: "M4 vamos revisar e terminar logo — desci no andar 1, quando fui descer ao 2º parei na PZ 50,50."
+
+**Diagnóstico do bug (não era lógica do server):** o hotfix da cont. 9 deixou as escadas do andar
+nos **cantos simétricos** (subida NW 43,43 / descida NE 57,43), as duas a 9 tiles da chegada (50,52)
+e **fora do viewport** (VP 15×11 só mostra ~5 tiles pro norte) — e o **rótulo só aparecia a 1 tile**.
+Resultado: o dono achou a escada errada (a de SUBIR, que no andar 1 = sair pra cidade 50,50) porque
+não dava pra distinguir/achar a de descer. O server fez certo (validou adjacência, exitDungeon andar1→cidade).
+
+**Fase 2 entregue (decisão da cont. 8: cavernas orgânicas):**
+- **Server — `genDungeonGrid` procedural** (`server.js`): cellular automata (fill 45% + 4 passes),
+  **determinístico por andar** (PRNG mulberry32 semeado pelo floor → mesmo andar = mesmo layout;
+  cache efêmero regenera igual). Garante clareira na chegada (raio 2, sem mob em cima), **conectividade
+  por flood-fill** (chão isolado vira parede → sala única), e **fallback pra sala cheia** se a geração
+  sair pequena/desconexa (nunca quebra). Região 40-60 (21×21).
+- **Server — escadas dinâmicas**: subida = chão perto da chegada (cheby 3-9) e **no lado OPOSTO à
+  descida** (explorar rumo à descida não cruza a saída → evita "subiu sem querer"); descida = ponto
+  mais FUNDO (BFS); boss (andar 5) também no fundo. `isTransitionTile` agora lê as escadas reais do
+  andar (`dungeonFloors.get(floor).stairs`, sem o boss pra não bloquear o spawn dele); handlers
+  `descendDungeon`/`exitDungeon` validam adjacência contra a escada real (antes: constantes fixas →
+  quebraria com layout procedural). Removidas as constantes mortas `DUNGEON_EXIT`/`DUNGEON_DOWN`.
+- **Cliente — navegação + clareza** (`play.html`): **seta na borda da tela** apontando a escada de
+  descida (roxo ▼) e subida (azul ▲) quando fora de vista; **glifo ▲/▼ persistente + rótulo visível
+  de longe** (não só a 1 tile) → nunca mais confundir sair com descer. **Matei o fallback stale**:
+  `dunStairUp/Down` retornam null sem `dungeonStairs` (antes chutavam 50,50/50,57 = o tile errado);
+  `checkDungeonStairs` e os draws guardam null. O cliente já desenhava o grid/escadas do server (Fase 1),
+  então o procedural "encaixou".
+
+**Verificação:** `node --check` server ✓; teste isolado do gerador (5 andares: chegada/escadas em chão,
+descida cheby 10-11, subida cheby 3-9 oposta, tudo conectado, determinístico) ✓; sintaxe do JS inline
+do cliente (vm.Script) ✓; **boot limpo no preview** (login renderiza, 0 erros no console). Math da seta
+conferido à mão. **Caminho in-game só testável pós-deploy.**
+
+**Balanceamento "dano cercado" (dono pediu nerf no crit do mob):** descoberto que **nenhum `MTYPE` tem
+`crit`** → online o mob **nunca crita** (server manda `crit:false` sempre; cliente só exibe a flag). O
+nerf seria no-op → **não mexi**. O "morri cercado" é só a SOMA do enxame. A própria clareira da Fase 2
+(chegada sem mob 3×3) já tira o swarm de chegada. Pendente decisão do dono: **teto de dano por tick**
+(fix real do enxame) ou deixar como está.
+
+> ⚠️ **Mexe em `server/**` → NÃO pushado.** Deploy com `/manutencao` + logout limpo (regra do wipe 30/05).
+> **Checklist in-game pós-deploy:** (1) descer andar 1→2→...→5 pela escada ▼ (não cai na cidade);
+> (2) seta de borda aponta a descida; (3) subir volta 1 andar / andar 1 → cidade 50,50; (4) cada andar
+> tem layout diferente e orgânico; (5) mob não nasce em cima de escada nem na clareira da chegada;
+> (6) boss no andar 5 no fundo da caverna.
+
+---
+
 ## 🐛 Sessão 31/05/2026 (cont. 9) — hotfixes pós-deploy da Fase 1 (bugs reportados in-game)
 
 Testando o lote anterior in-game, o dono pegou bugs sérios na masmorra + 1 de mecânica. Corrigidos:
