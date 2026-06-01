@@ -71,6 +71,16 @@ e deixou pra depois. No início da próxima, **pedir o detalhe**. Opções: o te
 server-autoritativos não "some" ao empilhar) e/ou revisar o pickup-ao-matar / o raio. Commits do dia:
 mana `644921f`, lote `c432609`, #1-altura `a20cfc1`, #2b+loot `84ae225`, #1-CSS `0e094ed`, pickup `a1fcf16`.
 
+**#1 LOOT-TEXT cravado no preview (`85faade`):** o "loot estranho" que o dono via ERA o **texto do loot
+do boss esticando a tela**. Reproduzi no preview (server estático local): a linha longa no `#log` esticava
+o `#gameContainer` pra **836px** (canvas 720 + ~116px de preto à direita). `overflow-wrap`/`overflow-x`/
+`max-width:100%` NÃO bastavam — sem largura travada, o `#chatPanel` expandia pro conteúdo e o `max-width`
+não tinha referência. Fix: **`#chatPanel { width:0; min-width:100% }`** (trava ao canvas). Confirmado no
+DOM: 836→722, log quebra a linha dentro. **#1 e o "loot estranho" RESOLVIDOS.** ✅ **Arquivo de 11 bugs
+100% endereçado** — só o "cair junto" (#3/#6 drop concentrado) fica como melhoria OPCIONAL (a coleta já
+funciona com raio 2 + pickup-ao-matar). LIÇÃO META: bug de layout = reproduzir no preview e medir o DOM
+ANTES de chutar (errei 2x no #1 teorizando; o preview cravou em 3 evals).
+
 **Deploys:** ambos via /manutencao. O `c432609` teve confirmação SÓLIDA — monitor pegou a janela de
 restart do Railway (`true`→DOWN→`false`) + Vercel servindo `ESCUDO_GUARDIAO`. Dono valida in-game
 pelo checklist (morte na masmorra, drop do boss, ESC, santuário, quest de chain).
