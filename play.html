@@ -10092,6 +10092,8 @@ window.endSpectate = endSpectate;
 // ─── MAGIAS ──────────────────────────────────────────────────────────────────
 // Magias disponíveis para "aprender" no Altar (paga com ouro pra trocar).
 // 'switchCost' = ouro pra equipar essa magia (substitui a atual).
+// ⚠️ Fonte canônica das magias. O server (server.js, SPELLS_META no handler spellCast)
+//    espelha manaCost/range/damage E as chaves daqui — manter os dois em sincronia.
 const SPELLS = {
     FIREBALL: {
         name: 'Bola de Fogo',

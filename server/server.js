@@ -5704,14 +5704,18 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'spellCast') {
             // Fase 5: server aplica manaCost + heal authoritative pra magia Cura.
             // Outras magias só têm manaCost (dmg é processado em attackMob/aoe).
+            // ⚠️ ESPELHO da tabela SPELLS do cliente (play.html ~10095) — a fonte canônica
+            //    (nome/desc/tooltip). manaCost/range/damage DEVEM bater com lá, e as CHAVES
+            //    também: o cliente envia spellKey=PROVOCACAO/FURIA (NÃO TAUNT/FURY) — chave
+            //    errada cai no `if (!sp) return` e a magia sai de graça (sem mana/XP).
             const SPELLS_META = {
-                FIREBALL: { manaCost: 18, range: 8, damage: 12 },
-                HEAL:     { manaCost: 12, healBase: 30 },
+                FIREBALL: { manaCost: 20, range: 8, damage: 12 },
+                HEAL:     { manaCost: 25, healBase: 30 },
                 HEAL_GRUPO: { manaCost: 60, healBase: 25, groupRange: 8 },
-                RAIO:     { manaCost: 10, range: 10, damage: 8 },
-                EXORI:    { manaCost: 25, range: 3, damage: 11 },   // range = aoeRange
-                TAUNT:    { manaCost: 8 },
-                FURY:     { manaCost: 20 },
+                RAIO:     { manaCost: 15, range: 10, damage: 8 },
+                EXORI:    { manaCost: 40, range: 3, damage: 11 },   // range = aoeRange
+                PROVOCACAO: { manaCost: 25 },
+                FURIA:    { manaCost: 35 },
             };
             const spellKey = String(msg.spellKey || '');
             const sp = SPELLS_META[spellKey];
