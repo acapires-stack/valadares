@@ -1133,6 +1133,13 @@ const MAX_HIT_DMG = 600;
 // rápido é 680ms (attackDelay 800 × atkSpd máx 0,15 da forja), então 200ms tem
 // 3,4× de folga e nunca bloqueia jogo limpo — mas impede rajada de hits forjados.
 const ATTACK_MIN_INTERVAL_MS = 200;
+// Deploy 2b: cadência mínima por AÇÃO de ataque de ARMA. O ataque legítimo MAIS
+// rápido é ~510ms (attackDelay 800 × atkSpd máx 0,15 da forja × Fúria 0,25 =
+// 800×0,85×0,75). 400ms fica 110ms abaixo disso → nunca engole hit limpo (mesmo com
+// jitter) mas corta o spam forjado (era 200ms/hit = ~2× DPS mesmo após o cap de dano).
+// Magia (janela do spellCast) é ISENTA — o Exori dispara vários attackMob no mesmo tick
+// e a frequência já é limitada pelo rate-limit 600ms do spellCast.
+const ATTACK_ACTION_MIN_MS = 400;
 const BOSS_POS  = { type:'ORC_LIDER',   x:46, y:95, respawn: BOSS_RESPAWN_MS };
 const DRAKE_POS = { type:'DRAKE_LIDER', x:82, y:80, respawn: DUNGEON_BOSS_RESPAWN_MS };
 const GOLEM_POS = { type:'GOLEM_REI',   x:70, y:90, respawn: DUNGEON_BOSS_RESPAWN_MS };
@@ -6152,6 +6159,15 @@ wss.on('connection', (ws, request) => {
             p.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
             // LOS — só valida pra alcance > 1 (ranged/magia); melee adjacente passa sem check
             if (serverRange > 1 && !hasLineOfSight(p.x, p.y, m.x, m.y)) return;
+            // Deploy 2b — cadência por AÇÃO de ataque de ARMA. Magia (janela ativa) é
+            // ISENTA: o Exori dispara N attackMob no mesmo tick e a frequência da magia já
+            // é limitada pelo rate-limit 600ms do spellCast. (Em jogo limpo você ou casta
+            // ou bate; o resíduo de bater durante a janela é auto-limitado pela mana, que é
+            // server-autoritativa.) O rate-limit por-mob 200ms (acima) segue protegendo o boss.
+            if (!spellWin){
+                if (nowAtk - (p._lastAttackActionAt || 0) < ATTACK_ACTION_MIN_MS) return;
+                p._lastAttackActionAt = nowAtk;
+            }
             // ─── N3 fase 2: consumo de munição/lança autoritativo ────
             // Munição (arco/besta): cliente indica ammoKey usado; server decrementa.
             // Se cliente mentiu (não tinha), rejeita o ataque.

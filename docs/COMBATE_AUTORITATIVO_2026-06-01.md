@@ -1,6 +1,6 @@
 # Combate autoritativo — Design (Deploy 2 do refactor mov./combate)
 
-> Status: **APROVADO. Deploy 2a (range + cap de dano) IMPLEMENTADO 01/06 — só server, cliente não muda.** Verificado: node --check + teste isolado 19/19. Aguardando deploy via /manutencao. **2b (cadência) pendente.**
+> Status: **APROVADO. Deploy 2a (range + cap) + 2b (cadência) IMPLEMENTADOS 01/06 — só server, cliente não muda.** Verificado: node --check + testes isolados (19/19 caps+range, 12/12 cadência). Aguardando deploy via /manutencao (dono optou por subir 2a+2b numa janela só).
 > Contexto: o Deploy 1 (movimento autoritativo) já está no ar e validado (commit `55c2080`, 01/06).
 > Este doc cobre a 2ª metade: tirar o `attackMob` (combate PvE) do client-trust.
 > Regra de ouro: **deploy ISOLADO do movimento** — se um número de dano sair errado in-game,
@@ -85,17 +85,20 @@ Troca o flat `MAX_HIT_DMG=600` por `attackDamageCapServer(p, ctx)`:
 
 Hoje: rate-limit **por mob** 200ms. Legítimo mais rápido = ~680ms (e até ~510ms com Fúria+forja). O 200ms deixa 3,4× passar.
 
-- Adiciona um **gate por AÇÃO de ataque** `p._lastAttackActionAt`: ataque de arma exige `now − _lastAttackActionAt ≥ cadenciaMin(p)`.
-- `cadenciaMin(p)` = `effectiveAttackDelay` server-side no **pior caso (mais permissivo)**: `800 × (1 − atkSpd_arma) × (1 − 0.25 Fúria)`.
-  Ex.: arma rápida (atkSpd 0.15) + Fúria → `800 × 0.85 × 0.75 ≈ 510ms`. Pra não clipar jitter, gate em ~**450ms**.
-  Isso corta o DPS forjado de 3,4× → ~1,5×. (Não dá pra cravar 680ms sem rastrear Fúria/atkSpd exatos por player —
-  por isso o gate é o pior-caso permissivo; ainda assim é >2× melhor que os 200ms de hoje.)
-- **Concilia o Exori (AoE):** com a janela de spell ativa (`_spellWindow`), os N `attackMob` do mesmo tick **não**
-  passam pelo gate de ação (a frequência do AoE já é limitada pelo rate-limit 600ms do `spellCast`).
-- **Mantém** o rate-limit por-mob 200ms (anti-rajada de hits forjados no MESMO mob — defesa do one-shot de boss).
+- Gate por AÇÃO de ataque de ARMA `p._lastAttackActionAt`: exige `now − _lastAttackActionAt ≥ ATTACK_ACTION_MIN_MS`.
+- **`atkSpd` NÃO está no `ITEM_META` do server** (é client-only; só a forja adiciona, máx 0,15 no +5) → não dá pra computar
+  a cadência exata por arma server-side. Solução: gate **FLAT** logo abaixo do ataque legítimo mais rápido possível.
+  O mais rápido = `800 × (1 − 0,15 forja) × (1 − 0,25 Fúria) = 510ms` (sem Fúria ≥680ms; sem forja ≥600ms). **Gate = 400ms**
+  → 110ms de folga sob 510ms (nunca engole hit limpo, mesmo com jitter) e corta o spam (era 200ms = ~2× DPS após o cap).
+- **Concilia o Exori (AoE):** com a janela de spell ativa (`_spellWindow`), os N `attackMob` do mesmo tick são **isentos**
+  do gate (a frequência da magia já é limitada pelo rate-limit 600ms do `spellCast`). O gate não atualiza nem lê o
+  `_lastAttackActionAt` durante a janela → a cadência da arma fica intacta.
+- **Mantém** o rate-limit por-mob 200ms (anti-rajada no MESMO mob — defesa do one-shot de boss, inclusive via Exori).
 
-**Risco:** é o gate mais sujeito a *feel* — apertado demais "engole" hits de quem tá com Fúria/arma rápida.
-Requer `atkSpd` no `ITEM_META` do server (confirmar; o cliente tem em `ITEMS[].atkSpd`). **Por isso: candidato a deploy separado** (2b), depois de 2a (range+cap) validar liso.
+**Risco residual (anotado):** durante a janela de magia (1s pós-cast), um ataque de ARMA forjado também fica isento do
+gate (não há discriminador limpo arma×magia). Mas: em jogo limpo você ou casta ou bate (o cliente não faz os dois no
+mesmo tick), e sustentar o exploit exige castar sem parar → **a mana (server-autoritativa, com regen limitado) auto-limita**.
+Mesmo assim o por-mob 200ms segue capando o single-target. Resíduo pequeno e bounded; melhor que os 200ms-em-tudo de hoje.
 
 ---
 
