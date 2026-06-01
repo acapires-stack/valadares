@@ -190,6 +190,10 @@
             background: linear-gradient(180deg, #15110a 0%, #0a0805 100%);
             border-top: 1px solid #3a2d10;
             box-shadow: inset 0 1px 0 rgba(255,200,80,0.05);
+            /* #1 (loot grande): trava a largura ao canvas. width:0 → o painel NÃO estica o
+               #gameContainer; min-width:100% → ocupa 100% do container (= canvas). Sem isto a
+               linha longa do loot do boss esticava #log → #gameContainer → sobrava preto à direita. */
+            width: 0; min-width: 100%; box-sizing: border-box;
         }
         .chat-tabs {
             display: flex;
