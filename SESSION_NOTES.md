@@ -7,6 +7,39 @@
 
 ---
 
+## ✅ Sessão 01/06/2026 — AUDITORIA 29/05 fechada (dedup + offline removido + protocolo) + DEPLOY
+
+Fechou a auditoria 29/05 inteira + deployou via /manutencao. **4 commits:** `1e389f1` (server.js dedup + dead
+code cliente), `3456f36`+`1d924ca` (**remoção do offline INTEIRO**), `55cf611` (protocolo morto).
+
+**Reconciliação 1ª:** a seção 🔴 SEGURANÇA da auditoria JÁ estava feita (lote `d5aec67`, 30/05 — daily/scrypt/
+rate-limits). O que faltava era LIMPEZA: dedup server.js (`_isValidEmail`→`isValidEmail`, `DOT_COLORS`,
+`HL_HUNT_COOLDOWN_MS`, 9 guards `typeof`), dead code cliente (`attack()`/CSS `.po-hp`/console.log), e os 2 grandes:
+
+**Offline removido (~826 linhas; cliente 100% server-authoritative):** spawnMonster/spawnInitialMonsters/helpers,
+updateMonster(AI)/pickSurroundSlot/tickMobDots, killMonster+rollDrops, branches `else` offline de doAttack/throwSpear/
+castSpell, tickRegen/tickStatusEffects offline, fallbacks de completeStage/turnInQuest/claimDaily/quest-choice/pickupAt/
+buyTalent, XP local em mobKilledByServer/tickTraining. No-op: rollAttackerStatus/gainSkillXpLocal/gainMagiaXp. Dead
+helpers removidos: gainSkillXp, applyPoison/Stun/Bleed (status vem direto dos handlers playerDot/playerStun). game-start
+sempre espera snapshot. Mantidos: `monsters[]`, BOSS_RESPAWN_MS (UI de respawn), hlHuntActive/Timer/HL_HUNT_DELAY_MS,
+serverLoot-compat. Cortes grandes via script anchor-based (emoji/template-safe); `node --check` a cada etapa.
+
+**Protocolo morto:** handlers WS `setEmail`/`passwordResetRequest`/`passwordResetConfirm` (cliente usa HTTP
+`/api/password-reset/*`) + handler `eventReward` (gold rain é `invUpdate.goldDelta`). Mantidos `pong` (keepalive) e
+`pkDeath` (vivo). `setAccountEmail` mantido (criação de conta).
+
+**Testado IN-GAME local** (server :8080 + preview "valadares" :3333): loop completo online-only — login→289 mobs do
+server→attackMob→dano (rate-limit 200ms ok)→kill→loot serverDrops (id `g1`)→XP+stats→pickup→inv. Zero erro.
+⚠️ **Pegadinha do teste local:** o browser do preview tem UA Electron → trip no version-gate; bypass =
+`CLIENT_VERSION='1.0.9'` ANTES do login. E combate bloqueado na PZ (sair de 46-54). Detalhe na memória.
+
+**DEPLOY (~11:04 via /manutencao):** monitor em background vigiou `/api/status`, push fast-forward no instante do
+`maintenance:true` (0 atrás, sem rebase). **Verificado no ar:** Vercel = cliente novo (símbolos offline = 0; doAttack/
+applyMobsSnapshot presentes); Railway = server novo (check via WS: handler removido `passwordResetRequest` não responde
+mais `passwordResetResult`); `/api/status`=maintenance:false. **Dono smoke-test OK in-game** (combate/loot/XP/masmorra). ✅
+
+---
+
 ## ✅ Sessão 31/05/2026 (cont. 13) — DEPLOY do lote (cont.10+11+12) + verificação
 
 Lote inteiro deployado via /manutencao (commit `67b4c19`): **M4 3b Fase 2** (masmorra procedural) + **3 bugs**
