@@ -1975,7 +1975,9 @@ function playerDodgeChanceServer(p){
     const esc = (p.skills && p.skills['Escudo'] && p.skills['Escudo'].val) || 10;
     const skillBased = 0.015 + Math.max(0, esc - 10) * 0.006;
     const perma = (p.permaBuffs && p.permaBuffs.dodgeBonus) || 0;
-    return Math.min(0.25, skillBased + perma);
+    // base+skill teto 25%; mérito (talento/quest) soma POR CIMA — é conquista do
+    // player, não deve ser comida pelo teto. Teto de segurança 50% (anti-invencível).
+    return Math.min(0.50, Math.min(0.25, skillBased) + perma);
 }
 function tickAI(){
     const now = Date.now();

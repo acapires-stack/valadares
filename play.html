@@ -5730,13 +5730,15 @@ function playerCritChance(){
     const sk = player.skills[w.skill];
     const skillBased = 0.015 + Math.max(0, sk.val - 10) * 0.004;   // base 1.5% + 0.4%/ponto
     const mults = (player.pvp || player.selos > 0) ? pvpMults() : null;
-    const perma = player.permaBuffs?.critBonus || 0;   // talent t_crit (+5%)
-    return Math.min(0.25, skillBased + (mults ? mults.crit : 0) + perma);   // teto TOTAL 25%
+    const perma = player.permaBuffs?.critBonus || 0;   // mérito: talento t_crit / quest (+5%)
+    // base+pvp teto 25%; mérito (talento/quest) soma POR CIMA (teto seg. 50%)
+    return Math.min(0.50, Math.min(0.25, skillBased + (mults ? mults.crit : 0)) + perma);
 }
 function playerDodgeChance(){
     const skillBased = 0.015 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;   // base 1.5% + 0.6%/ponto
-    const perma = player.permaBuffs?.dodgeBonus || 0;   // talent/aura (+5%)
-    return Math.min(0.25, skillBased + perma);   // teto TOTAL 25%
+    const perma = player.permaBuffs?.dodgeBonus || 0;   // mérito: talento/aura de quest (+5%)
+    // base teto 25%; mérito (talento/quest) soma POR CIMA (teto seg. 50%)
+    return Math.min(0.50, Math.min(0.25, skillBased) + perma);
 }
 
 function findArrow(){
@@ -9174,11 +9176,11 @@ function updateSidebar(){
     critEl.textContent = (playerCritChance()*100).toFixed(1)+'%';
     const cw = activeWeapon(), csk = player.skills[cw.skill];
     const cTal = Math.round((player.permaBuffs?.critBonus || 0) * 100);
-    critEl.title = `base 1,5% + ${cw.skill} +${Math.round(Math.max(0, csk.val-10)*0.4)}%${cTal?` + talento +${cTal}%`:''} · teto 25%`;
+    critEl.title = `base 1,5% + ${cw.skill} +${Math.round(Math.max(0, csk.val-10)*0.4)}% (teto 25%)${cTal?` + mérito +${cTal}%`:''}`;
     const dodgeEl = document.getElementById('dodgeVal');
     dodgeEl.textContent = (playerDodgeChance()*100).toFixed(1)+'%';
     const dTal = Math.round((player.permaBuffs?.dodgeBonus || 0) * 100);
-    dodgeEl.title = `base 1,5% + Escudo +${Math.round(Math.max(0, player.skills['Escudo'].val-10)*0.6)}%${dTal?` + talento +${dTal}%`:''} · teto 25%`;
+    dodgeEl.title = `base 1,5% + Escudo +${Math.round(Math.max(0, player.skills['Escudo'].val-10)*0.6)}% (teto 25%)${dTal?` + mérito +${dTal}%`:''}`;
     const skB = playerSpeedBonusFromSkills(), btB = playerSpeedBonusFromBoots();
     const spd = playerMoveDelay();
     const tilesPerSec = (1000 / spd).toFixed(1);

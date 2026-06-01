@@ -7,6 +7,19 @@
 
 ---
 
+## ⚖️ Sessão 31/05/2026 (cont. 12) — cap de crítico/esquiva: mérito (talento/quest) soma POR CIMA dos 25%
+
+Dono, vendo a quest "Aura do Vidente" (+5% esquiva permanente) ser comida pelo teto: "limitei em 25% mas as
+quests têm que somar, é mérito do player." Mudança: base+skill continua com **teto 25%**, mas os bônus
+PERMANENTES ganhos (talento t_crit/t_dodge + auras de quest — ambos em `permaBuffs`) somam **POR CIMA**.
+Teto de segurança **50%** (anti-invencível). Tocado: `playerCritChance`/`playerDodgeChance` (cliente) +
+`playerDodgeChanceServer` (server, esquiva PvE é authoritative) + os 2 tooltips do painel. Verificado no DOM:
+sem mérito 25%, com +5% de quest → **30%**, mérito alto → teto 50%. (Reverte em parte o "cap TOTAL inclui
+talento/pvp" do 30/05 — agora o mérito permanente fica por cima; pvp/buff temporário segue dentro do teto 25%.)
+Entrou junto no deploy da cont.10/11.
+
+---
+
 ## 🩹 Sessão 31/05/2026 (cont. 11) — 3 bugs in-game (cliente): loot de boss, Fúria, barras HP/MP
 
 Dono testando PRODUÇÃO (não o lote M4 da cont.10, que nem foi deployado) reportou 3 bugs — todos cliente (`play.html`):
