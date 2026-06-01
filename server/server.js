@@ -5252,8 +5252,10 @@ wss.on('connection', (ws, request) => {
             for (const dropId of ids){
                 const d = groundDrops.get(dropId);
                 if (!d) continue;
-                // Pickup auto-range: chebyshev ≤1 (mesma regra do cliente pickupAt)
-                if (Math.max(Math.abs(p.x - d.x), Math.abs(p.y - d.y)) > 1) continue;
+                // Pickup auto-range: chebyshev ≤2 (5×5, mesma regra do cliente pickupAt). #3/#6:
+                // era ≤1, mas o drop 3×3 do mob + você atacando a 1 tile deixava o loot de trás
+                // (a 2 tiles) inalcançável até andar pra lá.
+                if (Math.max(Math.abs(p.x - d.x), Math.abs(p.y - d.y)) > 2) continue;
                 groundDrops.delete(dropId);
                 if (d.type === 'GOLD'){
                     p.gold = (p.gold | 0) + (d.qty | 0);

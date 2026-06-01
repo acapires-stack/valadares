@@ -7,6 +7,62 @@
 
 ---
 
+## ✅ Sessão 01/06/2026 (cont. 2) — fix de mana + LOTE de 7 bugs do .docx (2 deploys via /manutencao)
+
+**1) Mana cliente×server (commit `644921f`, deployado):** o `SPELLS_META` do server tinha custos
+errados E 2 chaves quebradas. Alinhado à tabela `SPELLS` do cliente (fonte canônica): FIREBALL
+18→20, HEAL 12→25, RAIO 10→15, EXORI 25→40. Renomeadas `TAUNT`→`PROVOCACAO` (8→25) e `FURY`→`FURIA`
+(20→35) — o cliente enviava `PROVOCACAO`/`FURIA`, que caíam no `if(!sp)return` → saíam DE GRAÇA
+(sem mana nem XP de Magia). Agora custam e treinam. Comentário de sincronia nos 2 lados.
+
+**2) Lote de 7 itens do "jogo bugs.docx" (commit `c432609`, deployado):** o dono mandou .docx com 11
+itens; avaliei 1 a 1 contra o código (5 imagens extraídas via zipfile). #4 (dano estranho) já estava
+resolvido pelo combate autoritativo. Implementados:
+- **#5 🔴 CRÍTICO — morte na masmorra:** `playerDie` (cliente) só teleportava x/y pra (50,50)
+  mantendo `player.floor`, e o server NÃO zerava `target.floor` na morte → renascia **colado no boss**
+  no andar e o AI do andar seguia batendo ("mobs fora da tela") + dava pra matar o boss morto. Fix:
+  nova `returnPlayerToTown(p,id)` (server, extraída do `exitDungeon`) chamada em `tickAI` +
+  `tickPlayerDots`; `playerDie` (cliente) sai pro overworld; `groundItems` limpos/repopulados por
+  andar (`dungeonEnter`/`dungeonExit` mandam `groundDrops`) → loot não vaza entre andares.
+- **#8 + escudo:** 3 espadas 1h (ESPADA_ACO 9, LAMINA_DRACO_1H 12, ESPADA_GUARDIAO 16) +
+  ESCUDO_GUARDIAO def 12. ⚠️ Foram em `ITEMS` (cliente) **E** `ITEM_META`+`WEAPON_SKILL` (server) — o
+  cap de dano autoritativo usa `meta?.base||5`, então arma só-no-cliente seria CLIPADA (base 5) e o XP
+  iria pro Punho. Build de escudo sem igualar as 2H (16 < Eterna 30).
+- **#7:** as 1h novas + ESCUDO_GUARDIAO entram no loot do `SENHOR_PROFUNDEZAS` por chance (Aço 0.40,
+  Lâmina 0.25, Guardião/Escudo 0.12).
+- **#11:** santuário 5×5 pro Vendedor de Almas (75,20), contíguo ao Ferreiro — reverte a exclusão "de
+  propósito" da cont.5 (dono mudou de ideia).
+- **#9:** mob larga o alvo no santuário — `playerNearNpc` checa `inSanctuary` ANTES da grace de 2s →
+  não empilha mais na borda ao atacar de dentro.
+- **#10:** ESC sempre para o ataque — o handler do chat input fazia `stopPropagation` (comia o ESC
+  global → `clearTarget`); agora chama `clearTarget` no próprio handler do input.
+- **#2:** quest "pegar de novo" — `sanitizeSave` montava `validStages` só com os `stage.id` PUROS e
+  DELETAVA `_started`/`_kills`/`_visited` a cada save → progresso de chain perdido no round-trip.
+  Allowlist corrigida (id puro + flags; `_kills` clampado em `stage.count`). Turn-in valida server-side
+  e nunca confiou nessas flags → sem vetor novo.
+
+**✅ #1 (chat estoura em combate) — DEPLOYADO (`a20cfc1`, cliente-only):** com o repro do dono (aba
+COMBATE + log cheio) cravei: `syncChatHeight` usava `TABS_H=28`/`INPUT_H=36` FIXOS e só rodava em
+resize/load. Na aba COMBATE a barra ganha os `#logFilters` (>28px) → o `#log` calculado com 28
+estourava pra fora da tela. Fix: mede `.chat-tabs`/`#chatInputRow` REAIS + recalcula `syncChatHeight()`
+ao trocar de aba.
+
+**3º lote (cont.2) — 2 follow-ups pós-teste in-game do dono (deploy via /manutencao):**
+- **#2b — modal de quest "emperra":** entregar funcionava no server (creditava ouro/xp), mas o modal
+  não atualizava pro próximo estágio (tinha que fechar/reabrir). Causa: o handler do `questResult.ok`
+  re-renderizava o chainDialog via `(window.NPCS||[])`, mas `NPCS` é `const` (não vira `window.NPCS`)
+  → `undefined` → não achava o NPC. Fix: usa `NPCS` direto. (≠ do #2 sanitize, que era perda de
+  progresso no round-trip de save — os dois eram bugs reais distintos.)
+- **#3/#6 — coleta de loot ("loot de trás não pega"):** o pickup era raio 1 (3×3), mas o drop é 3×3 ao
+  redor do MOB e você ataca a 1 tile → os itens do lado oposto ficavam a 2 tiles. Fix: raio 2 (5×5) no
+  `pickupAt` (cliente) + `groundPickup` (server, valida proximidade) — os dois lados.
+
+**Deploys:** ambos via /manutencao. O `c432609` teve confirmação SÓLIDA — monitor pegou a janela de
+restart do Railway (`true`→DOWN→`false`) + Vercel servindo `ESCUDO_GUARDIAO`. Dono valida in-game
+pelo checklist (morte na masmorra, drop do boss, ESC, santuário, quest de chain).
+
+---
+
 ## ✅ Sessão 01/06/2026 — AUDITORIA 29/05 fechada (dedup + offline removido + protocolo) + DEPLOY
 
 Fechou a auditoria 29/05 inteira + deployou via /manutencao. **4 commits:** `1e389f1` (server.js dedup + dead

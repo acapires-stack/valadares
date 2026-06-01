@@ -5996,7 +5996,7 @@ function handleMP(msg){
             }
             if (typeof recomputeStats === 'function') recomputeStats();
             if (typeof renderQuests === 'function') renderQuests();
-            const chainNpc = msg.questResult.chainId && (window.NPCS || []).find(n => n.chain === msg.questResult.chainId);
+            const chainNpc = msg.questResult.chainId && NPCS.find(n => n.chain === msg.questResult.chainId);   // #2b: era window.NPCS (const não vira window.*) → modal não atualizava pós-entrega
             if (chainNpc && typeof renderChainDialog === 'function') renderChainDialog(chainNpc);
             saveState();
         }
@@ -11164,7 +11164,7 @@ function checkDungeonStairs(x, y){
     }
 }
 
-// ─── Itens: pickup automático no raio 1 ──────────────────────────────────────
+// ─── Itens: pickup automático no raio 2 (5×5) ─────────────────────────────────
 function pickupAt(x, y){
     // N3 fase 2: se conectado ao server, envia ids pro server processar.
     // Server retorna invUpdate + groundRemove (que limpa o local).
@@ -11172,7 +11172,9 @@ function pickupAt(x, y){
     if (ws && ws.readyState === 1 && serverAuthMobs){
         const ids = [];
         for (const it of groundItems){
-            if (Math.abs(it.x - x) > 1 || Math.abs(it.y - y) > 1) continue;
+            // raio 2: o drop do mob é 3×3 ao redor DELE e você ataca a 1 tile → com raio 1 os
+            // itens do lado oposto ficavam a 2 tiles e não eram pegos ("loot de trás"). #3/#6
+            if (Math.abs(it.x - x) > 2 || Math.abs(it.y - y) > 2) continue;
             // Só envia ids server-side (g123). Ids locais (number) são de single-player offline.
             if (typeof it.id === 'string' && it.id[0] === 'g') ids.push(it.id);
         }
