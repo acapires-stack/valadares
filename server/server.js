@@ -285,13 +285,6 @@ async function handleHttpRequest(req, res){
     return httpJson(res, 404, { error:'not_found' });
 }
 
-// Valida email — regex bem permissiva, alinhada com a do cliente.
-function _isValidEmail(s){
-    s = String(s || '').trim();
-    if (s.length < 5 || s.length > 120) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-}
-
 async function handleCreatePix(body, res){
     if (!mpPreference){
         return httpJson(res, 503, { error:'mp_not_configured' });
@@ -301,7 +294,7 @@ async function handleCreatePix(body, res){
     const email      = String(body.email || '').trim().substring(0, 120);
     if (!playerName){ return httpJson(res, 400, { error:'missing_player' }); }
     if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
-    if (!_isValidEmail(email)){ return httpJson(res, 400, { error:'invalid_email' }); }
+    if (!isValidEmail(email)){ return httpJson(res, 400, { error:'invalid_email' }); }
     const pkg = GOLD_PACKAGES[packageId];
     // NÃO persiste o email na conta aqui: este endpoint HTTP não tem sessão autenticada,
     // então `playerName` é arbitrário — gravar o email permitiria envenenar o save de
@@ -452,7 +445,7 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             if (acc && acc.save){
                 acc.save.gold = (acc.save.gold || 0) + gold;
                 acc.save._pendingPixCredit = (acc.save._pendingPixCredit || 0) + gold;
-                if (typeof flushAccounts === 'function') flushAccounts();
+                flushAccounts();
                 console.log(`[mp] gold creditado offline (save): ${playerName} +${gold} (payment ${paymentId})`);
             } else {
                 console.warn(`[mp] player não encontrado pra creditar: ${playerName} +${gold}`);
@@ -934,7 +927,7 @@ function grantGoldByName(name, amount, reason){
         const acc = getAccount(name);
         if (acc && acc.save){
             acc.save.gold = (acc.save.gold || 0) + amount;
-            if (typeof flushAccounts === 'function') flushAccounts();
+            flushAccounts();
             return true;
         }
     } catch (e){ console.warn('[grantGold]', e.message); }
@@ -955,7 +948,7 @@ function grantItemByName(name, itemKey, qty, reason){
         if (acc && acc.save){
             acc.save.inv = acc.save.inv || {};
             acc.save.inv[itemKey] = (acc.save.inv[itemKey] || 0) + qty;
-            if (typeof flushAccounts === 'function') flushAccounts();
+            flushAccounts();
             return true;
         }
     } catch (e){ console.warn('[grantItem]', e.message); }
@@ -1217,6 +1210,7 @@ const MEGA_BOSS_POS = { x: 50, y: 30 };
 const MEGA_BOSS_TYPE = 'SENHOR_VALADARES';
 const MEGA_BOSS_LIFETIME_MS = 30 * 60 * 1000;   // 30 min vivo
 const MEGA_BOSS_COOLDOWN_MS = 24 * 60 * 60 * 1000;  // 24h cooldown após morte/expira
+const HL_HUNT_COOLDOWN_MS = 5 * 60 * 1000;          // cooldown do claim de Highlander Hunt
 const megaBoss = {
     spawnedAt: 0,         // 0 = não está vivo
     lastResolvedAt: 0,    // última vez que morreu ou expirou
@@ -2480,7 +2474,7 @@ function checkSeasonRollover(){
                     acc.save.inv[winnerKey] = (acc.save.inv[winnerKey] || 0) + 1;
                     acc.save.seasonsWon = Array.isArray(acc.save.seasonsWon) ? acc.save.seasonsWon : [];
                     if (!acc.save.seasonsWon.includes(closedId)) acc.save.seasonsWon.push(closedId);
-                    if (typeof flushAccounts === 'function') flushAccounts();
+                    flushAccounts();
                 }
             } catch(e){ console.warn('[season] erro ao creditar offline:', e.message); }
         }
@@ -2492,7 +2486,7 @@ function checkSeasonRollover(){
     seasonState.id = newId;
     seasonState.ranking = new Map();
     // Persist imediato pra não perder em crash
-    if (typeof saveStateToDisk === 'function') saveStateToDisk();
+    saveStateToDisk();
     console.log(`[season] rollover ${closedId} → ${newId}, champion=${champion || '(nenhum)'}`);
 }
 setInterval(checkSeasonRollover, 60 * 1000);   // checa a cada minuto
@@ -3395,7 +3389,7 @@ function tickImpostorBot(){
 function killImpostorBot(killer){
     if (!impostorBot) return;
     killer.gold = (killer.gold || 0) + BOT_REWARD_GOLD;
-    if (typeof syncGoldRank === 'function') syncGoldRank(killer.name, killer.gold);
+    syncGoldRank(killer.name, killer.gold);
     incInv(killer, 'BENCAO_FENIX_TEMP', 1);
     // Marca expiry pra cleanup futuro
     killer._bencaoTempExpiry = (killer._bencaoTempExpiry || []);
@@ -3527,14 +3521,13 @@ function handleMobDeath(m, killerId){
             const stillAlive = Array.from(monsters.values()).some(x =>
                 x.id !== m.id && x.hunter && x.huntTargetId === tp.id && x.hp > 0);
             if (!stillAlive){
-                const COOLDOWN_MS = 5 * 60 * 1000;
                 tp._lastHlHuntClaim = Date.now();
                 const amount = 200 + Math.floor(Math.random() * 250);
                 tp.gold = (tp.gold || 0) + amount;
                 syncGoldRank(tp.name, tp.gold);
                 sendInvUpdate(tp, { goldDelta:{ amount, reason:'hl_hunt' } });
                 if (tp.ws && tp.ws.readyState === 1){
-                    tp.ws.send(JSON.stringify({ t:'hlHuntResult', ok:true, amount, retryAt: tp._lastHlHuntClaim + COOLDOWN_MS }));
+                    tp.ws.send(JSON.stringify({ t:'hlHuntResult', ok:true, amount, retryAt: tp._lastHlHuntClaim + HL_HUNT_COOLDOWN_MS }));
                 }
             }
         }
@@ -3572,11 +3565,11 @@ function handleMobDeath(m, killerId){
 // Ticka DoTs em mobs (veneno/sangra/fogo). Roda a cada 1s, processa dots
 // expirados, aplica dano, broadcasta updates+floats.
 const DOT_TICK_INTERVAL_MS = 3000;
+const DOT_COLORS = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };  // DoT type → cor do float (mob + player)
 function tickMobDots(){
     const now = Date.now();
     const updates = [];
     const floats  = [];
-    const dotColor = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
     for (const m of monsters.values()){
         if (!m.dots || !m.dots.length || m.hp <= 0) continue;
         let touched = false;
@@ -3587,7 +3580,7 @@ function tickMobDots(){
             m.hp = Math.max(0, m.hp - dmg);
             // M4: dano de DoT conta pro loot por contribuição (boss unique)
             if (m.unique && d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dmg; }
-            floats.push({ mobId: m.id, text: `-${dmg}`, color: dotColor[d.type] || '#aaa' });
+            floats.push({ mobId: m.id, text: `-${dmg}`, color: DOT_COLORS[d.type] || '#aaa' });
             d.ticksLeft--;
             if (d.ticksLeft <= 0) m.dots.splice(i, 1);
             else d.nextTickAt = now + DOT_TICK_INTERVAL_MS;
@@ -3856,7 +3849,6 @@ function applyAttackerStatus(target, mobType){
         }
     }
 }
-const PLAYER_DOT_COLORS = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
 function tickPlayerDots(){
     const now = Date.now();
     for (const p of players.values()){
@@ -3875,7 +3867,7 @@ function tickPlayerDots(){
                 if (other.ws.readyState !== 1) continue;
                 other.ws.send(JSON.stringify({
                     t:'playerFloat', id:p.id, text:`-${dmg}`,
-                    color: PLAYER_DOT_COLORS[d.type] || '#aaa',
+                    color: DOT_COLORS[d.type] || '#aaa',
                 }));
             }
             d.ticksLeft--;
@@ -5615,12 +5607,11 @@ wss.on('connection', (ws, request) => {
         // (visíveis pra todos via mobs snapshot/batch). Crédito é automático quando
         // o último cair em handleMobDeath (crédito via mob kill, não claim).
         if (msg.t === 'hlHuntTrigger') {
-            const COOLDOWN_MS = 5 * 60 * 1000;
             const now = Date.now();
             p._lastHlHuntClaim = p._lastHlHuntClaim || 0;
-            if (now - p._lastHlHuntClaim < COOLDOWN_MS){
+            if (now - p._lastHlHuntClaim < HL_HUNT_COOLDOWN_MS){
                 if (p.ws && p.ws.readyState === 1){
-                    p.ws.send(JSON.stringify({ t:'hlHuntResult', ok:false, reason:'cooldown', retryAt: p._lastHlHuntClaim + COOLDOWN_MS }));
+                    p.ws.send(JSON.stringify({ t:'hlHuntResult', ok:false, reason:'cooldown', retryAt: p._lastHlHuntClaim + HL_HUNT_COOLDOWN_MS }));
                 }
                 return;
             }
@@ -6837,7 +6828,7 @@ wss.on('connection', (ws, request) => {
                     const acc = getAccount(p.name);
                     if (acc && acc.save) acc.save.gold = v;
                     syncGoldRank(p.name, p.gold);
-                    if (typeof flushAccounts === 'function') flushAccounts();
+                    flushAccounts();
                     sendInvUpdate(p, {});
                     sendTo(id, { t:'serverMsg', level:'info', text:`💰 Gold = ${v.toLocaleString('pt-BR')}` });
                     return;
@@ -6860,7 +6851,7 @@ wss.on('connection', (ws, request) => {
                         acc.save.maxHp = p.maxHp; acc.save.maxMp = p.maxMp;
                         acc.save.hp = p.hp; acc.save.mp = p.mp;
                     }
-                    if (typeof flushAccounts === 'function') flushAccounts();
+                    flushAccounts();
                     sendInvUpdate(p, { skills: p.skills });
                     broadcastPstatsAll(p);   // empurra maxHp/maxMp/hp/mp novos pro cliente na hora
                     sendTo(id, { t:'serverMsg', level:'info', text:`${skName} = ${val} (maxHP ${p.maxHp}/maxMP ${p.maxMp})` });
@@ -6895,7 +6886,7 @@ wss.on('connection', (ws, request) => {
                             online = true;
                         }
                     }
-                    if (typeof flushAccounts === 'function') flushAccounts();
+                    flushAccounts();
                     sendTo(id, { t:'serverMsg', level:'info', text:`Quests de ${target} resetadas (Atendente + chains do mapa; diária preservada)${online ? ' [online]' : ''}.` });
                     return;
                 }

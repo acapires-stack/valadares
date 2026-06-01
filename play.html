@@ -589,12 +589,6 @@
         .po-dist.near   { background: rgba(116,209,118,0.15); color: #92e090; }
         .po-dist.mid    { background: rgba(255,170,32,0.15);  color: #ffcc70; }
         .po-dist.far    { background: rgba(100,100,100,0.15); color: #888; }
-        .po-hp-bar {
-            background: #050405; border: 1px solid #1a1408;
-            height: 4px; margin-top: 3px; border-radius: 1px;
-            overflow: hidden;
-        }
-        .po-hp-fill { height: 100%; transition: width 0.2s; }
         .po-actions {
             display: flex; gap: 4px; margin-top: 4px;
         }
@@ -4942,26 +4936,6 @@ function killMonster(m){
 
 // Distância Chebyshev = melee (8 tiles em volta, incluindo diagonais)
 const melee = (a, b) => Math.max(Math.abs(a.x-b.x), Math.abs(a.y-b.y));
-
-function attack(){
-    if (player.attackTimer > 0) return;
-    if (isStunned()) return;
-    // alvo na direção que está olhando
-    let tx = player.x, ty = player.y;
-    if (player.dir==='up') ty--; else if (player.dir==='down') ty++;
-    else if (player.dir==='left') tx--; else tx++;
-    let m = monsterAt(tx,ty);
-    if (!m){
-        // qualquer um nos 8 tiles ao redor
-        for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){
-            if (!dx && !dy) continue;
-            const c = monsterAt(player.x+dx, player.y+dy);
-            if (c){ doAttack(c); return; }
-        }
-        return;
-    }
-    doAttack(m);
-}
 
 // Se nada equipado, luta com Punho (base 3, sobe skill Punho).
 const PUNHO = { skill:'Punho', base:2 };
@@ -13695,7 +13669,6 @@ async function checkClientUpdate(){
         if (sig === _lastHtmlVersion){ _pendingHtmlVersion = null; return; }  // estável: limpa candidata
         // Mudou: exige a MESMA versão nova em 2 checks seguidos (debounce de CDN flapping)
         if (_pendingHtmlVersion !== sig){ _pendingHtmlVersion = sig; return; }
-        console.log('[autoupdate] nova versão confirmada, recarregando em 1.5s…');
         _isUpdating = true;
         // Overlay unificado — fase 1: atualizando
         showLoadingOverlay(true, 'ATUALIZANDO', 'Nova versão do jogo detectada…', 'Salvando progresso · combate pausado');
