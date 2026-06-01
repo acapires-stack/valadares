@@ -38,6 +38,12 @@ mob é desenhado em renderX/Y → no deslize (~280ms) a lógica "pula" 1 tile an
 (ordem inteira estável, alinhada ao que se vê). Verificado no preview (mob lógico-longe/visual-perto sobe pro topo;
 0 erros). Cliente-only.
 
+**Follow-up 2 (mesmo dia):** dono achou que o clique "não setava mob em diagonal". Repro no preview: na real é
+qualquer mob **ANDANDO** — o `canvas` click casava a pos **LÓGICA** (`m.x===tile`), mas a lógica fica 1 tile à
+frente do desenho no deslize → clicar no mob em movimento errava (parado funcionava). Fix: o clique casa por
+**render ARREDONDADO** (`monsters.find` + player remoto, no `click` e no `contextmenu`). `melee()` é Chebyshev,
+então alcance/ataque já incluíam diagonal — era só o clique de seleção. Cliente-only.
+
 ---
 
 ## 🔒 Sessão 01/06/2026 (cont. 3) — loot do mob comum TRAVADO por dano (anti-ninja) + fix DoT-loot

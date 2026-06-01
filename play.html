@@ -9728,7 +9728,9 @@ canvas.addEventListener('click', e => {
     const tileY = Math.floor(cy / TS + cam.y);
     // Mob no tile → mira (fora da PZ, qualquer hora). Resolve "boss no meio da multidão".
     if (!playerInSafeZone()){
-        const mm = monsters.find(m => m.x === tileX && m.y === tileY);
+        // casa pela posição VISUAL (render): o mob é desenhado em renderX/Y e a posição lógica
+        // fica 1 tile À FRENTE durante o deslize (~280ms) — clicar num mob ANDANDO errava o alvo.
+        const mm = monsters.find(m => Math.round(m.renderX ?? m.x) === tileX && Math.round(m.renderY ?? m.y) === tileY);
         if (mm){
             player.target = mm.id; player.targetType = 'monster'; player.autoAttack = true; mm.aggro = true;
             log(`<span class="log-sys">Alvo: ${escapeHtml(mm.name)} [AUTO]</span>`);
@@ -9740,7 +9742,7 @@ canvas.addEventListener('click', e => {
     if (player.pvp){
         for (const id in remotePlayers){
             const rp = remotePlayers[id];
-            if (rp.x === tileX && rp.y === tileY){
+            if (Math.round(rp.renderX ?? rp.x) === tileX && Math.round(rp.renderY ?? rp.y) === tileY){
                 if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
                 player.target = parseInt(id, 10);
                 player.targetType = 'player';
