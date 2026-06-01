@@ -7,6 +7,29 @@
 
 ---
 
+## ✅ Sessão 31/05/2026 (cont. 13) — DEPLOY do lote (cont.10+11+12) + verificação
+
+Lote inteiro deployado via /manutencao (commit `67b4c19`): **M4 3b Fase 2** (masmorra procedural) + **3 bugs**
+(loot de boss, Fúria, barras HP/MP) + **cap com mérito**. NO AR e confirmado (Vercel servindo o código novo;
+`/api/status`=maintenance:false; Railway redeployado).
+
+**Processo:** precisou de **2 janelas** de /manutencao — a 1ª expirou (~5min) enquanto eu adicionava o cap fix
+(lição: commitar TUDO antes de o dono travar; o lock auto-expira em minutos). Na 2ª, um monitor em background
+(`run_in_background`) vigiou `/api/status` e pushou no instante que travou (`maintenance:true` na iter 1), depois
+outro confirmou o server de volta.
+
+**Verificado pelo dono no painel:** crítico **30%** (Espada 71 → base+skill 25,9% capa em 25% + 5% talento),
+esquiva **27,5%** (Escudo 45 → 22,5% < teto, + 5% Aura) — o mérito soma por cima, **correto**. A esquiva chega a
+30% quando o Escudo passar de ~52 (aí base+skill bate no teto). (1ª vez o painel mostrou 25% velho = **cache do
+Electron**; fechar/reabrir puxou o novo — o Vercel já servia o código novo, confirmado por curl.)
+
+⏳ **Falta o dono validar IN-GAME (amanhã):** descer a masmorra 1→5 (cavernas/seta/escada ▼), 1 banner de loot de
+boss, Fúria laranja+▲, barras HP/MP desgrudadas. **Pendências antigas:** repor skills perdidas (Espada 69→61 via
+/skill admin); bugs de UI "piscada"/"desloca" (dono investiga repro); balance do enxame (cap por tick? — crit do
+mob é no-op online).
+
+---
+
 ## ⚖️ Sessão 31/05/2026 (cont. 12) — cap de crítico/esquiva: mérito (talento/quest) soma POR CIMA dos 25%
 
 Dono, vendo a quest "Aura do Vidente" (+5% esquiva permanente) ser comida pelo teto: "limitei em 25% mas as
