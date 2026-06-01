@@ -3879,144 +3879,8 @@ function rollDrops(monsterType, x, y){
 }
 
 const monsters = [];
-let nextMonId = 1;
-
-function spawnMonster(type, x, y){
-    const def = MTYPE[type];
-    monsters.push({
-        id: nextMonId++, type, name:def.name, color:def.color, size:def.size,
-        x, y, dir:'down',
-        renderX:x, renderY:y, prevX:x, prevY:y,
-        moveProgress:1, moveDuration:0,
-        hp:def.hp, maxHp:def.hp, dmg:def.dmg, speed:def.speed, xpReward:def.xp,
-        dodge: def.dodge || 0, crit: def.crit || 0,
-        intel: def.intel || 1,
-        moveTimer:0, attackTimer:0, aggro:false,
-        wanderX:x, wanderY:y,
-        unique: !!def.unique,
-    });
-}
-
-// Configuração dos anéis de spawn (compartilhada por spawn inicial e respawn)
-const SPAWN_RINGS = [
-    { min:6,  max:14, target:18, types:['RAT','RAT','RAT','RAT','SNAKE'] },
-    { min:14, max:24, target:20, types:['SNAKE','SNAKE','SPIDER','RAT'] },
-    { min:24, max:36, target:16, types:['SPIDER','SPIDER','WOLF'] },
-    { min:36, max:99, target:14, types:['WOLF','WOLF','ORC','ORC'] },
-];
-
-// Spawns exclusivos por bioma — só nascem em tiles do tipo certo
-const BIOME_SPAWNS = [
-    { name:'neve',    tile:7 /*T.SNOW*/, types:['TROLL','TROLL','TROLL'],                        target:10 },
-    { name:'deserto', tile:8 /*T.SAND*/, types:['LIZARD','LIZARD','SCORPION','SCORPION'],        target:12 },
-];
-
-function ringOf(x, y){
-    const d = Math.abs(x - M_W/2) + Math.abs(y - M_H/2);
-    return SPAWN_RINGS.find(r => d >= r.min && d < r.max);
-}
-
-function countByRing(){
-    const c = new Map(SPAWN_RINGS.map(r => [r, 0]));
-    for (const m of monsters){
-        const r = ringOf(m.x, m.y);
-        if (r) c.set(r, c.get(r) + 1);
-    }
-    return c;
-}
-
-function trySpawnInRing(ring, opts = {}){
-    const { offscreen = false, minDistFromPlayer = 0 } = opts;
-    const cam = offscreen ? getCamera() : null;
-    for (let tries = 0; tries < 200; tries++){
-        const x = 5 + Math.floor(Math.random() * (M_W - 10));
-        const y = 5 + Math.floor(Math.random() * (M_H - 10));
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x, y)) continue;
-        if (inSafeZone(x, y)) continue;
-        const dist = Math.abs(x - M_W/2) + Math.abs(y - M_H/2);
-        if (dist < ring.min || dist >= ring.max) continue;
-        if (minDistFromPlayer > 0){
-            const dp = Math.max(Math.abs(x - player.x), Math.abs(y - player.y));
-            if (dp < minDistFromPlayer) continue;
-        }
-        if (cam && x >= cam.x && x < cam.x + VP_W && y >= cam.y && y < cam.y + VP_H) continue;
-        const type = ring.types[Math.floor(Math.random() * ring.types.length)];
-        spawnMonster(type, x, y);
-        return true;
-    }
-    return false;
-}
-
-function trySpawnInBiome(biome, opts = {}){
-    const { offscreen = false, minDistFromPlayer = 0 } = opts;
-    const cam = offscreen ? getCamera() : null;
-    for (let tries = 0; tries < 200; tries++){
-        const x = 5 + Math.floor(Math.random() * (M_W - 10));
-        const y = 5 + Math.floor(Math.random() * (M_H - 10));
-        if (map[y][x] !== biome.tile) continue;
-        if (monsterAt(x, y)) continue;
-        if (inSafeZone(x, y)) continue;
-        if (inCave(x, y)) continue;
-        if (minDistFromPlayer > 0){
-            const dp = Math.max(Math.abs(x - player.x), Math.abs(y - player.y));
-            if (dp < minDistFromPlayer) continue;
-        }
-        if (cam && x >= cam.x && x < cam.x + VP_W && y >= cam.y && y < cam.y + VP_H) continue;
-        const type = biome.types[Math.floor(Math.random() * biome.types.length)];
-        spawnMonster(type, x, y);
-        return true;
-    }
-    return false;
-}
-
-function countByBiome(){
-    const c = new Map(BIOME_SPAWNS.map(b => [b, 0]));
-    for (const m of monsters){
-        for (const b of BIOME_SPAWNS){
-            if (map[m.y] && map[m.y][m.x] === b.tile){ c.set(b, c.get(b) + 1); break; }
-        }
-    }
-    return c;
-}
-
-function spawnInitialMonsters(){
-    if (serverAuthMobs) return;  // server cuida do spawn quando online
-    for (const ring of SPAWN_RINGS){
-        let placed = 0;
-        while (placed < ring.target){
-            if (!trySpawnInRing(ring)) break;
-            placed++;
-        }
-    }
-    // Cavernas
-    for (const cave of CAVES){
-        let placed = 0;
-        while (placed < cave.target){
-            if (!trySpawnInCave(cave)) break;
-            placed++;
-        }
-    }
-    // Biomas
-    for (const biome of BIOME_SPAWNS){
-        let placed = 0;
-        while (placed < biome.target){
-            if (!trySpawnInBiome(biome)) break;
-            placed++;
-        }
-    }
-    spawnBossAndLair();
-    spawnDrakeBoss();
-    spawnGolemBoss();
-}
-
-// Boss + guardas (Orcs ao redor) — respawna 5 min após morte do boss
-const BOSS_POS      = { x: 46, y: 95 };
-const DRAKE_BOSS_POS = { x: 82, y: 80 };
-const GOLEM_BOSS_POS = { x: 70, y: 90 };
 const BOSS_RESPAWN_MS = 5 * 60 * 1000;
 const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
-const LAIR_OFFSETS = [[-2,-1],[2,-1],[-2,1],[2,1],[0,-3],[0,3]];
 let bossDeathTime = null;
 let drakeBossDeathTime = null;
 let golemBossDeathTime = null;
@@ -4025,70 +3889,6 @@ let golemBossDeathTime = null;
 let hlHuntActive = false;
 let hlHuntTimer = 0;
 const HL_HUNT_DELAY_MS = 3 * 60 * 1000; // 3 min após virar Highlander
-const HL_HUNT_REWARD = () => 200 + Math.floor(Math.random() * 250);
-
-function spawnBossAndLair(){
-    if (!monsters.some(m => m.type === 'ORC_LIDER')){
-        spawnMonster('ORC_LIDER', BOSS_POS.x, BOSS_POS.y);
-    }
-    for (const [dx, dy] of LAIR_OFFSETS){
-        const x = BOSS_POS.x + dx, y = BOSS_POS.y + dy;
-        if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x, y)) continue;
-        spawnMonster('ORC', x, y);
-    }
-}
-
-function spawnDrakeBoss(){
-    if (!monsters.some(m => m.type === 'DRAKE_LIDER')){
-        spawnMonster('DRAKE_LIDER', DRAKE_BOSS_POS.x, DRAKE_BOSS_POS.y);
-    }
-    for (const [dx, dy] of [[-2,0],[2,0],[0,-2],[0,2]]){
-        const x = DRAKE_BOSS_POS.x+dx, y = DRAKE_BOSS_POS.y+dy;
-        if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x,y)) continue;
-        spawnMonster('DRAKE', x, y);
-    }
-}
-
-function spawnGolemBoss(){
-    if (!monsters.some(m => m.type === 'GOLEM_REI')){
-        spawnMonster('GOLEM_REI', GOLEM_BOSS_POS.x, GOLEM_BOSS_POS.y);
-    }
-    for (const [dx, dy] of [[-2,0],[2,0],[0,-2],[0,2]]){
-        const x = GOLEM_BOSS_POS.x+dx, y = GOLEM_BOSS_POS.y+dy;
-        if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-        if (!walkable(map[y][x])) continue;
-        if (monsterAt(x,y)) continue;
-        spawnMonster('GOLEM', x, y);
-    }
-}
-
-function spawnHighlanderHunters(){
-    const spawnPoints = [
-        { x:5, y:5 }, { x:95, y:5 }, { x:5, y:95 }, { x:95, y:95 },
-    ];
-    let spawned = 0;
-    for (const pt of spawnPoints){
-        if (spawned >= 3) break;
-        for (let tries=0; tries<40; tries++){
-            const x = pt.x + Math.floor(Math.random()*6) - 3;
-            const y = pt.y + Math.floor(Math.random()*6) - 3;
-            if (x<=0||y<=0||x>=M_W-1||y>=M_H-1) continue;
-            if (!walkable(map[y][x])) continue;
-            if (monsterAt(x,y)) continue;
-            const m = spawnMonster('CACADOR', x, y);
-            // marcar como caçador global (vai persistir no objeto)
-            const mo = monsters[monsters.length-1];
-            mo.hunter = true; mo.aggro = true;
-            spawned++; break;
-        }
-    }
-    hlHuntActive = true;
-    log('<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>');
-}
 
 function tickHighlanderHunt(dt){
     if (!player.highlander){ hlHuntActive = false; hlHuntTimer = 0; return; }
@@ -4108,54 +3908,7 @@ function tickHighlanderHunt(dt){
         }
         return;
     }
-    // Offline / single-player: lógica local (spawn + checagem de mortes + bonus)
-    if (hlHuntActive){
-        for (const m of monsters){
-            if (m.hunter && m.hp > 0){ m.wanderX = player.x; m.wanderY = player.y; m.aggro = true; }
-        }
-        if (!monsters.some(m => m.hunter && m.hp > 0)){
-            hlHuntActive = false;
-            hlHuntTimer = 0;
-            const bonus = HL_HUNT_REWARD();
-            player.gold += bonus;
-            const gEl = document.getElementById('goldVal');
-            if (gEl) gEl.textContent = player.gold + ' g';
-            log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${bonus}g</span>`);
-        }
-    } else {
-        hlHuntTimer += dt;
-        if (hlHuntTimer >= HL_HUNT_DELAY_MS) spawnHighlanderHunters();
-    }
 }
-
-function trySpawnInCave(cave){
-    for (let tries = 0; tries < 200; tries++){
-        const dx = Math.floor(Math.random() * (cave.r*2+1)) - cave.r;
-        const dy = Math.floor(Math.random() * (cave.r*2+1)) - cave.r;
-        const x = cave.x + dx, y = cave.y + dy;
-        if (x<=0 || y<=0 || x>=M_W-1 || y>=M_H-1) continue;
-        if (map[y][x] !== T.CAVE) continue;
-        if (monsterAt(x, y)) continue;
-        const type = cave.types[Math.floor(Math.random() * cave.types.length)];
-        const mon = spawnMonster(type, x, y);
-        return true;
-    }
-    return false;
-}
-
-function countByCave(){
-    const c = new Map(CAVES.map(cv => [cv, 0]));
-    for (const m of monsters){
-        const cv = inCave(m.x, m.y);
-        if (cv) c.set(cv, c.get(cv) + 1);
-    }
-    return c;
-}
-
-// Respawn dinâmico — mantém a população viva
-let respawnTimer = 0;
-const RESPAWN_INTERVAL = 900;    // tenta repor a cada 0.9s
-const RESPAWN_PER_TICK = 3;      // até 3 monstros por tick
 
 // Boss heal Lv3+ — bosses regeneram lentamente quando upados
 let bossHealTimer = 0;
@@ -4179,54 +3932,7 @@ function tickBossHeal(dt){
 
 function tickRespawns(dt){
     tickBossHeal(dt);
-    if (serverAuthMobs) { tickHighlanderHunt(dt); return; }  // respawn fica no server
-    if (bossDeathTime !== null && Date.now() - bossDeathTime >= BOSS_RESPAWN_MS){
-        spawnBossAndLair(); bossDeathTime = null;
-        log('<span class="log-up">⚔ O Orc Líder reapareceu!</span>');
-    }
-    if (drakeBossDeathTime !== null && Date.now() - drakeBossDeathTime >= DUNGEON_BOSS_RESPAWN_MS){
-        spawnDrakeBoss(); drakeBossDeathTime = null;
-        log('<span class="log-up">🔥 O Drake Ancião reapareceu no Covil!</span>');
-    }
-    if (golemBossDeathTime !== null && Date.now() - golemBossDeathTime >= DUNGEON_BOSS_RESPAWN_MS){
-        spawnGolemBoss(); golemBossDeathTime = null;
-        log('<span class="log-up">🪨 O Golem Rei reapareceu no Abismo!</span>');
-    }
     tickHighlanderHunt(dt);
-    respawnTimer += dt;
-    if (respawnTimer < RESPAWN_INTERVAL) return;
-    respawnTimer = 0;
-    let spawned = 0;
-    // Anéis externos
-    const counts = countByRing();
-    const deficits = SPAWN_RINGS
-        .map(r => ({ ring: r, deficit: r.target - counts.get(r) }))
-        .filter(d => d.deficit > 0)
-        .sort((a,b) => (b.deficit/b.ring.target) - (a.deficit/a.ring.target));
-    for (const d of deficits){
-        if (spawned >= RESPAWN_PER_TICK) break;
-        if (trySpawnInRing(d.ring, { offscreen: true, minDistFromPlayer: 4 })) spawned++;
-    }
-    // Cavernas
-    const cCounts = countByCave();
-    const cDef = CAVES
-        .map(cv => ({ cave: cv, deficit: cv.target - cCounts.get(cv) }))
-        .filter(d => d.deficit > 0)
-        .sort((a,b) => (b.deficit/b.cave.target) - (a.deficit/a.cave.target));
-    for (const d of cDef){
-        if (spawned >= RESPAWN_PER_TICK) break;
-        if (trySpawnInCave(d.cave)) spawned++;
-    }
-    // Biomas
-    const bCounts = countByBiome();
-    const bDef = BIOME_SPAWNS
-        .map(b => ({ biome: b, deficit: b.target - bCounts.get(b) }))
-        .filter(d => d.deficit > 0)
-        .sort((a,b) => (b.deficit/b.biome.target) - (a.deficit/a.biome.target));
-    for (const d of bDef){
-        if (spawned >= RESPAWN_PER_TICK) break;
-        if (trySpawnInBiome(d.biome, { offscreen: true, minDistFromPlayer: 4 })) spawned++;
-    }
 }
 
 function drawMonster(m, px, py){
@@ -13556,21 +13262,15 @@ function startGame(multiplayer, name){
     buildSkillList();
     ensureVisited();
     revealAround(player.x, player.y);
-    if (multiplayer){
-        // Não spawna local — espera snapshot do server (sem flicker)
-        showLoadingOverlay(true);
-        connectMP();
-        // Fallback: se WS não responder em 6s, gera mundo local
-        setTimeout(() => {
-            if (!serverAuthMobs && monsters.length === 0){
-                log('<span class="log-sys">Servidor lento — gerando mundo local.</span>');
-                spawnInitialMonsters();
-                showLoadingOverlay(false);
-            }
-        }, 6000);
-    } else {
-        spawnInitialMonsters();
-    }
+    // Online-only: sempre espera o snapshot de mobs do server (sem spawn local)
+    showLoadingOverlay(true);
+    connectMP();
+    // Se o server demorar, avisa — NAO gera mundo local (a reconexao cuida)
+    setTimeout(() => {
+        if (!serverAuthMobs && monsters.length === 0){
+            log('<span class="log-sys">Servidor demorando a responder — tentando reconectar…</span>');
+        }
+    }, 8000);
     log('<span class="log-sys">Bem-vindo a Valadares, '+player.name+'!</span>');
     if (restored) log('<span class="log-sys">Progresso restaurado.</span>');
     log('Use WASD para mover, ESPAÇO para atacar.');
