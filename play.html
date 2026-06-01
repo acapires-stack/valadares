@@ -9599,7 +9599,13 @@ function syncChatHeight(){
     const chat = document.getElementById('chatMessages');
     const wrapper = document.getElementById('gameWrapper');
     if (!log || !chat || !wrapper) return;
-    const TABS_H = 28, INPUT_H = 36;
+    // Mede a barra de abas e o input REAIS (antes era TABS_H=28 fixo — mas na aba
+    // COMBATE a barra ganha os #logFilters e fica mais alta, então o #log calculado
+    // com 28 estourava pra fora da tela ao trocar pra COMBATE). #1
+    const tabsEl  = wrapper.querySelector('.chat-tabs');
+    const inputEl = document.getElementById('chatInputRow');
+    const TABS_H  = tabsEl  ? tabsEl.getBoundingClientRect().height  : 28;
+    const INPUT_H = inputEl ? inputEl.getBoundingClientRect().height : 36;
     const canvasEl = document.getElementById('canvas');
     const canvasH = canvasEl ? canvasEl.getBoundingClientRect().height : 528;
     // Overhead = tudo acima do wrapper (title bar do Electron, margens) +
@@ -12714,6 +12720,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('chatMessages').style.display = isChat ? '' : 'none';
             // Input do chat fica SEMPRE visível: escondê-lo no modo COMBATE encolhia o
             // #chatPanel em ~37px e empurrava o layout do jogo ao alternar abas (bug reportado).
+            // #1: recalcula a altura do log/chat com a barra da aba ATUAL (os filtros da aba
+            // COMBATE mudam a altura da barra de abas) — senão o painel estoura pra fora da tela.
+            if (typeof syncChatHeight === 'function') syncChatHeight();
             if (isChat) document.getElementById('chatInput')?.focus();
         });
     });
