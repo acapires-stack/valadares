@@ -3868,16 +3868,6 @@ const DROPS = {
 const groundItems = [];   // { id, x, y, type, qty }
 let nextItemId = 1;
 
-function rollDrops(monsterType, x, y){
-    const table = DROPS[monsterType] || [];
-    for (const [type, chance, qMin, qMax] of table){
-        if (Math.random() < chance){
-            const qty = qMin + Math.floor(Math.random() * (qMax - qMin + 1));
-            groundItems.push({ id: nextItemId++, x, y, type, qty });
-        }
-    }
-}
-
 const monsters = [];
 const BOSS_RESPAWN_MS = 5 * 60 * 1000;
 const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
@@ -4006,147 +3996,6 @@ function drawMonster(m, px, py){
     }
 }
 
-// Escolhe a casa adjacente ao player mais perto deste monstro (cerca + fan-out)
-function pickSurroundSlot(m){
-    const intel = m.intel || 1;
-    const slots = [];
-    for (let dy = -1; dy <= 1; dy++){
-        for (let dx = -1; dx <= 1; dx++){
-            if (!dx && !dy) continue;
-            const x = player.x + dx, y = player.y + dy;
-            if (x<=0 || y<=0 || x>=M_W-1 || y>=M_H-1) continue;
-            if (!walkable(map[y][x])) continue;
-            if (inSafeZone(x, y)) continue;
-            const occ = monsterAt(x, y);
-            if (occ && occ !== m) continue;
-            const d = Math.max(Math.abs(m.x - x), Math.abs(m.y - y));
-            let score = d;
-            // Intel 2+: penaliza vagas próximas a outros mobs aggro (espalha)
-            if (intel >= 2){
-                let cluster = 0;
-                for (const om of monsters){
-                    if (om === m || !om.aggro || om.hp <= 0) continue;
-                    const od = Math.max(Math.abs(om.x - x), Math.abs(om.y - y));
-                    if (od <= 1) cluster++;
-                }
-                score += cluster * 0.8;
-            }
-            // Intel 3: flanco — prefere lado oposto ao que player está olhando
-            if (intel >= 3){
-                const back = {'up':[0,1],'down':[0,-1],'left':[1,0],'right':[-1,0]}[player.dir] || [0,0];
-                // se o slot está atrás do player, dá bônus negativo (preferido)
-                if (Math.sign(dx) === back[0] && Math.sign(dy) === back[1]) score -= 2.0;
-                else if (Math.sign(dx) === back[0] || Math.sign(dy) === back[1]) score -= 0.8;
-            }
-            // Tiebreak determinístico por id
-            const tiebreak = ((m.id * 31 + dx * 7 + dy * 11) % 100) / 1000;
-            slots.push({ x, y, score: score + tiebreak });
-        }
-    }
-    if (!slots.length) return null;
-    slots.sort((a,b) => a.score - b.score);
-    return slots[0];
-}
-
-// IA dos monstros (skip quando server-autoritativo — mob só anima localmente)
-function updateMonster(m, dt){
-    if (serverAuthMobs) return;
-    // DoT ticks (veneno/sangra/fogo). Pode matar o mob.
-    if (tickMobDots(m, Date.now())) return;
-    m.moveTimer  = Math.max(0, m.moveTimer-dt);
-    m.attackTimer = Math.max(0, m.attackTimer-dt);
-    const distChase = Math.abs(m.x-player.x)+Math.abs(m.y-player.y);
-    const distHit   = melee(m, player);
-
-    // Aggro: range maior, esquece se player muito longe OU dentro da PZ ou perto de NPC
-    const safeNow = playerInSafeZone() || playerNearNpcMiniPZ();
-    if (safeNow) m.aggro = false;
-    else if (distChase <= 10) m.aggro = true;
-    else if (distChase > 22) m.aggro = false;
-
-    if (m.attackTimer<=0 && distHit<=1 && !safeNow){
-        damagePlayer(m.dmg, m.name, m);
-        m.attackTimer = 1200;
-    }
-
-    if (m.moveTimer>0) return;
-
-    // Helper: tenta um deslocamento; retorna true se moveu
-    const tryMove = (dx, dy) => {
-        if (!dx && !dy) return false;
-        const nx = m.x + dx, ny = m.y + dy;
-        if (nx<=0 || ny<=0 || nx>=M_W-1 || ny>=M_H-1) return false;
-        if (!walkable(map[ny][nx])) return false;
-        if (monsterAt(nx, ny)) return false;
-        if (nx===player.x && ny===player.y) return false;
-        if (inSafeZone(nx, ny) || inSanctuary(nx, ny)) return false;
-        m.prevX = m.x; m.prevY = m.y;
-        m.x = nx; m.y = ny;
-        m.moveDuration = (dx && dy) ? m.speed * 1.5 : m.speed;
-        m.moveProgress = 0;
-        m.dir = dx>0?'right':dx<0?'left':dy>0?'down':'up';
-        return true;
-    };
-
-    if (m.aggro && distHit > 1){
-        // Intel 1 (burro): vai direto pro player, faz fila
-        // Intel 2+ (cerca/flanco): pega vaga adjacente otimizada
-        let tx, ty;
-        if (m.intel >= 2){
-            const slot = pickSurroundSlot(m);
-            tx = slot ? slot.x : player.x;
-            ty = slot ? slot.y : player.y;
-        } else {
-            tx = player.x; ty = player.y;
-        }
-        const ddx = tx - m.x, ddy = ty - m.y;
-        const sx = ddx > 0 ? 1 : ddx < 0 ? -1 : 0;
-        const sy = ddy > 0 ? 1 : ddy < 0 ? -1 : 0;
-        // Prioridade: diagonal direta → eixo dominante → secundário → diagonais alternativas
-        const moves = [];
-        if (sx && sy) moves.push([sx, sy]);              // diagonal direta
-        if (Math.abs(ddx) >= Math.abs(ddy)){
-            if (sx) moves.push([sx, 0]);
-            if (sy) moves.push([0, sy]);
-        } else {
-            if (sy) moves.push([0, sy]);
-            if (sx) moves.push([sx, 0]);
-        }
-        // Fallbacks diagonais quando um eixo é zero (contorna obstáculo)
-        if (sx && !sy) moves.push([sx, 1], [sx, -1], [0, 1], [0, -1]);
-        if (sy && !sx) moves.push([1, sy], [-1, sy], [1, 0], [-1, 0]);
-        let moved = false;
-        for (const [dx, dy] of moves){ if (tryMove(dx, dy)){ moved = true; break; } }
-        // Diagonal custa 1.4× tempo (mesma lógica do player)
-        const wasDiag = moved && Math.abs(sx) === 1 && Math.abs(sy) === 1;
-        m.moveTimer = m.speed * (moved ? (wasDiag ? 1.2 : 0.85) : 0.6);
-        // Anti-kite: mobs intel≥2 e bosses sprintam quando perseguindo a distância
-        // (counter pra spear/arco; ratos e cobras ficam dumb como antes)
-        if (distChase > 1 && (m.intel >= 2 || m.unique)){
-            m.moveTimer *= 0.6;
-        }
-    } else if (!m.aggro){
-        // Se está longe de casa (spawn), volta. Senão, vagueia leve.
-        const dxh = m.wanderX - m.x, dyh = m.wanderY - m.y;
-        const distHome = Math.max(Math.abs(dxh), Math.abs(dyh));
-        if (distHome > 6 && Math.random() < 0.7){
-            const sx = dxh > 0 ? 1 : dxh < 0 ? -1 : 0;
-            const sy = dyh > 0 ? 1 : dyh < 0 ? -1 : 0;
-            const dominant = Math.abs(dxh) >= Math.abs(dyh);
-            const moves = dominant ? [[sx,0],[0,sy]] : [[0,sy],[sx,0]];
-            for (const [dx,dy] of moves){ if (tryMove(dx,dy)) break; }
-        } else if (Math.random() < 0.3){
-            const d = Math.floor(Math.random()*4);
-            const dx = d===2 ? -1 : d===3 ? 1 : 0;
-            const dy = d===0 ? -1 : d===1 ? 1 : 0;
-            tryMove(dx, dy);
-        }
-        m.moveTimer = m.speed;
-    } else {
-        m.moveTimer = m.speed;
-    }
-}
-
 function monsterAt(x,y){
     return monsters.find(m => m.hp>0 && m.x===x && m.y===y);
 }
@@ -4164,7 +4013,6 @@ function remotePlayerOnTile(x,y){
 
 // ─── DoT em monstros (veneno/sangra/fogo proc de armas +N) ─────────────────
 const DOT_INTERVAL_MS = 3000;
-const DOT_COLOR = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
 const DOT_GLYPH = { poison:'☠', bleed:'🩸', burn:'🔥' };
 function applyMobDot(m, type, spec){
     if (!m || !spec) return;
@@ -4181,25 +4029,6 @@ function applyMobDot(m, type, spec){
     } else {
         m.dots.push({ type, dmg: spec.dmg, ticksLeft: spec.ticks, nextTickAt: Date.now() + DOT_INTERVAL_MS });
     }
-}
-// Roda os ticks de DoT do mob. Retorna true se o mob morreu por DoT.
-function tickMobDots(m, now){
-    if (!m.dots || !m.dots.length) return false;
-    for (let i = m.dots.length - 1; i >= 0; i--){
-        const d = m.dots[i];
-        if (now < d.nextTickAt) continue;
-        const dmg = d.dmg;
-        m.hp = Math.max(0, m.hp - dmg);
-        addFloat(m.x, m.y, `-${dmg}`, DOT_COLOR[d.type] || '#aaa', false);
-        d.ticksLeft--;
-        if (d.ticksLeft <= 0) m.dots.splice(i, 1);
-        else d.nextTickAt = now + DOT_INTERVAL_MS;
-        if (m.hp === 0){
-            if (!serverAuthMobs) killMonster(m);
-            return true;
-        }
-    }
-    return false;
 }
 // Tenta aplicar os procs do weapon equipado contra mob (chama applyMobDot
 // pra cada status disponível com roll). Retorna lista de procs aplicados.
@@ -4394,60 +4223,19 @@ function damagePlayer(amount, source, attacker){
 
 // Centraliza as regras de status: cada mob tem chance/efeito ao bater
 function rollAttackerStatus(mobType){
-    // Fase 5: server roda applyAttackerStatus em tickAI mob attack. Cliente
-    // recebe playerDot/playerStun pra setar UI. Aqui no-op online.
-    if (typeof serverAuthMobs !== 'undefined' && serverAuthMobs && _wsAuthed) return;
-    if (!mobType) return;
-    switch (mobType){
-        case 'SPIDER':   if (Math.random() < 0.15) applyPoison(2, 4, 3000, 'Aranha');           break;
-        case 'SCORPION': if (Math.random() < 0.30) applyPoison(3, 5, 3000, 'Escorpião');        break;
-        case 'LIZARD':   if (Math.random() < 0.20) applyBleed(1, 6, 2000, 'Lagarto');           break;
-        case 'TROLL':    if (Math.random() < 0.10) applyStun(1500, 'Troll');                    break;
-        case 'MINOTAUR': if (Math.random() < 0.25) applyStun(2000, 'Minotauro');                break;
-        // ★★ Senhor de Valadares: stun + bleed (efeitos devastadores)
-        case 'SENHOR_VALADARES':
-            if (Math.random() < 0.45) applyStun(2500, 'Senhor de Valadares');
-            if (Math.random() < 0.60) applyBleed(6, 6, 2000, 'Senhor de Valadares');
-            break;
-    }
+    // Online-only: status (veneno/sangra/stun) é autoritativo no server, que manda
+    // playerDot/playerStun pra setar a UI. No-op no cliente.
 }
 
-// Ganho de XP em skill genérico — sobe nível e recalcula stats
-// T3: wrapper que aplica XP só em modo offline. Em MP, o server credita
-// autoritative via handlers (attackMob, mobHit, spellCast, trainAttempt,
-// partyShareKill, questTurnIn) e envia skills via invUpdate. Use em
-// TODAS as fontes que têm equivalente server-side; gainSkillXp direto
-// fica reservado pra recv handlers (msg.skills) e fallback explícito.
+// Historico: era o wrapper de XP offline. Hoje o server credita skill XP
+// autoritativo (invUpdate { skills }); mantido como no-op pros call sites.
 function gainSkillXpLocal(name, amount){
-    if (ws && ws.readyState === 1 && _wsAuthed) return;
-    gainSkillXp(name, amount);
+    // Online-only: XP de skill é creditado server-side (invUpdate { skills }). No-op.
 }
 // Magia: server credita via handler spellCast com clamp hits[1..5].
 function gainMagiaXp(spellKey, hits){
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'spellCast', spellKey, hits })); } catch {}
-    } else {
-        gainSkillXp('Magia', hits);
-    }
-}
-function gainSkillXp(name, amount){
-    const sk = player.skills[name];
-    if (!sk) return;
-    // Aplica permaBuff xpBonus (decisão moral do Vendedor de Almas)
-    const bonus = player.permaBuffs?.xpBonus || 0;
-    if (bonus > 0) amount = Math.round(amount * (1 + bonus));
-    // Aplica bônus de evento diário "Sabedoria" (servidor avisa via eventBonus)
-    if (typeof _eventXpMul === 'number' && _eventXpMul > 1.01){
-        amount = Math.round(amount * _eventXpMul);
-    }
-    sk.xp += amount;
-    while (sk.xp >= sk.xpNext){
-        sk.xp -= sk.xpNext;
-        sk.val++;
-        sk.xpNext = Math.floor(sk.xpNext * 1.15);
-        log(`<span class="log-up">★ ${name} subiu para ${sk.val}!</span>`);
-        sndLevelUp();
-        recomputeStats();
     }
 }
 
@@ -4605,39 +4393,6 @@ function exitDungeonClient(msg){
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     if (typeof showServerToast === 'function') showServerToast('event', '⬆ De volta à cidade.', null, 4000);
     log('<span class="log-sys">Você voltou à superfície.</span>');
-}
-
-function killMonster(m){
-    const idx = monsters.indexOf(m);
-    if (idx>=0) monsters.splice(idx,1);
-    statsRecordMobKill(m.type, m.unique);
-    notifyMobKilledForQuests(m.type);
-    sndKill();
-    log(`<span class="log-kill">Você matou ${m.name}</span>`);
-    // drops
-    const before = groundItems.length;
-    rollDrops(m.type, m.x, m.y);
-    const dropped = groundItems.slice(before);
-    if (dropped.length){
-        const txt = dropped.map(d => `${d.qty}× ${ITEMS[d.type].name}`).join(', ');
-        log(`<span class="log-xp">Dropou: ${txt}</span>`);
-    }
-    if (player.target === m.id){
-        player.target = null;
-    }
-    if (m.type === 'ORC_LIDER'){
-        bossDeathTime = Date.now();
-        log(`<span class="log-up">⚔ Orc Líder caiu! Volta em 5 min.</span>`);
-    }
-    if (m.type === 'DRAKE_LIDER'){
-        drakeBossDeathTime = Date.now();
-        log(`<span class="log-up">🔥 Drake Ancião abatido! Volta em 8 min.</span>`);
-    }
-    if (m.type === 'GOLEM_REI'){
-        golemBossDeathTime = Date.now();
-        log(`<span class="log-up">🪨 Golem Rei destruído! Volta em 8 min.</span>`);
-    }
-    saveState();
 }
 
 // Distância Chebyshev = melee (8 tiles em volta, incluindo diagonais)
@@ -5469,9 +5224,6 @@ function throwSpear(){
         if (serverAuthMobs && ws && ws.readyState === 1){
             // server aplica dano + consome a lança equipada (throwSpear:true)
             ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit, throwSpear:true }));
-        } else {
-            m.hp = Math.max(0, m.hp - dmg);
-            if (m.hp === 0) killMonster(m);
         }
     }
     // projétil rotacionado
@@ -5590,10 +5342,6 @@ function doAttack(m){
         if (serverAuthMobs && ws && ws.readyState === 1){
             ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
             player.target = m.id; m.aggro = true;
-        } else {
-            m.hp = Math.max(0, m.hp - dmgR);
-            if (m.hp === 0) killMonster(m);
-            else { player.target = m.id; m.aggro = true; }
         }
         return;
     }
@@ -5637,10 +5385,6 @@ function doAttack(m){
         const attackRange = (wItem && wItem.meleeRange) || 1;
         ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:attackRange, crit, dots: procs }));
         player.target = m.id; m.aggro = true;
-    } else {
-        m.hp = Math.max(0, m.hp - dmg);
-        if (m.hp===0) killMonster(m);
-        else { player.target = m.id; m.aggro = true; }
     }
 }
 
@@ -5659,34 +5403,6 @@ function tickRegen(dt){
     // Server broadcasta pstats com hp/mp atualizado — cliente só renderiza.
     // manaBuff (POTION_MP que dá +80 MP em 10s) ainda é local pra UI snappy
     // — não é vetor crítico, e o cap em maxMp é validado server-side a cada pstats.
-    const serverRegenActive = (typeof serverAuthMobs !== 'undefined' && serverAuthMobs) && _wsAuthed;
-    if (!serverRegenActive){
-        // Offline / single-player: regen local (lógica antiga)
-        if (typeof document !== 'undefined' && document.hidden){
-            player.hpRegenTimer = 0;
-            player.mpRegenTimer = 0;
-        } else {
-            player.hpRegenTimer += dt;
-            player.mpRegenTimer += dt;
-            const m = pvpMults();
-            const inPz = playerInSafeZone();
-            const pzHp = inPz ? 4 : 1;
-            const pzMp = inPz ? 3 : 1;
-            const hpInterval = 4000 / (m.regenHp * pzHp);
-            const mpInterval = 2000 / (m.regenMp * pzMp);
-            const talentRegen = player.permaBuffs?.regenBonus || 0;
-            if (player.hpRegenTimer > hpInterval && player.hp < player.maxHp){
-                const heal = 1 + armorHpRegenBonus() + (inPz ? 1 : 0) + talentRegen;
-                player.hp = Math.min(player.maxHp, player.hp + heal);
-                player.hpRegenTimer = 0;
-            }
-            if (player.mpRegenTimer > mpInterval && player.mp < player.maxMp){
-                const mpGain = (inPz ? 2 : 1) + talentRegen;
-                player.mp = Math.min(player.maxMp, player.mp + mpGain);
-                player.mpRegenTimer = 0;
-            }
-        }
-    }
     // Pot de mana: UI-only countdown. MP é aplicado pelo server (tickPlayerRegen) e chega
     // via broadcastPstatsAll, então o cliente NÃO soma local pra evitar conflito com lockdown.
     if (player.manaBuff && player.manaBuff.life > 0){
@@ -6769,8 +6485,6 @@ function mobKilledByServer(m, serverLoot, serverDrops){
             const qty = Math.max(1, item.qty | 0);
             groundItems.push({ id: nextItemId++, x: m.x, y: m.y, type: item.type, qty });
         }
-    } else if (typeof rollDrops === 'function') {
-        rollDrops(m.type, m.x, m.y);
     }
     // T1: XP do mob kill agora é creditado server-side via gainSkillXpServer.
     // Em modo online, server manda `invUpdate { skills }` com skills autoritativas —
@@ -6778,9 +6492,6 @@ function mobKilledByServer(m, serverLoot, serverDrops){
     // Em modo offline (sem ws), fallback continua aplicando local.
     const wKey = player.equipped.weapon;
     const skill = m.skill || (wKey ? ITEMS[wKey].skill : 'Punho');
-    if (!(ws && ws.readyState === 1 && _wsAuthed)){
-        if (player.skills[skill]) gainSkillXp(skill, m.xpReward || 1);
-    }
     log(`<span class="log-kill">☠ ${m.name} morreu! (+${m.xpReward||0} xp ${skill})</span>`);
     addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
     if (player.target === m.id){ player.target = null; /* mantém autoAttack */ }
@@ -7768,52 +7479,6 @@ function completeStage(chainId, stage){
         log(`<span class="log-sys">Entregando: ${stage.name}…</span>`);
         return;
     }
-    // Offline fallback (single-player)
-    if (stage.kind === 'item'){
-        const have = player.inv[stage.type] || 0;
-        const take = Math.min(have, stage.count);
-        player.inv[stage.type] = have - take;
-        if (player.inv[stage.type] <= 0) delete player.inv[stage.type];
-        invSignature = null;
-    } else if (stage.kind === 'multiItem'){
-        for (const [k, n] of Object.entries(stage.items)){
-            const have = player.inv[k] || 0;
-            const take = Math.min(have, n);
-            player.inv[k] = have - take;
-            if (player.inv[k] <= 0) delete player.inv[k];
-        }
-        invSignature = null;
-    }
-    applyReward(stage.reward, chainId);
-    player.questFlags[chainId][stage.id] = true;
-    log(`<span class="log-up">★ Etapa concluída: ${stage.name}</span>`);
-    if (typeof showServerToast === 'function') showServerToast('event', `★ ${stage.name}`, null, 4000);
-    saveState();
-}
-function applyReward(reward, chainId){
-    if (!reward) return;
-    if (reward.gold){
-        player.gold += reward.gold;
-        log(`<span class="log-up">+${reward.gold}g</span>`);
-    }
-    if (reward.xp) for (const [s, v] of Object.entries(reward.xp)){
-        if (player.skills[s]) gainSkillXp(s, v);
-    }
-    if (reward.item) for (const [k, n] of Object.entries(reward.item)){
-        if (!ITEMS[k]) continue;
-        player.inv[k] = (player.inv[k] || 0) + n;
-        log(`<span class="log-up">+${n}× ${ITEMS[k].name}</span>`);
-        invSignature = null;
-    }
-    if (reward.flag){
-        player.flags = player.flags || {};
-        player.flags[reward.flag] = true;
-        log(`<span class="log-sys">⚡ Algo mudou no mundo…</span>`);
-    }
-    if (reward.permaBuff) for (const [k, v] of Object.entries(reward.permaBuff)){
-        player.permaBuffs[k] = (player.permaBuffs[k] || 0) + v;
-        log(`<span class="log-up">💎 Buff permanente: ${k} +${(v*100).toFixed(0)}%</span>`);
-    }
 }
 // Hook: incrementa contagem de mob kill em todas as chains com stage 'mob' ativo
 function notifyMobKillForChains(type){
@@ -7941,27 +7606,6 @@ function claimDaily(id){
         log(`<span class="log-sys">Recebendo recompensa: ${q.name}…</span>`);
         return true;
     }
-    // Offline fallback
-    if (q.goal.kind === 'item'){
-        const have = player.inv[q.goal.type] || 0;
-        const take = Math.min(have, q.goal.count);
-        player.inv[q.goal.type] = have - take;
-        if (player.inv[q.goal.type] <= 0) delete player.inv[q.goal.type];
-        invSignature = null;
-    }
-    if (q.reward.gold){
-        player.gold += q.reward.gold;
-        log(`<span class="log-up">+${q.reward.gold}g</span>`);
-    }
-    if (q.reward.xp) for (const [s, v] of Object.entries(q.reward.xp)){
-        if (player.skills[s]) gainSkillXp(s, v);
-    }
-    player.quests.daily.claimed = player.quests.daily.claimed || [];
-    player.quests.daily.claimed.push(id);
-    log(`<span class="log-up">★ Diária concluída: ${q.name}</span>`);
-    saveState();
-    renderQuests();
-    return true;
 }
 function questById(id){ return QUESTS.find(q => q.id === id); }
 function questProgress(id){
@@ -7987,29 +7631,6 @@ function turnInQuest(id){
         log(`<span class="log-sys">Entregando: ${q.name}…</span>`);
         return true;
     }
-    // Offline fallback (single-player): aplica local como antes.
-    if (q.goal.kind === 'item'){
-        const have = player.inv[q.goal.type] || 0;
-        const take = Math.min(have, q.goal.count);
-        player.inv[q.goal.type] = have - take;
-        if (player.inv[q.goal.type] <= 0) delete player.inv[q.goal.type];
-        invSignature = null;
-    }
-    if (q.reward.gold){
-        player.gold += q.reward.gold;
-        log(`<span class="log-up">+${q.reward.gold}g</span>`);
-    }
-    if (q.reward.xp){
-        for (const [skill, xp] of Object.entries(q.reward.xp)){
-            if (player.skills[skill]) gainSkillXp(skill, xp);
-        }
-    }
-    delete player.quests.active[id];
-    player.quests.completed.push(id);
-    log(`<span class="log-up">★ Quest concluída: ${q.name}</span>`);
-    saveState();
-    renderQuests();
-    return true;
 }
 function notifyMobKilledForQuests(type){
     // Chains narrativas
@@ -8307,38 +7928,6 @@ function sellToShop(itemKey, qtyStr){
 }
 
 // ─── Status Effects (poison/stun/bleed) ─────────────────────────────────────
-function applyPoison(dmgPerTick, ticks, intervalMs, source){
-    // refresh se já está envenenado: pega o maior
-    const existing = player.poison;
-    const totalNew = dmgPerTick * ticks;
-    const totalOld = existing ? existing.dmgPerTick * existing.ticksLeft : 0;
-    if (totalNew >= totalOld){
-        player.poison = {
-            dmgPerTick, ticksLeft: ticks, intervalMs,
-            nextTickAt: Date.now() + intervalMs, source,
-        };
-        log(`<span class="log-dmg">☠ Envenenado por ${source}! (${dmgPerTick} por tick × ${ticks})</span>`);
-        addFloat(player.x, player.y, 'ENVENENADO', '#74d176', true, -28);
-    }
-}
-function applyStun(durationMs, source){
-    const endAt = Date.now() + durationMs;
-    if (!player.stun || player.stun.endAt < endAt){
-        player.stun = { endAt };
-        log(`<span class="log-dmg">⚡ Atordoado por ${source}! (${(durationMs/1000).toFixed(1)}s)</span>`);
-        addFloat(player.x, player.y, 'STUN', '#ffaa20', true, -28);
-    }
-}
-function applyBleed(dmgPerTick, ticks, intervalMs, source){
-    const existing = player.bleed;
-    const totalNew = dmgPerTick * ticks;
-    const totalOld = existing ? existing.dmgPerTick * existing.ticksLeft : 0;
-    if (totalNew >= totalOld){
-        player.bleed = { dmgPerTick, ticksLeft: ticks, intervalMs, nextTickAt: Date.now() + intervalMs, source };
-        log(`<span class="log-dmg">🩸 Sangrando por ${source}!</span>`);
-        addFloat(player.x, player.y, 'SANGRA', '#cc3030', false, -28);
-    }
-}
 function clearStatusEffects(){
     player.poison = null; player.stun = null; player.bleed = null; player.buff = null; player.manaBuff = null;
 }
@@ -8352,40 +7941,6 @@ function tickStatusEffects(){
     // Fase 5: server tickPlayerDots aplica dmg autoritativo + manda playerFloat.
     // Cliente só limpa UI quando server manda playerDotEnd. Stun ainda local
     // (server seta player.stun via playerStun; isStunned auto-expira).
-    const serverDots = (typeof serverAuthMobs !== 'undefined' && serverAuthMobs) && _wsAuthed;
-    if (!serverDots){
-        const now = Date.now();
-        if (player.poison){
-            if (now >= player.poison.nextTickAt){
-                const dmg = player.poison.dmgPerTick;
-                player.hp = Math.max(0, player.hp - dmg);
-                addFloat(player.x, player.y, `-${dmg}`, '#74d176', false);
-                player.poison.ticksLeft--;
-                if (player.poison.ticksLeft <= 0){
-                    player.poison = null;
-                    log(`<span class="log-sys">Veneno passou.</span>`);
-                } else {
-                    player.poison.nextTickAt = now + player.poison.intervalMs;
-                }
-                if (player.hp === 0) playerDie();
-            }
-        }
-        if (player.bleed){
-            if (now >= player.bleed.nextTickAt){
-                const dmg = player.bleed.dmgPerTick;
-                player.hp = Math.max(0, player.hp - dmg);
-                addFloat(player.x, player.y, `-${dmg}`, '#cc3030', false);
-                player.bleed.ticksLeft--;
-                if (player.bleed.ticksLeft <= 0){
-                    player.bleed = null;
-                    log(`<span class="log-sys">Sangramento parou.</span>`);
-                } else {
-                    player.bleed.nextTickAt = now + player.bleed.intervalMs;
-                }
-                if (player.hp === 0) playerDie();
-            }
-        }
-    }
     // Stun: auto-expira em isStunned()
     isStunned();
 }
@@ -10233,14 +9788,6 @@ document.addEventListener('click', e => {
                 log(`<span class="log-sys">Decidindo: ${stage.choices[idx].label}…</span>`);
                 return;
             }
-            // Offline fallback
-            applyReward(stage.choices[idx].reward, chainId);
-            player.questFlags[chainId] = player.questFlags[chainId] || {};
-            player.questFlags[chainId][stage.id] = true;
-            log(`<span class="log-up">★ Decisão: ${stage.choices[idx].label}</span>`);
-            if (typeof showServerToast === 'function') showServerToast('event', `★ ${stage.choices[idx].label}`, null, 5000);
-            saveState();
-            renderChainDialog(NPCS.find(n => n.chain === chainId));
         }
         return;
     }
@@ -10659,10 +10206,6 @@ function castSpell(spellKey){
             if (serverAuthMobs && ws && ws.readyState === 1){
                 ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false }));
                 m.aggro = true;
-            } else {
-                m.hp = Math.max(0, m.hp - dmg);
-                if (m.hp === 0) killMonster(m);
-                else m.aggro = true;
             }
             addFloat(m.x, m.y, `-${dmg}`, sp.glow, true);
             hits++;
@@ -10808,10 +10351,6 @@ function castSpell(spellKey){
         ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false }));
         m.aggro = true;
         log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name}</span>`);
-    } else {
-        m.hp = Math.max(0, m.hp - dmg);
-        log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
-        if (m.hp === 0) killMonster(m);
     }
 }
 
@@ -11490,10 +11029,6 @@ function tickTraining(dt){
         // Offline: aplica direto local como antes.
         if (ws && ws.readyState === 1 && _wsAuthed){
             try { ws.send(JSON.stringify({ t:'trainAttempt', skill: training.skill })); } catch {}
-        } else {
-            player.gold -= training.cost;
-            const xp = trainingXpPerSession(training.skill);
-            gainSkillXp(training.skill, xp);
         }
         addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${training.skill}`, '#ffcc40');
         training.remaining--;
@@ -11619,28 +11154,6 @@ function pickupAt(x, y){
         }
         return;
     }
-    // Single-player offline: aplica direto local (como antes)
-    let pickedAny = false;
-    for (let i = groundItems.length-1; i >= 0; i--){
-        const it = groundItems[i];
-        if (Math.abs(it.x - x) > 1 || Math.abs(it.y - y) > 1) continue;
-        const def = ITEMS[it.type];
-        if (!def){
-            console.warn('[pickup] item desconhecido descartado:', it.type);
-            groundItems.splice(i, 1);
-            continue;
-        }
-        if (def.kind === 'gold'){
-            player.gold += it.qty;
-            log(`<span class="log-xp">+${it.qty} ouro (${player.gold})</span>`);
-        } else {
-            player.inv[it.type] = (player.inv[it.type] || 0) + it.qty;
-            log(`<span class="log-xp">Pegou ${it.qty}× ${def.name}</span>`);
-        }
-        groundItems.splice(i, 1);
-        pickedAny = true;
-    }
-    if (pickedAny) sndPickup();
 }
 
 function eatBestFood(){
@@ -12407,17 +11920,6 @@ function buyTalent(id){
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'talentAlloc', talentId:id })); } catch {}
         log(`<span class="log-sys">Adquirindo ${TALENT_DEFS_CLIENT[id].name}…</span>`);
-    } else {
-        // Offline fallback (single-player)
-        player.talents = player.talents || {};
-        player.talents[id] = true;
-        player.permaBuffs = player.permaBuffs || {};
-        const buffMap = { t_crit:['critBonus',0.05], t_dodge:['dodgeBonus',0.05], t_hp:['hpBonus',30], t_xp:['xpBonus',0.10], t_regen:['regenBonus',1], t_loot:['lootBonus',0.15] };
-        const [k, v] = buffMap[id] || [];
-        if (k) player.permaBuffs[k] = (player.permaBuffs[k] || 0) + v;
-        if (typeof recomputeStats === 'function') recomputeStats();
-        renderTalents();
-        saveState();
     }
 }
 window.openTalents = openTalents;
@@ -13629,7 +13131,6 @@ function loop(ts){
     updateAmbient();
     tickStatusEffects();
     tickTraining(dt);
-    monsters.forEach(m => updateMonster(m, dt));
     // interpolação visual (depois das mudanças de pos)
     tickRender(player, dt);
     monsters.forEach(m => tickRender(m, dt));
