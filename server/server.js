@@ -1251,18 +1251,17 @@ const SERVER_BOOT_TIME = Date.now();
 const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 
 // ─── M4 "As Profundezas" — masmorra aberta vertical ───────────────────────
-// Andar é compartilhado e perigoso (PvP forçado). Pro MVP: 1 andar, sala de
-// caverna 100×100 gerada pelo cliente (determinística). Server só rastreia
-// p.floor + posição + força PvP. Sem mobs ainda (Fase 2).
+// Andar compartilhado e perigoso (PvP forçado). 5 andares (boss no 5). O server
+// é DONO do layout: genDungeonGrid gera cada andar como caverna procedural
+// (cellular automata, determinística por andar) e rastreia p.floor + posição.
 // Entrada: Antro do Minotauro (83,17). Player desce → chega em (50,52) no andar.
-// Hotfix: escadas do andar AFASTADAS da chegada (subida canto NO 43,43 / descida
-// canto NE 57,43) — antes subida 50,50 colava na chegada 50,52 → o player subia
-// sem querer ao andar pro norte. Saída do andar 1 volta pra PZ da cidade (50,50).
+// Fase 2: as escadas do andar (subida/descida/boss) são PROCEDURAIS — escolhidas
+// por genDungeonGrid em chão alcançável (subida perto da chegada e no lado OPOSTO
+// à descida pra não pisar sem querer; descida/boss no ponto mais fundo). A saída
+// do andar 1 volta pra PZ da cidade (50,50).
 const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
 const DUNGEON_RETURN   = { x: 50, y: 50 };   // SAÍDA SEGURA: PZ da cidade (antes 83,18 = no meio dos minotauros = morte ao sair)
-const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada ao entrar/trocar de andar (centro; escadas ficam nos cantos)
-const DUNGEON_EXIT     = { x: 43, y: 43 };   // escada de SUBIDA — canto NO, ~9 tiles da chegada (não pisa sem querer)
-const DUNGEON_DOWN     = { x: 57, y: 43 };   // escada de DESCIDA — canto NE, ~9 tiles da chegada
+const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada FIXA ao entrar/trocar de andar (genDungeonGrid garante clareira aqui)
 const DUNGEON_MAX_FLOOR = 5;                  // Fase 3: 5 andares (boss no 5 — slice 3c)
 const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
 const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c)
@@ -1273,31 +1272,133 @@ const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fundo da sala (longe da ch
 // player → o resto enfileirava. Com 40-60 alcançam até 3 no canto / 5 na borda.
 const DUNGEON_ROOM = { x0: 40, y0: 40, x1: 60, y1: 60 };
 
-// ─── M4 3b: grid do andar (server = DONO do layout) ────────────────────────
-// O server gera o grid WALL/FLOOR de cada andar e o transmite ao cliente no
-// dungeonEnter; mobs/spawn/colisão passam a usar ESTE grid (não o bounding box).
-// Fase 1: layout = a sala cheia 40-60 de sempre → comportamento IDÊNTICO.
-// Fase 2 (próximo deploy): cellular automata por andar. Determinístico por floor;
-// cache efêmero (descartado quando o andar esvazia → regenera igual).
+// ─── M4 3b Fase 2: grid PROCEDURAL do andar (server = DONO do layout) ───────
+// O server gera o grid WALL/FLOOR de cada andar (cellular automata) e o transmite
+// ao cliente no dungeonEnter; mobs/spawn/colisão/escadas usam ESTE grid. Cavernas
+// orgânicas, DETERMINÍSTICAS por andar (mesmo andar = mesmo layout; cache efêmero
+// regenera idêntico). Garante: clareira na chegada, tudo conectado (flood-fill),
+// escadas em chão alcançável (subida PERTO / descida no ponto mais FUNDO). Se a
+// geração sair pequena/desconexa, cai pra sala cheia (= Fase 1) — nunca quebra.
 const DUNGEON_REGION = DUNGEON_ROOM;     // região coberta pelo grid (40..60 = 21×21)
 const dungeonFloors = new Map();          // floor → { region, rows, walkable:Set, floorTiles:[], stairs }
+// PRNG determinístico (mulberry32) — seed pelo andar (+ tentativa de retry).
+function dungeonRng(seed){
+    let s = (seed >>> 0) || 1;
+    return function(){
+        s = (s + 0x6D2B79F5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
 function genDungeonGrid(floor){
     const { x0, y0, x1, y1 } = DUNGEON_REGION;
-    const rows = [], walkable = new Set(), floorTiles = [];
-    for (let y = y0; y <= y1; y++){
+    const W = x1 - x0 + 1, H = y1 - y0 + 1;
+    const sx = DUNGEON_SPAWN.x - x0, sy = DUNGEON_SPAWN.y - y0;   // chegada em coords locais
+    const idx = (lx, ly) => ly * W + lx;
+    const NB4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+    // Gera caverna; cada tentativa muda o seed. wall[i]=1 parede, 0 chão.
+    let wall = null;
+    for (let attempt = 0; attempt < 6 && !wall; attempt++){
+        const rng = dungeonRng((floor * 0x9E3779B1) ^ (attempt * 0x85EBCA77));
+        const w = new Uint8Array(W * H);
+        for (let ly = 0; ly < H; ly++) for (let lx = 0; lx < W; lx++)
+            w[idx(lx, ly)] = (lx === 0 || ly === 0 || lx === W - 1 || ly === H - 1 || rng() < 0.45) ? 1 : 0;
+        // suavização CA (4 passes): vira parede com >=5 vizinhos-parede (fora do grid conta como parede)
+        for (let it = 0; it < 4; it++){
+            const nw = new Uint8Array(W * H);
+            for (let ly = 0; ly < H; ly++) for (let lx = 0; lx < W; lx++){
+                let walls = 0;
+                for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+                    if (!dx && !dy) continue;
+                    const nx = lx + dx, ny = ly + dy;
+                    walls += (nx < 0 || ny < 0 || nx >= W || ny >= H) ? 1 : w[idx(nx, ny)];
+                }
+                nw[idx(lx, ly)] = walls >= 5 ? 1 : 0;
+            }
+            w.set(nw);
+        }
+        // clareira garantida na chegada (raio 2 = sala de pouso, sem mob em cima)
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++){
+            const nx = sx + dx, ny = sy + dy;
+            if (nx > 0 && ny > 0 && nx < W - 1 && ny < H - 1) w[idx(nx, ny)] = 0;
+        }
+        // conectividade: flood-fill de chão a partir da chegada; chão isolado → parede
+        const seen = new Uint8Array(W * H);
+        const stack = [idx(sx, sy)]; seen[idx(sx, sy)] = 1;
+        let reachCount = 1;
+        while (stack.length){
+            const c = stack.pop(), cx = c % W, cy = (c / W) | 0;
+            for (const [dx, dy] of NB4){
+                const nx = cx + dx, ny = cy + dy;
+                if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                const ni = idx(nx, ny);
+                if (!seen[ni] && w[ni] === 0){ seen[ni] = 1; reachCount++; stack.push(ni); }
+            }
+        }
+        for (let i = 0; i < W * H; i++) if (w[i] === 0 && !seen[i]) w[i] = 1;
+        if (reachCount >= 90) wall = w;   // caverna boa (área jogável suficiente)
+    }
+    // Fallback: sala cheia 40-60 (= comportamento Fase 1) se nenhuma tentativa serviu
+    if (!wall){
+        wall = new Uint8Array(W * H);
+        for (let ly = 0; ly < H; ly++) for (let lx = 0; lx < W; lx++)
+            if (lx === 0 || ly === 0 || lx === W - 1 || ly === H - 1) wall[idx(lx, ly)] = 1;
+    }
+
+    // BFS de distância a partir da chegada (escolhe escadas perto/longe)
+    const dist = new Int16Array(W * H).fill(-1);
+    const q = [idx(sx, sy)]; dist[idx(sx, sy)] = 0;
+    for (let head = 0; head < q.length; head++){
+        const c = q[head], cx = c % W, cy = (c / W) | 0;
+        for (const [dx, dy] of NB4){
+            const nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+            const ni = idx(nx, ny);
+            if (wall[ni] === 0 && dist[ni] < 0){ dist[ni] = dist[c] + 1; q.push(ni); }
+        }
+    }
+
+    // rows / walkable / floorTiles (coords GLOBAIS) + acha o ponto mais FUNDO (far)
+    // e os candidatos de SUBIDA (anel perto da chegada, fora da clareira).
+    const chebySp = (gx, gy) => Math.max(Math.abs(gx - DUNGEON_SPAWN.x), Math.abs(gy - DUNGEON_SPAWN.y));
+    const rows = [], walkable = new Set(), floorTiles = [], upCands = [];
+    let far = null, farD = -1;
+    for (let ly = 0; ly < H; ly++){
         let row = '';
-        for (let x = x0; x <= x1; x++){
-            const isFloor = true;          // Fase 1: tudo chão (= sala 40-60 de hoje)
+        for (let lx = 0; lx < W; lx++){
+            const isFloor = wall[idx(lx, ly)] === 0;
             row += isFloor ? '1' : '0';
-            if (isFloor){ walkable.add(x + ',' + y); floorTiles.push({ x, y }); }
+            if (isFloor){
+                const gx = x0 + lx, gy = y0 + ly;
+                walkable.add(gx + ',' + gy); floorTiles.push({ x: gx, y: gy });
+                const d = dist[idx(lx, ly)];
+                if (d >= 0){
+                    if (d > farD){ farD = d; far = { x: gx, y: gy }; }           // descida/boss: mais fundo
+                    const cs = chebySp(gx, gy);
+                    if (cs >= 3 && cs <= 9) upCands.push({ x: gx, y: gy });      // subida: perto, fora da clareira
+                }
+            }
         }
         rows.push(row);
     }
+    if (!far) far = { x: DUNGEON_SPAWN.x, y: DUNGEON_SPAWN.y };
+    // Subida = candidato perto da chegada MAIS DISTANTE da descida (lados opostos →
+    // explorar rumo à descida não passa pela saída; evita "subiu sem querer").
+    let up = null, upScore = -1;
+    for (const c of upCands){
+        const sc = Math.max(Math.abs(c.x - far.x), Math.abs(c.y - far.y));
+        if (sc > upScore){ upScore = sc; up = c; }
+    }
+    if (!up) up = far;   // sala minúscula: degenera
+    const lastFloor = floor >= DUNGEON_MAX_FLOOR;
     const stairs = {
         spawn: { x: DUNGEON_SPAWN.x, y: DUNGEON_SPAWN.y },
-        up:    { x: DUNGEON_EXIT.x,  y: DUNGEON_EXIT.y },
-        down:  floor < DUNGEON_MAX_FLOOR ? { x: DUNGEON_DOWN.x, y: DUNGEON_DOWN.y } : null,
-        boss:  floor === DUNGEON_MAX_FLOOR ? { x: DUNGEON_BOSS_SPAWN.x, y: DUNGEON_BOSS_SPAWN.y } : null,
+        up:    { x: up.x,  y: up.y  },
+        down:  lastFloor ? null : { x: far.x, y: far.y },     // escada de descida = ponto mais fundo
+        boss:  lastFloor ? { x: far.x, y: far.y } : null,     // boss no ponto mais fundo do andar 5
     };
     return { floor, region: { x0, y0, x1, y1 }, rows, walkable, floorTiles, stairs };
 }
@@ -1320,9 +1421,15 @@ function isTransitionTile(floor, x, y){
         return (x === DUNGEON_ENTRANCE.x && y === DUNGEON_ENTRANCE.y) ||
                (x === DUNGEON_RETURN.x   && y === DUNGEON_RETURN.y);
     }
-    return (x === DUNGEON_EXIT.x  && y === DUNGEON_EXIT.y)  ||
-           (x === DUNGEON_DOWN.x  && y === DUNGEON_DOWN.y)  ||
-           (x === DUNGEON_SPAWN.x && y === DUNGEON_SPAWN.y);
+    // Fase 2: escadas são por-andar (procedural). Lê o grid já gerado (não força
+    // geração). Boss NÃO entra aqui de propósito — senão spawnMob bloquearia o
+    // próprio tile do boss; mob comum já evita o boss pelo 3×3 de spawnDungeonMobs.
+    const g = dungeonFloors.get(floor);
+    if (!g) return false;
+    const s = g.stairs;
+    return (s.spawn && x === s.spawn.x && y === s.spawn.y) ||
+           (s.up    && x === s.up.x    && y === s.up.y)    ||
+           (s.down  && x === s.down.x  && y === s.down.y);
 }
 function mobTileOk(m, x, y){
     const f = m.floor || 0;
@@ -5923,7 +6030,8 @@ wss.on('connection', (ws, request) => {
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
             if (cur < 1 || cur >= DUNGEON_MAX_FLOOR) return;   // precisa estar num andar e não no último
-            if (chebyshev(p.x, p.y, DUNGEON_DOWN.x, DUNGEON_DOWN.y) > 1){
+            const sd = getDungeonFloor(cur).stairs.down;       // Fase 2: escada de descida do andar (procedural)
+            if (!sd || chebyshev(p.x, p.y, sd.x, sd.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
                 return;
             }
@@ -5940,7 +6048,8 @@ wss.on('connection', (ws, request) => {
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
             if (cur === 0) return;                      // já está na cidade
-            if (chebyshev(p.x, p.y, DUNGEON_EXIT.x, DUNGEON_EXIT.y) > 1){
+            const su = getDungeonFloor(cur).stairs.up;          // Fase 2: escada de subida do andar (procedural)
+            if (!su || chebyshev(p.x, p.y, su.x, su.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
                 return;
             }
