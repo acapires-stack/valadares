@@ -6520,6 +6520,10 @@ function mobKilledByServer(m, serverLoot, serverDrops){
     log(`<span class="log-kill">☠ ${m.name} morreu! (+${m.xpReward||0} xp ${skill})</span>`);
     addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
     if (player.target === m.id){ player.target = null; /* mantém autoAttack */ }
+    // #3/#6: coleta o loot recém-caído NA HORA da morte. Antes o pickup só rodava ao MOVER
+    // → matar parado deixava tudo no chão. Raio 2 cobre o drop 3×3 do mob no melee; o server
+    // valida a proximidade (chebyshev ≤2). Pro caso ranged (matar de longe) ainda anda até o loot.
+    pickupAt(player.x, player.y);
 }
 
 // ─── Multiplayer authoritative state ─────────────────────────────────────────
