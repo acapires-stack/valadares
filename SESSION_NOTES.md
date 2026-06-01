@@ -7,6 +7,32 @@
 
 ---
 
+## 🎯 Sessão 01/06/2026 (cont. 4) — Battle List (lista de combate clicável) no lugar da janela de alvo
+
+Dono: contra o bot **007** o alvo só aparecia na janela, não no mundo; e com **boss no meio da multidão**
+não dava pra setar ele. Visão dele = a **Battle List do Tibia** (lista de bichos, clica/anda por todos).
+**Descoberta-chave no diagnóstico:** hoje NÃO dá pra clicar num mob pra mirar — o `click` do canvas só
+mirava player e **só em PvP**; mob só por Tab/auto, e o `targetScore` prioriza perto+ferido → o boss (HP
+alto) nunca era pego.
+
+**Decisões do dono:** ordenar por **DISTÂNCIA** (mais perto no topo); **NÃO travar** o alvo (mantém a auto-troca).
+
+**Implementado (tudo em `play.html` — CLIENTE only → deploy só Vercel, sem `/manutencao`, sem reconexão):**
+- `getBattleList()`: mobs visíveis + players PvP visíveis, ordenado por distância (Chebyshev), desempate por id (estável).
+- `renderTargetWidget()` reescrito: a seção **"Combate"** (ex-"Alvo") vira **lista clicável** — dot+nome+barra HP,
+  alvo atual com `.active` + tag AUTO. PZ → zona segura; vazio → "Nenhum inimigo à vista".
+- Listener delegado em `#targetWidget`: clique numa linha mira o inimigo (mob/boss/player).
+- `canvas` click: agora mira **MOB** no tile (fora da PZ), além do player PvP (era só player) → resolve "boss na multidão".
+- `cycleBattleList()`: Espaço (`engage`) e Tab andam pela lista em ordem e dão a volta. (`targetNearest` mantido só no auto-engage passivo.)
+- Marcador de alvo (retângulo vermelho) agora desenhado também no **player remoto alvo** → conserta o "007 só na janela".
+- CSS `.bl-*` novo. ⚠️ As classes `.target-name/.target-hp-bar/.target-meta/.target-auto-tag` ficaram **órfãs** (dead CSS — limpar depois).
+
+**Verificado no preview** (mobs fake via eval): ordem por distância ✓; 5 linhas ✓; **clique no boss → mira o boss**
+(id+aggro) ✓; ciclo anda+wrap ✓; `.active`+AUTO ✓; **boot 0 erros** ✓. **Falta in-game:** anel no player alvo,
+clique-no-mundo, teclas Espaço/Tab, e o feel com mobs reais.
+
+---
+
 ## 🔒 Sessão 01/06/2026 (cont. 3) — loot do mob comum TRAVADO por dano (anti-ninja) + fix DoT-loot
 
 Dono escolheu, de 3 opções, a **"bag travada por dano, depois libera"** (mantém o feel Tibia de loot no

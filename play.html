@@ -434,6 +434,32 @@
             font-weight: 600;
         }
 
+        /* Battle List (lista de combate — alvos visíveis, ordenada por distância) */
+        .battle-list { display:flex; flex-direction:column; gap:2px; padding:2px 0; }
+        .bl-row {
+            display:flex; align-items:center; gap:5px;
+            padding:2px 4px; border:1px solid transparent; border-radius:2px;
+            cursor:pointer; font-size:10.5px; line-height:1.2;
+        }
+        .bl-row:hover { background:#1a1410; border-color:#3a2d10; }
+        .bl-row.active { background:rgba(204,48,48,0.14); border-color:#7a2a1a; }
+        .bl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; box-shadow:0 0 3px rgba(0,0,0,0.6); }
+        .bl-name { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#e8cc7a; }
+        .bl-name.player { color:#ff8060; }
+        .bl-hp {
+            position:relative; width:52px; height:11px; flex-shrink:0;
+            background:#0a0805; border:1px solid #2a200a; border-radius:1px; overflow:hidden;
+        }
+        .bl-hp-fill { position:absolute; left:0; top:0; bottom:0; height:100%; transition:width 0.15s; }
+        .bl-hp-txt {
+            position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+            font-size:8px; color:#fff; text-shadow:0 1px 1px rgba(0,0,0,0.95); font-family:'Consolas',monospace;
+        }
+        .bl-auto {
+            font-size:7.5px; color:#ff8060; background:rgba(204,48,48,0.18);
+            border:1px solid #5a2010; border-radius:2px; padding:0 3px; flex-shrink:0; letter-spacing:0.5px;
+        }
+
         /* PVP widget */
         .pvp-skulls {
             display: flex; gap: 4px;
@@ -1891,9 +1917,9 @@
             <div id="partyWidget"></div>
         </div>
 
-        <!-- Alvo + Online dividem o espaço restante -->
+        <!-- Combate (battle list) + Online dividem o espaço restante -->
         <div class="s-section split-half">
-            <div class="s-label">Alvo</div>
+            <div class="s-label">Combate</div>
             <div id="targetWidget" class="target-empty">Nenhum alvo</div>
         </div>
 
@@ -8600,6 +8626,33 @@ function updateMobileHotbar(){
 }
 
 // ─── Widgets da sidebar direita ─────────────────────────────────────────────
+// Lista de combate (Battle List): mobs visíveis + (em PvP) players inimigos visíveis,
+// ordenados por DISTÂNCIA (mais perto no topo; desempate por id → ordem estável p/ não
+// pular sob você). Cada entry: {id, type:'monster'|'player', ref, name, hp, maxHp, dist, ...}.
+function getBattleList(){
+    const cam = getCamera();
+    const inView = (x,y) => x>=cam.x && x<cam.x+VP_W && y>=cam.y && y<cam.y+VP_H;
+    const out = [];
+    for (const m of monsters){
+        if (!inView(m.x, m.y)) continue;
+        const dist = Math.max(Math.abs(m.x-player.x), Math.abs(m.y-player.y));
+        out.push({ id:m.id, type:'monster', ref:m, name:m.name, hp:m.hp, maxHp:m.maxHp, dist, color:m.color||'#aaa', unique:!!m.unique, level:m.level });
+    }
+    if (player.pvp){
+        for (const idK in remotePlayers){
+            const rp = remotePlayers[idK];
+            if (!rp || !rp.pvp || rp.ghost) continue;
+            if (!inView(rp.x, rp.y)) continue;
+            const dist = Math.max(Math.abs(rp.x-player.x), Math.abs(rp.y-player.y));
+            out.push({ id:parseInt(idK,10), type:'player', ref:rp, name:rp.name||'Player', hp:rp.hp??100, maxHp:rp.maxHp??100, dist, color:'#ff8060', isPlayer:true });
+        }
+    }
+    out.sort((a,b) => a.dist - b.dist || a.id - b.id);
+    return out;
+}
+
+// Painel "Combate" = Battle List clicável. Cada linha mira o inimigo (clique, via
+// listener delegado abaixo); o alvo atual fica destacado. PZ → zona segura; vazio → aviso.
 function renderTargetWidget(){
     const el = document.getElementById('targetWidget');
     if (!el) return;
@@ -8608,41 +8661,26 @@ function renderTargetWidget(){
         el.innerHTML = '<div style="text-align:center;color:#6fb8e8;padding:6px 0;font-size:11px;font-weight:600;letter-spacing:1px">🛡 ZONA SEGURA</div>';
         return;
     }
-    let target = null, isPlayer = false;
-    if (player.target){
-        if (player.targetType === 'player'){
-            const rp = remotePlayers[player.target];
-            if (rp){
-                target = { name: rp.name || 'Player', hp: rp.hp ?? 100, maxHp: rp.maxHp ?? 100 };
-                isPlayer = true;
-            }
-        } else {
-            target = monsters.find(m => m.id === player.target);
-        }
-    }
-    if (!target){
+    const list = getBattleList();
+    if (!list.length){
         el.className = 'target-empty';
-        el.innerHTML = 'Nenhum alvo';
+        el.innerHTML = 'Nenhum inimigo à vista';
         return;
     }
-    el.className = '';
-    const pct = Math.max(0, target.hp) / target.maxHp * 100;
-    const color = pct > 50 ? '#4caf50' : pct > 25 ? '#ffaa00' : '#cc3030';
-    const meta = [];
-    if (player.autoAttack) meta.push('<span class="target-auto-tag">AUTO</span>');
-    const wK = player.equipped.weapon;
-    const wI = wK ? ITEMS[wK] : null;
-    if (wI && wI.ranged){
-        const fl = (player.inv.FLECHA || 0) + (player.inv.FLECHA_PERF || 0);
-        meta.push(`<span style="color:${fl>0?'#cce0a0':'#cc5050'}">▶ ${fl} flechas</span>`);
-    }
-    el.innerHTML = `
-        <div class="target-name ${isPlayer?'player':''}">${isPlayer?'☠ ':''}${escapeHtml(target.name)}</div>
-        <div class="target-hp-bar">
-            <div class="target-hp-fill" style="width:${pct}%;background:${color}"></div>
-            <div class="target-hp-text">${Math.max(0,target.hp)}/${target.maxHp}</div>
-        </div>
-        ${meta.length ? `<div class="target-meta">${meta.join('')}</div>` : ''}`;
+    el.className = 'battle-list';
+    el.innerHTML = list.map(e => {
+        const isCur = player.target === e.id && player.targetType === e.type;
+        const pct = Math.max(0, e.hp) / (e.maxHp || 1) * 100;
+        const color = pct > 50 ? '#4caf50' : pct > 25 ? '#ffaa00' : '#cc3030';
+        const lvl = (e.unique && e.level > 1) ? ` Lv${e.level}` : '';
+        const auto = (isCur && player.autoAttack) ? '<span class="bl-auto">AUTO</span>' : '';
+        return `<div class="bl-row${isCur?' active':''}" data-bid="${e.id}" data-btype="${e.type}">
+            <span class="bl-dot" style="background:${e.color}"></span>
+            <span class="bl-name${e.isPlayer?' player':''}">${e.isPlayer?'☠ ':''}${escapeHtml(e.name)}${lvl}</span>
+            <span class="bl-hp"><span class="bl-hp-fill" style="width:${pct}%;background:${color}"></span><span class="bl-hp-txt">${Math.max(0,e.hp)}/${e.maxHp}</span></span>
+            ${auto}
+        </div>`;
+    }).join('');
 }
 
 function renderPvpWidget(){
@@ -9676,22 +9714,58 @@ function canvasMousePx(e){
 // Event delegation — captura clicks mesmo se HTML for re-renderizado entre press/release
 // Click no canvas: trava em player remoto e liga auto-attack
 canvas.addEventListener('click', e => {
-    if (!player.pvp) return;
     const { cx, cy } = canvasMousePx(e);
     const cam = getCamera();
     const tileX = Math.floor(cx / TS + cam.x);
     const tileY = Math.floor(cy / TS + cam.y);
-    for (const id in remotePlayers){
-        const rp = remotePlayers[id];
-        if (rp.x === tileX && rp.y === tileY){
-            if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
-            player.target = parseInt(id, 10);
-            player.targetType = 'player';
-            player.autoAttack = true;
-            log(`<span class="log-dmg">Alvo PvP: ${escapeHtml(rp.name)} ☠ [AUTO]</span>`);
+    // Mob no tile → mira (fora da PZ, qualquer hora). Resolve "boss no meio da multidão".
+    if (!playerInSafeZone()){
+        const mm = monsters.find(m => m.x === tileX && m.y === tileY);
+        if (mm){
+            player.target = mm.id; player.targetType = 'monster'; player.autoAttack = true; mm.aggro = true;
+            log(`<span class="log-sys">Alvo: ${escapeHtml(mm.name)} [AUTO]</span>`);
+            renderTargetWidget();
             return;
         }
     }
+    // Player PvP no tile (só com PvP ligado)
+    if (player.pvp){
+        for (const id in remotePlayers){
+            const rp = remotePlayers[id];
+            if (rp.x === tileX && rp.y === tileY){
+                if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
+                player.target = parseInt(id, 10);
+                player.targetType = 'player';
+                player.autoAttack = true;
+                log(`<span class="log-dmg">Alvo PvP: ${escapeHtml(rp.name)} ☠ [AUTO]</span>`);
+                renderTargetWidget();
+                return;
+            }
+        }
+    }
+});
+
+// Click numa linha da Battle List (#targetWidget) → mira aquele inimigo (mob/boss/player).
+document.getElementById('targetWidget')?.addEventListener('click', e => {
+    const row = e.target.closest('.bl-row');
+    if (!row) return;
+    const id = parseInt(row.dataset.bid, 10);
+    const type = row.dataset.btype;
+    if (Number.isNaN(id) || !type) return;
+    if (type === 'player'){
+        const rp = remotePlayers[id];
+        if (!rp) return;
+        if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
+    } else if (!monsters.find(m => m.id === id)){
+        return;
+    }
+    player.target = id;
+    player.targetType = type;
+    player.autoAttack = true;
+    if (type === 'monster'){ const mm = monsters.find(m => m.id === id); if (mm) mm.aggro = true; }
+    const nm = type === 'player' ? (remotePlayers[id]?.name || 'Player') : (monsters.find(m => m.id === id)?.name || 'inimigo');
+    log(`<span class="${type==='player'?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(nm)}${type==='player'?' ☠':''} [AUTO]</span>`);
+    renderTargetWidget();
 });
 
 // Right-click no boneco de outro player → menu contextual (Trade / Msg)
@@ -9971,7 +10045,7 @@ document.addEventListener('keydown', e => {
         if (chatTab && !chatTab.classList.contains('active')) chatTab.click();
         document.getElementById('chatInput')?.focus();
     }
-    if (e.key==='Tab'){ e.preventDefault(); targetNearest(true); }
+    if (e.key==='Tab'){ e.preventDefault(); const n = cycleBattleList(); log(n ? `<span class="${n.isPlayer?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(n.name)}${n.isPlayer?' ☠':''} [AUTO]</span>` : '<span class="log-sys">Nenhum inimigo à vista.</span>'); }
     if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
@@ -10059,15 +10133,32 @@ function clearTarget(){
     log('<span class="log-sys">Alvo cancelado.</span>');
 }
 
-// ESPAÇO: prioriza NPC adjacente. Caso contrário, engaja combate.
+// Espaço/Tab: anda pela Battle List em ordem (distância). Sem alvo → pega o 1º (mais
+// perto). Retorna o entry escolhido, ou null se não há inimigo à vista.
+function cycleBattleList(){
+    const list = getBattleList();
+    if (!list.length) return null;
+    let idx = -1;
+    if (player.target != null)
+        idx = list.findIndex(e => e.id === player.target && e.type === player.targetType);
+    const next = list[(idx + 1) % list.length];
+    player.target = next.id;
+    player.targetType = next.type;
+    player.autoAttack = true;
+    if (next.type === 'monster' && next.ref) next.ref.aggro = true;
+    return next;
+}
+
+// ESPAÇO: prioriza NPC adjacente. Caso contrário, anda pela Battle List (igual TAB) e,
+// se o novo alvo for um mob adjacente, já bate (sem alvo → pega o 1º = mais perto).
 function engage(){
     const npc = npcAt(player.x, player.y);
     if (npc){ interactNpc(npc); return; }
-    // Se já tem alvo, SPACE cicla pro próximo (igual TAB). Senão, pega o mais próximo.
-    targetNearest(player.target != null);
-    const m = player.target ? monsters.find(x=>x.id===player.target) : null;
-    if (m && melee(m, player) <= 1 && player.attackTimer <= 0){
-        doAttack(m);
+    const next = cycleBattleList();
+    if (!next){ log('<span class="log-sys">Nenhum inimigo à vista.</span>'); return; }
+    log(`<span class="${next.isPlayer?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(next.name)}${next.isPlayer?' ☠':''} [AUTO]</span>`);
+    if (next.type === 'monster' && next.ref && melee(next.ref, player) <= 1 && player.attackTimer <= 0){
+        doAttack(next.ref);
     }
 }
 
@@ -13695,6 +13786,12 @@ function loop(ts){
                 ctx.fillStyle = '#cc3030';
                 ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
                 ctx.fillText('☠', px+TS/2, py-14);
+            }
+            // marcador de alvo (mesmo retângulo do mob) quando este player remoto é o alvo
+            // atual — conserta o "007 só aparece na janela, não no mundo".
+            if (player.targetType === 'player' && player.target === parseInt(id, 10)){
+                ctx.strokeStyle = '#ff4040'; ctx.lineWidth = 2;
+                ctx.strokeRect(px+2, py+2, TS-4, TS-4);
             }
         }
     }
