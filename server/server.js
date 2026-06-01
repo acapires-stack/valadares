@@ -3727,6 +3727,42 @@ function pvpRangeCapServer(p){
     if (meta && typeof meta.throwable === 'number') return Math.min(8, meta.throwable);
     return 1;
 }
+
+// ─── Combate PvE autoritativo (Deploy 2a) ────────────────────────────────────
+// Mesma filosofia do PvP: o cliente segue mandando amount/range no attackMob,
+// mas o server DERIVA o alcance e CAPA o dano. O número que o player vê continua
+// o roll dele (zero risco de "dano errado"); só o exagero é barrado.
+// Alcance da arma = o máximo que ela alcança legitimamente (ranged/throwable; a
+// lança 1H usa throwable, que cobre o meleeRange dela). Punho/melee puro = 1.
+// Cap 8 (nenhuma arma passa disso; magia de range maior entra pela janela de spell).
+function weaponRangeServer(p){
+    const wKey = p.equipped && p.equipped.weapon;
+    if (!wKey) return 1;
+    const tier = getUpgradeTier(wKey);
+    const meta = ITEM_META[tier.base];
+    if (!meta) return 1;
+    return Math.min(8, Math.max(meta.ranged || 0, meta.throwable || 0, 1));
+}
+// Teto de dano por hit no PvE. Mantém msg.amount; só limita o exagero.
+// Magia (dentro da janela do spellCast): teto pelo dano da magia + Magia/3, folga
+// ×4 (crit×2 · Fúria×1,25 · pvp×1,35 · variância). Arma: teto POR PLAYER, generoso
+// (NUNCA clipa hit legítimo — usa base+forja+skill que o server conhece, com a maior
+// skill relevante; ×4 cobre crit+mults, +7 cobre ammo/variância) mas MUITO mais
+// apertado que o flat 600 pra setup fraco. (Não reusa pvpDamageCapServer base×15+100:
+// aquele clipa build de Distância/forja alta de baixa base — risco de "número errado".)
+function attackDamageCapServer(p, spellWin){
+    if (spellWin){
+        const magia = (p.skills && p.skills.Magia && p.skills.Magia.val) || 10;
+        return (spellWin.damage + Math.floor(magia / 3)) * 4 + 50;
+    }
+    const wKey = p.equipped && p.equipped.weapon;
+    const tier = wKey ? getUpgradeTier(wKey) : { base: null, plus: 0 };
+    const base = (tier.base && ITEM_META[tier.base] && ITEM_META[tier.base].base) || 2;
+    const meleeSk = (p.skills && p.skills[weaponSkillOf(p)] && p.skills[weaponSkillOf(p)].val) || 10;
+    const distSk  = (p.skills && p.skills['Distância'] && p.skills['Distância'].val) || 10;
+    const skillBonus = Math.floor(Math.max(meleeSk, distSk) / 3);
+    return (base + tier.plus * 5 + skillBonus + 7) * 4 + 40;
+}
 function armorHpRegenServer(p){
     if (!p.equipped) return 0;
     let total = 0;
@@ -5662,11 +5698,11 @@ wss.on('connection', (ws, request) => {
             // Fase 5: server aplica manaCost + heal authoritative pra magia Cura.
             // Outras magias só têm manaCost (dmg é processado em attackMob/aoe).
             const SPELLS_META = {
-                FIREBALL: { manaCost: 18 },
+                FIREBALL: { manaCost: 18, range: 8, damage: 12 },
                 HEAL:     { manaCost: 12, healBase: 30 },
                 HEAL_GRUPO: { manaCost: 60, healBase: 25, groupRange: 8 },
-                RAIO:     { manaCost: 10 },
-                EXORI:    { manaCost: 25 },
+                RAIO:     { manaCost: 10, range: 10, damage: 8 },
+                EXORI:    { manaCost: 25, range: 3, damage: 11 },   // range = aoeRange
                 TAUNT:    { manaCost: 8 },
                 FURY:     { manaCost: 20 },
             };
@@ -5683,6 +5719,11 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             p.mp = Math.max(0, (p.mp ?? 0) - sp.manaCost);
+            // Deploy 2a: magia de DANO abre uma janela curta que autoriza o attackMob
+            // seguinte a usar o range/cap da MAGIA (não o da arma). A mana já foi paga e
+            // validada acima → não dá pra forjar range de magia sem castar de verdade.
+            // Exori (AoE) dispara vários attackMob no mesmo tick → a janela de 1s cobre o burst.
+            if (sp.range) p._spellWindow = { range: sp.range, damage: sp.damage || 12, until: now + 1000 };
             // Cura em grupo — AoE de heal, alcança QUALQUER player em raio groupRange
             // (não precisa party). Cura o caster + outros players. Skipa bots e ghosts.
             let healedAmount = 0;
@@ -6101,11 +6142,16 @@ wss.on('connection', (ws, request) => {
             if (p._lastHitMob.size > 64){
                 for (const [mid, t] of p._lastHitMob){ if (nowAtk - t > 5000) p._lastHitMob.delete(mid); }
             }
-            const range = msg.range || 1;
-            if (chebyshev(p.x, p.y, m.x, m.y) > range) return;
+            const range = msg.range || 1;   // compat: só alimenta o flag isRanged do XP abaixo
+            // Deploy 2a — alcance AUTORITATIVO: deriva do equip (arma) ou da janela de magia
+            // (spellCast pago). Ignora o msg.range na distância → fecha o "range:99" (bater de
+            // qualquer canto do mapa), pra ataque de arma E pra magia forjada.
+            const spellWin = (p._spellWindow && Date.now() < p._spellWindow.until) ? p._spellWindow : null;
+            const serverRange = spellWin ? spellWin.range : weaponRangeServer(p);
+            if (chebyshev(p.x, p.y, m.x, m.y) > serverRange) return;
             p.lastAttackAt = Date.now();   // quebra mini-PZ do NPC por 2s
-            // LOS — só valida pra ranged (range > 1); melee adjacente passa sem check
-            if (range > 1 && !hasLineOfSight(p.x, p.y, m.x, m.y)) return;
+            // LOS — só valida pra alcance > 1 (ranged/magia); melee adjacente passa sem check
+            if (serverRange > 1 && !hasLineOfSight(p.x, p.y, m.x, m.y)) return;
             // ─── N3 fase 2: consumo de munição/lança autoritativo ────
             // Munição (arco/besta): cliente indica ammoKey usado; server decrementa.
             // Se cliente mentiu (não tinha), rejeita o ataque.
@@ -6140,10 +6186,11 @@ wss.on('connection', (ws, request) => {
                 broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
             }
             if (invDirty) sendInvUpdate(p, { reason:'ammo' });
-            // teto de dano por hit: MAX_HIT_DMG cobre o maior hit legítimo (~372) com
-            // folga. Antes era (hp do mob + 50) → permitia one-shot de QUALQUER mob,
-            // inclusive o boss 5000hp (amount:5050 = 1 golpe + 100% do loot por dano).
-            const dmg = Math.max(1, Math.min(msg.amount | 0, MAX_HIT_DMG));
+            // teto de dano por hit — Deploy 2a: POR PLAYER (arma/skill ou magia na janela),
+            // não mais o flat 600. Mantém o msg.amount (o número que o player vê é o roll
+            // dele); só barra o exagero (arma fraca mandando 600 → capada no real dela).
+            // MAX_HIT_DMG fica como teto absoluto de segurança (>372 legítimo → nunca clipa).
+            const dmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
             m.hp = Math.max(0, m.hp - dmg);
             // M4: rastreia dano por player em bosses unique — pro loot ser
             // distribuído por contribuição (anti-ninja). Só unique (sem overhead
