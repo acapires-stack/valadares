@@ -12104,15 +12104,20 @@ function renderTalents(){
             const maxed = rank >= max;
             const canBuy = !maxed && avail > 0;
             const rankTag = rank > 0 ? `<span style="color:#74d176;font-size:10px;font-weight:700;white-space:nowrap;margin-left:6px">RANK ${rank}/${max}</span>` : '';
+            // .chest-btn é width:100% (full-width nos baús/loja). Aqui ele vive num flex-row
+            // ao lado da descrição (flex:1) — sem override, o width:100% vira flex-basis 100%
+            // e ESPREME a descrição até o min-content (nome quebra, texto vira filete). Trava o
+            // botão em largura de conteúdo (width:auto + flex-shrink:0), min-width só pra alinhar.
+            const btnStyle = 'margin:0;padding:5px 12px;font-size:12px;width:auto;flex-shrink:0;white-space:nowrap;min-width:120px;text-align:center';
             const btn = maxed
-                ? `<span style="color:#74d176;font-size:11px;font-weight:700">✓ MÁX (${max}/${max})</span>`
+                ? `<span style="color:#74d176;font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap;text-align:center;min-width:120px">✓ MÁX (${max}/${max})</span>`
                 : canBuy
-                    ? `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px" onclick="buyTalent('${id}')">${rank>0?'subir rank':'comprar'} (1 pt)</button>`
-                    : `<button class="chest-btn" style="margin:0;padding:5px 12px;font-size:12px;opacity:0.4;cursor:not-allowed" disabled>sem pontos</button>`;
+                    ? `<button class="chest-btn" style="${btnStyle}" onclick="buyTalent('${id}')">${rank>0?'subir rank':'comprar'} (1 pt)</button>`
+                    : `<button class="chest-btn" style="${btnStyle};opacity:0.4;cursor:not-allowed" disabled>sem pontos</button>`;
             return `
                 <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid #1a1408;${rank>0 ? 'background:#0a1a0a' : ''}">
-                    <span style="font-size:22px;width:32px;text-align:center">${def.icon}</span>
-                    <div style="flex:1">
+                    <span style="font-size:22px;width:32px;flex-shrink:0;text-align:center">${def.icon}</span>
+                    <div style="flex:1;min-width:0">
                         <div style="color:${rank>0 ? '#74d176' : '#ffd060'};font-weight:600;font-size:13px">${def.name}${rankTag}</div>
                         <div style="color:#888;font-size:11px;margin-top:2px">${def.desc}</div>
                     </div>
