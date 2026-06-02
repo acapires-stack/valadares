@@ -7,6 +7,18 @@
 
 ---
 
+## 🐛 Sessão 02/06/2026 — RESPEC recalcula do ZERO (subtração deixava resíduo do bug de inflação)
+
+Dono (manhã, pós-deploy do `fab98ca` + 1 respec): "respec não resetou tudo" — Crítico/Esquiva ainda em **50/50**.
+Causa: o respec **SUBTRAÍA** `rank×buff`, mas o permaBuffs vinha **INFLADO** pelo rank-colapso (acima do que os
+ranks justificavam) → sobrava resíduo, e re-alocar somou por cima. **Fix:** o respec agora **RECALCULA o
+permaBuffs do ZERO** — zera os talentos e reconstrói SÓ as **auras de quest** (não-talento): `xpBonus` via flag
+`flag_vendedor_killed`; `dodgeBonus` via posse do item `AURA_VIDENTE`. Crit/Esquiva voltam ao base (talento=0).
+Server-only → /manutencao. **Dono respeca de novo pós-deploy** (claude é char de teste, sem problema). Vale pra
+todos (preserva auras de quest no respec). `node --check` ✓.
+
+---
+
 ## 🐛 Sessão 01/06/2026 (cont. 8) — FIX: ranks de talento colapsavam pra 1 a cada save
 
 Dono: "só consigo ter 1 talento no nível 5, quando escolho outro reseta." **Bug que EU introduzi na Fase 1**

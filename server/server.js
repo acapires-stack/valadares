@@ -5972,15 +5972,16 @@ wss.on('connection', (ws, request) => {
             if (!owned.length){ sendTo(id, { t:'serverMsg', level:'warn', text:'Nada pra redistribuir.' }); return; }
             const COST = 5000;
             if ((p.gold || 0) < COST){ sendTo(id, { t:'serverMsg', level:'warn', text:`Respec custa ${COST}g — você não tem.` }); return; }
-            p.permaBuffs = p.permaBuffs || {};
-            for (const tid of owned){
-                const def = TALENT_DEFS[tid];
-                const rank = Math.max(0, Math.floor(Number(p.talents[tid]) || 0));
-                for (const [k, v] of Object.entries(def.buff)){
-                    p.permaBuffs[k] = Math.max(0, (p.permaBuffs[k] || 0) - v * rank);
-                }
-                delete p.talents[tid];
-            }
+            // RECALCULA o permaBuffs do ZERO (NÃO subtrai — a subtração deixava resíduo quando o
+            // permaBuffs vinha INFLADO pelo bug do rank-colapso). Zera os talentos e reconstrói o
+            // permaBuffs SÓ com as auras de QUEST (não-talento), re-derivadas das fontes:
+            //   • xpBonus +5% → flag flag_vendedor_killed (Vendedor de Almas)
+            //   • dodgeBonus +5% → posse do item AURA_VIDENTE (Aura do Vidente / Madame Crepúsculo)
+            for (const tid of owned) delete p.talents[tid];
+            const perma = {};
+            if (p.flags && p.flags.flag_vendedor_killed) perma.xpBonus = 0.05;
+            if (hasInv(p, 'AURA_VIDENTE', 1) || (p.equipped && p.equipped.cosmetic === 'AURA_VIDENTE')) perma.dodgeBonus = 0.05;
+            p.permaBuffs = perma;
             p.gold -= COST; syncGoldRank(p.name, p.gold);
             recomputeMaxStatsServer(p);
             broadcastPstatsAll(p);
