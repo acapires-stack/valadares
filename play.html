@@ -13293,8 +13293,17 @@ function applySaveData(d){
         if (typeof d.email === 'string') player.email = d.email.slice(0, 120); else player.email = '';
         if (Array.isArray(d.seasonsWon)) player.seasonsWon = d.seasonsWon.slice(0, 24); else player.seasonsWon = [];
         if (d.talents && typeof d.talents === 'object'){
+            // Preserva o RANK (multi-rank) — espelha o load do server no join. O bug antigo
+            // fazia `player.talents[tid] = true`, COLAPSANDO todo rank pra 1 a cada login
+            // (gêmeo client-side do fab98ca, que só pegou os caminhos do server). Sintoma:
+            // relogar "resetava" os talentos pro rank 1 e mostrava pontos fantasma no modal.
             player.talents = {};
-            for (const tid of Object.keys(d.talents)) if (d.talents[tid]) player.talents[tid] = true;
+            for (const tid of Object.keys(d.talents)){
+                const def = TALENT_DEFS_CLIENT[tid];
+                if (!def) continue;   // id desconhecido (talento removido do jogo): ignora
+                const v = Math.max(0, Math.min(def.max || 1, Math.floor(Number(d.talents[tid]) || 0)));  // legado boolean true → 1
+                if (v > 0) player.talents[tid] = v;
+            }
         } else { player.talents = {}; }
         if (Array.isArray(d.visited) && d.visited.length === M_W*M_H){
             player.visited = new Uint8Array(d.visited);
