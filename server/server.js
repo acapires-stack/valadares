@@ -4858,17 +4858,10 @@ wss.on('connection', (ws, request) => {
             }
             if (data.questFlags && typeof data.questFlags === 'object') p.questFlags = data.questFlags;
             if (data.flags && typeof data.flags === 'object') p.flags = data.flags;
-            if (data.permaBuffs && typeof data.permaBuffs === 'object') p.permaBuffs = data.permaBuffs;
-            // M5: talents hidratam aqui APENAS se ainda não temos no server.
-            // Como talents agora viram permaBuffs ao serem alocados via handler,
-            // se o save do cliente trouxer talents que o server desconhece, ainda
-            // confiamos pra compat — server lockdown FULL fica pra fase futura.
-            if (data.talents && typeof data.talents === 'object'){
-                p.talents = p.talents || {};
-                for (const tid of Object.keys(data.talents)){
-                    if (TALENT_DEFS[tid] && data.talents[tid]) p.talents[tid] = true;
-                }
-            }
+            // talents + permaBuffs são SERVER-AUTORITATIVOS (talentAlloc/talentRespec/quests).
+            // saveUpload NÃO os toca — o cliente envia por compat, mas o server IGNORA e persiste
+            // os valores VIVOS (lockdown abaixo). 🐛 FIX: o loop antigo fazia `p.talents[tid]=true`,
+            // COLAPSANDO os ranks multi-rank pra 1 a cada save ("rankeio um talento e o outro reseta").
             // Server é autoritativo em maxHp/maxMp/hp/mp (lockdown N3 fase 5).
             // Cliente às vezes envia undefined (race conditions entre devices) — força
             // os valores do server pra não persistir lixo no acc.save.
@@ -4893,6 +4886,10 @@ wss.on('connection', (ws, request) => {
             if (p.skills && typeof p.skills === 'object') data.skills = p.skills;
             if (p.equipped && typeof p.equipped === 'object') data.equipped = p.equipped;
             if (p.chests && typeof p.chests === 'object') data.chests = p.chests;
+            // talents (RANKS) + permaBuffs: persiste os do SERVER (vivos), não os do cliente —
+            // senão o save do cliente reverteria os ranks (era a causa do "reseta ao escolher outro").
+            if (p.talents && typeof p.talents === 'object') data.talents = p.talents;
+            if (p.permaBuffs && typeof p.permaBuffs === 'object') data.permaBuffs = p.permaBuffs;
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
@@ -4983,7 +4980,10 @@ wss.on('connection', (ws, request) => {
                 if (acc.save.talents && typeof acc.save.talents === 'object'){
                     p.talents = {};
                     for (const tid of Object.keys(acc.save.talents)){
-                        if (TALENT_DEFS[tid] && acc.save.talents[tid]) p.talents[tid] = true;
+                        if (!TALENT_DEFS[tid]) continue;
+                        // preserva o RANK (multi-rank); legado boolean `true` → Number(true)=1
+                        const v = Math.max(0, Math.min(TALENT_DEFS[tid].max || 1, Math.floor(Number(acc.save.talents[tid]) || 0)));
+                        if (v > 0) p.talents[tid] = v;
                     }
                 }
                 // M6 Tinturaria: hidrata tintas autoritativas do save.

@@ -7,6 +7,26 @@
 
 ---
 
+## 🐛 Sessão 01/06/2026 (cont. 8) — FIX: ranks de talento colapsavam pra 1 a cada save
+
+Dono: "só consigo ter 1 talento no nível 5, quando escolho outro reseta." **Bug que EU introduzi na Fase 1**
+(esqueci de atualizar 2 lugares que tratavam talento como boolean tem/não-tem):
+- **saveUpload** (`server.js`): a cada upload do save do cliente (periódico), `p.talents[tid] = true` **COLAPSAVA o
+  rank vivo pra 1** → ranquear um talento "resetava" os outros.
+- **login** (re-join): mesma coisa (`= true`) ao relogar.
+Colateral: rank colapsa mas permaBuffs não → pontos "voltavam" (re-rank) e o buff inflava (capado no sanitize).
+
+**Fix (server-only):** (1) saveUpload NÃO mexe mais em talents/permaBuffs (são server-autoritativos); persiste os
+VIVOS do server no lockdown (`data.talents=p.talents`, `data.permaBuffs=p.permaBuffs`). (2) login restaura o RANK
+numérico (clamp `[0,max]`; legado boolean→1). Verificado: `node --check` + clamp isolado (true→1, 5→5, 99→5, undef→0).
+
+⚠️ **server/** → /manutencao.** **Recuperação pós-deploy:** o save do dono ficou com ranks colapsados (1s) +
+permaBuffs acumulado (capado, inofensivo). Depois de deployar: **dono faz RESPEC (5000g)** → refunda + re-aloca
+limpo. (Slate 100% limpo: admin pode zerar talents/permaBuffs.) LIÇÃO: ao mudar a forma de um dado (boolean→rank),
+varrer TODOS os pontos de persistência (alloc/save/login/sanitize), não só o handler principal.
+
+---
+
 ## 🎨 Sessão 01/06/2026 (cont. 7) — 2 tweaks de UI (pedido do dono): banner de forja + inventário mais largo
 
 Cliente-only (`play.html`).
