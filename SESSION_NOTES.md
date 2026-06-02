@@ -7,6 +7,23 @@
 
 ---
 
+## 🎨 Sessão 01/06/2026 (cont. 7) — 2 tweaks de UI (pedido do dono): banner de forja + inventário mais largo
+
+Cliente-only (`play.html`).
+1. **Banner de resultado na bancada:** o float ✨/💥 aparecia no player **ATRÁS da modal opaca** → dono não via
+   sucesso/falha. Agora banner verde/vermelho no topo do `forjaPanel` (`_forgeResult`, expira 30s) + fundo do
+   `#craftModal` mais transparente (0.82→**0.55**).
+2. **Inventário mais largo:** `#invSidebar` 165→**200px** + qty vira **"×N"** com `flex-shrink:0` (não corta em
+   item forjado de nome longo) e nome com `min-width:0` (wrap gracioso).
+
+Verificado no preview: inv 200px, bancada rgba .55, "×7" renderiza, `renderForja` sem erro, **boot 0 erros**.
+
+⚠️ **Estes 2 são cliente-only**, MAS os commits de talento (Fase 1+2, server) já estão **à frente e não-pushados**
+→ não dá pra pushar só o cliente sem levar o server junto (Railway redeploy = risco de wipe com dono online).
+Então **tudo (UI + Fase 1 + Fase 2) sobe junto no próximo `/manutencao`**.
+
+---
+
 ## ⚜️ Sessão 01/06/2026 (cont. 6) — Talentos Fase 2: 7 talentos novos (QoL+Poder) + respec
 
 Dono escolheu **"QoL + Poder, todos abertos"** (sem gating). Add 7 talentos (a 🕯️ **Segunda Chance**/reviver
