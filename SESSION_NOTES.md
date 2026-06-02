@@ -7,6 +7,35 @@
 
 ---
 
+## ⚜️ Sessão 01/06/2026 (cont. 6) — Talentos Fase 2: 7 talentos novos (QoL+Poder) + respec
+
+Dono escolheu **"QoL + Poder, todos abertos"** (sem gating). Add 7 talentos (a 🕯️ **Segunda Chance**/reviver
+fica pra **Fase 2b** — mexe nos caminhos de morte/loot, sensível, não atropelar). Modelo aditivo multi-rank (max 5).
+
+**Novos (TALENT_DEFS server + TALENT_DEFS_CLIENT cliente):** 🔮 Pacto Arcano (`manaBonus` +20), 👟 Passos Leves
+(`moveSpeedBonus` +4%), 🍀 Sortudo (`rareLuck` +10%), ⚔️ Golpe Pesado (`damageBonus` +4%), 💥 Precisão Mortal
+(`critDmgBonus` +0.1), 🩸 Vampirismo (`lifesteal` +3%), 🛡️ Pele de Pedra (`dmgReduction` +3%).
+
+**Hooks server:** `recomputeMaxStatsServer` (+manaBonus); `attackDamageCapServer` abre folga **POR PLAYER**
+(`(1+dmgB)*(1+critB/2)`) pra não clipar Golpe/Precisão (sem talento = cap igual ao de antes); `tickAI` aplica
+`dmgReduction` (teto seg. 50%); `attackMob` aplica `lifesteal` (cura % do dano, cap maxHp, broadcastPstats);
+`rollLoot(mobType, luck)` boosta chance de **ITENS** (gold inalterado), threaded nos 2 call sites. Sanitize
+auto-capa as keys novas (allowlist = `max×buff`).
+
+**Hooks cliente:** `recomputeStats` (+manaBonus); `playerMoveDelay` (×(1−moveSpeedBonus)); `applyAttackMults`
+(×(1+damageBonus)); helper `critMultPlayer()` (2 + critDmgBonus) nos **5 spots de crit** (melee/ranged/lança/magia/PvP).
+
+**Respec** (server `talentRespec` + botão "↺ Redistribuir tudo (5000g)"): **SUBTRAI** a contribuição de cada
+talento do permaBuffs (preserva auras de quest — sem derive do zero), zera ranks, devolve pontos, cobra 5000g.
+
+**Verificado preview:** critMult 2.3, dano 100→120, move mais rápido, mana +60, **13 talentos compráveis**,
+respec aparece/funciona; **boot 0 erros**. `node --check` server ✓; `vm.Script` cliente ✓. (Hooks de combate
+— lifesteal/redução/luck/cap/respec — só testáveis **in-game**.)
+
+⚠️ **server/** → deploy `/manutencao` + logout.** **Fase 2b:** Segunda Chance (reviver — caminhos de morte).
+
+---
+
 ## ⚜️ Sessão 01/06/2026 (cont. 5) — Talentos MULTI-RANK (Fase 1 da expansão de endgame)
 
 Dono aprovou a proposta de expandir os talentos (o print dele mostrou os 6 talentos single-rank **todos

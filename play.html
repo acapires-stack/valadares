@@ -4467,6 +4467,7 @@ function applyAttackMults(dmg){
     let mult = pvpMults().dmg;
     if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
     mult *= buffMult().dmg;
+    mult *= (1 + ((player.permaBuffs && player.permaBuffs.damageBonus) || 0));   // Golpe Pesado (t_power)
     return Math.floor(dmg * mult);
 }
 // Delay efetivo de ataque considerando atkSpd da arma equipada (upgrades +N)
@@ -4501,8 +4502,9 @@ function recomputeStats(){
     const sumSkills = Object.values(s).reduce((a,sk) => a + sk.val, 0);
     const above = Math.max(0, sumSkills - 60);
     const hpExtra = (player.permaBuffs?.hpBonus || 0);   // talent t_hp
+    const mpExtra = (player.permaBuffs?.manaBonus || 0);  // talent t_mana (Pacto Arcano)
     const newMaxHp = 100 + above + hpExtra;
-    const newMaxMp = 100 + Math.floor(above / 2);
+    const newMaxMp = 100 + Math.floor(above / 2) + mpExtra;
     const dHp = newMaxHp - player.maxHp;
     const dMp = newMaxMp - player.maxMp;
     if (dHp > 0){ player.hp += dHp; hpFlash = 600; }
@@ -5194,6 +5196,9 @@ function playerSpeedBonusFromBoots(){
 }
 function playerMoveDelay(){
     let d = player.moveDelay - playerSpeedBonusFromSkills() - playerSpeedBonusFromBoots();
+    // Passos Leves (t_speed): +% velocidade de movimento permanente
+    const _msb = (player.permaBuffs && player.permaBuffs.moveSpeedBonus) || 0;
+    if (_msb > 0) d = Math.floor(d * (1 - _msb));
     // PvP speed multiplier
     if (player.selos > 0 || player.highlander){
         const m = pvpMults();
@@ -5230,6 +5235,8 @@ function playerCritChance(){
     // base+pvp teto 25%; mérito (talento/quest) soma POR CIMA (teto seg. 50%)
     return Math.min(0.50, Math.min(0.25, skillBased + (mults ? mults.crit : 0)) + perma);
 }
+// Precisão Mortal (t_critdmg): crit base ×2 + critDmgBonus por rank (×2 → ×2.5 no máx).
+function critMultPlayer(){ return 2 + ((player.permaBuffs && player.permaBuffs.critDmgBonus) || 0); }
 function playerDodgeChance(){
     const skillBased = 0.015 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;   // base 1.5% + 0.6%/ponto
     const perma = player.permaBuffs?.dodgeBonus || 0;   // mérito: talento/aura de quest (+5%)
@@ -5278,7 +5285,7 @@ function throwSpear(){
         let dmg = wItem.throwDmg + Math.floor(sk.val/3) + Math.floor(Math.random()*5) - 2;
         dmg = Math.max(1, dmg);
         const crit = Math.random() < playerCritChance();
-        if (crit) dmg *= 2;
+        if (crit) dmg *= critMultPlayer();
         addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#cce0a0', crit, crit ? -10 : 0);
         log(`<span class="log-dmg">${crit?'★ ':''}${wItem.name} arremessada: -${dmg} em ${m.name}</span>`);
         gainSkillXpLocal('Distância', 1);
@@ -5383,7 +5390,7 @@ function doAttack(m){
         const baseR = wItem.base + (arrow.ammoBonus || 0) + Math.floor(sk.val/3);
         let dmgR = Math.max(1, baseR + Math.floor(Math.random()*5) - 2);
         const critR = Math.random() < playerCritChance();
-        if (critR) dmgR *= 2;
+        if (critR) dmgR *= critMultPlayer();
         dmgR = Math.floor(dmgR * buffMult().dmg);
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
         if (critR) sndCrit(); else sndHit();
@@ -5429,7 +5436,7 @@ function doAttack(m){
     const base = w.base + Math.floor(sk.val/3);
     let dmg = Math.max(1, base + Math.floor(Math.random()*5) - 2);
     const crit = Math.random() < playerCritChance();
-    if (crit) dmg *= 2;
+    if (crit) dmg *= critMultPlayer();
     dmg = applyAttackMults(dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
     if (crit) sndCrit(); else sndHit();
@@ -6052,6 +6059,13 @@ function handleMP(msg){
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, '⚜ ' + def.name, '#ffd060', true, -20);
             }
+            if (typeof recomputeStats === 'function') recomputeStats();
+            if (document.getElementById('talentsModal')?.style.display === 'flex') renderTalents();
+            saveState();
+        }
+        // Respec: server devolveu talents={} + permaBuffs ajustados (auras de quest preservadas).
+        if (msg.talentRespec && msg.talentRespec.ok){
+            log('<span class="log-up">↺ Talentos redistribuídos — pontos devolvidos (−5000g).</span>');
             if (typeof recomputeStats === 'function') recomputeStats();
             if (document.getElementById('talentsModal')?.style.display === 'flex') renderTalents();
             saveState();
@@ -10479,7 +10493,7 @@ function castSpell(spellKey){
     let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
     dmg = Math.max(1, dmg);
     const crit = Math.random() < playerCritChance();
-    if (crit) dmg *= 2;
+    if (crit) dmg *= critMultPlayer();
     dmg = Math.floor(dmg * buffMult().dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : sp.glow, true, crit ? -10 : 0);
     projectiles.push({
@@ -11143,7 +11157,7 @@ function pvpAttackPlayer(targetId){
     const base = w.base + Math.floor(sk.val/3);
     let dmg = Math.max(1, base + Math.floor(Math.random()*5) - 2);
     const crit = Math.random() < playerCritChance();
-    if (crit) dmg *= 2;
+    if (crit) dmg *= critMultPlayer();
     dmg = applyAttackMults(dmg);
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
@@ -12018,6 +12032,13 @@ const TALENT_DEFS_CLIENT = {
     t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills (por rank)', icon:'📚', cat:'Utilidade', max:5 },
     t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen (por rank)', icon:'✚', cat:'Defensivo', max:5 },
     t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob (por rank)',  icon:'💰', cat:'Utilidade', max:5 },
+    t_mana:     { name:'Pacto Arcano',    desc:'+20 mana máxima (por rank)',             icon:'🔮', cat:'Utilidade', max:5 },
+    t_speed:    { name:'Passos Leves',    desc:'+4% velocidade de movimento (por rank)', icon:'👟', cat:'Utilidade', max:5 },
+    t_luck:     { name:'Sortudo',         desc:'+10% chance de drop de itens (por rank)', icon:'🍀', cat:'Utilidade', max:5 },
+    t_power:    { name:'Golpe Pesado',    desc:'+4% dano corpo a corpo (por rank)',      icon:'⚔️', cat:'Ofensivo', max:5 },
+    t_critdmg:  { name:'Precisão Mortal', desc:'crítico +10% mais forte (por rank)',     icon:'💥', cat:'Ofensivo', max:5 },
+    t_lifesteal:{ name:'Vampirismo',      desc:'cura 3% do dano causado (por rank)',     icon:'🩸', cat:'Ofensivo', max:5 },
+    t_armor:    { name:'Pele de Pedra',   desc:'+3% redução de dano (por rank)',         icon:'🛡️', cat:'Defensivo', max:5 },
 };
 function totalLevelsAbove10(){
     if (!player.skills) return 0;
@@ -12053,7 +12074,8 @@ function renderTalents(){
     const totalLv = totalLevelsAbove10();
     summary.innerHTML = `
         <div style="font-size:18px;color:#ffd060;font-weight:bold">${avail} ponto${avail===1?'':'s'} disponíve${avail===1?'l':'is'}</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">${used}/${earned} usados · ${totalLv} níveis totais (próximo ponto em ${10 - (totalLv % 10)} levels)</div>`;
+        <div style="font-size:11px;color:#888;margin-top:4px">${used}/${earned} usados · ${totalLv} níveis totais (próximo ponto em ${10 - (totalLv % 10)} levels)</div>
+        ${used > 0 ? `<button class="chest-btn" style="margin-top:8px;padding:4px 12px;font-size:11px;background:#2a1810;border-color:#5a3a1a" onclick="respecTalents()">↺ Redistribuir tudo (5000g)</button>` : ''}`;
     const byCat = { Ofensivo:[], Defensivo:[], Utilidade:[] };
     for (const [id, def] of Object.entries(TALENT_DEFS_CLIENT)){
         byCat[def.cat].push({ id, def });
@@ -12093,9 +12115,19 @@ function buyTalent(id){
         log(`<span class="log-sys">${rank>0?'Subindo':'Adquirindo'} ${def.name}…</span>`);
     }
 }
+function respecTalents(){
+    if (talentPointsUsed() < 1) return;
+    if ((player.gold || 0) < 5000){ log('<span class="log-sys">Respec custa 5000g — você não tem.</span>'); return; }
+    if (!confirm('Redistribuir TODOS os talentos? Devolve os pontos e custa 5000g.')) return;
+    if (ws && ws.readyState === 1 && _wsAuthed){
+        try { ws.send(JSON.stringify({ t:'talentRespec' })); } catch {}
+        log('<span class="log-sys">Redistribuindo talentos…</span>');
+    }
+}
 window.openTalents = openTalents;
 window.closeTalents = closeTalents;
 window.buyTalent = buyTalent;
+window.respecTalents = respecTalents;
 
 // ─── Modal de Guild (membros + leader + online) ──────────────────────────
 function openGuildModal(info){

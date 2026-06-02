@@ -862,8 +862,9 @@ function recomputeMaxStatsServer(p){
     }
     const above = Math.max(0, sumSkills - 60);
     const hpExtra = (p.permaBuffs?.hpBonus) || 0;
+    const mpExtra = (p.permaBuffs?.manaBonus) || 0;   // talent t_mana (Pacto Arcano)
     const newMaxHp = 100 + above + hpExtra;
-    const newMaxMp = 100 + Math.floor(above / 2);
+    const newMaxMp = 100 + Math.floor(above / 2) + mpExtra;
     const oldMaxHp = p.maxHp || 100;
     const oldMaxMp = p.maxMp || 100;
     const dHp = newMaxHp - oldMaxHp;
@@ -1118,12 +1119,14 @@ const LOOT = {
         ['PART_FOGO', 0.10, 1, 1], ['PART_TROVAO', 0.10, 1, 1],
     ],
 };
-function rollLoot(mobType){
+function rollLoot(mobType, luck){
     const table = LOOT[mobType];
     if (!table) return [];
+    const lk = Math.max(0, luck || 0);   // Sortudo (t_luck): + chance relativa de ITENS (gold inalterado)
     const out = [];
     for (const [type, chance, qMin, qMax] of table){
-        if (Math.random() < chance){
+        const c = type === 'GOLD' ? chance : Math.min(0.95, chance * (1 + lk));
+        if (Math.random() < c){
             const qty = qMin + Math.floor(Math.random() * (qMax - qMin + 1));
             out.push({ type, qty });
         }
@@ -2116,7 +2119,8 @@ function tickAI(){
                     const raw = mobCrit ? m.dmg * 2 : m.dmg;
                     const def = totalDefenseServer(target);
                     const reduction = def > 0 ? def / (def + 30) : 0;
-                    const actual = Math.max(1, Math.round(raw * (1 - reduction)));
+                    const tRed = Math.min(0.5, (target.permaBuffs && target.permaBuffs.dmgReduction) || 0);   // Pele de Pedra (teto seg. 50%)
+                    const actual = Math.max(1, Math.round(raw * (1 - reduction) * (1 - tRed)));
                     if ((target.hp ?? 100) > 0){
                         target.hp = Math.max(0, (target.hp ?? 100) - actual);
                         broadcastPstatsAll(target);
@@ -2444,6 +2448,15 @@ const TALENT_DEFS = {
     t_xp:    { name:'Aprendizado Acelerado', desc:'+10% XP em todas as skills', buff:{ xpBonus:    0.10 }, max:5 },
     t_regen: { name:'Recuperação Rápida',    desc:'+1 HP/MP por tick de regen', buff:{ regenBonus: 1    }, max:5 },
     t_loot:  { name:'Caçador de Tesouros',   desc:'+15% gold de drops de mob',  buff:{ lootBonus:  0.15 }, max:5 },
+    // Fase 2 — endgame (QoL + Poder). Multi-rank max 5, sem gating. Buffs server-autoritativos,
+    // capados no sanitize (allowlist = max_rank × buff). crit/dodge/dano seguem tetos no cálculo.
+    t_mana:     { name:'Pacto Arcano',     desc:'+20 mana máxima',             buff:{ manaBonus:      20   }, max:5 },
+    t_speed:    { name:'Passos Leves',     desc:'+4% velocidade de movimento', buff:{ moveSpeedBonus: 0.04 }, max:5 },
+    t_luck:     { name:'Sortudo',          desc:'+10% chance de drop de itens',buff:{ rareLuck:       0.10 }, max:5 },
+    t_power:    { name:'Golpe Pesado',     desc:'+4% dano corpo a corpo',      buff:{ damageBonus:    0.04 }, max:5 },
+    t_critdmg:  { name:'Precisão Mortal',  desc:'crítico +10% mais forte',     buff:{ critDmgBonus:   0.10 }, max:5 },
+    t_lifesteal:{ name:'Vampirismo',       desc:'cura 3% do dano causado',     buff:{ lifesteal:      0.03 }, max:5 },
+    t_armor:    { name:'Pele de Pedra',    desc:'+3% redução de dano',         buff:{ dmgReduction:   0.03 }, max:5 },
 };
 function totalLevelsAbove10(p){
     if (!p.skills) return 0;
@@ -3663,7 +3676,7 @@ function handleMobDeath(m, killerId){
     }
     monsters.delete(m.id);
     const killer = players.get(killerId);
-    const loot = rollLoot(m.type);
+    const loot = rollLoot(m.type, (killer && killer.permaBuffs && killer.permaBuffs.rareLuck) || 0);
     const isBoss = !!m.unique;
     // M5 talent t_loot (+15% gold) — espelha o caminho do attackMob.
     if (!isBoss && killer){
@@ -3886,7 +3899,12 @@ function attackDamageCapServer(p, spellWin){
     const meleeSk = (p.skills && p.skills[weaponSkillOf(p)] && p.skills[weaponSkillOf(p)].val) || 10;
     const distSk  = (p.skills && p.skills['Distância'] && p.skills['Distância'].val) || 10;
     const skillBonus = Math.floor(Math.max(meleeSk, distSk) / 3);
-    return (base + tier.plus * 5 + skillBonus + 7) * 4 + 40;
+    // Fase 2: o cap precisa acomodar Golpe Pesado (+dano) e Precisão Mortal (crit ×2→×2.x),
+    // senão o hit legítimo buffado seria clipado. Folga POR PLAYER → sem talento, cap = o de antes.
+    const dmgB  = (p.permaBuffs && p.permaBuffs.damageBonus)  || 0;
+    const critB = (p.permaBuffs && p.permaBuffs.critDmgBonus) || 0;
+    const slack = (1 + dmgB) * (1 + critB / 2);
+    return Math.round(((base + tier.plus * 5 + skillBonus + 7) * 4 + 40) * slack);
 }
 function armorHpRegenServer(p){
     if (!p.equipped) return 0;
@@ -5945,6 +5963,36 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
+        // Respec: zera os ranks e DEVOLVE os pontos, cobrando gold. Subtrai a contribuição de
+        // cada talento do permaBuffs — preserva auras de QUEST (não recalcula do zero, sem risco
+        // de apagar dodgeBonus da Aura do Vidente / xpBonus do Vendedor).
+        if (msg.t === 'talentRespec') {
+            p.talents = p.talents || {};
+            const owned = Object.keys(p.talents).filter(t => TALENT_DEFS[t] && Math.floor(Number(p.talents[t]) || 0) > 0);
+            if (!owned.length){ sendTo(id, { t:'serverMsg', level:'warn', text:'Nada pra redistribuir.' }); return; }
+            const COST = 5000;
+            if ((p.gold || 0) < COST){ sendTo(id, { t:'serverMsg', level:'warn', text:`Respec custa ${COST}g — você não tem.` }); return; }
+            p.permaBuffs = p.permaBuffs || {};
+            for (const tid of owned){
+                const def = TALENT_DEFS[tid];
+                const rank = Math.max(0, Math.floor(Number(p.talents[tid]) || 0));
+                for (const [k, v] of Object.entries(def.buff)){
+                    p.permaBuffs[k] = Math.max(0, (p.permaBuffs[k] || 0) - v * rank);
+                }
+                delete p.talents[tid];
+            }
+            p.gold -= COST; syncGoldRank(p.name, p.gold);
+            recomputeMaxStatsServer(p);
+            broadcastPstatsAll(p);
+            sendInvUpdate(p, {
+                talents: p.talents,
+                permaBuffs: p.permaBuffs,
+                goldDelta:{ amount: -COST, reason:'respec' },
+                talentRespec:{ ok:true },
+            });
+            return;
+        }
+
         // ─── M6: Cassino slot machine (gold sink) ──────────────────────────
         // RNG + payout autoritativos no server. Cliente envia { amount },
         // server valida 100-10000g, debita aposta, rola 3 símbolos e credita
@@ -6332,6 +6380,12 @@ wss.on('connection', (ws, request) => {
             // MAX_HIT_DMG fica como teto absoluto de segurança (>372 legítimo → nunca clipa).
             const dmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
             m.hp = Math.max(0, m.hp - dmg);
+            // Vampirismo (t_lifesteal): cura % do dano causado (cap maxHp); sincroniza HP via pstats.
+            const _ls = (p.permaBuffs && p.permaBuffs.lifesteal) || 0;
+            if (_ls > 0 && dmg > 0 && (p.hp ?? 0) < (p.maxHp ?? 0)){
+                p.hp = Math.min(p.maxHp, (p.hp || 0) + Math.max(1, Math.round(dmg * _ls)));
+                broadcastPstatsAll(p);
+            }
             // Anti-ninja: rastreia dano por player em TODOS os mobs — o dono do loot
             // (boss = direto no inv; mob comum = bag no chão) é quem deu mais dano.
             // damageBy some quando o mob é deletado na morte (sem leak).
@@ -6397,7 +6451,7 @@ wss.on('connection', (ws, request) => {
                 monsters.delete(m.id);
                 // Loot autoritativo: server roda LOOT e mantém drops no chão.
                 // Cada item ganha id server-side; broadcast spawn pra TODOS verem.
-                const loot = rollLoot(m.type);
+                const loot = rollLoot(m.type, (p.permaBuffs && p.permaBuffs.rareLuck) || 0);
                 // M5 talent t_loot: +15% gold de drops. Aplica antes do spawn.
                 const lootBonus = p.permaBuffs?.lootBonus || 0;
                 if (lootBonus > 0){
