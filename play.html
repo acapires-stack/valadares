@@ -4484,6 +4484,9 @@ function effectiveAttackDelay(){
     // (1 - spd) usada pela arma e pelo movimento (playerMoveDelay), então empilha igual.
     const bspd = (player.buff && player.buff.spd) || 0;
     if (bspd > 0) d = d * (1 - bspd);
+    // Mãos Rápidas (t_atkspeed): +% velocidade de ataque permanente (mesma fórmula da arma/Fúria).
+    const asb = (player.permaBuffs && player.permaBuffs.atkSpdBonus) || 0;
+    if (asb > 0) d = d * (1 - asb);
     return Math.max(150, Math.floor(d));
 }
 function activeWeapon(){
@@ -12051,6 +12054,7 @@ const TALENT_DEFS_CLIENT = {
     t_critdmg:  { name:'Precisão Mortal', desc:'crítico +10% mais forte (por rank)',     icon:'💥', cat:'Ofensivo', max:5 },
     t_lifesteal:{ name:'Vampirismo',      desc:'cura 3% do dano causado (por rank)',     icon:'🩸', cat:'Ofensivo', max:5 },
     t_armor:    { name:'Pele de Pedra',   desc:'+3% redução de dano (por rank)',         icon:'🛡️', cat:'Defensivo', max:5 },
+    t_atkspeed: { name:'Mãos Rápidas',    desc:'+3% velocidade de ataque (por rank)',    icon:'⚡', cat:'Ofensivo', max:5 },
 };
 function totalLevelsAbove10(){
     if (!player.skills) return 0;

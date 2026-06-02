@@ -17,6 +17,12 @@ permaBuffs do ZERO** — zera os talentos e reconstrói SÓ as **auras de quest*
 Server-only → /manutencao. **Dono respeca de novo pós-deploy** (claude é char de teste, sem problema). Vale pra
 todos (preserva auras de quest no respec). `node --check` ✓.
 
+**+ ⚡ Mãos Rápidas (8º talento da Fase 2, Ofensivo)** — pedido do dono ("vel. de ataque não tem talento?").
+atk speed +3%/rank (max 5 = +15%; `atkSpdBonus` no `effectiveAttackDelay`, mesma fórmula da arma/Fúria, def nos
+2 lados, sanitize auto-capa). Calibrado: pior caso (forja+5 0.15 × Fúria 0.25 × talento 0.15 = **433ms**) fica
+ACIMA do cap de cadência do server (**400ms**) → não desperdiça rank. Verificado no preview: 800→680ms com +15%,
+aparece no painel, 14 talentos compráveis. **Sobe JUNTO com o respec fix no mesmo /manutencao.**
+
 ---
 
 ## 🐛 Sessão 01/06/2026 (cont. 8) — FIX: ranks de talento colapsavam pra 1 a cada save

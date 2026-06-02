@@ -2457,6 +2457,7 @@ const TALENT_DEFS = {
     t_critdmg:  { name:'Precisão Mortal',  desc:'crítico +10% mais forte',     buff:{ critDmgBonus:   0.10 }, max:5 },
     t_lifesteal:{ name:'Vampirismo',       desc:'cura 3% do dano causado',     buff:{ lifesteal:      0.03 }, max:5 },
     t_armor:    { name:'Pele de Pedra',    desc:'+3% redução de dano',         buff:{ dmgReduction:   0.03 }, max:5 },
+    t_atkspeed: { name:'Mãos Rápidas',     desc:'+3% velocidade de ataque',    buff:{ atkSpdBonus:    0.03 }, max:5 },
 };
 function totalLevelsAbove10(p){
     if (!p.skills) return 0;
