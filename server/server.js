@@ -2105,6 +2105,13 @@ function tickAI(){
                     }
                     continue;
                 }
+                // 🕯️ Segunda Chance: 2s de imunidade pós-revive — anima o swing mas sem dano.
+                if ((target._invulnUntil || 0) > now){
+                    if (target.ws && target.ws.readyState === 1){
+                        try { target.ws.send(JSON.stringify({ t:'mobHit', mobId: m.id, amount: 0, actual: 0, immune: true })); } catch {}
+                    }
+                    continue;
+                }
                 // Esquiva do player (espelha cliente). ANTES só rodava no cliente offline →
                 // esquiva morta em PvE; o player tomava dano "esquivando". Agora vale aqui.
                 if (Math.random() < playerDodgeChanceServer(target)){
@@ -2122,18 +2129,26 @@ function tickAI(){
                     const tRed = Math.min(0.5, (target.permaBuffs && target.permaBuffs.dmgReduction) || 0);   // Pele de Pedra (teto seg. 50%)
                     const actual = Math.max(1, Math.round(raw * (1 - reduction) * (1 - tRed)));
                     if ((target.hp ?? 100) > 0){
-                        target.hp = Math.max(0, (target.hp ?? 100) - actual);
-                        broadcastPstatsAll(target);
-                        // Fase 5: DoT/stun authoritative no server (rollAttackerStatus
-                        // do cliente fica como no-op quando online).
-                        applyAttackerStatus(target, m.type);
-                        // Morreu → o cliente respawna no spawn (playerDie manda pos pro
-                        // outro lado do mapa). Libera 1 pos não-adjacente (anti-teleporte).
-                        if (target.hp === 0){
-                            target._posGraceUntil = Date.now() + 60000;
-                            // #5: morrer na masmorra devolve pra cidade. Sem isto o floor
-                            // não zerava → renascia colado no boss e o AI do andar seguia.
-                            if ((target.floor || 0) > 0) returnPlayerToTown(target, target.id);
+                        const newHp = Math.max(0, (target.hp ?? 100) - actual);
+                        // 🕯️ Segunda Chance: se o golpe MATARIA, tenta reviver no lugar (só PvE).
+                        // Reviveu → hp já setado + pstats no helper; NÃO aplica DoT/stun, NÃO morre,
+                        // NÃO returnPlayerToTown (mantém o player na masmorra = preserva a run).
+                        if (newHp === 0 && trySecondChance(target)){
+                            /* reviveu — pula toda a sequência de morte */
+                        } else {
+                            target.hp = newHp;
+                            broadcastPstatsAll(target);
+                            // Fase 5: DoT/stun authoritative no server (rollAttackerStatus
+                            // do cliente fica como no-op quando online).
+                            applyAttackerStatus(target, m.type);
+                            // Morreu → o cliente respawna no spawn (playerDie manda pos pro
+                            // outro lado do mapa). Libera 1 pos não-adjacente (anti-teleporte).
+                            if (target.hp === 0){
+                                target._posGraceUntil = Date.now() + 60000;
+                                // #5: morrer na masmorra devolve pra cidade. Sem isto o floor
+                                // não zerava → renascia colado no boss e o AI do andar seguia.
+                                if ((target.floor || 0) > 0) returnPlayerToTown(target, target.id);
+                            }
                         }
                     }
                     if (target.ws.readyState === 1){
@@ -2458,6 +2473,11 @@ const TALENT_DEFS = {
     t_lifesteal:{ name:'Vampirismo',       desc:'cura 3% do dano causado',     buff:{ lifesteal:      0.03 }, max:5 },
     t_armor:    { name:'Pele de Pedra',    desc:'+3% redução de dano',         buff:{ dmgReduction:   0.03 }, max:5 },
     t_atkspeed: { name:'Mãos Rápidas',     desc:'+3% velocidade de ataque',    buff:{ atkSpdBonus:    0.03 }, max:5 },
+    // Fase 2b — 🕯️ Segunda Chance: revive 1× ao morrer (SÓ PvE), +20% HP por rank, cooldown 30min.
+    // buff:{} de propósito — o efeito é gated pelo RANK (p.talents.t_secondchance), NÃO por permaBuffs;
+    // o loop do talentAlloc sobre def.buff vira no-op (não suja permaBuffs nem a allowlist do sanitize).
+    // Server-autoritativo: intercepta a morte em tickAI/tickPlayerDots via trySecondChance (abaixo).
+    t_secondchance: { name:'Segunda Chance', desc:'Revive 1× ao morrer (+20% HP/rank, recarga 30min)', buff:{}, max:5 },
 };
 function totalLevelsAbove10(p){
     if (!p.skills) return 0;
@@ -2478,6 +2498,31 @@ function talentPointsUsed(p){
     return n;
 }
 function talentPointsAvailable(p){ return Math.max(0, talentPointsEarned(p) - talentPointsUsed(p)); }
+
+// ─── Segunda Chance (Fase 2b) — revive server-autoritativo ───────────────────
+// Quando o player MORRERIA por PvE (mob/veneno), se tem o talento e está fora de
+// cooldown: seta hp = rank×20% do maxHp em vez de 0, marca cooldown (timestamp
+// absoluto que persiste no save, padrão dailyClaim) e dá 2s de imunidade. Os
+// caminhos de morte (tickAI/tickPlayerDots) chamam trySecondChance ANTES de matar.
+// PvP (pvpAttack/processPkDeathServerSide) NÃO usa isto — decisão "só PvE".
+const SECOND_CHANCE_CD_MS     = 30 * 60 * 1000;   // 30min de cooldown
+const SECOND_CHANCE_INVULN_MS = 2000;             // 2s sem tomar dano pós-revive
+function secondChanceReady(p){
+    const rank = Math.floor(Number(p.talents && p.talents.t_secondchance) || 0);
+    return rank >= 1 && !((p.scReadyAt || 0) > Date.now());
+}
+function trySecondChance(p){            // true = reviveu (o caller PULA a morte)
+    if (!secondChanceReady(p)) return false;
+    const rank = Math.floor(Number(p.talents.t_secondchance) || 0);
+    p.hp = Math.max(1, Math.ceil((p.maxHp || 100) * Math.min(100, rank * 20) / 100));   // %HP por rank em INTEIRO (evita drift de float: 3*0.20=0.6000…1 → daria 301 em vez de 300)
+    p.scReadyAt    = Date.now() + SECOND_CHANCE_CD_MS;   // seta JÁ → anti-duplo-proc no mesmo tick (AoE/enxame)
+    p._invulnUntil = Date.now() + SECOND_CHANCE_INVULN_MS;
+    if (p.ws && p.ws.readyState === 1){
+        try { p.ws.send(JSON.stringify({ t:'secondChance', hp:p.hp, readyAt:p.scReadyAt, rank })); } catch {}
+    }
+    broadcastPstatsAll(p);   // outros (mesmo andar) veem o hp revivido
+    return true;
+}
 
 // Helpers de bump duplo (ranking all-time + season). Sempre usar em vez de
 // mexer direto em r.mobKills/pkKills/bossKills/gold pra manter os dois em sync.
@@ -2863,6 +2908,12 @@ function sanitizeSave(data, ownerName){
             if (v === 0){ delete data.talents[k]; }
             else if (v !== data.talents[k]){ log(`talents.${k}`, data.talents[k], v); data.talents[k] = v; }
         }
+    }
+    // 🕯️ Segunda Chance: cooldown é timestamp absoluto — aceita só número ≥ 0 (defesa p/ backup de restore).
+    if ('scReadyAt' in data){
+        const v = Number(data.scReadyAt);
+        if (!isFinite(v) || v < 0){ delete data.scReadyAt; }
+        else if (v !== data.scReadyAt){ data.scReadyAt = Math.floor(v); }
     }
     // Stats — cap quantidade de keys + valores (evita DoS por save gigante de mobKills fake)
     if (data.stats && typeof data.stats === 'object'){
@@ -3930,7 +3981,8 @@ function pvpMultsServer(p){
 function broadcastPstatsAll(p){
     const payload = JSON.stringify({
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
-        cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null
+        cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null,
+        scReadyAt: p.scReadyAt || 0   // 🕯️ Segunda Chance: cliente mostra cooldown no modal
     });
     const f = p.floor || 0;   // M4: só players do mesmo andar veem os stats
     for (const other of players.values()){
@@ -4052,6 +4104,7 @@ function tickPlayerDots(){
     for (const p of players.values()){
         if (!p.dots || !p.dots.length) continue;
         if (!p.ws || p.ws.readyState !== 1) continue;
+        if ((p._invulnUntil || 0) > now) continue;   // 🕯️ Segunda Chance: imunidade pós-revive — sem tick de DoT
         if ((p.hp ?? 100) <= 0){ p.dots.length = 0; continue; }
         let hpChanged = false;
         for (let i = p.dots.length - 1; i >= 0; i--){
@@ -4078,6 +4131,14 @@ function tickPlayerDots(){
                 d.nextTickAt = now + d.intervalMs;
             }
             if (p.hp === 0){
+                // 🕯️ Segunda Chance (só PvE): se o DoT letal NÃO veio de um player vivo, tenta reviver.
+                // (Hoje todo DoT em player vem de mob → sempre PvE; o guard é à prova de futuro p/ DoT de PvP.)
+                const dotFromPlayer = d.byId && players.has(d.byId);
+                if (!dotFromPlayer && trySecondChance(p)){
+                    p.dots.length = 0;   // limpa DoTs ao reviver — clean slate
+                    hpChanged = true;
+                    break;
+                }
                 // Morte por DoT → cliente respawna no spawn. Libera 1 pos não-adjacente.
                 p._posGraceUntil = Date.now() + 60000;
                 if ((p.floor || 0) > 0) returnPlayerToTown(p, p.id);   // #5: DoT na masmorra também devolve pra cidade
@@ -4894,6 +4955,7 @@ wss.on('connection', (ws, request) => {
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
+            data.scReadyAt = p.scReadyAt || 0;   // 🕯️ Segunda Chance: cooldown persiste (server-autoritativo, timestamp absoluto)
             // ★ TRAVA ANTI-WIPE: nunca deixa um save vazio-default sobrescrever um acc.save
             // populado. Foi ISSO que zerou contas — uma sessão fantasma (p.* vazio, ex.: 2ª
             // conexão no reconnect do deploy) gravava {gold:0, inv:{}, skills base} por cima
@@ -4975,6 +5037,7 @@ wss.on('connection', (ws, request) => {
                 }
                 // Anti-replay de daily: hidrata SÓ do save server-side (nunca de data do saveUpload)
                 if (acc.save.dailyClaim && typeof acc.save.dailyClaim === 'object') p.dailyClaim = acc.save.dailyClaim;
+                if (typeof acc.save.scReadyAt === 'number') p.scReadyAt = acc.save.scReadyAt;   // 🕯️ Segunda Chance cooldown
                 if (acc.save.questFlags && typeof acc.save.questFlags === 'object') p.questFlags = acc.save.questFlags;
                 if (acc.save.flags && typeof acc.save.flags === 'object') p.flags = acc.save.flags;
                 if (acc.save.permaBuffs && typeof acc.save.permaBuffs === 'object') p.permaBuffs = acc.save.permaBuffs;
@@ -5538,6 +5601,13 @@ wss.on('connection', (ws, request) => {
                     broadcastMsg('warn', `💀 ${p.name} acabou com o corpo de ${tgt.name}!`);
                     players.delete(msg.targetId);
                     broadcast(null, { t:'leave', id: msg.targetId });
+                }
+                return;
+            }
+            // 🕯️ Segunda Chance: 2s de imunidade pós-revive bloqueia até dano PvP (janela curta).
+            if (!isBotTarget && (tgt._invulnUntil || 0) > Date.now()){
+                if (tgt.ws && tgt.ws.readyState === 1){
+                    try { tgt.ws.send(JSON.stringify({ t:'pvpHit', from:id, fromName:p.name, amount, actual:0 })); } catch {}
                 }
                 return;
             }
@@ -6397,6 +6467,8 @@ wss.on('connection', (ws, request) => {
             // - Distância (range>1 OU ammo OU throwSpear): +1 em Distância
             const isRanged = range > 1 || typeof msg.ammoKey === 'string' || !!msg.throwSpear;
             gainSkillXpServer(p, isRanged ? 'Distância' : weaponSkillOf(p), 1);
+            // Build de escudo (1-mão + escudo): o Escudo treina junto POR HIT, mesmo XP (pedido do dono).
+            if (hasShieldEquipped(p)) gainSkillXpServer(p, 'Escudo', 1);
             // Skills atualizadas — só envia se não vai morrer (mobKill abaixo envia skills no payload)
             if (m.hp > 0) sendSkillsOnly(p, 'attackHit');
             // DoT procs (veneno/sangra/fogo de armas +N) — cliente enviou no msg.dots
@@ -6477,8 +6549,12 @@ wss.on('connection', (ws, request) => {
                 // T1: XP authoritative na skill da arma equipada
                 const skillUsed = weaponSkillOf(p);
                 gainSkillXpServer(p, skillUsed, m.xp || 1);
+                // Build de escudo (1-mão + escudo): o Escudo ganha o MESMO XP de kill que a arma (pedido do dono).
+                // 2H e escudo são mutuamente exclusivos → escudo equipado ⇒ arma 1-mão.
+                const shieldXp = hasShieldEquipped(p) ? (m.xp || 1) : 0;
+                if (shieldXp > 0) gainSkillXpServer(p, 'Escudo', shieldXp);
                 // killer recebe mobKill (boss → loot:[] pro cliente não criar drops)
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1 });
+                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp });
                 // Envia skills atualizadas (autoritativo)
                 sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)

@@ -5648,6 +5648,19 @@ function handleMP(msg){
         sendJoinNow();
         return;
     }
+    if (msg.t === 'secondChance'){
+        // 🕯️ Segunda Chance procou no servidor (só PvE): reviveu NO LUGAR com % HP.
+        // Server é autoritativo no hp (manda pstats junto); aqui é só hp imediato + FX + cooldown.
+        // Como o hp vem > 0, o handler de pstats NÃO dispara playerDie() (sem tela de morte/penalidade).
+        if (typeof msg.hp === 'number') player.hp = msg.hp;
+        if (typeof msg.readyAt === 'number') player.scReadyAt = msg.readyAt;
+        log('<span class="log-up">🕯️ ━━ Segunda Chance — você sobreviveu! ━━</span>');
+        if (typeof addFloat === 'function') addFloat(player.x, player.y, '🕯️ SEGUNDA CHANCE', '#ffcc40', true, -10);
+        if (typeof sndLevelUp === 'function') sndLevelUp();
+        if (typeof showServerToast === 'function') showServerToast('event', '🕯️ Segunda Chance! Você renasceu no lugar.');
+        if (document.getElementById('talentsModal')?.style.display === 'flex' && typeof renderTalents === 'function') renderTalents();
+        return;
+    }
     if (msg.t === 'versionTooOld'){
         // Server diz: seu cliente Electron é antigo demais. Mostra modal full-screen
         // bloqueando login até o user baixar a nova versão (auto-update foi pouco
@@ -5824,6 +5837,7 @@ function handleMP(msg){
             if (typeof msg.maxHp === 'number') player.maxHp = msg.maxHp;
             if (typeof msg.mp === 'number') player.mp = msg.mp;
             if (typeof msg.maxMp === 'number') player.maxMp = msg.maxMp;
+            if (typeof msg.scReadyAt === 'number') player.scReadyAt = msg.scReadyAt;   // 🕯️ Segunda Chance: cooldown p/ o modal
             if (wasAlive && player.hp === 0 && !player._dying) playerDie();
             return;
         }
@@ -6455,6 +6469,8 @@ function handleMP(msg){
             const fakeMob = { id: msg.mobId, type: msg.mobType, name: def.name, x: msg.x, y: msg.y, xpReward: msg.xpGained || msg.xp, skill: msg.skill };
             mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null);
         }
+        // Build de escudo: o servidor também creditou Escudo (mesmo XP) — loga pra confirmar.
+        if (msg.shieldXp > 0) log(`<span class="log-up">+${msg.shieldXp} xp Escudo</span>`);
     } else if (msg.t === 'mobMissing'){
         // mob que tentei atacar já morreu/sumiu
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
@@ -6471,6 +6487,9 @@ function handleMP(msg){
             log(`<span class="log-sys">🌀 Você esquivou de ${defName}!</span>`);
             return;
         }
+        // 🕯️ Imune (grace de connect / janela de 2s da Segunda Chance): server manda actual:0+immune.
+        // Não anima dano nem toca som — evita spam de "-0" durante a imunidade.
+        if (msg.immune) return;
         let actual = (typeof msg.actual === 'number') ? msg.actual : null;
         if (actual == null){
             const amount = msg.dmg | 0;
@@ -12055,6 +12074,7 @@ const TALENT_DEFS_CLIENT = {
     t_lifesteal:{ name:'Vampirismo',      desc:'cura 3% do dano causado (por rank)',     icon:'🩸', cat:'Ofensivo', max:5 },
     t_armor:    { name:'Pele de Pedra',   desc:'+3% redução de dano (por rank)',         icon:'🛡️', cat:'Defensivo', max:5 },
     t_atkspeed: { name:'Mãos Rápidas',    desc:'+3% velocidade de ataque (por rank)',    icon:'⚡', cat:'Ofensivo', max:5 },
+    t_secondchance: { name:'Segunda Chance', desc:'Revive 1× ao morrer (PvE): +20% HP por rank. Recarrega em 30min.', icon:'🕯️', cat:'Defensivo', max:5 },
 };
 function totalLevelsAbove10(){
     if (!player.skills) return 0;
@@ -12114,12 +12134,20 @@ function renderTalents(){
                 : canBuy
                     ? `<button class="chest-btn" style="${btnStyle}" onclick="buyTalent('${id}')">${rank>0?'subir rank':'comprar'} (1 pt)</button>`
                     : `<button class="chest-btn" style="${btnStyle};opacity:0.4;cursor:not-allowed" disabled>sem pontos</button>`;
+            // 🕯️ Segunda Chance é o único talento com ESTADO (cooldown). Mostra pronto/recarga.
+            // (Estático: atualiza ao reabrir o modal ou quando chega pstats/secondChance.)
+            const scInfo = (id === 't_secondchance' && rank > 0)
+                ? ((player.scReadyAt || 0) > Date.now()
+                    ? `<div style="color:#c89050;font-size:10px;margin-top:2px">⏳ recarrega em ${Math.ceil(((player.scReadyAt||0) - Date.now())/60000)} min</div>`
+                    : `<div style="color:#74d176;font-size:10px;margin-top:2px">✓ pronto pra reviver</div>`)
+                : '';
             return `
                 <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid #1a1408;${rank>0 ? 'background:#0a1a0a' : ''}">
                     <span style="font-size:22px;width:32px;flex-shrink:0;text-align:center">${def.icon}</span>
                     <div style="flex:1;min-width:0">
                         <div style="color:${rank>0 ? '#74d176' : '#ffd060'};font-weight:600;font-size:13px">${def.name}${rankTag}</div>
                         <div style="color:#888;font-size:11px;margin-top:2px">${def.desc}</div>
+                        ${scInfo}
                     </div>
                     ${btn}
                 </div>`;
@@ -13083,6 +13111,17 @@ let _lastHtmlVersion = null;
 let _pendingHtmlVersion = null;   // candidata: precisa confirmar em 2 checks pra valer
 let _autoUpdateStarted = Date.now();
 let _isUpdating = false;   // true durante a janela de reload (bloqueia damage)
+let _updatePendingSince = 0;        // 1º instante em que uma versão nova ficou pendente (p/ teto de defer)
+let _updateDeferNotified = false;   // já avisei o player 1× que tem update esperando?
+// 🔄 Seguro pra recarregar? NÃO em masmorra (run é efêmera → reconexão te joga no overworld = perde tudo)
+// nem em combate (o reload fecha o WS e o dano é server-autoritativo → trava). Incidente 02/06: o push
+// do fix de layout recarregou o dono no meio da masmorra. Fora disso (overworld parado) é seguro.
+function isSafeToReload(){
+    if ((player.floor || 0) > 0) return false;                                          // em masmorra
+    if (player.hurtTimer > 0) return false;                                             // levou dano agorinha
+    if (player.lastAttackAt && Date.now() - player.lastAttackAt < 6000) return false;   // atacou há <6s
+    return true;
+}
 async function checkClientUpdate(){
     if (_isUpdating) return;
     if (!started) return;                                  // só em jogo — login não recarrega sozinho
@@ -13096,9 +13135,20 @@ async function checkClientUpdate(){
         const sig = res.headers.get('etag') || res.headers.get('last-modified') || '';
         if (!sig) return;
         if (_lastHtmlVersion === null){ _lastHtmlVersion = sig; return; }   // baseline
-        if (sig === _lastHtmlVersion){ _pendingHtmlVersion = null; return; }  // estável: limpa candidata
+        if (sig === _lastHtmlVersion){ _pendingHtmlVersion = null; _updatePendingSince = 0; _updateDeferNotified = false; return; }  // estável: limpa candidata + timer de defer
         // Mudou: exige a MESMA versão nova em 2 checks seguidos (debounce de CDN flapping)
         if (_pendingHtmlVersion !== sig){ _pendingHtmlVersion = sig; return; }
+        // 🔄 Guard (02/06): não recarrega no meio de masmorra/combate. Adia mantendo a candidata
+        // (o poll de 60s re-tenta) até ficar seguro. Teto de 15min evita rodar cliente stale pra sempre.
+        if (!_updatePendingSince) _updatePendingSince = Date.now();
+        const deferredTooLong = Date.now() - _updatePendingSince > 15 * 60 * 1000;
+        if (!isSafeToReload() && !deferredTooLong){
+            if (!_updateDeferNotified){
+                _updateDeferNotified = true;
+                log('<span class="log-sys">🔄 Nova versão pronta — recarrega assim que você sair da masmorra/combate.</span>');
+            }
+            return;
+        }
         _isUpdating = true;
         // Overlay unificado — fase 1: atualizando
         showLoadingOverlay(true, 'ATUALIZANDO', 'Nova versão do jogo detectada…', 'Salvando progresso · combate pausado');
