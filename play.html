@@ -876,7 +876,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #forgotPwdModal, #partyInviteModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #petModal, #forgotPwdModal, #partyInviteModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -2179,6 +2179,19 @@
     </div>
 </div>
 
+<div id="petModal" style="display:none">
+    <div class="chest-box" style="min-width:460px;max-width:560px;max-height:88vh;display:flex;flex-direction:column">
+        <div class="chest-title">🐾 DOMADOR DE PETS</div>
+        <div style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:12px">
+            Um pet ativo dá um bônus passivo · sobe de nível matando mobs · <b style="color:#ffd060">1 equipado por vez</b>
+        </div>
+        <div id="petBody" style="flex:1;overflow-y:auto;min-height:200px;max-height:60vh"></div>
+        <div id="petResult" style="text-align:center;min-height:18px;margin-top:10px;font-size:12px;color:#c8a050"></div>
+        <div class="chest-hint" style="margin-top:10px"><kbd>ESC</kbd> fechar</div>
+        <button class="chest-close" onclick="closePetShop()">×</button>
+    </div>
+</div>
+
 <div id="auctionModal" style="display:none">
     <div class="chest-box" style="min-width:620px;max-width:760px;max-height:88vh;display:flex;flex-direction:column">
         <div class="chest-title">⚖ CASA DE LEILÕES</div>
@@ -2453,15 +2466,15 @@ function nearestChest(){
 function atChest(){ return nearestChest() !== null; }
 
 // Bancada de craft (centro-baixo da PZ, entre os baús de baixo)
-const CRAFT_POS = { x: 50, y: 52 };
+const CRAFT_POS = { x: 51, y: 52 };
 // Altar de magias (centro-alto da PZ, entre os baús de cima)
-const ALTAR_POS = { x: 50, y: 48 };
+const ALTAR_POS = { x: 50, y: 49 };
 function atAltar(){
     if ((player.floor || 0) !== 0) return false;   // M4: altar só na cidade
     return Math.max(Math.abs(player.x - ALTAR_POS.x), Math.abs(player.y - ALTAR_POS.y)) <= 1;
 }
 // Boneco de treino (2 tiles abaixo do Crupiê, canto inferior-esquerdo da PZ)
-const DUMMY_POS = { x: 48, y: 52 };
+const DUMMY_POS = { x: 49, y: 52 };
 function atDummy(){
     if ((player.floor || 0) !== 0) return false;   // M4: treino só na cidade
     return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
@@ -2469,7 +2482,7 @@ function atDummy(){
 // ─── NPCs (PZ + mundo) ─────────────────────────────────────────────────────
 const NPCS = [
     // PZ — layout simétrico nas bordas do quadrado 9×9 (PZ raio 4 ao redor de 50,50).
-    // Centerline livre pra Altar (50,48) e Craft (50,52). Cada NPC tem ≥2 tiles
+    // Centro: Domador (50,47) topo · Altar (50,49) · Treino (49,52) · Craft (51,52). Cada NPC tem ≥2 tiles
     // de respiro pros lados, player anda solto entre eles.
     // Top row (y=47): comércio
     { id:'mercador',  name:'Mercador',     pos:{x:47,y:47}, body:'#3a5a8a', hat:'#ffcc40', action:'shop',     hint:'mercador' },
@@ -2480,6 +2493,7 @@ const NPCS = [
     // Bottom row (y=53): serviços
     { id:'atendente', name:'Atendente',    pos:{x:47,y:53}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
     { id:'tintureira',name:'Tintureira',   pos:{x:53,y:53}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
+    { id:'domador',   name:'Domador',      pos:{x:50,y:47}, body:'#2a5a3a', hat:'#8af0a0', action:'petshop',  hint:'pets' },
     // Mundo — chains narrativas (cada um tem seu local temático)
     { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', sanctuary:true, chain:'cripta' },
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', sanctuary:true, chain:'forja'  },
@@ -2490,6 +2504,26 @@ const NPCS = [
     // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
     { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', sanctuary:true, chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
 ];
+
+// ─── M6 PET — defs (espelha PET_DEFS do server). Buff/level são autoritativos
+// no server; aqui guardamos só visual + texto pra UI/render. ───────────────
+const PET_DEFS = {
+    PET_TATU:     { name:'Tatu-Cofre',      emoji:'🪙', buffKey:'lootBonus',  l1:0.06, lMax:0.15, maxLvl:10, price:30000, color:'#c8922e', belly:'#f0d28a', glow:'#ffd24a', buffLabel:'ouro de drops',  desc:'Fareja moedas — aumenta o ouro que cai dos monstros.' },
+    PET_VAGALUME: { name:'Vaga-lume Sábio', emoji:'✨', buffKey:'xpBonus',    l1:0.06, lMax:0.15, maxLvl:10, price:30000, color:'#9acb3c', belly:'#e8ffb0', glow:'#c8ff60', buffLabel:'XP de skill',    desc:'Brilha com sabedoria — aumenta o XP de skill por kill.' },
+    PET_GATO:     { name:'Gato Preto',      emoji:'🍀', buffKey:'rareLuck',   l1:0.10, lMax:0.30, maxLvl:10, price:40000, color:'#2a2a30', belly:'#5a5a66', glow:'#a060e0', buffLabel:'sorte de itens', desc:'Dá sorte — aumenta a chance de itens (raros) no loot.' },
+    PET_ESPIRITO: { name:'Espírito Vital',  emoji:'❤️', buffKey:'regenBonus', l1:1,    lMax:3,    maxLvl:10, price:25000, color:'#46c0b0', belly:'#bff5ec', glow:'#60ffe0', buffLabel:'regen de HP',    desc:'Sopro de vida — acelera sua recuperação de HP.' },
+};
+function petBuffValue(def, lvl){
+    const L = Math.max(1, Math.min(def.maxLvl, lvl | 0));
+    if (def.maxLvl <= 1) return def.lMax;
+    return def.l1 + (def.lMax - def.l1) * (L - 1) / (def.maxLvl - 1);
+}
+function petBuffText(def, lvl){
+    const v = petBuffValue(def, lvl);
+    if (def.buffKey === 'regenBonus') return `+${Math.round(v)} ${def.buffLabel}`;
+    return `+${Math.round(v * 100)}% ${def.buffLabel}`;
+}
+function petXpNextClient(lvl){ return Math.floor(120 * Math.pow(1.5, Math.max(1, lvl) - 1)); }
 
 function npcVisible(n){ return !n.hiddenUntil || (player.flags && player.flags[n.hiddenUntil]); }
 function npcAt(x, y){
@@ -2558,6 +2592,7 @@ function interactNpc(npc){
     if (npc.action === 'casino')   { openCasino(); return; }
     if (npc.action === 'dye')      { openDye(); return; }
     if (npc.action === 'auction')  { openAuction(); return; }
+    if (npc.action === 'petshop')  { openPetShop(); return; }
     if (npc.action === 'chain')    { openChainDialog(npc); return; }
 }
 const TRAINING_TIME = 2000;   // ms por sessão
@@ -4109,6 +4144,7 @@ const player = {
     moveProgress: 1, moveDuration: 0,      // 0..1 (1 = animação completa)
     dir: 'down',
     color: '#1a1a1a',
+    pet: null, pets: {},   // M6 Pet — equipado (flat) + mapa {key:{lvl,xp}} (server-autoritativo)
     moveTimer: 0, moveDelay: 220,
     attackTimer: 0, attackDelay: 800,
     hp: 100, maxHp: 100,
@@ -4825,7 +4861,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -5850,6 +5886,7 @@ function handleMP(msg){
             if (typeof msg.mp === 'number') rp.mp = msg.mp;
             if (typeof msg.maxMp === 'number') rp.maxMp = msg.maxMp;
             if ('cosmetic' in msg) rp.cosmetic = msg.cosmetic;
+            if ('pet' in msg) rp.pet = msg.pet;
             if (msg.equipped && typeof msg.equipped === 'object') rp.equipped = msg.equipped;
             if (Array.isArray(msg.badges)) rp.badges = msg.badges.slice(0, 2);
             if ('dyes' in msg) rp.dyes = (msg.dyes && typeof msg.dyes === 'object') ? msg.dyes : {};
@@ -5879,6 +5916,13 @@ function handleMP(msg){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
+        // M6 Pet: estado autoritativo do server (posse/nível) + equipado persistido.
+        if (msg.pets && typeof msg.pets === 'object') player.pets = msg.pets;
+        if ('pet' in msg) player.pet = msg.pet || null;
+        if ((msg.pets || ('pet' in msg))){
+            const pm = document.getElementById('petModal');
+            if (pm && pm.style.display === 'flex' && typeof renderPetShop === 'function') renderPetShop();
+        }
         // M6 Tinturaria: dyes autoritativos do server.
         if (msg.dyes && typeof msg.dyes === 'object'){
             player.dyes = msg.dyes;
@@ -6264,6 +6308,18 @@ function handleMP(msg){
             };
             out.innerHTML = `<span style="color:#cc3030">✗ ${errs[msg.error] || 'Falhou'}</span>`;
         }
+    } else if (msg.t === 'petResult'){
+        // M6 Pet — resultado da compra. invUpdate já creditou pets/gold; aqui só feedback.
+        const out = document.getElementById('petResult');
+        if (msg.ok){
+            if (msg.pets && typeof msg.pets === 'object') player.pets = msg.pets;
+            const def = PET_DEFS[msg.pet];
+            if (out) out.innerHTML = `<span style="color:#74d176">✓ ${def ? def.name : 'Pet'} adotado! Clique em "equipar".</span>`;
+            if (typeof renderPetShop === 'function') renderPetShop();
+        } else if (out){
+            const errs = { not_at_npc:'Aproxime-se do Domador', no_gold:'Sem ouro suficiente', owned:'Você já tem esse pet', invalid:'Pet inválido' };
+            out.innerHTML = `<span style="color:#cc3030">✗ ${errs[msg.error] || 'Falhou'}</span>`;
+        }
     } else if (msg.t === 'casinoResult'){
         // M6 — server rolou os 3 símbolos + payout. Cliente só renderiza.
         const reels = document.querySelectorAll('#casinoReels .reel');
@@ -6472,6 +6528,21 @@ function handleMP(msg){
         }
         // Build de escudo: o servidor também creditou Escudo (mesmo XP) — loga pra confirmar.
         if (msg.shieldXp > 0) log(`<span class="log-up">+${msg.shieldXp} xp Escudo</span>`);
+        // M6 Pet — server concedeu xp ao pet equipado. Atualiza barra + avisa level-up.
+        if (msg.petGain && msg.petGain.key){
+            const g = msg.petGain;
+            player.pets = player.pets || {};
+            player.pets[g.key] = { lvl: g.lvl, xp: g.xp };
+            if (g.leveled){
+                const pdef = PET_DEFS[g.key];
+                if (pdef){
+                    log(`<span class="log-up">🐾 ${pdef.name} subiu pro nível ${g.lvl}! (${petBuffText(pdef, g.lvl)})</span>`);
+                    if (typeof addFloat === 'function') addFloat(player.x, player.y, `🐾 Lv ${g.lvl}`, '#aef0ae', true, -22);
+                }
+            }
+            const pm = document.getElementById('petModal');
+            if (pm && pm.style.display === 'flex' && typeof renderPetShop === 'function') renderPetShop();
+        }
     } else if (msg.t === 'mobMissing'){
         // mob que tentei atacar já morreu/sumiu
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
@@ -6926,6 +6997,71 @@ const DYE_SLOT_LABELS = {
     feet:     { label:'Botas',            icon:'👢' },
     cosmetic: { label:'Capa (cosmético)', icon:'✦' },
 };
+// ─── M6 PET — Domador (loja + equipar + barra de nível) ────────────────────
+function openPetShop(){
+    closeAllModals();
+    document.getElementById('petModal').style.display = 'flex';
+    document.getElementById('petResult').textContent = '';
+    renderPetShop();
+}
+function closePetShop(){ document.getElementById('petModal').style.display = 'none'; }
+window.openPetShop = openPetShop; window.closePetShop = closePetShop;
+function renderPetShop(){
+    const body = document.getElementById('petBody');
+    if (!body) return;
+    const owned = player.pets || {};
+    const equipped = player.pet || null;
+    let html = '';
+    for (const key of Object.keys(PET_DEFS)){
+        const def = PET_DEFS[key];
+        const rec = owned[key];
+        const isOwned = !!rec;
+        const lvl = isOwned ? (rec.lvl | 0) : 1;
+        const isEq = equipped === key;
+        const border = isEq ? '2px solid #74d176' : '1px solid #3a2d20';
+        html += `<div style="margin-bottom:10px;padding:10px;background:#0a0805;border:${border};border-radius:5px;display:flex;align-items:center;gap:10px">`;
+        html += `<div style="font-size:26px;line-height:1">${def.emoji}</div>`;
+        html += `<div style="flex:1;min-width:0">`;
+        html += `<div style="color:#e0c060;font-weight:600;font-size:14px">${def.name}${isOwned ? ` <span style="color:#8aa050;font-size:11px">Lv ${lvl}${lvl >= def.maxLvl ? ' · máx' : ''}</span>` : ''}</div>`;
+        html += `<div style="color:#9a8a6a;font-size:11px;margin:2px 0">${def.desc}</div>`;
+        html += `<div style="color:#74d176;font-size:12px;font-weight:600">${petBuffText(def, lvl)}${isOwned && lvl < def.maxLvl ? ` <span style="color:#5a7a40">→ máx ${petBuffText(def, def.maxLvl)}</span>` : ''}</div>`;
+        if (isOwned && lvl < def.maxLvl){
+            const next = petXpNextClient(lvl);
+            const pct = Math.max(0, Math.min(100, Math.round((rec.xp || 0) / next * 100)));
+            html += `<div style="margin-top:5px;height:6px;background:#1a1410;border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:#9acb3c"></div></div>`;
+            html += `<div style="color:#6a6050;font-size:10px;margin-top:1px">${rec.xp || 0} / ${next} xp</div>`;
+        }
+        html += `</div>`;
+        html += `<div style="flex-shrink:0;display:flex;flex-direction:column;gap:4px;align-items:flex-end">`;
+        if (!isOwned){
+            const canBuy = (player.gold | 0) >= def.price;
+            html += `<div style="color:#ffd060;font-size:12px;font-weight:600">${def.price.toLocaleString('pt-BR')}g</div>`;
+            html += `<button onclick="petBuyClick('${key}')" ${canBuy ? '' : 'disabled'} style="padding:5px 12px;border-radius:4px;font-size:12px;${canBuy ? 'background:#2a4a2a;color:#aef0ae;border:1px solid #3a6a3a;cursor:pointer' : 'background:#1a1410;color:#5a5040;border:1px solid #2a2418;cursor:not-allowed'}">adotar</button>`;
+        } else if (isEq){
+            html += `<button onclick="petEquipClick(null)" style="padding:5px 12px;border-radius:4px;font-size:12px;background:#3a2a1a;color:#e0b080;border:1px solid #5a4020;cursor:pointer">desequipar</button>`;
+        } else {
+            html += `<button onclick="petEquipClick('${key}')" style="padding:5px 12px;border-radius:4px;font-size:12px;background:#2a3a4a;color:#a0d0f0;border:1px solid #3a5a7a;cursor:pointer">equipar</button>`;
+        }
+        html += `</div></div>`;
+    }
+    body.innerHTML = html;
+}
+function petBuyClick(key){
+    const def = PET_DEFS[key]; if (!def) return;
+    const out = document.getElementById('petResult');
+    if (!ws || ws.readyState !== 1 || !_wsAuthed){ if (out) out.innerHTML = '<span style="color:#cc3030">Sem conexão</span>'; return; }
+    if ((player.gold | 0) < def.price){ if (out) out.innerHTML = `<span style="color:#cc3030">Sem ouro (${def.price.toLocaleString('pt-BR')}g)</span>`; return; }
+    if (!confirm(`Adotar ${def.name} por ${def.price.toLocaleString('pt-BR')}g?\n\nOuro atual: ${(player.gold | 0).toLocaleString('pt-BR')}g`)) return;
+    try { ws.send(JSON.stringify({ t:'petBuy', pet:key })); } catch {}
+}
+function petEquipClick(key){
+    // Otimista local + sync imediato; o server valida posse (ignora pet não-possuído).
+    player.pet = key || null;
+    if (ws && ws.readyState === 1){ try { ws.send(JSON.stringify({ t:'playerSync', pet: player.pet })); } catch {} }
+    renderPetShop();
+}
+window.petBuyClick = petBuyClick; window.petEquipClick = petEquipClick;
+
 function openDye(){
     closeAllModals();
     document.getElementById('dyeModal').style.display = 'flex';
@@ -10775,6 +10911,72 @@ function tickTrails(dt){
         if (trails[i].life <= 0) trails.splice(i, 1);
     }
 }
+// ─── M6 Pet — render do bichinho que segue o dono ──────────────────────────
+// Pos própria que faz ease pra ~0.7 tile ATRÁS do dono (oposto ao facing):
+// trilha ao andar, repousa atrás ao parar. 100% cliente (buff/level são server).
+const PET_DIR_VEC = { down:[0,1], up:[0,-1], left:[-1,0], right:[1,0] };
+let petBobT = 0;
+function _petTarget(ent){
+    const vec = PET_DIR_VEC[ent.dir] || PET_DIR_VEC.down;
+    const bx = (ent.renderX != null ? ent.renderX : ent.x);
+    const by = (ent.renderY != null ? ent.renderY : ent.y);
+    return [ bx - vec[0] * 0.7, by - vec[1] * 0.7 ];
+}
+function _tickPetEnt(ent, dt){
+    if (!ent || !ent.pet || !PET_DEFS[ent.pet]){ if (ent) ent._petRX = null; return; }
+    const t = _petTarget(ent);
+    if (ent._petRX == null){ ent._petRX = t[0]; ent._petRY = t[1]; }
+    const k = Math.min(1, dt * 0.009);
+    ent._petRX += (t[0] - ent._petRX) * k;
+    ent._petRY += (t[1] - ent._petRY) * k;
+}
+function tickPet(dt){
+    petBobT += dt * 0.005;
+    _tickPetEnt(player, dt);
+    for (const id in remotePlayers) _tickPetEnt(remotePlayers[id], dt);
+}
+function _drawPetSprite(cx, cy, def, lvl){
+    ctx.save();
+    const t = Math.max(0, Math.min(1, (lvl - 1) / 9));
+    if (t > 0){
+        ctx.globalAlpha = 0.16 + 0.24 * t;
+        ctx.fillStyle = def.glow || def.color;
+        ctx.beginPath(); ctx.arc(cx, cy, 10 + 3 * t, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(cx, cy + 7, 7, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = def.color;
+    ctx.beginPath(); ctx.moveTo(cx - 5.5, cy - 5); ctx.lineTo(cx - 3, cy - 10); ctx.lineTo(cx - 1, cy - 5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx + 5.5, cy - 5); ctx.lineTo(cx + 3, cy - 10); ctx.lineTo(cx + 1, cy - 5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.55; ctx.fillStyle = def.belly || '#ffffff';
+    ctx.beginPath(); ctx.ellipse(cx, cy + 2.5, 4, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 2.4, cy - 1, 1.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 2.4, cy - 1, 1.7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#101014';
+    ctx.beginPath(); ctx.arc(cx - 2.4, cy - 1, 0.85, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 2.4, cy - 1, 0.85, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+}
+function _drawPetEnt(ent, cam){
+    if (!ent || !ent.pet || ent._petRX == null) return;
+    const def = PET_DEFS[ent.pet]; if (!def) return;
+    const rx = ent._petRX, ry = ent._petRY;
+    if (rx < cam.x - 1 || rx > cam.x + VP_W + 1 || ry < cam.y - 1 || ry > cam.y + VP_H + 1) return;
+    const cx = (rx - cam.x) * TS + TS / 2;
+    const bob = Math.sin(petBobT + (ent.id || 0) * 0.7) * 2;
+    const cy = (ry - cam.y) * TS + TS / 2 + bob;
+    const lvl = (ent.pets && ent.pets[ent.pet] && ent.pets[ent.pet].lvl) || 1;
+    _drawPetSprite(cx, cy, def, lvl);
+}
+function drawPets(cam){
+    for (const id in remotePlayers) _drawPetEnt(remotePlayers[id], cam);
+    _drawPetEnt(player, cam);
+}
 function drawTrails(cam){
     for (const t of trails){
         const sx = (t.x - cam.x) * TS + TS/2;
@@ -13007,6 +13209,7 @@ function logout(){
         target: null, autoAttack: false,
         weapon: null,
         equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null },
+        pet: null, pets: {},   // M6: pet equipado (flat) + mapa {key:{lvl,xp}} autoritativo do server
         inv: {}, chests: { b1:{}, b2:{}, b3:{}, b4:{} }, gold: 0,
         activeSpell: null,
         pvp: false, selos: 0, highlander: false,
@@ -13160,6 +13363,7 @@ function startGame(multiplayer, name){
                 hp: player.hp, maxHp: player.maxHp,
                 mp: player.mp, maxMp: player.maxMp,
                 cosmetic: player.equipped.cosmetic || null,
+                pet: player.pet || null,
                 equipped: player.equipped,
                 badges: (player.equippedBadges || []).slice(0, 2),
             };
@@ -13518,6 +13722,7 @@ function loop(ts){
     tickProjectiles(dt);
     tickAuras(dt);
     tickTrails(dt);
+    tickPet(dt);
     tickParticles(dt);
     tickAmbientParticles(dt);
     updateAmbient();
@@ -13993,6 +14198,7 @@ function loop(ts){
 
     // Trails cosméticos — desenhados antes dos mobs/players pra ficarem no chão
     drawTrails(cam);
+    drawPets(cam);   // M6 Pet — bichinho atrás do dono (entre o chão e os personagens)
 
     // monstros visíveis (usa renderX/Y para animação suave)
     monsters.forEach(m => {

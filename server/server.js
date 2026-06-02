@@ -834,7 +834,7 @@ function gainSkillXpServer(p, name, amount){
     if (!p.skills) p.skills = {};
     const sk = p.skills[name]; if (!sk) return;
     let amt = amount | 0;
-    const bonus = p.permaBuffs?.xpBonus || 0;
+    const bonus = (p.permaBuffs?.xpBonus || 0) + petBuffVal(p, 'xpBonus');
     if (bonus > 0) amt = Math.round(amt * (1 + bonus));
     // Evento diário Sabedoria — +50% xp durante a janela ativa.
     if (typeof dailyEventState !== 'undefined' && dailyEventState.isActive && dailyEventState.type?.id === 'wisdom'){
@@ -849,6 +849,50 @@ function gainSkillXpServer(p, name, amount){
         leveled = true;
     }
     if (leveled) recomputeMaxStatsServer(p);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// M6 PET — buff passivo de economia/QoL (server-autoritativo). O pet EQUIPADO
+// (p.pet) espelha o cosmético; o nível/xp por pet (p.pets[key]) é estado
+// SERVER-autoritativo: concedido na morte de mob, persistido/sanitizado no load
+// — NUNCA confiado do cliente (lição do saveUpload). O BUFF é DERIVADO de
+// (pet, nível) no ponto de uso, JAMAIS gravado no permaBuffs (que é recalculado
+// do zero no respec — misturar pet ali reintroduziria os bugs de rank/save).
+const PET_DEFS = {
+    PET_TATU:     { name:'Tatu-Cofre',      buffKey:'lootBonus',  l1:0.06, lMax:0.15, maxLvl:10, price:30000 },
+    PET_VAGALUME: { name:'Vaga-lume Sábio', buffKey:'xpBonus',    l1:0.06, lMax:0.15, maxLvl:10, price:30000 },
+    PET_GATO:     { name:'Gato Preto',      buffKey:'rareLuck',   l1:0.10, lMax:0.30, maxLvl:10, price:40000 },
+    PET_ESPIRITO: { name:'Espírito Vital',  buffKey:'regenBonus', l1:1,    lMax:3,    maxLvl:10, price:25000 },
+};
+const PET_XP_BASE = 120;   // xp p/ subir do nível 1→2; cresce ×1.5 por nível
+function petXpNext(lvl){ return Math.floor(PET_XP_BASE * Math.pow(1.5, Math.max(1, lvl) - 1)); }
+// Valor do buff do pet equipado pra uma key específica (0 se não tiver/não bater).
+// Escala linear entre l1 (nível 1) e lMax (maxLvl). Derivado — nunca persistido.
+function petBuffVal(p, buffKey){
+    const key = p && p.pet; if (!key) return 0;
+    const def = PET_DEFS[key]; if (!def || def.buffKey !== buffKey) return 0;
+    const owned = p.pets && p.pets[key]; if (!owned) return 0;   // só vale se for dono
+    const lvl = Math.max(1, Math.min(def.maxLvl, owned.lvl | 0));
+    if (def.maxLvl <= 1) return def.lMax;
+    return def.l1 + (def.lMax - def.l1) * (lvl - 1) / (def.maxLvl - 1);
+}
+// Concede xp ao pet EQUIPADO na morte de mob. Server-autoritativo. Retorna
+// snapshot {key,lvl,xp,next,leveled} pro cliente atualizar a barra (ou null).
+function gainPetXp(p, amount){
+    const key = p && p.pet; if (!key) return null;
+    const def = PET_DEFS[key]; if (!def) return null;
+    p.pets = p.pets || {};
+    const owned = p.pets[key]; if (!owned) return null;
+    if ((owned.lvl | 0) >= def.maxLvl){ owned.lvl = def.maxLvl; owned.xp = 0; return { key, lvl:def.maxLvl, xp:0, next:0, leveled:false }; }
+    owned.xp = (owned.xp | 0) + Math.max(0, amount | 0);
+    let leveled = false;
+    while (owned.lvl < def.maxLvl && owned.xp >= petXpNext(owned.lvl)){
+        owned.xp -= petXpNext(owned.lvl);
+        owned.lvl++;
+        leveled = true;
+    }
+    if (owned.lvl >= def.maxLvl) owned.xp = 0;
+    return { key, lvl:owned.lvl, xp:owned.xp, next: owned.lvl >= def.maxLvl ? 0 : petXpNext(owned.lvl), leveled };
 }
 
 // Fase 5: recalcula maxHp/maxMp baseado em soma de skills + talent hpBonus.
@@ -1676,6 +1720,7 @@ function snapshotPlayers(floor){
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
         cosmetic: p.cosmetic || null,
+        pet: p.pet || null,
         equipped: p.equipped || null,
         badges: p.badges || [],
         dyes: p.dyes || null,
@@ -1860,7 +1905,7 @@ function enterDungeonFloor(p, id, floor, dir){
             groundDrops: snapshotGroundDrops(floor),   // #5: cliente limpa/repopula loot do andar (não vaza entre andares)
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
 }
 
 // Tira o player da masmorra e o devolve pra cidade (overworld): restaura o PvP,
@@ -1881,7 +1926,7 @@ function returnPlayerToTown(p, id){
             groundDrops: snapshotGroundDrops(0),
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
 }
 
 function tickRespawns(){
@@ -3728,11 +3773,11 @@ function handleMobDeath(m, killerId){
     }
     monsters.delete(m.id);
     const killer = players.get(killerId);
-    const loot = rollLoot(m.type, (killer && killer.permaBuffs && killer.permaBuffs.rareLuck) || 0);
+    const loot = rollLoot(m.type, ((killer && killer.permaBuffs && killer.permaBuffs.rareLuck) || 0) + (killer ? petBuffVal(killer, 'rareLuck') : 0));
     const isBoss = !!m.unique;
     // M5 talent t_loot (+15% gold) — espelha o caminho do attackMob.
     if (!isBoss && killer){
-        const lootBonus = killer.permaBuffs?.lootBonus || 0;
+        const lootBonus = (killer.permaBuffs?.lootBonus || 0) + petBuffVal(killer, 'lootBonus');
         if (lootBonus > 0){ for (const it of loot){ if (it && it.type === 'GOLD' && it.qty > 0) it.qty = Math.max(1, Math.round(it.qty * (1 + lootBonus))); } }
     }
     // M4 anti-ninja: boss distribui por dano (direto no inv); mob comum cai no chão
@@ -3743,16 +3788,17 @@ function handleMobDeath(m, killerId){
     if (isBoss) distributeBossLoot(m, loot, killer);
     else spawnedDrops = dropMobLoot(m, loot, killer);
     // T1: XP authoritative na skill da arma equipada do killer
-    let xpGained = 0, skillUsed = null;
+    let xpGained = 0, skillUsed = null, petGain = null;
     if (killer){
         skillUsed = weaponSkillOf(killer);
         gainSkillXpServer(killer, skillUsed, m.xp || 1);
         xpGained = m.xp || 1;
+        petGain = gainPetXp(killer, m.xp || 1);
     }
     if (killer && killer.ws.readyState === 1){
         killer.ws.send(JSON.stringify({
             t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot,
-            drops: spawnedDrops, skill: skillUsed, xpGained,
+            drops: spawnedDrops, skill: skillUsed, xpGained, petGain,
         }));
         // Envia skills atualizadas (autoritativo)
         sendInvUpdate(killer, { skills: killer.skills, reason:'mobKill' });
@@ -3981,7 +4027,7 @@ function pvpMultsServer(p){
 function broadcastPstatsAll(p){
     const payload = JSON.stringify({
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
-        cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null,
+        cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null,
         scReadyAt: p.scReadyAt || 0   // 🕯️ Segunda Chance: cliente mostra cooldown no modal
     });
     const f = p.floor || 0;   // M4: só players do mesmo andar veem os stats
@@ -4012,7 +4058,7 @@ function tickPlayerRegen(){
         const maxHp = p.maxHp || 100;
         const maxMp = p.maxMp || 0;
         if (now - p._regenHpAt >= hpInterval && p.hp < maxHp){
-            const heal = 1 + armorHp + (inPz ? 1 : 0) + talent;
+            const heal = 1 + armorHp + (inPz ? 1 : 0) + talent + Math.round(petBuffVal(p, 'regenBonus'));
             p.hp = Math.min(maxHp, p.hp + heal);
             p._regenHpAt = now;
             changed = true;
@@ -4952,6 +4998,10 @@ wss.on('connection', (ws, request) => {
             // senão o save do cliente reverteria os ranks (era a causa do "reseta ao escolher outro").
             if (p.talents && typeof p.talents === 'object') data.talents = p.talents;
             if (p.permaBuffs && typeof p.permaBuffs === 'object') data.permaBuffs = p.permaBuffs;
+            // M6 Pet — server-autoritativo (nível/xp concedido na morte; equip via playerSync).
+            // Persiste o estado VIVO do server (igual talents/permaBuffs); ignora o do cliente.
+            if (p.pets && typeof p.pets === 'object') data.pets = p.pets;
+            data.pet = p.pet || null;
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
@@ -5058,6 +5108,19 @@ wss.on('connection', (ws, request) => {
                         if (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) p.dyes[slot] = c;
                     }
                 }
+                // M6 Pet — hidrata estado autoritativo (sanitiza: só keys conhecidas,
+                // nível clampado a [1,maxLvl], xp ≥ 0). Equipado só vale se for dono.
+                if (acc.save.pets && typeof acc.save.pets === 'object'){
+                    p.pets = {};
+                    for (const k of Object.keys(acc.save.pets)){
+                        const def = PET_DEFS[k]; if (!def) continue;
+                        const rec = acc.save.pets[k]; if (!rec || typeof rec !== 'object') continue;
+                        const lvl = Math.max(1, Math.min(def.maxLvl, Math.floor(Number(rec.lvl) || 1)));
+                        const xp = Math.max(0, Math.floor(Number(rec.xp) || 0));
+                        p.pets[k] = { lvl, xp };
+                    }
+                }
+                if (typeof acc.save.pet === 'string' && p.pets && p.pets[acc.save.pet]) p.pet = acc.save.pet;
             } else {
                 if (msg.equipped && typeof msg.equipped === 'object') p.equipped = { ...p.equipped, ...msg.equipped };
             }
@@ -5109,7 +5172,7 @@ wss.on('connection', (ws, request) => {
             }));
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
-            sendInvUpdate(p, { chests: p.chests, reason:'join' });
+            sendInvUpdate(p, { chests: p.chests, pets: p.pets || {}, pet: p.pet || null, reason:'join' });
             // Recuperação: se admin liberou (_restoreUntil), pede o backup local do cliente.
             if (acc && acc._restoreUntil && acc._restoreUntil > Date.now()){
                 sendTo(id, { t:'restoreMode' });
@@ -5123,7 +5186,7 @@ wss.on('connection', (ws, request) => {
             } else {
                 ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
             }
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
             // Anuncia entrada (só pros outros)
             broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
             return;
@@ -5297,8 +5360,8 @@ wss.on('connection', (ws, request) => {
             const idx = msg.idx | 0;
             const r = RECIPES[idx];
             if (!r){ sendTo(id, { t:'serverMsg', level:'warn', text:'Receita inválida.' }); return; }
-            // Tem que estar perto da bancada (50,52) — chebyshev ≤ 1
-            if (Math.max(Math.abs(p.x - 50), Math.abs(p.y - 52)) > 1){
+            // Tem que estar perto da bancada (51,52) — chebyshev ≤ 1
+            if (Math.max(Math.abs(p.x - 51), Math.abs(p.y - 52)) > 1){
                 sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se da bancada.' }); return;
             }
             for (const [k, q] of Object.entries(r.in)){
@@ -5377,7 +5440,7 @@ wss.on('connection', (ws, request) => {
             p.equipped[slot] = itemKey;
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey } });
             // Broadcast pstats pros outros verem o visual
-            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [] });
             return;
         }
         if (msg.t === 'invUnequip') {
@@ -5389,7 +5452,7 @@ wss.on('connection', (ws, request) => {
             incInv(p, k, 1);
             p.equipped[slot] = null;
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey:null } });
-            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [] });
             return;
         }
 
@@ -5623,7 +5686,7 @@ wss.on('connection', (ws, request) => {
             if (wasAlive){
                 tgt.hp = Math.max(0, (tgt.hp ?? 100) - actual);
                 if (isBotTarget){
-                    broadcast(null, { t:'pstats', id: tgt.id, hp: tgt.hp, maxHp: tgt.maxHp, mp: 0, maxMp: 0, cosmetic: null, equipped: tgt.equipped, badges: tgt.badges || [] });
+                    broadcast(null, { t:'pstats', id: tgt.id, hp: tgt.hp, maxHp: tgt.maxHp, mp: 0, maxMp: 0, cosmetic: null, pet: null, equipped: tgt.equipped, badges: tgt.badges || [] });
                 } else {
                     broadcastPstatsAll(tgt);
                 }
@@ -5675,6 +5738,11 @@ wss.on('connection', (ws, request) => {
                 const cos = (typeof msg.cosmetic === 'string' && msg.cosmetic.length < 32) ? msg.cosmetic : null;
                 if (cos !== p.cosmetic){ p.cosmetic = cos; statsChanged = true; }
             }
+            // M6 Pet equipado: propaga pros outros. Só vale um pet que o player POSSUI.
+            if ('pet' in msg){
+                const pk = (typeof msg.pet === 'string' && msg.pet.length < 32 && p.pets && p.pets[msg.pet]) ? msg.pet : null;
+                if (pk !== p.pet){ p.pet = pk; statsChanged = true; }
+            }
             // Badges de conquista: até 2 strings curtas
             if (Array.isArray(msg.badges)){
                 const bs = msg.badges.filter(s => typeof s === 'string' && s.length < 32).slice(0, 2);
@@ -5682,7 +5750,7 @@ wss.on('connection', (ws, request) => {
                 statsChanged = true;
             }
             if (statsChanged){
-                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null });
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null });
             }
             return;
         }
@@ -5893,8 +5961,8 @@ wss.on('connection', (ws, request) => {
             if (now - p._lastTrainAt < 1500) return reject('too_fast');
             p._lastTrainAt = now;
             // Adjacência: Magia treina no Altar, demais skills no Boneco
-            const DUMMY = { x:48, y:52 };
-            const ALTAR = { x:50, y:48 };
+            const DUMMY = { x:49, y:52 };
+            const ALTAR = { x:50, y:49 };
             const target = skill === 'Magia' ? ALTAR : DUMMY;
             if (Math.max(Math.abs(p.x - target.x), Math.abs(p.y - target.y)) > 1){
                 return reject(skill === 'Magia' ? 'not_at_altar' : 'not_at_dummy');
@@ -6314,6 +6382,47 @@ wss.on('connection', (ws, request) => {
         // do slot, não do item: trocar a armor mantém a tinta. Server é dono —
         // F12 com cor fora da palette ou slot inválido falha. Persiste em
         // p.dyes, broadcast via pstats pra outros verem em tempo real.
+        if (msg.t === 'petBuy') {
+            const PET_NPC_POS = { x: 50, y: 47 };   // sync com NPCS.domador em play.html
+            const now = Date.now();
+            p._lastPetBuyAt = p._lastPetBuyAt || 0;
+            if (now - p._lastPetBuyAt < 800) return;
+            p._lastPetBuyAt = now;
+            if (chebyshev(p.x, p.y, PET_NPC_POS.x, PET_NPC_POS.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'petResult', error:'not_at_npc' }));
+                return;
+            }
+            const key = String(msg.pet || '');
+            const def = PET_DEFS[key];
+            if (!def){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'petResult', error:'invalid' }));
+                return;
+            }
+            p.pets = p.pets || {};
+            if (p.pets[key]){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'petResult', error:'owned' }));
+                return;
+            }
+            if ((p.gold || 0) < def.price){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'petResult', error:'no_gold' }));
+                return;
+            }
+            p.gold -= def.price;
+            p.pets[key] = { lvl: 1, xp: 0 };
+            syncGoldRank(p.name, p.gold);
+            if (p.authedName){
+                const acc = getAccount(p.authedName);
+                if (acc){
+                    acc.save = acc.save || {};
+                    acc.save.pets = { ...p.pets };
+                    acc.save.gold = p.gold;
+                    queueSaveAccounts();
+                }
+            }
+            sendInvUpdate(p, { goldDelta:{ amount: -def.price, reason:'pet_buy' }, pets: p.pets });
+            if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'petResult', ok:true, pet:key, pets:p.pets }));
+            return;
+        }
         if (msg.t === 'dyeItem') {
             const TINTUREIRA_POS = { x: 53, y: 53 };   // sync com NPCS.tintureira em play.html
             const DYE_SLOTS = ['armor', 'head', 'feet', 'cosmetic'];
@@ -6443,7 +6552,7 @@ wss.on('connection', (ws, request) => {
                 }
                 invDirty = true;
                 // Propaga equipped pra outros players
-                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, equipped:p.equipped, badges:p.badges || [] });
+                broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [] });
             }
             if (invDirty) sendInvUpdate(p, { reason:'ammo' });
             // teto de dano por hit — Deploy 2a: POR PLAYER (arma/skill ou magia na janela),
@@ -6525,9 +6634,9 @@ wss.on('connection', (ws, request) => {
                 monsters.delete(m.id);
                 // Loot autoritativo: server roda LOOT e mantém drops no chão.
                 // Cada item ganha id server-side; broadcast spawn pra TODOS verem.
-                const loot = rollLoot(m.type, (p.permaBuffs && p.permaBuffs.rareLuck) || 0);
+                const loot = rollLoot(m.type, ((p.permaBuffs && p.permaBuffs.rareLuck) || 0) + petBuffVal(p, 'rareLuck'));
                 // M5 talent t_loot: +15% gold de drops. Aplica antes do spawn.
-                const lootBonus = p.permaBuffs?.lootBonus || 0;
+                const lootBonus = (p.permaBuffs?.lootBonus || 0) + petBuffVal(p, 'lootBonus');
                 if (lootBonus > 0){
                     for (const it of loot){
                         if (it && it.type === 'GOLD' && it.qty > 0){
@@ -6549,12 +6658,13 @@ wss.on('connection', (ws, request) => {
                 // T1: XP authoritative na skill da arma equipada
                 const skillUsed = weaponSkillOf(p);
                 gainSkillXpServer(p, skillUsed, m.xp || 1);
+                const petGain = gainPetXp(p, m.xp || 1);
                 // Build de escudo (1-mão + escudo): o Escudo ganha o MESMO XP de kill que a arma (pedido do dono).
                 // 2H e escudo são mutuamente exclusivos → escudo equipado ⇒ arma 1-mão.
                 const shieldXp = hasShieldEquipped(p) ? (m.xp || 1) : 0;
                 if (shieldXp > 0) gainSkillXpServer(p, 'Escudo', shieldXp);
                 // killer recebe mobKill (boss → loot:[] pro cliente não criar drops)
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp });
+                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp, petGain });
                 // Envia skills atualizadas (autoritativo)
                 sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
