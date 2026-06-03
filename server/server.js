@@ -418,9 +418,10 @@ async function handleMpWebhook(body, req, res){
         pending.gold = pending.gold || gold;
         mpPayments.set(paymentId, pending);
         console.log(`[mp] webhook payment=${paymentId} status=${status} ref=${ref} player=${pending.playerName} gold=${pending.gold}`);
-        if (status === 'approved' && pending.playerName && pending.gold > 0 && !pending.credited){
+        if (status === 'approved' && pending.playerName && pending.gold > 0 && !pending.credited && !creditedPayments.has(paymentId)){
             pending.credited = true;
             creditGoldToPlayer(pending.playerName, pending.gold, paymentId);
+            markPaymentCredited(paymentId);   // idempotência durável (audit 2026-06-03): bloqueia re-crédito após restart
         }
     } catch (e){
         console.warn('[mp] erro no webhook:', e.message);
@@ -465,6 +466,30 @@ function creditGoldToPlayer(playerName, gold, paymentId){
 // Em produção (Railway), Volume montado em /data; localmente fica ao lado do server.js
 const STATE_FILE = process.env.STATE_FILE_PATH || path.join(__dirname, 'state.json');
 const STATE_SAVE_INTERVAL_MS = 30 * 1000;  // 30s — menos janela de perda
+
+// ─── Idempotência DURÁVEL de pagamentos (audit 2026-06-03) ───────────────────
+// O Map mpPayments é só memória: um restart (deploy/OOM/plataforma) zerava o guard
+// `pending.credited`, e um webhook reentregue (retry legítimo do MP OU replay de
+// uma notificação assinada capturada) re-creditava o MESMO pagamento real — pagava
+// 1×, recebia gold N×. Persistimos em disco o conjunto de paymentIds JÁ creditados;
+// o webhook checa antes e grava o crédito. (Só impede DUPLICATA — nunca bloqueia o
+// 1º crédito.) Co-localizado no MESMO volume do state (em prod = /data) — senão o
+// __dirname do Railway é efêmero e a dedup sumiria a cada redeploy.
+const MP_CREDITED_FILE = process.env.MP_CREDITED_PATH || path.join(path.dirname(STATE_FILE), 'mp_credited.json');
+const creditedPayments = new Set();
+try {
+    const _arr = JSON.parse(fs.readFileSync(MP_CREDITED_FILE, 'utf8'));
+    if (Array.isArray(_arr)) for (const _id of _arr) creditedPayments.add(String(_id));
+    console.log(`[mp] idempotência: ${creditedPayments.size} pagamentos já creditados carregados`);
+} catch { /* arquivo ainda não existe na 1ª execução — ok */ }
+function markPaymentCredited(paymentId){
+    creditedPayments.add(String(paymentId));
+    try {
+        const _tmp = MP_CREDITED_FILE + '.tmp';
+        fs.writeFileSync(_tmp, JSON.stringify(Array.from(creditedPayments)));
+        fs.renameSync(_tmp, MP_CREDITED_FILE);   // escrita atômica (tmp + rename)
+    } catch(e){ console.warn('[mp] erro ao persistir idempotência de pagamento:', e.message); }
+}
 
 // ─── Constants do mundo ─────────────────────────────────────────────────────
 const M_W = 100, M_H = 100;
