@@ -7,6 +7,49 @@
 
 ---
 
+## 🔒 Sessão 03/06/2026 (cont.) — Sensíveis da auditoria: 3 server-only FEITOS, 2 ADIADOS pelo dono
+
+Retomada dos 4 itens "sensíveis/cross-file" que sobraram da auditoria (`docs/AUDITORIA_2026-06-03.md`).
+**Feitos os 3 server-only** (testados local, no working tree, **NÃO commitados/deployados**); **2 cross-cliente
+ADIADOS pelo dono** (resíduo Baixo). Diff: só `server/server.js` (+152/-42) → 1× /manutencao quando for subir.
+
+**✅ Pagamento #3 — frescor de `ts` (`validateMpSignature`):** checagem de `|agora - ts|` DEPOIS do HMAC passar
+(o ts é autêntico = parte do manifest). **Conservador** (a idempotência durável `markPaymentCredited` segue a
+proteção real; isto é defesa-extra): normaliza unidade (`<1e12` = segundos→×1000; senão já ms), só aplica em
+epoch plausível (1.5e12..5e12), janela `MP_TS_TOLERANCE_MS` default **15min** tunável, **fail-OPEN** em ts
+inparseável/implausível. MP assina cada entrega → retry legítimo ganha ts novo, nunca é barrado. Testado: 9
+casos de unidade (seg/ms frescos=ok, seg/ms 20min=stale, 10min=ok, micro/lixo/vazio=fail-open).
+
+**✅ Resto do Lote 3 #8 — rate-limit global de msg:** token bucket por conexão no topo do `ws.on('message')`,
+após o `ping` (isento p/ não matar heartbeat). `MSG_BUCKET_CAP=80` (burst) / `MSG_BUCKET_REFILL=40`/s (sustentado)
+/ `MSG_FLOOD_DISCONNECT=400`, todos tunáveis por env. **Descarta** o excedente (cliente reconcilia via updates
+autoritativos) e só **fecha o socket** em flood SUSTENTADO (o contador de drops só acumula quando o bucket fica
+< meio cheio → pico legítimo não acumula rumo ao disconnect). + throttle do BROADCAST de `pvp` (300ms) — era o
+pior fan-out (global por mensagem); o ESTADO segue atualizado, só o re-broadcast é limitado. NÃO toquei
+float/attackVfx/playerSync/invEquip (o bucket global cobre; throttle neles arriscaria dropar cosmético de AoE).
+Calibrado em simulação: 15/s e 30/s (combate real) = **0 drops**; 45/s = só dropa o excedente; 1000/s = dropa +
+desconecta ~5s; burst 80/s sobrevive a pico curto.
+
+**✅ Resto do Lote 3 #7 — scrypt async no auth:** `crypto.scrypt` (async) em vez de `scryptSync` (bloqueava
+~15ms o event loop de TODOS por login). Helpers `scryptAsync`/`hashPwScryptAsync`/`verifyPwHashAsync`;
+`createAccount`/`verifyAccount` viraram **async** (chamados só no ramo `auth`, confirmado por grep). Paths raros
+seguem sync: reset HTTP (server.js:174) e rehash legado→scrypt. Ramo `auth` refatorado: guard `p._authPending`
+(1 scrypt por socket por vez), conclusão (matar-sessão + authOk) no callback `.then`; `.catch`→`authFail
+server_error`; `finishAuth` checa `ws.readyState` (socket pode fechar durante o scrypt). Matar-sessão-dupla e
+trava anti-wipe preservados intactos. Testado E2E: harness isolado bootou o server em temp dir + WS cru → **4/4
+PASS** (conta nova authOk isNew=true / login correto isNew=false / senha errada authFail bad_password / 2ª conta).
+
+`node --check` ✓ após cada lote. **NÃO commitado** (aguarda o dono) — regra de deploy intocada: nunca pushar
+server/** com player online; entra num único /manutencao + logout limpo.
+
+**⏸️ ADIADOS pelo dono (resíduo Baixo, cross-cliente, fazer junto com M7):**
+- **Lote 1b** (quests mob/visit server-auth): toca cliente (questAccept + render de progresso) e quest em
+  andamento recontaria do zero no deploy. O re-claim INFINITO já morreu no Lote 1 — sobra só claim 1×/quest.
+- **pwHash djb2→SHA-256**: Baixo (só pesa se accounts.json vazar; scrypt+rate-limit cobrem o online). Reset
+  forçado inviável (conta sem email trancaria) → só **dual-format** serviria. Adiado.
+
+---
+
 ## 🧹 Sessão 03/06/2026 — Resíduo da remoção do offline (fecha o que o 01/06 deixou)
 
 Dono pediu pra "remover o offline". **Verificação primeiro** (pedido dele: "verifica se já não fizemos isso") —

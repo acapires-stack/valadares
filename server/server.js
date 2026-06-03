@@ -30,6 +30,13 @@ const MP_BASE_URL = process.env.MP_BASE_URL || `https://ws.valadares.app.br`;
 // Quando setado, valida x-signature de toda chamada em /webhook/mp (HMAC-SHA256). Sem secret = sem validação (modo dev/compat).
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || '';
 let _mpSecretWarned = false;
+// Tolerância de frescor do ts da assinatura do webhook (audit 2026-06-03, pagamento #3).
+// Defesa-em-profundidade contra replay de webhook assinado: a idempotência durável
+// (markPaymentCredited/creditedPayments) já protege o financeiro, então isto é GENEROSO de
+// propósito — nunca barrar um pagamento legítimo importa mais que a janela curta. MP assina
+// CADA entrega (retries ganham ts novo), logo 15min cobre skew de relógio + atraso de
+// processamento sem barrar retry legítimo, e ainda mata replay de assinatura antiga capturada.
+const MP_TS_TOLERANCE_MS = parseInt(process.env.MP_TS_TOLERANCE_MS, 10) || (15 * 60 * 1000);
 if (MP_TOKEN){
     try {
         const mercadopago = require('mercadopago');
@@ -60,6 +67,13 @@ const _errorRateMap = new Map();   // ip → lastErrorAt (anti-flood do /api/err
 const _pixRateMap   = new Map();   // ip → lastCreateAt (anti-flood do /api/pix/create)
 const _ipConnCount  = new Map();   // ip → nº de conexões WS abertas (anti-flood, audit 2026-06-03)
 const MAX_CONN_PER_IP = parseInt(process.env.MAX_CONN_PER_IP, 10) || 30;   // teto generoso (CGNAT-safe p/ jogo pequeno), tunável por env
+// Rate-limit global de mensagens por conexão (audit 2026-06-03 — anti-amplificação/DoS).
+// Token bucket GENEROSO: combate/AoE real pica ~10-15 msg/s; teto sustentado 40/s, burst 80
+// — bem acima do legítimo. Excedente é DESCARTADO (cliente reconcilia via updates
+// autoritativos), e só derruba o socket em flood SUSTENTADO. Tunável por env.
+const MSG_BUCKET_CAP       = parseInt(process.env.MSG_BUCKET_CAP, 10)       || 80;    // burst
+const MSG_BUCKET_REFILL    = parseInt(process.env.MSG_BUCKET_REFILL, 10)    || 40;    // msgs/s sustentado
+const MSG_FLOOD_DISCONNECT = parseInt(process.env.MSG_FLOOD_DISCONNECT, 10) || 400;   // descartes em flood sustentado → fecha ws
 // IP do cliente atrás do proxy do Railway. O ÚLTIMO item do X-Forwarded-For é o que o
 // proxy confiável anexou (os primeiros são injetáveis pelo cliente). Pegar split[0] era
 // spoofável → permitia burlar rate-limit E inflar o Map indefinidamente (memory leak).
@@ -399,6 +413,19 @@ function validateMpSignature(req){
     const b = Buffer.from(v1, 'utf8');
     if (a.length !== b.length){ return { ok:false, reason:'hash_mismatch' }; }
     if (!crypto.timingSafeEqual(a, b)){ return { ok:false, reason:'hash_mismatch' }; }
+    // Frescor do ts (audit 2026-06-03, pagamento #3): o HMAC acima já provou que o ts é
+    // AUTÊNTICO (faz parte do manifest), então aqui só barramos REPLAY de uma assinatura
+    // válida porém ANTIGA. CONSERVADOR: normaliza a unidade (segundos vs ms pela magnitude)
+    // e faz fail-OPEN se o ts for inparseável/implausível — nunca rejeita por dúvida de
+    // unidade. A idempotência durável (markPaymentCredited) é a proteção real; isto é extra.
+    let tsMs = Number(ts);
+    if (Number.isFinite(tsMs) && tsMs > 0){
+        if (tsMs < 1e12) tsMs *= 1000;            // ~10 dígitos = segundos → ms; ~13 dígitos = já ms
+        if (tsMs >= 1.5e12 && tsMs <= 5e12){      // só confia na unidade se cair em epoch plausível (~2017..2128)
+            const skew = Math.abs(Date.now() - tsMs);
+            if (skew > MP_TS_TOLERANCE_MS){ return { ok:false, reason:'stale_ts' }; }
+        }
+    }
     return { ok:true };
 }
 
@@ -3129,6 +3156,35 @@ function verifyPwHash(stored, clientHash){
     const a = Buffer.from(calc, 'hex'), b = Buffer.from(stored, 'hex');
     return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+// ── Variantes ASSÍNCRONAS do scrypt (audit 2026-06-03 — anti-DoS de event-loop) ──
+// crypto.scrypt (async) deriva fora do event loop, ao contrário do scryptSync que bloqueia
+// ~15ms cada. Usadas SÓ no hot path de auth (createAccount/verifyAccount). Paths raros
+// (reset HTTP, rehash legado→scrypt) seguem síncronos — rodam 1× por conta, custo irrelevante.
+function scryptAsync(clientHash, salt){
+    return new Promise((resolve, reject) => {
+        crypto.scrypt(String(clientHash || ''), salt, SCRYPT_KEYLEN, SCRYPT_PARAMS, (err, dk) => {
+            if (err) reject(err); else resolve(dk.toString('hex'));
+        });
+    });
+}
+async function hashPwScryptAsync(clientHash){
+    const salt = crypto.randomBytes(16).toString('hex');
+    const derived = await scryptAsync(clientHash, salt);
+    return `scrypt$${salt}$${derived}`;
+}
+async function verifyPwHashAsync(stored, clientHash){
+    if (typeof stored !== 'string' || !stored) return false;
+    if (stored.startsWith('scrypt$')){
+        const parts = stored.split('$');   // ['scrypt', saltHex, hashHex]
+        if (parts.length !== 3 || !parts[1] || !parts[2]) return false;
+        const calc = await scryptAsync(clientHash, parts[1]);
+        const a = Buffer.from(calc, 'hex'), b = Buffer.from(parts[2], 'hex');
+        return a.length === b.length && crypto.timingSafeEqual(a, b);
+    }
+    const calc = hashPwLegacy(clientHash);   // sha256 legado é barato/síncrono
+    const a = Buffer.from(calc, 'hex'), b = Buffer.from(stored, 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 function validAccountName(n){
     return typeof n === 'string' && n.length >= 1 && n.length <= 14 && /^[A-Za-z0-9_\- ]+$/.test(n);
 }
@@ -3146,9 +3202,10 @@ function isEmptyDefaultSaveServer(d){
     return skillsTen && noInv && noGold && noEquip && noChests;
 }
 function getAccount(name){ return accounts.get(String(name || '').toLowerCase()); }
-function createAccount(name, clientHash, email){
+async function createAccount(name, clientHash, email){
+    const pwHash = await hashPwScryptAsync(clientHash);   // async: não bloqueia o event loop
     const a = {
-        name, pwHash: hashPwScrypt(clientHash),
+        name, pwHash,
         save: null, savedAt: 0, createdAt: Date.now(),
         email: null, emailVerified: false, resetToken: null,
     };
@@ -3160,13 +3217,13 @@ function createAccount(name, clientHash, email){
     queueSaveAccounts();
     return a;
 }
-function verifyAccount(name, clientHash){
+async function verifyAccount(name, clientHash){
     const a = getAccount(name);
     if (!a) return false;
-    if (!verifyPwHash(a.pwHash, clientHash)) return false;
+    if (!(await verifyPwHashAsync(a.pwHash, clientHash))) return false;   // async: não bloqueia o event loop
     // Rehash transparente: migra conta legada (sha256) pra scrypt no login bem-sucedido.
     if (!String(a.pwHash || '').startsWith('scrypt$')){
-        a.pwHash = hashPwScrypt(clientHash);
+        a.pwHash = hashPwScrypt(clientHash);   // raro (1× por conta legada) — sync ok
         queueSaveAccounts();
     }
     return true;
@@ -4883,6 +4940,30 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
+        // ─── Rate-limit global de mensagens (audit 2026-06-03) ─────────────
+        // Token bucket por conexão — defesa primária contra flood de amplificação
+        // (handlers que re-broadcastam: pvp/float/attackVfx/playerSync/invEquip). ping é
+        // isento (acima) pra nunca matar o heartbeat; auth+gameplay passam por aqui. Generoso:
+        // descarta excedente (não desconecta no 1º estouro) e só derruba flood sustentado.
+        {
+            const nowMsg = Date.now();
+            const lastTok = p._msgTokAt || nowMsg;
+            p._msgTok = Math.min(MSG_BUCKET_CAP, (p._msgTok ?? MSG_BUCKET_CAP) + (nowMsg - lastTok) / 1000 * MSG_BUCKET_REFILL);
+            p._msgTokAt = nowMsg;
+            if (p._msgTok < 1){
+                p._msgDropped = (p._msgDropped || 0) + 1;
+                if (p._msgDropped >= MSG_FLOOD_DISCONNECT){
+                    console.warn(`[flood] ${p.authedName || p.name || id} descartou ${p._msgDropped} msgs (flood sustentado) — fechando ws`);
+                    try { ws.close(4029, 'msg-flood'); } catch {}
+                }
+                return;   // descarta a mensagem excedente
+            }
+            p._msgTok -= 1;
+            // zera o contador de abuso só quando o cliente volta a ficar ocioso (bucket > meio cheio),
+            // pra um pico legítimo não acumular rumo ao disconnect, mas um flood contínuo acumular.
+            if (p._msgDropped && p._msgTok > MSG_BUCKET_CAP * 0.5) p._msgDropped = 0;
+        }
+
         // ─── AUTH (precede join) ──────────────────────────────────────────
         // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
         // Cria conta se não existir, devolve save server-side se houver.
@@ -4937,47 +5018,70 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             p._authAttempts.push(nowAuth);
-            let acc = getAccount(name);
-            let isNew = false;
-            if (!acc){
+            // ── Verificação de conta ASSÍNCRONA (audit 2026-06-03 — anti-DoS de event-loop) ──
+            // scrypt fora do event loop (crypto.scrypt) pra um flood de login não congelar
+            // movimento/combate/chat de TODOS (scryptSync bloqueava ~15ms cada). O guard
+            // p._authPending impede vários scrypts concorrentes no mesmo socket. A conclusão
+            // (matar-sessão + authOk) roda no callback; o resto do switch segue síncrono e intocado.
+            if (p._authPending) return;   // já há uma auth em voo neste socket
+            p._authPending = true;
+            const optEmail = isValidEmail(msg.email) ? msg.email : null;
+            const existingAcc = getAccount(name);
+            const onAuthErr = (e) => {
+                p._authPending = false;
+                recordError({ kind:'auth', player:name, msg:e && e.message, stack:e && e.stack });
+                try { ws.send(JSON.stringify({ t:'authFail', reason:'server_error' })); } catch {}
+            };
+            // Conclui a auth com a conta já resolvida. Espelha EXATAMENTE o fluxo síncrono antigo.
+            const finishAuth = (acc, isNew) => {
+                p._authPending = false;
+                if (!ws || ws.readyState !== 1) return;   // socket fechou durante o scrypt → aborta
+                // Auth ok — limpa contador
+                p._authAttempts = [];
+                p.authed = true;
+                p.authedName = acc.name;
+                // ★ CAUSA-RAIZ DO WIPE: mata QUALQUER outra sessão da mesma conta (viva OU fantasma).
+                // removeGhostsByName só pegava ghosts JÁ `disconnected` e casava por `op.name` (que é
+                // 'Anônimo' até o join) → uma 2ª sessão VIVA escapava, e era ELA, com p.* vazio, que
+                // gravava save vazio por cima do bom. Aqui casa por authedName e DERRUBA a antiga
+                // (fechar o WS → close handler só deleta quando disconnected, não salva; trava cobre o resto).
+                const _accLower = acc.name.toLowerCase();
+                for (const [oid, op] of players){
+                    if (oid === id) continue;
+                    const sameAcct = (op.authedName && op.authedName.toLowerCase() === _accLower) || (op.name === acc.name);
+                    if (!sameAcct) continue;
+                    op.disconnected = true;
+                    try {
+                        if (op.ws && op.ws.readyState === 1){
+                            op.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:'Sua conta entrou em outro lugar — esta sessão foi encerrada.' }));
+                            op.ws.close(4031, 'session-replaced');
+                        }
+                    } catch {}
+                    players.delete(oid);
+                    broadcast(null, { t:'leave', id: oid });
+                }
+                ws.send(JSON.stringify({
+                    t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0,
+                    hasEmail: !!acc.email,
+                }));
+            };
+            if (!existingAcc){
                 // Email opcional no registro inicial — user pode adicionar depois.
                 // Se passou email inválido ou em uso, conta é criada sem ele.
-                const optEmail = isValidEmail(msg.email) ? msg.email : null;
-                acc = createAccount(name, pwHash, optEmail);
-                isNew = true;
-                console.log(`[auth] nova conta: ${name}${acc.email ? ' (com email)' : ''}`);
-            } else if (!verifyAccount(name, pwHash)){
-                ws.send(JSON.stringify({ t:'authFail', reason:'bad_password' }));
-                return;
-            }
-            // Auth ok — limpa contador
-            p._authAttempts = [];
-            p.authed = true;
-            p.authedName = acc.name;
-            // ★ CAUSA-RAIZ DO WIPE: mata QUALQUER outra sessão da mesma conta (viva OU fantasma).
-            // removeGhostsByName só pegava ghosts JÁ `disconnected` e casava por `op.name` (que é
-            // 'Anônimo' até o join) → uma 2ª sessão VIVA escapava, e era ELA, com p.* vazio, que
-            // gravava save vazio por cima do bom. Aqui casa por authedName e DERRUBA a antiga
-            // (fechar o WS → close handler só deleta quando disconnected, não salva; trava cobre o resto).
-            const _accLower = acc.name.toLowerCase();
-            for (const [oid, op] of players){
-                if (oid === id) continue;
-                const sameAcct = (op.authedName && op.authedName.toLowerCase() === _accLower) || (op.name === acc.name);
-                if (!sameAcct) continue;
-                op.disconnected = true;
-                try {
-                    if (op.ws && op.ws.readyState === 1){
-                        op.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:'Sua conta entrou em outro lugar — esta sessão foi encerrada.' }));
-                        op.ws.close(4031, 'session-replaced');
+                createAccount(name, pwHash, optEmail).then(acc => {
+                    console.log(`[auth] nova conta: ${name}${acc.email ? ' (com email)' : ''}`);
+                    finishAuth(acc, true);
+                }).catch(onAuthErr);
+            } else {
+                verifyAccount(name, pwHash).then(ok => {
+                    if (!ok){
+                        p._authPending = false;
+                        try { ws.send(JSON.stringify({ t:'authFail', reason:'bad_password' })); } catch {}
+                        return;
                     }
-                } catch {}
-                players.delete(oid);
-                broadcast(null, { t:'leave', id: oid });
+                    finishAuth(existingAcc, false);
+                }).catch(onAuthErr);
             }
-            ws.send(JSON.stringify({
-                t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0,
-                hasEmail: !!acc.email,
-            }));
             return;
         }
 
@@ -5325,6 +5429,12 @@ wss.on('connection', (ws, request) => {
             if (typeof msg.highlander === 'boolean'){
                 p.highlander = msg.highlander;
             }
+            // Throttle do BROADCAST (audit 2026-06-03): toggle de PvP é humano/raro e este era
+            // o pior fan-out (global por mensagem). O ESTADO já foi atualizado acima; aqui só
+            // limitamos o re-broadcast a ~3/s. Eventual consistência via playerSync/snapshot.
+            const nowPvp = Date.now();
+            if (p._lastPvpBcastAt && nowPvp - p._lastPvpBcastAt < 300) return;
+            p._lastPvpBcastAt = nowPvp;
             broadcast(null, { t:'pvp', id, pvp:p.pvp });
             return;
         }
