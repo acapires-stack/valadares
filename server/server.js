@@ -1997,6 +1997,22 @@ function returnPlayerToTown(p, id){
     broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
 }
 
+// Respawn PvE server-autoritativo (fix do LOOP DE MORTE — 2026-06-03).
+// BUG: a morte deixava hp=0 no SERVIDOR. O respawn era 100% client-side (o cliente
+// seta hp cheio LOCAL + manda `pos`), mas o handler de `pos` IGNORA hp pelo lockdown N3
+// → ficava cliente="cheio" × servidor="morto" (0). A regen pula hp<=0, então o servidor
+// nunca recuperava sozinho. A cada pstats(hp=0) o cliente re-disparava playerDie() =
+// LOOP de morte drenando 15% de skill por ciclo (catastrófico em AFK/auto-farm, que não
+// toma poção nem reloga pra sair do 0). Agora o servidor RESSUSCITA de fato.
+function respawnPlayerServer(p, id){
+    if (!p) return;
+    p.dots = [];                                   // clean slate: sem DoT herdado da morte (não sangra pós-respawn)
+    p.hp = p.maxHp;
+    p.mp = p.maxMp;
+    if ((p.floor || 0) > 0) returnPlayerToTown(p, id);   // masmorra → cidade (zera floor + manda dungeonExit pro cliente)
+    broadcastPstatsAll(p);                         // servidor e cliente concordam (hp cheio) → o loop não se forma
+}
+
 function tickRespawns(){
     // Bosses por timer
     const now = Date.now();
@@ -2258,9 +2274,11 @@ function tickAI(){
                             // outro lado do mapa). Libera 1 pos não-adjacente (anti-teleporte).
                             if (target.hp === 0){
                                 target._posGraceUntil = Date.now() + 60000;
-                                // #5: morrer na masmorra devolve pra cidade. Sem isto o floor
-                                // não zerava → renascia colado no boss e o AI do andar seguia.
-                                if ((target.floor || 0) > 0) returnPlayerToTown(target, target.id);
+                                // Fix LOOP DE MORTE (2026-06-03): ressuscita server-side (HP/MP cheios)
+                                // + (masmorra→cidade, dentro do helper). O pstats(hp=0) já saiu acima
+                                // (broadcastPstatsAll(target)) → o cliente viu a morte/penalidade UMA vez;
+                                // aqui o servidor ressuscita pra não ficar "morto" e re-disparar playerDie.
+                                respawnPlayerServer(target, target.id);
                             }
                         }
                     }
@@ -4290,8 +4308,12 @@ function tickPlayerDots(){
                 }
                 // Morte por DoT → cliente respawna no spawn. Libera 1 pos não-adjacente.
                 p._posGraceUntil = Date.now() + 60000;
-                if ((p.floor || 0) > 0) returnPlayerToTown(p, p.id);   // #5: DoT na masmorra também devolve pra cidade
-                p.dots.length = 0;
+                // Sinaliza hp=0 ao cliente (dispara playerDie/penalidade UMA vez) ANTES de ressuscitar,
+                // senão o respawn server-side cheio faria o cliente nem ver a morte.
+                broadcastPstatsAll(p);
+                // Fix LOOP DE MORTE (2026-06-03): ressuscita server-side cheio + (masmorra→cidade).
+                // (respawnPlayerServer já zera p.dots — clean slate.)
+                respawnPlayerServer(p, p.id);
                 break;
             }
         }
@@ -7266,7 +7288,7 @@ wss.on('connection', (ws, request) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /heal · /resetquests NOME' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /setskills NOME N · /heal · /resetquests NOME' });
                     return;
                 }
                 if (cmd === '/deluser'){
@@ -7426,6 +7448,38 @@ wss.on('connection', (ws, request) => {
                     sendInvUpdate(p, { skills: p.skills });
                     broadcastPstatsAll(p);   // empurra maxHp/maxMp/hp/mp novos pro cliente na hora
                     sendTo(id, { t:'serverMsg', level:'info', text:`${skName} = ${val} (maxHP ${p.maxHp}/maxMP ${p.maxMp})` });
+                    return;
+                }
+                if (cmd === '/setskills'){
+                    // Admin: seta TODAS as skills de OUTRO player pra N (compensação do loop de morte).
+                    // O /skill acima só edita o próprio char; este alcança um alvo (online ou offline).
+                    // Uso: /setskills NOME N
+                    const sp = arg.split(/\s+/);
+                    const targetName = (sp[0] || '').trim();
+                    const val = Math.max(10, Math.min(200, parseInt(sp[1], 10) || 10));
+                    if (!targetName){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /setskills NOME N' }); return; }
+                    const acc = getAccount(targetName);
+                    if (!acc || !acc.save){ sendTo(id, { t:'serverMsg', level:'warn', text:`Conta "${targetName}" não existe (cheque o nome/maiúsculas).` }); return; }
+                    const SKILL_KEYS = ['Punho','Espada','Machado','Clava','Distância','Escudo','Magia'];
+                    if (!acc.save.skills || typeof acc.save.skills !== 'object') acc.save.skills = {};
+                    for (const sk of SKILL_KEYS){
+                        acc.save.skills[sk] = { val, xp: 0, xpNext: Math.floor(50 * Math.pow(1.15, val - 10)) };
+                    }
+                    // Alvo ONLINE? aplica no player vivo + recalcula maxHp/maxMp na hora.
+                    let note = ' (offline — vale no próximo login)';
+                    for (const tp of players.values()){
+                        if (tp.authedName && tp.authedName.toLowerCase() === targetName.toLowerCase()){
+                            tp.skills = acc.save.skills;
+                            recomputeMaxStatsServer(tp);
+                            acc.save.maxHp = tp.maxHp; acc.save.maxMp = tp.maxMp;
+                            sendInvUpdate(tp, { skills: tp.skills });
+                            broadcastPstatsAll(tp);
+                            note = ' (online — aplicado na hora)';
+                            break;
+                        }
+                    }
+                    flushAccounts();
+                    sendTo(id, { t:'serverMsg', level:'info', text:`Skills de ${targetName} = ${val} em TODAS${note}` });
                     return;
                 }
                 if (cmd === '/heal'){
