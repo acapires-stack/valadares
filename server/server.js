@@ -58,6 +58,8 @@ const mpPayments = new Map();
 // ─── HTTP handlers ──────────────────────────────────────────────────────
 const _errorRateMap = new Map();   // ip → lastErrorAt (anti-flood do /api/error)
 const _pixRateMap   = new Map();   // ip → lastCreateAt (anti-flood do /api/pix/create)
+const _ipConnCount  = new Map();   // ip → nº de conexões WS abertas (anti-flood, audit 2026-06-03)
+const MAX_CONN_PER_IP = parseInt(process.env.MAX_CONN_PER_IP, 10) || 30;   // teto generoso (CGNAT-safe p/ jogo pequeno), tunável por env
 // IP do cliente atrás do proxy do Railway. O ÚLTIMO item do X-Forwarded-For é o que o
 // proxy confiável anexou (os primeiros são injetáveis pelo cliente). Pegar split[0] era
 // spoofável → permitia burlar rate-limit E inflar o Map indefinidamente (memory leak).
@@ -4825,6 +4827,17 @@ function removeGhostsByName(name, exceptId){
 // ─── Conexões ───────────────────────────────────────────────────────────────
 wss.on('connection', (ws, request) => {
     const id = nextId++;
+    // Teto de conexões por IP (audit 2026-06-03): sem isto um host abria sockets ILIMITADOS
+    // → flood + (cada socket novo zerava o limite de auth por-conexão) alimentando o
+    // scryptSync que BLOQUEIA o event loop. Conta só conexões ACEITAS; decrementa no close.
+    // Default 30 (generoso p/ CGNAT de jogo pequeno), tunável por env MAX_CONN_PER_IP.
+    const _connIp = clientIp(request);
+    if ((_ipConnCount.get(_connIp) || 0) >= MAX_CONN_PER_IP){
+        console.warn(`[conn] teto de ${MAX_CONN_PER_IP} conexões/IP atingido — recusando (id=${id})`);
+        try { ws.close(4029, 'too-many-connections'); } catch {}
+        return;
+    }
+    _ipConnCount.set(_connIp, (_ipConnCount.get(_connIp) || 0) + 1);
     // Detecta Electron pelo User-Agent — UA do Electron sempre contém 'Electron/X.Y.Z'.
     // Importante: clientes v1.0.6 e anteriores NÃO mandam `platform` no auth,
     // então sem essa detecção do UA o gate de versão seria pulado por eles
@@ -7350,6 +7363,9 @@ wss.on('connection', (ws, request) => {
         recordError({ kind:'ws_error', player: p.name || null, msg: err.message || String(err), meta: { code: err.code || null, id } });
     });
     ws.on('close', (code, reasonBuf) => {
+        // Decrementa o contador de conexões do IP (audit 2026-06-03); limpa a entrada no 0.
+        { const _n = (_ipConnCount.get(_connIp) || 0) - 1;
+          if (_n > 0) _ipConnCount.set(_connIp, _n); else _ipConnCount.delete(_connIp); }
         const reason = reasonBuf ? reasonBuf.toString().slice(0, 100) : '';
         console.log(`[ws:close] id=${id} name=${p.name || '?'} code=${code} reason=${reason || '(empty)'}`);
         counters.ws_closes[String(code)] = (counters.ws_closes[String(code)] || 0) + 1;
