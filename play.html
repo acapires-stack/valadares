@@ -4274,40 +4274,6 @@ function snapshotDeathReplay(){
     player._lastDeathReplay = _deathReplayBuffer.slice();
     _deathReplayBuffer = [];
 }
-function damagePlayer(amount, source, attacker){
-    if (_isUpdating) return;   // janela de auto-update — combate pausado
-    // Marca último atacante pra spectator pós-morte
-    if (attacker && attacker.id != null){
-        _lastHitBy = { kind: 'mob', id: attacker.id, name: attacker.name || source || 'mob' };
-    } else if (source){
-        _lastHitBy = { kind: 'mob', id: null, name: source };
-    }
-    if (Math.random() < playerDodgeChance()){
-        log(`<span class="log-sys">Você esquivou de ${source}.</span>`);
-        gainSkillXpLocal('Escudo', 1);
-        return;
-    }
-    const crit = attacker && Math.random() < (attacker.crit || 0);
-    let raw = amount;
-    if (crit) raw *= 2;
-    // Defesa percentual (diminishing returns): def/(def+30). 30=50%, 60=67%, 90=75%
-    const def = totalDefense();
-    const reduction = def > 0 ? def / (def + 30) : 0;
-    const actual  = Math.max(1, Math.round(raw * (1 - reduction)));
-    const blocked = raw - actual;
-    player.hp = Math.max(0, player.hp - actual);
-    sndDmg();
-    addFloat(player.x, player.y, `-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
-    player.hurtTimer = crit ? 450 : 300;
-    recordReplay('hit', `${crit?'★ ':''}${source}: -${actual}`, crit ? '#ff6020' : '#ff3030');
-    const dt = blocked > 0 ? ` (${blocked} bloq · ${Math.round(reduction*100)}%)` : '';
-    log(`<span class="log-dmg">⚠ ${crit?'★ ':''}${source}: ${actual}${dt}</span>`);
-    // Skill Escudo só treina se realmente está usando um (server credita em MP)
-    if (hasShield()) gainSkillXpLocal('Escudo', 1);
-    // Status effects do atacante
-    rollAttackerStatus(attacker ? attacker.type : null);
-    if (player.hp === 0) playerDie();
-}
 
 // Centraliza as regras de status: cada mob tem chance/efeito ao bater
 function rollAttackerStatus(mobType){
@@ -5457,7 +5423,7 @@ function doAttack(m){
         return;
     }
 
-    // MELEE — caminho ativo de corpo-a-corpo (online manda attackMob; offline aplica local)
+    // MELEE — caminho ativo de corpo-a-corpo (manda attackMob; o dano/morte é autoritativo no server, o cálculo local é só p/ float/log/FX)
     // Lança 1H com meleeRange > 1: exige linha de visão (sem atravessar parede)
     if (wItem && wItem.meleeRange > 1){
         const distM = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
@@ -5568,7 +5534,7 @@ function connectMP(){
         ws = new WebSocket(wsUrl);
         log(`<span class="log-sys">Conectando em ${escapeHtml(wsUrl)}…</span>`);
     } catch (e){
-        log('<span class="log-sys">Servidor offline. Jogando sem multiplayer.</span>');
+        log('<span class="log-sys">Não foi possível conectar ao servidor — verifique o endereço.</span>');
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
         return;
@@ -11523,8 +11489,8 @@ function tickTraining(dt){
     const now = performance.now();
     if (now - training.lastTick >= TRAINING_TIME){
         if (player.gold < training.cost){ stopTraining('acabou o ouro'); return; }
-        // T3: server credita XP + debita gold (handler trainAttempt) em modo MP.
-        // Offline: aplica direto local como antes.
+        // T3: server credita XP + debita gold (handler trainAttempt). O addFloat/remaining
+        // abaixo é só feedback de UI; o progresso real é autoritativo no server.
         if (ws && ws.readyState === 1 && _wsAuthed){
             try { ws.send(JSON.stringify({ t:'trainAttempt', skill: training.skill })); } catch {}
         }
@@ -11656,7 +11622,7 @@ function pickupAt(x, y){
             // itens do lado oposto ficavam a 2 tiles e não eram pegos ("loot de trás"). #3/#6
             if (Math.abs(it.x - x) > 2 || Math.abs(it.y - y) > 2) continue;
             if (lootLockedToOther(it)) continue;   // bag travada pra outro durante o lock — não tenta catar (server rejeitaria)
-            // Só envia ids server-side (g123). Ids locais (number) são de single-player offline.
+            // Só envia ids server-side (g123) — o pickup é autoritativo no server.
             if (typeof it.id === 'string' && it.id[0] === 'g') ids.push(it.id);
         }
         if (ids.length){
