@@ -7,6 +7,48 @@
 
 ---
 
+## 🩹 Sessão 03/06/2026 (cont. 2) — FIX do LOOP DE MORTE (`bc59235`) + validação do deploy de segurança + `/setskills`
+
+Retomada "valadares". 1º reconciliei o estado: a maratona de segurança 03/06 já estava 100%
+commitada/pushada/no ar (os 3 sensíveis viraram `88c6ddb`; a memória dizia "não commitado" —
+corrigida). **Validação remota não-destrutiva do deploy** (probes WS, sem ghost session): portão
+de auth do Lote 0 ATIVO em prod (join sem auth ignorado — teste diferencial baseline×join: zero
+diferença); `/health`=200, `/api/status` maintenance:false, `/api/admin/state` com token falso →
+401. (Os internos do `88c6ddb` — rate-limit/scrypt/ts — não têm sinal externo seguro; descansam
+nos testes locais + validação in-game.)
+
+**🐛 BUG reportado pelo dono (loop de morte na M4):** AFK farmando na masmorra, "morria, aparecia
+cheio, tentava sair e morria de novo", drenando skill. **Causa-raiz (cravada no código):** a morte
+PvE deixava `hp=0` no SERVIDOR. O respawn era 100% client-side — o cliente seta hp cheio LOCAL +
+manda `pos`, mas o handler de `pos` IGNORA hp pelo lockdown N3 (server.js:5412), e
+`tickPlayerRegen` pula `hp<=0` (4148). Logo: cliente="cheio" × servidor="morto" (0). A cada
+`broadcastPstatsAll`(hp=0) o cliente re-disparava `playerDie()` (play.html:5844) = loop perdendo
+**15% skill/ciclo** (play.html:4379). Player ativo escapa (poção/heal/relog cura o 0); AFK/auto-farm
+não → loop. `returnPlayerToTown` também não restaurava HP. Gatilho provável: AFK na M4 recolocado
+pela reconexão do redeploy `88c6ddb`.
+
+**FIX (`bc59235`, server-only):** helper `respawnPlayerServer(p,id)` — zera `p.dots` + `hp/mp`
+cheios + (masmorra→cidade via `returnPlayerToTown`) + `broadcastPstatsAll`. Chamado nos 2 sites de
+morte PvE: `tickAI` (~2281) e `tickPlayerDots` (~4316), com o `pstats(0)` saindo ANTES (cliente vê
+a morte/penalidade UMA vez, depois o servidor ressuscita → nada de loop). **Segunda Chance intacto**
+(checado no `if (trySecondChance)` ANTES; o helper só roda no `else`/cooldown). **+ novo
+`/setskills NOME N`** (admin): o `/skill` só edita o próprio char; este seta as 7 skills de OUTRO
+player (online/offline). Usado `chucknorris→70` (compensação da perda no loop).
+
+**DEPLOY sem /manutencao** (dono OFFLINE): probe de presença WS confirmou **0 players online** →
+push direto seguro (a regra "nunca pushar server/** com player online" cumprida por VERIFICAÇÃO,
+não pela /manutencao). Monitor de `/health` pegou o GAP (`000` às 18:30:25 = swap do Railway) +
+estável `200` ~3min = boot limpo. **VALIDADO IN-GAME pelo dono:** morreu 1×, respawnou na cidade
+INTACTO, sem loop; HP 760/760 estável confirmado por probe ao vivo (1 evento, zero oscilação). ✅
+
+**Follow-up anotado:** PvP (`processPkDeathServerSide`) tem o MESMO gap (server hp=0 pós-morte) mas
+risco BAIXO (respawna na PZ, sem mob/pvp pra re-cutucar o loop) → aplicar o mesmo respawn lá numa
+próxima (cuidado com o fluxo de espectador). **LIÇÃO:** o lockdown de hp no `pos` (sem restore
+server-side correspondente no respawn) deixou a morte PvE com hp=0 PERMANENTE no servidor — o
+respawn era client-faked. Só validação IN-GAME pega esse tipo de desync.
+
+---
+
 ## 🔒 Sessão 03/06/2026 (cont.) — Sensíveis da auditoria: 3 server-only FEITOS, 2 ADIADOS pelo dono
 
 Retomada dos 4 itens "sensíveis/cross-file" que sobraram da auditoria (`docs/AUDITORIA_2026-06-03.md`).
