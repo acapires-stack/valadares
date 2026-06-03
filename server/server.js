@@ -71,6 +71,14 @@ function clientIp(req){
     }
     return ((req.socket && req.socket.remoteAddress) || '').toString().slice(0, 45);
 }
+// Comparação constant-time do admin token (audit 2026-06-03): `!==` curto-circuita no 1º
+// byte → vaza um oráculo de timing do segredo. timingSafeEqual exige buffers de mesmo tamanho.
+function adminTokenOk(token){
+    if (!ADMIN_TOKEN) return false;
+    const a = Buffer.from(String(token || ''), 'utf8');
+    const b = Buffer.from(ADMIN_TOKEN, 'utf8');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 // Evict entradas velhas dos rate-maps (TTL 5min). Sem isto os Maps crescem ilimitado.
 setInterval(() => {
     const cutoff = Date.now() - 5 * 60_000;
@@ -217,7 +225,7 @@ async function handleHttpRequest(req, res){
     if (req.method === 'GET' && req.url.startsWith('/api/admin/state')){
         const url = new URL(req.url, 'http://localhost');
         const token = url.searchParams.get('token') || req.headers['x-admin-token'] || '';
-        if (!ADMIN_TOKEN || token !== ADMIN_TOKEN) return httpJson(res, 401, { error:'unauthorized' });
+        if (!adminTokenOk(token)) return httpJson(res, 401, { error:'unauthorized' });
         const onlineList = [];
         for (const p of players.values()){
             if (p.disconnected || !p.name || p.name === 'Anônimo') continue;
@@ -250,7 +258,7 @@ async function handleHttpRequest(req, res){
     if (req.method === 'POST' && req.url.startsWith('/api/admin/action')){
         const url = new URL(req.url, 'http://localhost');
         const token = url.searchParams.get('token') || req.headers['x-admin-token'] || '';
-        if (!ADMIN_TOKEN || token !== ADMIN_TOKEN) return httpJson(res, 401, { error:'unauthorized' });
+        if (!adminTokenOk(token)) return httpJson(res, 401, { error:'unauthorized' });
         try {
             const body = await readBody(req);
             const kind = String(body.kind || '');
@@ -360,10 +368,10 @@ async function handleCreatePix(body, res){
 function validateMpSignature(req){
     if (!MP_WEBHOOK_SECRET){
         if (!_mpSecretWarned){
-            console.warn('[mp] MP_WEBHOOK_SECRET não configurado — webhook aceita qualquer POST (modo compat).');
+            console.error('[mp] ⚠️ MP_WEBHOOK_SECRET NÃO configurado — webhook REJEITADO (fail-closed). Configure o secret na Railway p/ creditar pagamentos. (audit 2026-06-03)');
             _mpSecretWarned = true;
         }
-        return { ok:true, reason:'no_secret' };
+        return { ok:false, reason:'no_secret' };   // fail-CLOSED: sem secret, não confia em ninguém (antes: ok:true = aceitava qualquer POST)
     }
     const sig = req.headers['x-signature'];
     const reqId = req.headers['x-request-id'];
@@ -2745,7 +2753,12 @@ function saveStateToDisk(){
         auctions: Array.from(auctions.values()),
     };
     try {
-        fs.writeFileSync(STATE_FILE, JSON.stringify(snap), 'utf8');
+        // Escrita ATÔMICA (audit 2026-06-03): tmp + rename, como o accounts.json. Antes era
+        // writeFileSync direto → crash/OOM/disco-cheio no meio corrompia o state.json e o boot
+        // caía em spawnInitial(), descartando TODOS os auctions (itens em escrow somem pra sempre).
+        const _tmp = STATE_FILE + '.tmp';
+        fs.writeFileSync(_tmp, JSON.stringify(snap), 'utf8');
+        fs.renameSync(_tmp, STATE_FILE);
     } catch(e){
         console.error('[state] erro ao salvar:', e.message);
     }
