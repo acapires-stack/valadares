@@ -2,5 +2,9 @@ server/node_modules/
 server/package-lock.json
 server/state.json
 server/accounts.json
+server/accounts_backups/
+server/errors.json
+server/mp_credited.json
+server/_*.js
 electron/node_modules/
 electron/dist/
