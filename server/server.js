@@ -4972,14 +4972,19 @@ wss.on('connection', (ws, request) => {
             // passam por handlers server-side autoritativos. saveUpload IGNORA data.skills
             // — cliente continua enviando no save por compat, mas server descarta.
             // Em divergência, próximo invUpdate corrige.
+            // ─── Quest state: completed + questFlags são SERVER-AUTORITATIVOS (audit 2026-06-03)
+            // Antes o cliente reenviava completed:[] / questFlags zerados a cada save e
+            // re-reivindicava quests infinitamente (gold/itens/permaBuffs ilimitados via
+            // questTurnIn). Agora o server IGNORA esses dois campos no saveUpload e mantém os
+            // seus (mutados só por questTurnIn). `active` e `daily` seguem do cliente — active
+            // é só "em quais quests estou"; daily tem anti-replay próprio em p.dailyClaim.
             if (data.quests && typeof data.quests === 'object'){
-                p.quests = {
-                    active: (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {},
-                    completed: Array.isArray(data.quests.completed) ? data.quests.completed.slice(0, 200) : [],
-                    daily: (data.quests.daily && typeof data.quests.daily === 'object') ? data.quests.daily : null,
-                };
+                p.quests = p.quests || { active:{}, completed:[], daily:null };
+                p.quests.active = (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {};
+                p.quests.daily  = (data.quests.daily && typeof data.quests.daily === 'object') ? data.quests.daily : null;
+                if (!Array.isArray(p.quests.completed)) p.quests.completed = [];   // completed: preserva o do server
             }
-            if (data.questFlags && typeof data.questFlags === 'object') p.questFlags = data.questFlags;
+            // questFlags (progresso de chains): server é dono — NÃO honra o do cliente.
             if (data.flags && typeof data.flags === 'object') p.flags = data.flags;
             // talents + permaBuffs são SERVER-AUTORITATIVOS (talentAlloc/talentRespec/quests).
             // saveUpload NÃO os toca — o cliente envia por compat, mas o server IGNORA e persiste
@@ -5016,6 +5021,11 @@ wss.on('connection', (ws, request) => {
             // M6 Pet — server-autoritativo (nível/xp concedido na morte; equip via playerSync).
             // Persiste o estado VIVO do server (igual talents/permaBuffs); ignora o do cliente.
             if (p.pets && typeof p.pets === 'object') data.pets = p.pets;
+            // Quest state autoritativo (audit 2026-06-03): persiste o p.quests / p.questFlags
+            // VIVOS do server — completed + progresso de chain são mutados SÓ por questTurnIn.
+            // Nunca os do cliente, que reenviava completed:[] / flags zerados pra re-claim infinito.
+            if (p.quests && typeof p.quests === 'object') data.quests = p.quests;
+            if (p.questFlags && typeof p.questFlags === 'object') data.questFlags = p.questFlags;
             data.pet = p.pet || null;
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
