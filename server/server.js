@@ -4930,6 +4930,15 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
+        // ─── PORTÃO DE AUTENTICAÇÃO (audit 2026-06-03 — CRÍTICO) ───────────
+        // Tudo que não seja ping/auth (ambos já tratados acima, cada um com seu
+        // próprio return) exige sessão autenticada. Sem isto, um socket podia
+        // mandar `join` com name='alcione' (sem senha) e o isAdmin(p.name) POR
+        // NOME o tratava como admin total (/gold infinito, /deluser, etc).
+        // Agora nenhum handler com estado roda sem auth, e a autorização de
+        // admin usa p.authedName (conta provada), nunca o p.name falsificável.
+        if (!p.authed || !p.authedName) return;
+
         // ─── SAVE upload (snapshot do save do player) ─────────────────────
         if (msg.t === 'saveUpload') {
             if (!p.authed || !p.authedName) return;
@@ -5055,13 +5064,10 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'join') {
-            // Se o cliente passou pelo auth, força o nome da conta (impede impersonate)
-            if (p.authed && p.authedName){
-                p.name = p.authedName;
-            } else {
-                // Cliente legado (sem auth) — aceita pelo nome cru por compat, mas não persiste save
-                p.name = String(msg.name || 'Anônimo').substring(0, 14);
-            }
+            // Auth é obrigatório (portão acima) → o nome é SEMPRE o da conta provada.
+            // Nunca confiar em msg.name: era o vetor de impersonate e de admin sem
+            // senha (join com name='alcione'). (audit 2026-06-03)
+            p.name = p.authedName;
             p.x     = msg.x ?? 50;
             p.y     = msg.y ?? 50;
             p.pvp   = !!msg.pvp;
@@ -6813,7 +6819,7 @@ wss.on('connection', (ws, request) => {
             // CRITICAL FIX (audit 29/05): handler antes não checava admin
             // → qualquer player podia broadcast spam/phishing via F12.
             // Agora exige isAdmin + rate limit 2s.
-            if (!isAdmin(p.name)){
+            if (!isAdmin(p.authedName)){
                 console.warn(`[announce] tentativa não-admin de ${p.name || '?'}`);
                 return;
             }
@@ -6976,7 +6982,7 @@ wss.on('connection', (ws, request) => {
             if (!toName || !text) return;
             // Rate-limit (mesmo balde do chat normal)
             const now = Date.now();
-            if (!isAdmin(p.name)){
+            if (!isAdmin(p.authedName)){
                 p.lastChatAt = p.lastChatAt || 0;
                 if (now - p.lastChatAt < 500){
                     if (now - (p.lastChatRateWarn || 0) > 2000){
@@ -7007,7 +7013,7 @@ wss.on('connection', (ws, request) => {
             if (!text) return;
             // Rate-limit: 1 msg / 500ms por player (admin não conta — comandos)
             const now = Date.now();
-            if (!isAdmin(p.name)){
+            if (!isAdmin(p.authedName)){
                 p.lastChatAt = p.lastChatAt || 0;
                 if (now - p.lastChatAt < 500){
                     // Avisa só na primeira recusa dentro de uma janela de 2s pra não floodar de volta
@@ -7042,8 +7048,9 @@ wss.on('connection', (ws, request) => {
                 }
                 return;
             }
-            // Comandos admin (só se nome do player tá em ADMIN_NAMES)
-            if (text.startsWith('/') && isAdmin(p.name)){
+            // Comandos admin — autorização pela conta PROVADA (p.authedName), nunca
+            // pelo nome de exibição p.name (que era falsificável via join). (audit 2026-06-03)
+            if (text.startsWith('/') && isAdmin(p.authedName)){
                 const [cmd, ...rest] = text.split(' ');
                 const arg = rest.join(' ').trim();
                 if (cmd === '/say' && arg){
@@ -7199,7 +7206,7 @@ wss.on('connection', (ws, request) => {
                 if (cmd === '/gold'){
                     const v = Math.max(0, Math.min(100000000, parseInt(arg, 10) || 0));
                     p.gold = v;
-                    const acc = getAccount(p.name);
+                    const acc = getAccount(p.authedName);
                     if (acc && acc.save) acc.save.gold = v;
                     syncGoldRank(p.name, p.gold);
                     flushAccounts();
@@ -7219,7 +7226,7 @@ wss.on('connection', (ws, request) => {
                     p.skills[skName].xp = 0;
                     p.skills[skName].xpNext = Math.floor(50 * Math.pow(1.15, val - 10));
                     recomputeMaxStatsServer(p);   // recalcula maxHp/maxMp pelas skills novas (senão ficam no valor antigo até relogar)
-                    const acc = getAccount(p.name);
+                    const acc = getAccount(p.authedName);
                     if (acc && acc.save){
                         acc.save.skills = p.skills;
                         acc.save.maxHp = p.maxHp; acc.save.maxMp = p.maxMp;
