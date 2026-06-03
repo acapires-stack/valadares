@@ -5103,8 +5103,12 @@ wss.on('connection', (ws, request) => {
             // Nunca confiar em msg.name: era o vetor de impersonate e de admin sem
             // senha (join com name='alcione'). (audit 2026-06-03)
             p.name = p.authedName;
-            p.x     = msg.x ?? 50;
-            p.y     = msg.y ?? 50;
+            // Posição AUTORITATIVA (audit 2026-06-03): ignora msg.x/msg.y (era teleporte p/
+            // qualquer tile do overworld + fuga de PvP por reconexão). Default = spawn seguro;
+            // o bloco do save abaixo sobrescreve pela ÚLTIMA posição PERSISTIDA no server,
+            // validada. A janela pós-restart ainda força a PZ.
+            p.x     = SAFE_CX;
+            p.y     = SAFE_CY;
             p.pvp   = !!msg.pvp;
             p.hp    = msg.hp ?? 100;
             p.maxHp = msg.maxHp ?? 100;
@@ -5113,6 +5117,11 @@ wss.on('connection', (ws, request) => {
             ensurePlayerInvSlots(p);
             const acc = p.authedName ? getAccount(p.authedName) : null;
             if (acc && acc.save){
+                // Posição: última PERSISTIDA no server (validada). Default SAFE acima cobre
+                // save sem x/y, tile inválido, ou logout na masmorra (coord não-walkable no
+                // overworld → cai na PZ). Fecha o teleporte por msg.x/y forjado. (audit 2026-06-03)
+                { const _x = Math.floor(Number(acc.save.x)), _y = Math.floor(Number(acc.save.y));
+                  if (Number.isFinite(_x) && Number.isFinite(_y) && isWalkable(_x, _y)){ p.x = _x; p.y = _y; } }
                 if (acc.save.inv && typeof acc.save.inv === 'object') p.inv = { ...acc.save.inv };
                 if (acc.save.equipped && typeof acc.save.equipped === 'object') p.equipped = { ...p.equipped, ...acc.save.equipped };
                 if (acc.save.chests && typeof acc.save.chests === 'object'){
@@ -5668,6 +5677,11 @@ wss.on('connection', (ws, request) => {
                 if (!p.pvp) return;
                 if (!tgt.pvp && !tgt.disconnected) return;   // se vivo, precisa estar com PvP
             }
+            // PZ server-side (audit 2026-06-03): a regra "não ataca na Zona Segura" só existia
+            // no cliente → um frame WS cru atacava/saqueava na PZ (inclusive o corpo ghost de
+            // quem deslogou na cidade, que nem exige tgt.pvp). Aborta se atacante OU alvo estiver
+            // na safe zone. Duelo consensual e bot 007 ficam de fora (combate combinado).
+            if (!inDuel && !isBotTarget && (playerInSafe(p) || playerInSafe(tgt))) return;
             // Caps server-side: cliente envia amount/range mas sem cap aceitaria
             // {amount:99999, range:999} one-shottando alvo do outro lado do mapa.
             const rangeCap = pvpRangeCapServer(p);
@@ -6532,6 +6546,11 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'attackMob') {
             const m = monsters.get(msg.monsterId);
             if (!m || m.hp <= 0) { sendTo(id, { t:'mobMissing', mobId: msg.monsterId }); return; }
+            // Mesmo-andar (audit 2026-06-03): a masmorra (andares 1-5) vive na MESMA caixa de
+            // coords globais (40-60) que o overworld → sem isto, um player no andar N acumulava
+            // dano no boss do andar 5 (coords determinísticas) e roubava o loot via damageBy/
+            // distributeBossLoot sem nunca ter descido. Exige o mesmo floor.
+            if ((p.floor || 0) !== (m.floor || 0)) { sendTo(id, { t:'mobMissing', mobId: msg.monsterId }); return; }
             // Rate-limit anti-spam: o ataque legítimo MAIS rápido é 680ms (o cliente
             // trava o input nesse ritmo). 200ms tem 3,4× de folga — não afeta jogo
             // limpo, mas barra a rajada de hits forjados que (mesmo com o teto de 600)
