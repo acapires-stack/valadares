@@ -7,6 +7,25 @@
 
 ---
 
+## 🧹 Sessão 03/06/2026 — Resíduo da remoção do offline (fecha o que o 01/06 deixou)
+
+Dono pediu pra "remover o offline". **Verificação primeiro** (pedido dele: "verifica se já não fizemos isso") —
+e de fato **já tinha sido feito** na sessão 01/06 (`3456f36`+`1d924ca`, offline INTEIRO, deployado e testado
+in-game). Sobrou só **cauda de código morto** que aquele lote neutralizou mas não arrancou:
+
+- **`damagePlayer`** (~34 linhas) — dano client-side com dodge/crit/defesa/morte. Único chamador era a AI de
+  mob local, removida em `1d924ca` → **zero referências** no repo (só sobra menção em comentário no server.js).
+  Removida. (Escapou do 01/06 pq não é "símbolo de mob" — o grep de verificação de lá não pegava.)
+- **Log enganoso** no `catch` de `connectMP`: "Servidor offline. Jogando sem multiplayer." → "Não foi possível
+  conectar ao servidor" (não existe mais jogo sem server).
+- **Comentários defasados** (melee/train/pickup) que diziam "offline aplica local" — hoje só o server é
+  autoritativo (o cálculo local é só float/log/FX). `gainSkillXpLocal` mantido no-op de propósito (call sites).
+
+**Client-only (Vercel).** JS inline compila (0 erros). PR #4 squash-merged em `main` (`8a2d592`), build verde.
+Sem `server/**` → sem reconexão/`/manutencao`. ROADMAP atualizado (P0.6: offline+protocolo ✅ FECHADOS).
+
+---
+
 ## 🐛 Sessão 02/06/2026 — RESPEC recalcula do ZERO (subtração deixava resíduo do bug de inflação)
 
 Dono (manhã, pós-deploy do `fab98ca` + 1 respec): "respec não resetou tudo" — Crítico/Esquiva ainda em **50/50**.
