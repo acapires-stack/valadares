@@ -1917,13 +1917,18 @@ function spawnInitial(){
 function spawnDungeonMobs(){
     // Fase 3: mantém população em CADA andar com player; limpa andares vazios
     // (masmorra efêmera — não simula andar sem ninguém e evita acúmulo de mobs).
+    // M7 FIX: só andares de MASMORRA (1..DUNGEON_MAX_FLOOR). A arena usa floor 9000+ como
+    // instância isolada e NÃO pode entrar aqui — senão este tick (8s) spawnava SOMBRA/CARRASCO
+    // escalados por 1.6^9000 (≈1.2M HP / one-shot de 60k) na arena, e deletava o grid da arena
+    // no meio da partida. O grid/limpeza da arena é gerido por endArenaMatch/returnFromArena.
+    const isDungeonFloor = (f) => f >= 1 && f <= DUNGEON_MAX_FLOOR;
     const floorsWithPlayers = new Set();
-    for (const p of players.values()){ const f = p.floor || 0; if (f >= 1) floorsWithPlayers.add(f); }
+    for (const p of players.values()){ const f = p.floor || 0; if (isDungeonFloor(f)) floorsWithPlayers.add(f); }
     for (const m of Array.from(monsters.values())){
-        if ((m.floor || 0) >= 1 && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
+        if (isDungeonFloor(m.floor || 0) && !floorsWithPlayers.has(m.floor || 0)) monsters.delete(m.id);
     }
-    // M4 3b: descarta o grid de andares vazios (efêmero; regenera ao reentrar)
-    for (const f of [...dungeonFloors.keys()]){ if (!floorsWithPlayers.has(f)) dungeonFloors.delete(f); }
+    // M4 3b: descarta o grid de andares de MASMORRA vazios (efêmero; regenera ao reentrar)
+    for (const f of [...dungeonFloors.keys()]){ if (isDungeonFloor(f) && !floorsWithPlayers.has(f)) dungeonFloors.delete(f); }
     for (const floor of floorsWithPlayers){
         const g = getDungeonFloor(floor);   // M4 3b: grid do andar (layout/escadas/floor tiles)
         // ★ Boss do último andar: 1 por vez, com cooldown de respawn pós-morte (anti-farm)
