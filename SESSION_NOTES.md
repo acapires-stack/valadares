@@ -58,10 +58,32 @@ pelo legado e **re-deriva o stored a partir do SHA-256** (migração transparent
 - `node --check` em todos + JS inline do play.html/reset.html sem erro. **Preview**: play.html carrega sem erro de
   console, `hashPwSha256` funciona no browser (s256: estável), modal+overlay da arena renderizam (screenshots ok).
 
-**⏳ NÃO deployado ainda** — aguarda o ritual: dono ativa `/manutencao`, confirma 0 players, logout limpo, então
-push único (server/** + cliente). Pós-deploy: dono faz **1 login real** (valida migração pwHash) + **1 partida de
-arena com alt** (valida o 1v1 completo, que o harness cobre só via forfeit). PENDENTE M7 fase 2: 3v3 + cosmético
-semanal. `pwHash` legacy pode sair em algumas semanas (após todos migrarem).
+**✅ DEPLOYADO — CONFIRMADO NO AR (04/06, via curl+git):** `main`==`origin/main` (após `fetch`); server
+`ws.valadares.app.br` `/health` ok + `maintenance:false`; cliente `valadares.app.br/jogar` serve o código novo
+(`Mestre da Arena`/`arenaModal`/`arenaJoin`/`hashPwSha256`) → Railway+Vercel auto-deployaram (a frase "não
+deployado" abaixo era snapshot de meio-de-sessão, antes do push). Deploy 1 = `1efd23a` via `/manutencao`.
+
+**🐛 2 HOTFIXES pegos NO TESTE IN-GAME (e por isso valeu testar ao vivo):**
+1. **`5516b76` (server, 2º `/manutencao`) — mob de masmorra spawnando na arena:** o tick `spawnDungeonMobs` (8s)
+   coletava TODOS os floors≥1 com players → incluía o floor 9001 da arena → spawnava SOMBRA/CARRASCO escalados
+   por `1.6^9000` (~1,2M HP / dano 60k) que one-shotavam os lutadores. Fix: `spawnDungeonMobs` trata SÓ floors
+   `1..DUNGEON_MAX_FLOOR` (`isDungeonFloor`) nas 3 varreduras. Harness ganhou regressão (match >8s → 0 mob → **12/12**).
+2. **`3afd7ba` (cliente, Vercel SEM `/manutencao`) — "Não pode PvP na PZ" travava o ataque na arena:** em
+   `pvpAttackPlayer` o `playerInSafeZone()` é floor-gated mas o 2º termo `inSafeZone(tgt.x,tgt.y)` era CRU — e a
+   região da arena (44-56×46-54) se sobrepõe às coords da PZ (46-54) → bloqueava. Fix: gate por floor (só PZ no
+   floor 0). **LIÇÃO: instância que sobrepõe coords da PZ + `inSafeZone` cru = ação bloqueada na instância; sempre floor-gatear.**
+
+**✅ VALIDADO IN-GAME (04/06):** dono logou (migração pwHash OK — está jogando na conta dele), entrou na fila da
+arena, casou e **venceu o bot várias vezes** — caminho MORTE-POR-COMBATE (`processPkDeathServerSide`→arena→
+`endArenaMatch`, que o harness só cobria via forfeit) CONFIRMADO + rating atualizado + retorno à cidade. Também
+validei buff de conta de teste via painel admin ao vivo (`/setskills ClaudeBot 80` — exigiu o bot mandar 1
+`saveUpload` p/ criar `acc.save`, senão o `/setskills` diz "conta não existe"). **Conta de teste `ClaudeBot`
+ficou na prod** (skill 80, rating arena ~969, só derrotas) — inofensiva; dono pode `/deluser ClaudeBot` quando quiser.
+
+**⏳ PENDENTE:** spot-check opcional de 1 quest de mob in-game (contagem server-side; já 3/3 no harness). **M7 fase
+2: 3v3 (party) + recompensa cosmética semanal (ladder do `arenaRating` no rollover).** `pwHash` legacy pode sair
+em ~semanas (após todos migrarem). **Bot de arena turbinado (arma + IA esperta)** = pedido em aberto pra dar
+luta de verdade (hoje é punho puro, dano capado em 100 — vira só tanque ao buffar skill).
 
 ---
 

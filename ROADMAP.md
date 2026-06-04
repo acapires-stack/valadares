@@ -125,8 +125,10 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
   floor único reusando a máquina de masmorra), **rating Elo** (`arenaRating`/`arenaWins`/`arenaLosses`), **aposta
   de gold OPCIONAL** (vencedor leva o pote; 0 = só rating), countdown 3s, forfeit/timeout. NPC "Mestre da Arena"
   (50,54). Bundle: **Lote 1b** (quest kill/visita server-auth) + **pwHash djb2→SHA-256 dual-format** fechados
-  junto. Testado por harness isolado (pwHash 7/7, arena 10/10, lote1b 3/3) + preview. ⏳ **aguarda /manutencao
-  pra deploy** (server/** + cliente). Detalhes no `SESSION_NOTES.md`.
+  junto. Testado por harness isolado (pwHash 7/7, arena **12/12**, lote1b 3/3) + preview. ✅ **DEPLOYADO + VALIDADO
+  IN-GAME 04/06** (`1efd23a` + 2 hotfixes pegos no teste ao vivo: `5516b76` mob-de-masmorra-spawnando-na-arena +
+  `3afd7ba` "PvP na PZ" travava ataque na arena). Dono venceu o bot — caminho morte-por-combate confirmado.
+  Detalhes no `SESSION_NOTES.md`.
 - 🎯 **Fase 2 (próxima)** — bracket **3v3** (times via party) + **recompensa cosmética semanal** (ladder de
   `arenaRating` premiada no rollover de temporada).
 
