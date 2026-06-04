@@ -738,7 +738,7 @@ const QUEST_CHAINS = {
     cripta: {
         npc:'eremita',
         stages: [
-            { id:'cr1', kind:'visit',     reward:{ gold:80,  xp:{Magia:50} } },
+            { id:'cr1', kind:'visit', x:18, y:18, radius:3, reward:{ gold:80,  xp:{Magia:50} } },
             { id:'cr2', kind:'item',      type:'OSSO',     count:8,  reward:{ gold:200, xp:{Magia:80} } },
             { id:'cr3', kind:'mob',       type:'SKELETON', count:10, reward:{ gold:400, xp:{Magia:150}, item:{OSSO:5} } },
             { id:'cr4', kind:'mob',       type:'MINOTAUR', count:1,  reward:{ gold:800, xp:{Magia:200}, item:{POTION_MP:5}, flag:'flag_vendedor_revealed' } },
@@ -773,7 +773,7 @@ const QUEST_CHAINS = {
         stages: [
             { id:'vh1', kind:'multiItem', items:{ SILK:5, OSSO:3 }, reward:{ gold:500, xp:{Magia:50} } },
             { id:'vh2', kind:'mob',   type:'SPIDER',     count:5, reward:{ gold:600, xp:{Espada:80} } },
-            { id:'vh3', kind:'visit', reward:{ gold:800, xp:{'Distância':80} } },
+            { id:'vh3', kind:'visit', x:78, y:18, radius:3, reward:{ gold:800, xp:{'Distância':80} } },
             { id:'vh4', kind:'item',  type:'CORACAO_HL', count:1, reward:{ gold:200 } },
             { id:'vh5', kind:'choice', choices: [
                 { reward:{ item:{COROA_SOMBRIA:1}, gold:5000, flag:'flag_vohrim_traitor' } },
@@ -1281,6 +1281,10 @@ const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
 const GHOST_TIMEOUT_MS = 3 * 60 * 1000;   // body stays 3 min após logout
 
+// M7 Arena — posição do Mestre da Arena (borda inferior-central da PZ, livre de
+// outros NPCs/features por ≥2 sqm). Definido aqui (antes de NPC_POSITIONS) pra
+// entrar na lista de proteção; o módulo da arena (mais abaixo) reusa esta const.
+const ARENA_NPC = { x: 50, y: 54 };
 // Posições dos NPCs (espelhadas do cliente). Mob não ataca player adjacente a NPC (mini-PZ raio 2).
 // Mantém aqui no server porque cliente é dono dos NPCs (não precisa sincronizar tudo).
 // Também usado pelo questTurnIn pra validar adjacência no momento da entrega.
@@ -1308,6 +1312,7 @@ const NPC_POSITIONS = [
     QUEST_NPCS.crepusculo,
     QUEST_NPCS.vohrim,
     QUEST_NPCS.vendedor,
+    ARENA_NPC,   // mestre da arena (M7) — protege o tile como os outros NPCs da PZ
 ];
 const NPC_PROTECT_RADIUS = 1;   // 3×3 ao redor do NPC (suficiente pra ler modal)
 const NPC_PROTECT_COMBAT_GRACE_MS = 2000;   // ao atacar, perde proteção por 2s
@@ -3235,16 +3240,32 @@ async function createAccount(name, clientHash, email){
     queueSaveAccounts();
     return a;
 }
-async function verifyAccount(name, clientHash){
+// Verifica a conta aceitando DOIS formatos de transporte do cliente (dual-format):
+//   clientHash       = SHA-256 forte (cliente novo) — ou djb2, se for cliente ANTIGO
+//   clientHashLegacy = djb2 fraco (o cliente novo manda como fallback de migração)
+// O stored do server é sempre scrypt(clientHash). Migração transparente: conta cujo
+// stored foi derivado do djb2 valida pelo legado e é RE-DERIVADA a partir do SHA-256
+// forte no 1º login com o cliente novo. Cliente ANTIGO (sem clientHashLegacy) segue
+// funcionando: o djb2 vem em clientHash e casa direto (+ rehash sha256-legado→scrypt).
+async function verifyAccount(name, clientHash, clientHashLegacy){
     const a = getAccount(name);
     if (!a) return false;
-    if (!(await verifyPwHashAsync(a.pwHash, clientHash))) return false;   // async: não bloqueia o event loop
-    // Rehash transparente: migra conta legada (sha256) pra scrypt no login bem-sucedido.
-    if (!String(a.pwHash || '').startsWith('scrypt$')){
-        a.pwHash = hashPwScrypt(clientHash);   // raro (1× por conta legada) — sync ok
-        queueSaveAccounts();
+    // 1) Transporte atual (SHA-256 do cliente novo, OU djb2 do cliente antigo)
+    if (await verifyPwHashAsync(a.pwHash, clientHash)){
+        if (!String(a.pwHash || '').startsWith('scrypt$')){
+            a.pwHash = hashPwScrypt(clientHash);   // rehash sha256-legado→scrypt (1× por conta)
+            queueSaveAccounts();
+        }
+        return true;
     }
-    return true;
+    // 2) Fallback djb2: conta ainda não migrada pro transporte forte → migra AGORA
+    if (clientHashLegacy && await verifyPwHashAsync(a.pwHash, clientHashLegacy)){
+        a.pwHash = hashPwScrypt(clientHash);       // re-deriva o stored a partir do SHA-256 forte
+        queueSaveAccounts();
+        console.log(`[auth] ${name}: transporte de senha migrado djb2→SHA-256`);
+        return true;
+    }
+    return false;
 }
 // Admin: lê estado salvo + online de um player. Retorna null se conta não existe.
 function adminCheckUser(rawName){
@@ -3854,6 +3875,63 @@ function distributeBossLoot(m, loot, fallbackKiller){
     }
 }
 
+// ─── Lote 1b: progresso de quest SERVER-AUTORITATIVO ──────────────────────
+// Antes a contagem de kills/visitas era client-trusted (F12 forjava progress e
+// reivindicava reward sem fazer a quest). Agora o SERVER conta kills (attackMob +
+// handleMobDeath) e visitas (handler pos), valida no turnIn, e manda questProgress
+// pro cliente refletir. questFlags já é server-owned/persistido (audit 03/06).
+function serverCurrentChainStage(p, chainId){
+    const chain = QUEST_CHAINS[chainId];
+    if (!chain) return null;
+    const prog = (p.questFlags && p.questFlags[chainId]) || {};
+    for (const stage of chain.stages){ if (!prog[stage.id]) return stage; }   // 1ª não-completa
+    return null;
+}
+function creditQuestKill(p, mobType){
+    if (!p || !mobType) return;
+    // Quests simples ativas (goal mob do tipo)
+    if (p.quests && p.quests.active){
+        for (const qid of Object.keys(p.quests.active)){
+            const q = QUESTS_BY_ID[qid];
+            if (!q || q.goal.kind !== 'mob' || q.goal.type !== mobType) continue;
+            if (Array.isArray(p.quests.completed) && p.quests.completed.includes(qid)) continue;
+            const st = p.quests.active[qid] || (p.quests.active[qid] = { progress: 0 });
+            if ((st.progress | 0) < q.goal.count){
+                st.progress = (st.progress | 0) + 1;
+                sendTo(p.id, { t:'questProgress', kind:'simple', questId: qid, progress: st.progress });
+            }
+        }
+    }
+    // Chains (stage atual = mob do tipo)
+    for (const chainId of Object.keys(QUEST_CHAINS)){
+        const stage = serverCurrentChainStage(p, chainId);
+        if (!stage || stage.kind !== 'mob' || stage.type !== mobType) continue;
+        p.questFlags = p.questFlags || {};
+        p.questFlags[chainId] = p.questFlags[chainId] || {};
+        const key = stage.id + '_kills';
+        if ((p.questFlags[chainId][key] || 0) < stage.count){
+            p.questFlags[chainId][key] = (p.questFlags[chainId][key] || 0) + 1;
+            p.questFlags[chainId][stage.id + '_started'] = true;   // UI: marca engajado
+            sendTo(p.id, { t:'questProgress', kind:'chain', chainId, flags: p.questFlags[chainId] });
+        }
+    }
+}
+function creditQuestVisit(p, x, y){
+    if (!p) return;
+    for (const chainId of Object.keys(QUEST_CHAINS)){
+        const stage = serverCurrentChainStage(p, chainId);
+        if (!stage || stage.kind !== 'visit' || typeof stage.x !== 'number') continue;
+        if (Math.max(Math.abs(x - stage.x), Math.abs(y - stage.y)) > (stage.radius || 1)) continue;
+        p.questFlags = p.questFlags || {};
+        p.questFlags[chainId] = p.questFlags[chainId] || {};
+        if (!p.questFlags[chainId][stage.id + '_visited']){
+            p.questFlags[chainId][stage.id + '_visited'] = true;
+            p.questFlags[chainId][stage.id + '_started'] = true;
+            sendTo(p.id, { t:'questProgress', kind:'chain', chainId, flags: p.questFlags[chainId] });
+        }
+    }
+}
+
 // Resolve a morte de um mob (extração da lógica do attackMob handler) —
 // reutilizado pra mortes por DoT (veneno/sangra/fogo).
 function handleMobDeath(m, killerId){
@@ -3915,6 +3993,7 @@ function handleMobDeath(m, killerId){
         gainSkillXpServer(killer, skillUsed, m.xp || 1);
         xpGained = m.xp || 1;
         petGain = gainPetXp(killer, m.xp || 1);
+        creditQuestKill(killer, m.type);   // Lote 1b: conta kill de quest (DoT/unificado)
     }
     if (killer && killer.ws.readyState === 1){
         killer.ws.send(JSON.stringify({
@@ -4024,6 +4103,11 @@ function processPkDeathServerSide(killer, victim){
     // Duelo: usa endDuel em vez do flow normal (não dá selo, não dropa)
     if (killer.duel && killer.duel.opponentId === victim.id && victim.duel && victim.duel.opponentId === killer.id){
         endDuel(killer, victim, false);
+        return;
+    }
+    // M7 Arena: mesma partida → endArenaMatch (sem selo, sem drop de gold/HL, sem pena de skill)
+    if (killer.arena && victim.arena && killer.arena.matchId === victim.arena.matchId){
+        endArenaMatch(killer, victim, false);
         return;
     }
     // Gold drop: 10% do que vítima tinha (alinhado com ghost kill)
@@ -4588,6 +4672,216 @@ function tickDuels(){
 }
 setInterval(safeTick('tickDuels', tickDuels), 5_000);
 
+// ─── M7 Arena PvP 1v1 (matchmaking) ───────────────────────────────────────
+// Diferente do duelo (desafio DIRETO, no mundo): a arena é FILA + matchmaking
+// (o server casa 2 players com a MESMA aposta) numa INSTÂNCIA isolada — um floor
+// único por partida, reusando a máquina de masmorra (broadcast/colisão/teleporte
+// já são filtrados por floor). Aposta de gold é OPCIONAL (0 = só rating). Rating
+// é Elo (base 1000). Recompensa cosmética semanal fica pra fase 2 do M7.
+const arenaQueue = [];                       // [{ id, name, wager, joinedAt }]
+const arenaMatches = new Map();              // matchId -> { id1, id2, floor, wager, startedAt }
+let arenaFloorSeq = 9000;                    // floor único por match (> DUNGEON_MAX_FLOOR=5, sem colisão)
+let arenaMatchSeq = 0;
+const ARENA_FIGHT_DELAY_MS = 3000;           // countdown 3..2..1 antes de liberar o hit
+const ARENA_MAX_MS = 3 * 60 * 1000;          // empate por timeout (espelha DUEL_MAX_MS)
+const ARENA_REGION = { x0: 44, y0: 46, x1: 56, y1: 54 };   // sala 13×9 (coords isoladas por floor)
+const ARENA_SPAWN_A = { x: 46, y: 50 };      // canto O
+const ARENA_SPAWN_B = { x: 54, y: 50 };      // canto L
+const ARENA_JOIN_COOLDOWN_MS = 800;          // anti-spam de entrar/sair da fila
+
+// Grid da arena: sala retangular fechada (paredes na borda, chão dentro). MESMO
+// shape que genDungeonGrid → applyDungeonGrid no cliente e dungeonTileWalkable no
+// server funcionam sem mudança. Sem escadas (stairs nulas).
+function genArenaGrid(floor){
+    const { x0, y0, x1, y1 } = ARENA_REGION;
+    const W = x1 - x0 + 1, H = y1 - y0 + 1;
+    const rows = [], walkable = new Set(), floorTiles = [];
+    for (let ly = 0; ly < H; ly++){
+        let row = '';
+        for (let lx = 0; lx < W; lx++){
+            const isWall = (lx === 0 || ly === 0 || lx === W - 1 || ly === H - 1);
+            row += isWall ? '0' : '1';
+            if (!isWall){
+                const gx = x0 + lx, gy = y0 + ly;
+                walkable.add(gx + ',' + gy); floorTiles.push({ x: gx, y: gy });
+            }
+        }
+        rows.push(row);
+    }
+    const stairs = { spawn: { x: ARENA_SPAWN_A.x, y: ARENA_SPAWN_A.y }, up: null, down: null, boss: null };
+    return { floor, region: { x0, y0, x1, y1 }, rows, walkable, floorTiles, stairs };
+}
+
+// Teleporta UM player pra instância da arena (clone enxuto de enterDungeonFloor).
+// O grid já está registrado em dungeonFloors (startArenaMatch). spawn = canto do player.
+function enterArenaFloor(p, id, floor, spawn, opponentName){
+    p.floor = floor;
+    const g = dungeonFloors.get(floor);
+    p.x = spawn.x; p.y = spawn.y;
+    if (p.ws && p.ws.readyState === 1){
+        p.ws.send(JSON.stringify({
+            t:'dungeonEnter', floor, dir:'down', x:p.x, y:p.y,
+            grid: { region: g.region, rows: g.rows },
+            stairs: g.stairs,
+            players: snapshotPlayers(floor).filter(sp => sp.id !== id),
+            mobs: [], groundDrops: [],
+            arena: true, opponentName,
+        }));
+    }
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+}
+
+// Tira o player da arena de volta pra cidade, ao lugar de ORIGEM (clone de
+// returnPlayerToTown mas usa p._arenaReturn em vez de DUNGEON_RETURN).
+function returnFromArena(p, id){
+    if ((p.floor || 0) > 0) broadcast(id, { t:'leave', id }, p.floor);
+    p.pvp = !!p._pvpBeforeArena;
+    const ret = p._arenaReturn || DUNGEON_RETURN;
+    p.floor = 0;
+    p.x = ret.x; p.y = ret.y;
+    if (p.ws && p.ws.readyState === 1){
+        p.ws.send(JSON.stringify({
+            t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
+            players: snapshotPlayers(0).filter(sp => sp.id !== id),
+            mobs: snapshotMobs(0),
+            groundDrops: snapshotGroundDrops(0),
+        }));
+    }
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+    p._pvpBeforeArena = undefined;
+    p._arenaReturn = undefined;
+}
+
+// Elo padrão (K=32, piso 100). Muta arenaRating dos dois registros de ranking.
+function arenaEloUpdate(rW, rL, draw){
+    const Ra = rW.arenaRating ?? 1000, Rb = rL.arenaRating ?? 1000;
+    const Ea = 1 / (1 + Math.pow(10, (Rb - Ra) / 400));
+    const Eb = 1 - Ea;
+    const Sa = draw ? 0.5 : 1, Sb = draw ? 0.5 : 0;
+    const K = 32;
+    rW.arenaRating = Math.max(100, Math.round(Ra + K * (Sa - Ea)));
+    rL.arenaRating = Math.max(100, Math.round(Rb + K * (Sb - Eb)));
+}
+
+// Cria a partida: escrow da aposta (igual startDuel), gera+registra o grid,
+// teleporta os 2 pra instância (curados, DoTs limpos, PvP forçado), countdown.
+function startArenaMatch(p1, p2, wager){
+    // Re-valida gold no momento do match (pode ter mudado desde a fila)
+    if (wager > 0 && ((p1.gold || 0) < wager || (p2.gold || 0) < wager)){
+        for (const pp of [p1, p2]){
+            if ((pp.gold || 0) >= wager){
+                arenaQueue.push({ id: pp.id, name: pp.name, wager, joinedAt: Date.now() });
+                sendTo(pp.id, { t:'arenaQueued', wager, size: arenaQueue.length, requeued: true });
+            } else {
+                sendTo(pp.id, { t:'arenaCancel', reason:'no_gold' });
+            }
+        }
+        return;
+    }
+    // Escrow (igual startDuel)
+    if (wager > 0){
+        p1.gold = Math.max(0, (p1.gold || 0) - wager);
+        p2.gold = Math.max(0, (p2.gold || 0) - wager);
+        syncGoldRank(p1.name, p1.gold);
+        syncGoldRank(p2.name, p2.gold);
+    }
+    const matchId = ++arenaMatchSeq;
+    const floor = ++arenaFloorSeq;
+    dungeonFloors.set(floor, genArenaGrid(floor));
+    const fightAt = Date.now() + ARENA_FIGHT_DELAY_MS;
+    arenaMatches.set(matchId, { id1: p1.id, id2: p2.id, floor, wager, startedAt: Date.now() });
+    const setup = (p, opp) => {
+        p._pvpBeforeArena = !!p.pvp;
+        p._arenaReturn = { x: p.x, y: p.y };
+        p.pvp = true;
+        p.dots = [];                       // sem DoT residual de mob entrando na arena
+        p.hp = p.maxHp; p.mp = p.maxMp;    // começa cheio
+        p.arena = { matchId, opponentId: opp.id, opponentName: opp.name, floor, wager, fightAt };
+    };
+    setup(p1, p2);
+    setup(p2, p1);
+    // Teleporta os 2 (sequencial → o 2º já enxerga o 1º no snapshot do floor)
+    enterArenaFloor(p1, p1.id, floor, ARENA_SPAWN_A, p2.name);
+    enterArenaFloor(p2, p2.id, floor, ARENA_SPAWN_B, p1.name);
+    sendTo(p1.id, { t:'arenaCountdown', until: fightAt, opponentName: p2.name, wager });
+    sendTo(p2.id, { t:'arenaCountdown', until: fightAt, opponentName: p1.name, wager });
+    broadcastPstatsAll(p1); broadcastPstatsAll(p2);
+    console.log(`[arena] match ${matchId} floor ${floor}: ${p1.name} vs ${p2.name} (wager ${wager})`);
+}
+
+// Resolve a partida: pote (2× ao vencedor / refund no empate), Elo, W/L,
+// arenaEnd, cura os 2, teleporta de volta, limpa estado/instância.
+function endArenaMatch(winner, loser, draw){
+    const wager   = (winner.arena && winner.arena.wager)   ?? (loser.arena && loser.arena.wager)   ?? 0;
+    const matchId = (winner.arena && winner.arena.matchId) ?? (loser.arena && loser.arena.matchId);
+    const floor   = (winner.arena && winner.arena.floor)   ?? (loser.arena && loser.arena.floor);
+    if (wager > 0){
+        if (draw){
+            winner.gold = (winner.gold || 0) + wager;
+            loser.gold  = (loser.gold  || 0) + wager;
+        } else {
+            winner.gold = (winner.gold || 0) + wager * 2;
+        }
+        syncGoldRank(winner.name, winner.gold);
+        syncGoldRank(loser.name,  loser.gold);
+    }
+    const rW = ensureRanking(winner.name), rL = ensureRanking(loser.name);
+    if (rW && rL){
+        arenaEloUpdate(rW, rL, draw);
+        if (!draw){ rW.arenaWins = (rW.arenaWins || 0) + 1; rL.arenaLosses = (rL.arenaLosses || 0) + 1; }
+    }
+    sendTo(winner.id, { t:'arenaEnd', winner:true,  draw:!!draw, wager, opponentName: loser.name,  rating: rW ? rW.arenaRating : 1000, gold: winner.gold });
+    sendTo(loser.id,  { t:'arenaEnd', winner:false, draw:!!draw, wager, opponentName: winner.name, rating: rL ? rL.arenaRating : 1000, gold: loser.gold });
+    if (draw) broadcastMsg('warn', `⚔ Arena: ${winner.name} e ${loser.name} empataram.`);
+    else broadcastMsg('event', `🏆 ${winner.name} venceu a Arena contra ${loser.name}!` + (wager > 0 ? ` (+${wager * 2}g)` : ''));
+    // Cura os 2 (esporte: começa e termina cheio; o perdedor não cai morto na cidade)
+    winner.hp = winner.maxHp; winner.mp = winner.maxMp; winner.dots = [];
+    loser.hp  = loser.maxHp;  loser.mp  = loser.maxMp;  loser.dots = [];
+    winner.arena = null; loser.arena = null;
+    returnFromArena(winner, winner.id);
+    returnFromArena(loser, loser.id);
+    broadcastPstatsAll(winner); broadcastPstatsAll(loser);
+    if (matchId != null) arenaMatches.delete(matchId);
+    if (floor != null) dungeonFloors.delete(floor);
+    console.log(`[arena] match ${matchId} fim: ${draw ? 'empate' : winner.name + ' venceu'} (wager ${wager})`);
+}
+
+function tickArena(){
+    const now = Date.now();
+    // 1. Timeout de partidas (empate, refund)
+    for (const [mid, m] of [...arenaMatches]){
+        if (now - m.startedAt <= ARENA_MAX_MS) continue;
+        const p1 = players.get(m.id1), p2 = players.get(m.id2);
+        if (p1 && p2 && p1.arena && p2.arena && p1.arena.matchId === mid && p2.arena.matchId === mid){
+            endArenaMatch(p1, p2, true);
+        } else {
+            // órfã (algum sumiu sem fechar) — limpa instância e devolve quem sobrou
+            arenaMatches.delete(mid);
+            dungeonFloors.delete(m.floor);
+            for (const pp of [p1, p2]) if (pp && pp.arena && pp.arena.matchId === mid){ pp.arena = null; returnFromArena(pp, pp.id); }
+        }
+    }
+    // 2. Tira da fila quem saiu / entrou em duelo / arena / masmorra
+    for (let i = arenaQueue.length - 1; i >= 0; i--){
+        const e = arenaQueue[i], pp = players.get(e.id);
+        if (!pp || pp.arena || pp.duel || (pp.floor || 0) !== 0) arenaQueue.splice(i, 1);
+    }
+    // 3. Casa 2 com a MESMA aposta (mais antigos primeiro)
+    for (let i = 0; i < arenaQueue.length; i++){
+        let matched = false;
+        for (let j = i + 1; j < arenaQueue.length; j++){
+            if (arenaQueue[i].wager !== arenaQueue[j].wager) continue;
+            const a = arenaQueue[i], b = arenaQueue[j];
+            arenaQueue.splice(j, 1); arenaQueue.splice(i, 1);   // remove os 2 (j > i → ordem ok)
+            const p1 = players.get(a.id), p2 = players.get(b.id);
+            if (p1 && p2) startArenaMatch(p1, p2, a.wager);
+            matched = true; break;
+        }
+        if (matched) i = -1;   // array mutou → reinicia o scan
+    }
+}
+setInterval(safeTick('tickArena', tickArena), 2_000);
+
 // ─── Party 1-4 players ─────────────────────────────────────────────────────
 // Grupo efêmero (não persiste). Lidera quem cria. Compartilha XP de mob por
 // proximidade (raio 12) e dá visibilidade do HP dos colegas no minimap.
@@ -5020,6 +5314,7 @@ wss.on('connection', (ws, request) => {
             }
             const name = String(msg.name || '').trim().substring(0, 14);
             const pwHash = String(msg.pwHash || '');
+            const pwHashLegacy = String(msg.pwHashLegacy || '');   // djb2 (migração dual-format pwHash)
             if (!validAccountName(name)){
                 ws.send(JSON.stringify({ t:'authFail', reason:'bad_name' }));
                 return;
@@ -5095,7 +5390,7 @@ wss.on('connection', (ws, request) => {
                     finishAuth(acc, true);
                 }).catch(onAuthErr);
             } else {
-                verifyAccount(name, pwHash).then(ok => {
+                verifyAccount(name, pwHash, pwHashLegacy).then(ok => {
                     if (!ok){
                         p._authPending = false;
                         try { ws.send(JSON.stringify({ t:'authFail', reason:'bad_password' })); } catch {}
@@ -5157,7 +5452,19 @@ wss.on('connection', (ws, request) => {
             // é só "em quais quests estou"; daily tem anti-replay próprio em p.dailyClaim.
             if (data.quests && typeof data.quests === 'object'){
                 p.quests = p.quests || { active:{}, completed:[], daily:null };
-                p.quests.active = (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {};
+                // active: o cliente diz EM QUAIS quests está; mas o `progress` de mob é
+                // SERVER-AUTORITATIVO (Lote 1b) — preserva o do server, IGNORA o do cliente
+                // (senão F12 forja progress e reivindica sem matar). Quest nova entra em 0;
+                // o server incrementa em creditQuestKill. (Caveat: quest de mob em andamento
+                // no deploy recontа do zero — item-quest não afeta, deriva do inventário.)
+                const _clientActive = (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {};
+                const _prevActive = p.quests.active || {};
+                const _mergedActive = {};
+                for (const _qid of Object.keys(_clientActive)){
+                    const _prev = _prevActive[_qid];
+                    _mergedActive[_qid] = { progress: (_prev && typeof _prev.progress === 'number') ? _prev.progress : 0 };
+                }
+                p.quests.active = _mergedActive;
                 p.quests.daily  = (data.quests.daily && typeof data.quests.daily === 'object') ? data.quests.daily : null;
                 if (!Array.isArray(p.quests.completed)) p.quests.completed = [];   // completed: preserva o do server
             }
@@ -5431,6 +5738,7 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             p.dir = (typeof msg.dir === 'string' && msg.dir.length < 8) ? msg.dir : p.dir;
+            if ((p.floor || 0) === 0) creditQuestVisit(p, p.x, p.y);   // Lote 1b: visita de quest server-auth
             // Lockdown N3: hp/maxHp são server-authoritative. msg.hp/msg.maxHp do
             // cliente NUNCA são aceitos aqui (F12 `{t:'pos',hp:99999}` virava invencível).
             // Mutações de hp vêm de tickAI/tickPlayerDots/pvpAttack/spellCast/invConsume
@@ -5827,6 +6135,11 @@ wss.on('connection', (ws, request) => {
             const nowPvp = Date.now();
             if (nowPvp - (p._lastPvpAt || 0) < 400) return;
             p._lastPvpAt = nowPvp;
+            // M7 Arena: durante o countdown ninguém bate; e o alvo só pode ser o oponente da partida.
+            if (p.arena){
+                if (Date.now() < p.arena.fightAt) return;
+                if (tgt.id !== p.arena.opponentId) return;
+            }
             // Duelo consensual: permite ataque mesmo sem PvP toggle, se for o oponente
             const inDuel = p.duel && p.duel.opponentId === tgt.id && tgt.duel && tgt.duel.opponentId === id;
             // Bot 007 — qualquer player pode atacar sem precisar de PvP toggle
@@ -6033,6 +6346,11 @@ wss.on('connection', (ws, request) => {
                 p.quests.completed = p.quests.completed || [];
                 if (!p.quests.active[q.id]) return reject('not_active');
                 if (p.quests.completed.includes(q.id)) return reject('already_done');
+                // Lote 1b: progresso de mob é server-autoritativo — valida no turn-in.
+                if (q.goal.kind === 'mob'){
+                    const prog = (p.quests.active[q.id] && p.quests.active[q.id].progress) | 0;
+                    if (prog < q.goal.count) return reject('not_done');
+                }
                 // valida items se a goal pede coleta
                 if (q.goal.kind === 'item' && !hasInv(p, q.goal.type, q.goal.count)) return reject('no_items');
                 // consome items + marca completa
@@ -6070,6 +6388,9 @@ wss.on('connection', (ws, request) => {
                         if (!hasInv(p, k, n)) return reject('no_items');
                     }
                 }
+                // Lote 1b: mob/visit são server-autoritativos — valida progresso real.
+                if (stage.kind === 'mob'  && ((progress[stage.id + '_kills']) | 0) < stage.count) return reject('not_done');
+                if (stage.kind === 'visit' && !progress[stage.id + '_visited']) return reject('not_done');
                 // resolve reward (choice pega de stage.choices[choiceId].reward)
                 let reward = stage.reward;
                 if (stage.kind === 'choice'){
@@ -6554,6 +6875,7 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'descendDungeon') {
+            if (p.arena) return;   // M7: sem escada dentro da arena
             const now = Date.now();
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
@@ -6572,6 +6894,7 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'exitDungeon') {
+            if (p.arena) return;   // M7: sem escada dentro da arena
             const now = Date.now();
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
@@ -6897,6 +7220,7 @@ wss.on('connection', (ws, request) => {
                 // Ranking: incrementa mobKills (e bossKills se for unique) — all-time + season
                 bumpMobKill(p.name, !!m.unique);
                 sharePartyKill(p, m);
+                creditQuestKill(p, m.type);   // Lote 1b: conta kill de quest (melee/magia)
             }
             return;
         }
@@ -7001,6 +7325,44 @@ wss.on('connection', (ws, request) => {
                 sendTo(from.id, { t:'serverMsg', level:'warn', text:`${p.name} recusou o duelo.` });
             }
             sendTo(id, { t:'serverMsg', level:'info', text:'Duelo recusado.' });
+            return;
+        }
+
+        // ─── M7 Arena — fila + matchmaking ───────────────────────────────
+        if (msg.t === 'arenaJoin') {
+            const now = Date.now();
+            if (p._lastArenaQAt && now - p._lastArenaQAt < ARENA_JOIN_COOLDOWN_MS) return;
+            p._lastArenaQAt = now;
+            if (p.arena){ sendTo(id, { t:'arenaCancel', reason:'in_match' }); return; }
+            if (p.duel){ sendTo(id, { t:'arenaCancel', reason:'in_duel' }); return; }
+            if ((p.floor || 0) !== 0){ sendTo(id, { t:'arenaCancel', reason:'not_in_city' }); return; }
+            if (chebyshev(p.x, p.y, ARENA_NPC.x, ARENA_NPC.y) > 1){ sendTo(id, { t:'arenaCancel', reason:'not_at_npc' }); return; }
+            const already = arenaQueue.find(e => e.id === id);
+            if (already){ sendTo(id, { t:'arenaQueued', wager: already.wager, size: arenaQueue.length }); return; }
+            let wager = Math.max(0, Math.min(1_000_000, msg.wager | 0));
+            if (wager > 0 && wager < 50) wager = 50;             // mínimo 50g se apostar (igual duelo)
+            if (wager > (p.gold || 0)){ sendTo(id, { t:'arenaCancel', reason:'no_gold' }); return; }
+            arenaQueue.push({ id, name: p.name, wager, joinedAt: now });
+            sendTo(id, { t:'arenaQueued', wager, size: arenaQueue.length });
+            console.log(`[arena] ${p.name} entrou na fila (wager ${wager}, fila ${arenaQueue.length})`);
+            return;
+        }
+        if (msg.t === 'arenaLeaveQueue') {
+            const qi = arenaQueue.findIndex(e => e.id === id);
+            if (qi >= 0) arenaQueue.splice(qi, 1);
+            sendTo(id, { t:'arenaCancel', reason:'left' });
+            return;
+        }
+        if (msg.t === 'arenaStats') {
+            const r = ensureRanking(p.name);
+            sendTo(id, {
+                t:'arenaStats',
+                rating: (r && r.arenaRating) || 1000,
+                wins:   (r && r.arenaWins)   || 0,
+                losses: (r && r.arenaLosses) || 0,
+                queued: arenaQueue.some(e => e.id === id),
+                inMatch: !!p.arena,
+            });
             return;
         }
 
@@ -7559,6 +7921,20 @@ wss.on('connection', (ws, request) => {
                 p.duel = null;
             }
         }
+        // M7 Arena ativa: abandonar conta como derrota (oponente leva o pote)
+        if (p.arena){
+            const opp = players.get(p.arena.opponentId);
+            if (opp && opp.arena && opp.arena.opponentId === id){
+                endArenaMatch(opp, p, false);
+            } else {
+                const fl = p.arena.floor, mid = p.arena.matchId;
+                p.arena = null;
+                arenaMatches.delete(mid);
+                dungeonFloors.delete(fl);
+            }
+        }
+        // Sai da fila da arena se estava esperando
+        { const _qi = arenaQueue.findIndex(e => e.id === id); if (_qi >= 0) arenaQueue.splice(_qi, 1); }
         // Party: ao desconectar, sai da party (se único membro, dissolve)
         if (p.name){
             const party = findPartyOfPlayer(p.name);

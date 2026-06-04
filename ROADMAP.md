@@ -120,9 +120,15 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 **M6 Pet cosmético** [~60min]
 - Segue o player, sem combat impact
 
-**M7 Arena PvP** [2 sessões]
-- Bracket 1v1 e 3v3 com matchmaking simples (queue → match quando 2/6 prontos)
-- Recompensa cosmética semanal
+**M7 Arena PvP** [fase 1 ✅ 04/06 · falta fase 2]
+- ✅ **Fase 1 (04/06)** — 1v1 com **matchmaking** (fila → match com wager igual), **arena isolada** (instância em
+  floor único reusando a máquina de masmorra), **rating Elo** (`arenaRating`/`arenaWins`/`arenaLosses`), **aposta
+  de gold OPCIONAL** (vencedor leva o pote; 0 = só rating), countdown 3s, forfeit/timeout. NPC "Mestre da Arena"
+  (50,54). Bundle: **Lote 1b** (quest kill/visita server-auth) + **pwHash djb2→SHA-256 dual-format** fechados
+  junto. Testado por harness isolado (pwHash 7/7, arena 10/10, lote1b 3/3) + preview. ⏳ **aguarda /manutencao
+  pra deploy** (server/** + cliente). Detalhes no `SESSION_NOTES.md`.
+- 🎯 **Fase 2 (próxima)** — bracket **3v3** (times via party) + **recompensa cosmética semanal** (ladder de
+  `arenaRating` premiada no rollover de temporada).
 
 **✅ M8 Auction House** (RESOLVIDO sessão 29/05 — 1 sessão, não 2)
 - NPC Leiloeiro em (53, 47). Modal BROWSE/MINHAS/VENDER.

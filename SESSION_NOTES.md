@@ -7,6 +7,64 @@
 
 ---
 
+## ⚔ Sessão 04/06/2026 — M7 Arena PvP 1v1 (matchmaking) + Lote 1b (quest server-auth) + pwHash dual-format
+
+Retomada "valadares" → "fazer as coisas do M7". Escopo travado com o dono (AskUserQuestion): **1v1 núcleo**
+(fila+matchmaking+instância+rating+countdown), **aposta de gold OPCIONAL** (vencedor leva o pote), e **+ os 2
+itens de segurança adiados** (Lote 1b + pwHash). 3v3 e recompensa cosmética semanal ficam pra **fase 2 do M7**.
+
+**Descoberta que barateou tudo:** o duelo 1v1 consensual (`/duelo`) já existia inteiro. E a arena vira
+**instância reusando a máquina de masmorra** — `enterDungeonClient` força `player.pvp=true` (cliente) + o
+handler de dungeon força `p.pvp=true` (server) → combate, isolamento (broadcast por floor), teleporte e
+colisão **já funcionam** num floor único por partida. Só faltou a camada de fila/match/rating + UI.
+
+**A — Arena 1v1 (server `server.js` + cliente `play.html`):**
+- Estado: `arenaQueue`/`arenaMatches`/`arenaFloorSeq` (floor 9000+ por match, isolado), `ARENA_NPC` (50,54 —
+  borda inferior da PZ, livre de outros NPCs), `genArenaGrid` (sala 13×9 no shape de `genDungeonGrid`).
+- Ciclo: `arenaJoin {wager}` (valida adjacência ao NPC + gold) → `tickArena` (2s) casa 2 com **wager igual** →
+  `startArenaMatch` (escrow estilo `startDuel`, grid registrado em `dungeonFloors`, teleporta os 2 curados/PvP
+  forçado/DoTs limpos via `enterArenaFloor`) → `arenaCountdown` (3s; `pvpAttack` bloqueia hit antes do `fightAt`
+  e só aceita o oponente) → morte (ramo de arena em `processPkDeathServerSide`) ou forfeit/timeout →
+  `endArenaMatch` (pote 2×/refund + **Elo K=32 piso 100** `arenaRating`/`arenaWins`/`arenaLosses` — auto-persiste
+  no `rankings`/`state.json` + `returnFromArena` ao lugar de origem + cura). Abandono (close) e guards
+  `if(p.arena)return` nos handlers de escada.
+- Cliente: NPC "Mestre da Arena" + modal `#arenaModal` (rating/W-L, input de aposta, entrar/sair) + overlay de
+  countdown "⚔ vs NOME → LUTE!" + handlers `arenaStats/arenaQueued/arenaCancel/arenaCountdown/arenaEnd`. Branch
+  `msg.arena` no `enterDungeonClient` (chrome próprio, sem escada). **Guards de morte sem penalidade**
+  (`player._arena`) no `pstats`/`playerDie`/`pkDeathBy` — server resolve via `arenaEnd` (sem perda de 15% skill).
+
+**B — Lote 1b (quest progress server-autoritativo, `server.js` + `play.html`):**
+Antes a contagem de kills/visitas era client-trusted (F12 forjava `progress`/`_kills`/`_visited` e reivindicava
+sem fazer). Agora: `creditQuestKill` nos **2** caminhos de morte (attackMob melee/magia + handleMobDeath/DoT) +
+`creditQuestVisit` no handler `pos` (coords das visitas cr1=18,18 / vh3=78,18 adicionadas ao server). Validação
+no `questTurnIn` (mob: `progress>=count`; visit: `_visited`). `saveUpload` para de confiar no `progress` de mob
+do cliente (server-owned, quest nova entra em 0). Cliente: handler `questProgress` (aplica valor absoluto do
+server por cima do otimista local). **Caveat (aceito pelo dono):** quest de mob/visita **em andamento no deploy
+reconta do zero** — item-quest não afeta (deriva do inventário).
+
+**C — pwHash djb2→SHA-256 (dual-format, `server.js` + `play.html`):**
+O `clientHash` é opaco pro server (faz scrypt por cima). O cliente agora manda **`pwHash`=SHA-256 forte** +
+**`pwHashLegacy`=djb2**. `verifyAccount(name, hash, legacy)`: tenta o forte; se falhar e vier o legado, valida
+pelo legado e **re-deriva o stored a partir do SHA-256** (migração transparente, sem fricção). Cliente ANTIGO
+(só djb2 em `pwHash`, sem legacy) **segue funcionando** (casa direto). `reset.html` fica em djb2 de propósito
+(o login migra; mudar arriscaria lockout). `admin.html` usa token, não muda.
+
+**Testes (harnesses isolados `server/_test_*.js`, ignorados pelo git):** sobem o server num tempdir + WS cru.
+- `_test_pwhash.js` **7/7**: conta nova SHA-256, re-login, senha errada, conta legada migra, pós-migração só
+  SHA-256, backward-compat (cliente antigo djb2). **Sem lockout.**
+- `_test_arena.js` **10/10**: auth dos 2, matchmaking (wager igual), countdown + oponente certo, teleporte
+  `dungeonEnter arena:true`, forfeit→vencedor+Elo mudou+retorno `dungeonExit`.
+- `_test_lote1b.js` **3/3**: `progress` forjado via saveUpload → turn-in **rejeitado `not_done`** (exploit fechado).
+- `node --check` em todos + JS inline do play.html/reset.html sem erro. **Preview**: play.html carrega sem erro de
+  console, `hashPwSha256` funciona no browser (s256: estável), modal+overlay da arena renderizam (screenshots ok).
+
+**⏳ NÃO deployado ainda** — aguarda o ritual: dono ativa `/manutencao`, confirma 0 players, logout limpo, então
+push único (server/** + cliente). Pós-deploy: dono faz **1 login real** (valida migração pwHash) + **1 partida de
+arena com alt** (valida o 1v1 completo, que o harness cobre só via forfeit). PENDENTE M7 fase 2: 3v3 + cosmético
+semanal. `pwHash` legacy pode sair em algumas semanas (após todos migrarem).
+
+---
+
 ## 🩹 Sessão 03/06/2026 (cont. 2) — FIX do LOOP DE MORTE (`bc59235`) + validação do deploy de segurança + `/setskills`
 
 Retomada "valadares". 1º reconciliei o estado: a maratona de segurança 03/06 já estava 100%

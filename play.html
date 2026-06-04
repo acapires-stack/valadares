@@ -876,7 +876,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #petModal, #forgotPwdModal, #partyInviteModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #arenaModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #petModal, #forgotPwdModal, #partyInviteModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -2083,6 +2083,39 @@
     </div>
 </div>
 
+<div id="arenaModal" style="display:none">
+    <div class="chest-box" style="min-width:360px;max-width:440px;text-align:center">
+        <div class="chest-title">⚔ ARENA PvP — 1v1</div>
+        <div style="padding:6px 10px;color:#c8a050;font-size:12px;line-height:1.6">
+            Fila com matchmaking. O servidor casa você com outro desafiante de aposta igual, numa arena isolada.
+            <div style="margin-top:10px;display:flex;justify-content:space-around;font-size:12px">
+                <div>Rating<br><b id="arenaRating" style="color:#ffd060;font-size:18px">—</b></div>
+                <div>Vitórias<br><b id="arenaWins" style="color:#74d176;font-size:18px">0</b></div>
+                <div>Derrotas<br><b id="arenaLosses" style="color:#d07d7d;font-size:18px">0</b></div>
+            </div>
+            <div style="margin-top:14px">
+                💰 Aposta (gold):
+                <input id="arenaWagerInput" type="number" min="0" step="50" value="0"
+                    style="width:90px;background:#0a0805;border:1px solid #3a2d10;color:#ffcc40;padding:4px;text-align:center;font-family:inherit">
+                <div style="font-size:10px;color:#888;margin-top:3px">0 = só rating · mín 50g se apostar · vencedor leva o dobro</div>
+            </div>
+            <div id="arenaStatus" style="margin-top:12px;font-size:12px;color:#9ab0c0;min-height:18px"></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;padding:6px 14px 14px">
+            <button class="craft-btn" id="arenaJoinBtn" style="background:#3a2818;border-color:#7a5a20;color:#ffcc40" onclick="arenaJoinQueue()">⚔ ENTRAR NA FILA</button>
+            <button class="craft-btn" id="arenaLeaveBtn" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d;display:none" onclick="arenaLeaveQueue()">✗ SAIR DA FILA</button>
+        </div>
+        <button class="chest-close" onclick="closeArenaModal()">×</button>
+    </div>
+</div>
+
+<div id="arenaOverlay" style="display:none;position:fixed;top:14%;left:0;right:0;text-align:center;z-index:150;pointer-events:none">
+    <div style="display:inline-block;background:rgba(20,5,8,0.85);border:1px solid #6a2a2a;border-radius:4px;padding:10px 22px;color:#ffd060;font-size:15px;text-shadow:0 0 8px #000">
+        <span id="arenaOverlayVs">⚔ ARENA</span>
+        <div id="arenaOverlayCount" style="font-size:30px;color:#ff6040;margin-top:4px">3</div>
+    </div>
+</div>
+
 <div id="tradeModal" style="display:none">
     <div class="chest-box" style="min-width:680px;max-width:760px">
         <div class="chest-title">🤝 NEGOCIAÇÃO</div>
@@ -2494,6 +2527,7 @@ const NPCS = [
     { id:'atendente', name:'Atendente',    pos:{x:47,y:53}, body:'#5a3a8a', hat:'#aacfff', action:'quests',   hint:'quests'  },
     { id:'tintureira',name:'Tintureira',   pos:{x:53,y:53}, body:'#5a2050', hat:'#e040a0', action:'dye',      hint:'tinturaria' },
     { id:'domador',   name:'Domador',      pos:{x:50,y:47}, body:'#2a5a3a', hat:'#8af0a0', action:'petshop',  hint:'pets' },
+    { id:'arena',     name:'Mestre da Arena', pos:{x:50,y:54}, body:'#4a2030', hat:'#ff6040', action:'arena',   hint:'arena' },
     // Mundo — chains narrativas (cada um tem seu local temático)
     { id:'eremita',   name:'Eremita',          pos:{x:22,y:22}, body:'#3a3a3a', hat:'#8a4040', action:'chain', sanctuary:true, chain:'cripta' },
     { id:'ferreiro',  name:'Velho Ferreiro',   pos:{x:78,y:22}, body:'#5a3018', hat:'#aa6020', action:'chain', sanctuary:true, chain:'forja'  },
@@ -2568,6 +2602,7 @@ function npcInteractionHint(npc){
     if (npc.action === 'casino')   return { label:'cassino',        marker:'🎰', markerColor:'#cc2050' };
     if (npc.action === 'dye')      return { label:'tinturaria',     marker:'🎨', markerColor:'#e040a0' };
     if (npc.action === 'auction')  return { label:'leilão',          marker:'⚖', markerColor:'#80a0c0' };
+    if (npc.action === 'arena')    return { label:'arena PvP',       marker:'⚔', markerColor:'#ff6040' };
     if (npc.action === 'chain'){
         const stages = (player.questFlags && player.questFlags[npc.chain]) || null;
         const chain = QUEST_CHAINS[npc.chain];
@@ -2593,6 +2628,7 @@ function interactNpc(npc){
     if (npc.action === 'dye')      { openDye(); return; }
     if (npc.action === 'auction')  { openAuction(); return; }
     if (npc.action === 'petshop')  { openPetShop(); return; }
+    if (npc.action === 'arena')    { openArenaQueue(); return; }
     if (npc.action === 'chain')    { openChainDialog(npc); return; }
 }
 const TRAINING_TIME = 2000;   // ms por sessão
@@ -4358,6 +4394,7 @@ function applyBlessingRevive(){
 }
 
 async function playerDie(){
+    if (player._arena){ player.hp = Math.max(1, player.hp || 1); return; }   // M7 Arena: morte resolvida pelo server (arenaEnd), sem penalidade
     if (player._dying) return;   // re-entrancy guard durante janela de bênção
     player._dying = true;
     try {
@@ -4438,9 +4475,17 @@ function enterDungeonClient(msg){
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot não vaza entre andares
     if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }); }
-    const goingDown = msg.dir !== 'up';
-    if (typeof showServerToast === 'function') showServerToast('warn', goingDown ? `⬇ Andar ${player.floor} das Profundezas — PvP FORÇADO. Cuidado.` : `⬆ Subiu pro Andar ${player.floor}.`, null, 4500);
-    log(`<span class="log-die">━━ AS PROFUNDEZAS · Andar ${player.floor} ━━</span>`);
+    if (msg.arena){
+        // M7 Arena: instância isolada (não é masmorra). Chrome próprio, sem escadas.
+        dungeonStairs = null;
+        player._arena = player._arena || { opponentName: msg.opponentName };
+        if (typeof showServerToast === 'function') showServerToast('warn', `⚔ ARENA vs ${msg.opponentName || '?'} — sem fuga. Vença!`, null, 4000);
+        log(`<span class="log-die">━━ ARENA · vs ${escapeHtml(msg.opponentName || '?')} ━━</span>`);
+    } else {
+        const goingDown = msg.dir !== 'up';
+        if (typeof showServerToast === 'function') showServerToast('warn', goingDown ? `⬇ Andar ${player.floor} das Profundezas — PvP FORÇADO. Cuidado.` : `⬆ Subiu pro Andar ${player.floor}.`, null, 4500);
+        log(`<span class="log-die">━━ AS PROFUNDEZAS · Andar ${player.floor} ━━</span>`);
+    }
 }
 function exitDungeonClient(msg){
     player.floor = 0;
@@ -4827,7 +4872,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal','arenaModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -5493,7 +5538,8 @@ function tickRegen(dt){
 // ═══════════════════════════════════════════════════════════════════════════
 let ws = null;
 let _wsAuthed = false;        // true após authOk do server (save server-side liberado)
-let _authPwHash = null;       // hash da senha pra mandar no auth ao (re)conectar
+let _authPwHash = null;       // transporte FORTE (SHA-256) da senha pro auth ao (re)conectar
+let _authPwHashLegacy = null; // transporte LEGADO (djb2) — migração dual-format no server
 let _didInitialAuth = false;  // marca primeira auth da sessão (login). Reconexão = true
 const remotePlayers = {}; // id -> {x,y,dir,name,hp,maxHp}
 
@@ -5571,7 +5617,7 @@ function connectMP(){
         }
         // Se temos pwHash, autentica primeiro. O `join` é mandado quando authOk chegar.
         if (_authPwHash){
-            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash, email: _authEmail || undefined, platform: CLIENT_PLATFORM, clientVersion: CLIENT_VERSION })); } catch {}
+            try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash, pwHashLegacy: _authPwHashLegacy || undefined, email: _authEmail || undefined, platform: CLIENT_PLATFORM, clientVersion: CLIENT_VERSION })); } catch {}
             // Fallback: se server não responder ao auth em 8s, joina como legado (sem sync)
             const wsAtAuth = ws;
             setTimeout(() => {
@@ -5686,6 +5732,7 @@ function handleMP(msg){
         showServerToast(reason === 'maintenance' ? 'warn' : 'admin', txt, null, 4000);
         _wsAuthed = false;
         _authPwHash = null;
+        _authPwHashLegacy = null;
         try { ws.close(); } catch {}
         // Limpa credenciais locais erradas SÓ em senha incorreta (não em manutenção!)
         if (reason === 'bad_password' && player.name){
@@ -5841,7 +5888,10 @@ function handleMP(msg){
             if (typeof msg.mp === 'number') player.mp = msg.mp;
             if (typeof msg.maxMp === 'number') player.maxMp = msg.maxMp;
             if (typeof msg.scReadyAt === 'number') player.scReadyAt = msg.scReadyAt;   // 🕯️ Segunda Chance: cooldown p/ o modal
-            if (wasAlive && player.hp === 0 && !player._dying) playerDie();
+            if (wasAlive && player.hp === 0 && !player._dying){
+                if (player._arena) player.hp = 1;   // M7 Arena: sem penalidade local; o server resolve via arenaEnd
+                else playerDie();
+            }
             return;
         }
         // HP/MP de outro player
@@ -6150,12 +6200,28 @@ function handleMP(msg){
             bad_choice:'Escolha inválida.',
             bad_kind:'Tipo de quest inválido.',
             bad_daily:'Recompensa não bate com a tabela diária.',
+            not_done:'Você ainda não completou os objetivos da quest.',
         };
         const text = reasons[msg.reason] || 'Servidor rejeitou a entrega.';
         log(`<span class="log-sys">⚠ ${text}</span>`);
         // Toast visível no centro — o log vai pra aba COMBATE e o player pode
         // estar na aba CHAT, fazendo a falha parecer silenciosa ("não dá nada").
         if (typeof showServerToast === 'function') showServerToast('warn', `⚠ ${text} (${msg.reason})`, null, 5000);
+    } else if (msg.t === 'questProgress'){
+        // Lote 1b: progresso de quest é server-autoritativo (kill/visita). Aplica o
+        // valor ABSOLUTO do server por cima do otimista local e atualiza a UI.
+        if (msg.kind === 'simple' && msg.questId){
+            player.quests = player.quests || { active:{}, completed:[], daily:null };
+            player.quests.active = player.quests.active || {};
+            player.quests.active[msg.questId] = player.quests.active[msg.questId] || { progress: 0 };
+            if (typeof msg.progress === 'number') player.quests.active[msg.questId].progress = msg.progress;
+        } else if (msg.kind === 'chain' && msg.chainId && msg.flags && typeof msg.flags === 'object'){
+            player.questFlags = player.questFlags || {};
+            player.questFlags[msg.chainId] = Object.assign(player.questFlags[msg.chainId] || {}, msg.flags);
+        }
+        if (typeof renderQuests === 'function' && document.getElementById('questsModal')?.style.display === 'flex') renderQuests();
+        const chainNpc = msg.chainId && NPCS.find(n => n.chain === msg.chainId);
+        if (chainNpc && typeof renderChainDialog === 'function' && document.getElementById('chainDialogModal')?.style.display === 'flex') renderChainDialog(chainNpc);
     } else if (msg.t === 'dungeonEnter'){
         // M4: server confirmou descida pro andar. Troca o grid ativo, teleporta,
         // PvP forçado, e repopula remotePlayers com quem está no andar.
@@ -6228,6 +6294,52 @@ function handleMP(msg){
             log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
         }
         saveState();
+    } else if (msg.t === 'arenaStats'){
+        // M7: stats autoritativos da arena (rating/W-L) pro modal
+        if (typeof msg.rating === 'number') player.arenaRating = msg.rating;
+        if (typeof msg.wins === 'number') player.arenaWins = msg.wins;
+        if (typeof msg.losses === 'number') player.arenaLosses = msg.losses;
+        player._arenaQueued = !!msg.queued;
+        const rEl = document.getElementById('arenaRating'); if (rEl) rEl.textContent = player.arenaRating;
+        const wEl = document.getElementById('arenaWins');   if (wEl) wEl.textContent = player.arenaWins || 0;
+        const lEl = document.getElementById('arenaLosses'); if (lEl) lEl.textContent = player.arenaLosses || 0;
+        _renderArenaStatus(msg.queued ? 'queued' : 'idle');
+    } else if (msg.t === 'arenaQueued'){
+        player._arenaQueued = true;
+        _renderArenaStatus('queued');
+        const st = document.getElementById('arenaStatus');
+        if (st) st.textContent = msg.wager > 0 ? `⏳ Na fila (aposta ${msg.wager}g)… esperando oponente.` : '⏳ Na fila… esperando oponente.';
+        if (typeof showServerToast === 'function') showServerToast('event', '⚔ Você entrou na fila da Arena.');
+    } else if (msg.t === 'arenaCancel'){
+        player._arenaQueued = false;
+        _renderArenaStatus('idle');
+        const reasons = { no_gold:'Gold insuficiente pra essa aposta.', not_at_npc:'Aproxime-se do Mestre da Arena.', not_in_city:'Só dá pra entrar na fila na cidade.', in_match:'Você já está numa partida.', in_duel:'Você está em duelo.', left:'Você saiu da fila.' };
+        const st = document.getElementById('arenaStatus'); if (st) st.textContent = reasons[msg.reason] || '';
+    } else if (msg.t === 'arenaCountdown'){
+        player._arenaQueued = false;
+        player._arena = { opponentName: msg.opponentName, wager: msg.wager, fightAt: msg.until };
+        closeArenaModal();
+        _arenaShowCountdown(msg.until, msg.opponentName);
+        log(`<span class="log-up">⚔ ARENA! Oponente: ${escapeHtml(msg.opponentName)}${msg.wager > 0 ? ` · aposta ${msg.wager}g` : ''}. Prepare-se!</span>`);
+    } else if (msg.t === 'arenaEnd'){
+        player._arena = null;
+        if (typeof msg.gold === 'number') player.gold = msg.gold;
+        if (typeof msg.rating === 'number') player.arenaRating = msg.rating;
+        player.hp = player.maxHp; player.mp = player.maxMp;
+        if (typeof clearStatusEffects === 'function') clearStatusEffects();
+        const ov = document.getElementById('arenaOverlay'); if (ov) ov.style.display = 'none';
+        if (_arenaCountTimer){ clearInterval(_arenaCountTimer); _arenaCountTimer = null; }
+        if (msg.draw){
+            log(`<span class="log-sys">⚔ Arena: empate contra ${escapeHtml(msg.opponentName)}. Aposta devolvida. Rating ${msg.rating}.</span>`);
+        } else if (msg.winner){
+            player.arenaWins = (player.arenaWins || 0) + 1;
+            log(`<span class="log-up">🏆 Venceu a Arena contra ${escapeHtml(msg.opponentName)}!${msg.wager > 0 ? ` +${msg.wager * 2}g` : ''} Rating ${msg.rating}.</span>`);
+            if (typeof sndLevelUp === 'function') sndLevelUp();
+            if (typeof checkAchievements === 'function') checkAchievements();
+        } else {
+            player.arenaLosses = (player.arenaLosses || 0) + 1;
+            log(`<span class="log-die">💀 Perdeu a Arena contra ${escapeHtml(msg.opponentName)}.${msg.wager > 0 ? ` -${msg.wager}g` : ''} Rating ${msg.rating}.</span>`);
+        }
     } else if (msg.t === 'auctions'){
         // M8 — snapshot do servidor (browse + mine + serverNow).
         _auctionData = {
@@ -6856,6 +6968,69 @@ function rejectDuelInvite(silent){
 }
 window.acceptDuelInvite = acceptDuelInvite;
 window.rejectDuelInvite = rejectDuelInvite;
+
+// ─── M7 Arena 1v1 (matchmaking) ───────────────────────────────────────────
+let _arenaCountTimer = null;
+function openArenaQueue(){
+    const n = npcAt(player.x, player.y);
+    if (!n || n.action !== 'arena'){ log('<span class="log-sys">Aproxime-se do Mestre da Arena.</span>'); return; }
+    closeAllModals();
+    document.getElementById('arenaModal').style.display = 'flex';
+    _renderArenaStatus(player._arenaQueued ? 'queued' : 'idle');
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'arenaStats' }));   // puxa rating/W-L autoritativo
+}
+function closeArenaModal(){ const m = document.getElementById('arenaModal'); if (m) m.style.display = 'none'; }
+function _renderArenaStatus(state){
+    const joinBtn = document.getElementById('arenaJoinBtn');
+    const leaveBtn = document.getElementById('arenaLeaveBtn');
+    const st = document.getElementById('arenaStatus');
+    if (!joinBtn || !leaveBtn) return;
+    if (state === 'queued'){
+        joinBtn.style.display = 'none';
+        leaveBtn.style.display = '';
+        if (st && !st.textContent) st.textContent = '⏳ Na fila… esperando oponente.';
+    } else {
+        joinBtn.style.display = '';
+        leaveBtn.style.display = 'none';
+        if (st && state === 'idle') st.textContent = '';
+    }
+}
+function arenaJoinQueue(){
+    const w = Math.max(0, parseInt(document.getElementById('arenaWagerInput').value, 10) || 0);
+    if (w > 0 && w > (player.gold || 0)){
+        const st = document.getElementById('arenaStatus'); if (st) st.textContent = 'Gold insuficiente pra essa aposta.';
+        return;
+    }
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'arenaJoin', wager: w }));
+}
+function arenaLeaveQueue(){
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'arenaLeaveQueue' }));
+}
+// Overlay de countdown 3..2..1 → LUTE! antes de liberar o combate.
+function _arenaShowCountdown(until, opponentName){
+    const ov = document.getElementById('arenaOverlay');
+    const vs = document.getElementById('arenaOverlayVs');
+    const cnt = document.getElementById('arenaOverlayCount');
+    if (!ov) return;
+    if (vs) vs.textContent = '⚔ ARENA — vs ' + (opponentName || '?');
+    ov.style.display = 'block';
+    if (_arenaCountTimer){ clearInterval(_arenaCountTimer); _arenaCountTimer = null; }
+    const tick = () => {
+        const left = Math.ceil((until - Date.now()) / 1000);
+        if (left > 0){ if (cnt) cnt.textContent = String(left); }
+        else {
+            if (cnt) cnt.textContent = 'LUTE!';
+            if (_arenaCountTimer){ clearInterval(_arenaCountTimer); _arenaCountTimer = null; }
+            setTimeout(() => { const o = document.getElementById('arenaOverlay'); if (o) o.style.display = 'none'; }, 900);
+        }
+    };
+    tick();
+    _arenaCountTimer = setInterval(tick, 200);
+}
+window.openArenaQueue = openArenaQueue;
+window.closeArenaModal = closeArenaModal;
+window.arenaJoinQueue = arenaJoinQueue;
+window.arenaLeaveQueue = arenaLeaveQueue;
 
 // ─── Loja de Ouro (PIX via MercadoPago) ──────────────────────────────────
 const SERVER_HTTP_BASE = (() => {
@@ -8364,6 +8539,11 @@ async function pkDeathBy(killerId, killerName){
     if (player._duel && player._duel.opponentId === killerId){
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:'pkDeath', killerId, duel:true }));
         // Mantém o cliente vivo (HP a 1) até receber duelEnd que restaura tudo
+        player.hp = 1;
+        return;
+    }
+    // M7 Arena: server resolve via arenaEnd (sem penalidade). Mantém vivo a 1 hp até lá.
+    if (player._arena){
         player.hp = 1;
         return;
     }
@@ -11684,10 +11864,22 @@ vigGrad.addColorStop(1,'rgba(0,0,0,0.45)');
 let started = false, lastTs = 0;
 // ─── Contas (localStorage) ───────────────────────────────────────────────────
 function hashPw(s){
-    // hash leve só pra não guardar senha pura. NÃO é segurança real.
+    // hash leve só pra não guardar senha pura. NÃO é segurança real. (transporte LEGADO)
     let h = 5381;
     for (let i = 0; i < s.length; i++) h = ((h<<5) + h + s.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36) + ':' + s.length;
+}
+// Transporte FORTE: SHA-256 da senha (substitui o djb2 fraco). O server faz scrypt
+// por cima; o espaço de pré-imagem deixa de ser limitado pelos 32 bits do djb2 se
+// accounts.json vazar. crypto.subtle exige secure context (prod https; localhost conta).
+// Fallback pro djb2 se subtle faltar (ex.: http LAN) — não trava o login.
+async function hashPwSha256(s){
+    try {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(s)));
+        return 's256:' + Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e){
+        return hashPw(String(s));
+    }
 }
 function accountKey(name){ return 'valadares:acc:' + name; }
 function getAccount(name){
@@ -13016,7 +13208,7 @@ function closeTutorial(){
 window.openTutorial = openTutorial;
 window.closeTutorial = closeTutorial;
 
-function tryLogin(multiplayer){
+async function tryLogin(multiplayer){
     const name = document.getElementById('charInput').value.trim();
     const pwd  = document.getElementById('pwdInput').value;
     const emailField = document.getElementById('emailInput');
@@ -13039,7 +13231,9 @@ function tryLogin(multiplayer){
     } catch {}
     // Guarda o pwHash + email pra mandar no `auth` do WS — server valida + devolve save.
     // Email é opcional: server cria conta com ele se nova; ignora se conta já existe (use setEmail).
-    _authPwHash = multiplayer ? hashPw(pwd) : null;
+    // Transporte FORTE (SHA-256) + LEGADO (djb2) — o server migra contas sem trancar ninguém.
+    _authPwHash = multiplayer ? await hashPwSha256(pwd) : null;
+    _authPwHashLegacy = multiplayer ? hashPw(pwd) : null;
     _authEmail = email || null;
     startGame(multiplayer, name);
 }
@@ -13163,6 +13357,7 @@ function logout(){
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     // limpa credenciais da sessão atual
     _authPwHash = null;
+    _authPwHashLegacy = null;
     _wsAuthed = false;
     _didInitialAuth = false;
     // limpa intervals da sessão (evita saveState rodando pós-logout)
