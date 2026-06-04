@@ -11623,7 +11623,11 @@ function pvpAttackPlayer(targetId){
     const tgt = remotePlayers[targetId];
     if (!tgt){ return; }
     if (!tgt.pvp){ log('<span class="log-sys">Este player não está com PvP ligado.</span>'); return; }
-    if (playerInSafeZone() || inSafeZone(tgt.x, tgt.y)){
+    // PZ só existe no floor 0 (cidade). Na arena/masmorra (floor>0) NÃO há PZ — e como a região
+    // da arena (e da masmorra) se sobrepõe às COORDS da PZ (46-54), o inSafeZone(alvo) cru
+    // bloqueava o ataque indevidamente ("Não pode PvP na PZ" mesmo lutando). Gate por floor
+    // (espelha playerInSafeZone, que já é floor-gated). Os 2 lutadores estão sempre no mesmo floor.
+    if ((player.floor || 0) === 0 && (inSafeZone(player.x, player.y) || inSafeZone(tgt.x, tgt.y))){
         log('<span class="log-sys">Não pode PvP na PZ.</span>'); return;
     }
     if (player.attackTimer > 0) return;
