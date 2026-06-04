@@ -19,6 +19,17 @@ const SITE_URL = 'https://valadares.app.br/jogar';
 
 const IS_DEV = !app.isPackaged;
 
+// ─── Anti-throttle quando a janela perde foco (Windows) ───────────────────
+// Por padrão o Chromium "congela" o renderer quando a janela é ocluída ou
+// desfocada (alt-tab, clicar em outro app). Como o Valadares roda um game loop
+// contínuo (requestAnimationFrame), isso fazia o jogo PARAR ao perder o foco e
+// só voltar ao clicar de novo na tela. Estes switches desligam o backgrounding
+// do processo/oclusão no Windows; o webPreferences.backgroundThrottling:false
+// (abaixo) cobre o throttle de rAF/timers. Precisam vir ANTES do app ficar pronto.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+
 let mainWindow = null;
 
 // ─── Persistência de preferências (zoom, fullscreen) ──────────────────────
@@ -71,6 +82,11 @@ function createWindow() {
             // F12 / Ctrl+Shift+I desabilitados em produção
             devTools: IS_DEV,
             zoomFactor: 1,
+            // Mantém o game loop (requestAnimationFrame) em velocidade cheia
+            // mesmo com a janela sem foco / em segundo plano. Sem isto o Chromium
+            // estrangula o rAF ao perder o foco e o jogo "trava" até clicar na
+            // tela de novo. Par com os switches de backgrounding lá em cima.
+            backgroundThrottling: false,
         },
     });
 
