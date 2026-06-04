@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prometi uma dungeon. Saiu o endgame inteiro. — Devlog Valadares</title>
+<meta name="description" content="As Profundezas, Casa de Leilão, Tinturaria, Pets, árvore de talentos de verdade, combate autoritativo e Arena PvP 1v1. Duas semanas em que o jogo deixou de ser &quot;jogável&quot; pra ter pra onde ir depois do primeiro boss.">
+<link rel="canonical" href="https://valadares.app.br/devlog/endgame-e-arena">
+<meta property="og:title" content="Prometi uma dungeon. Saiu o endgame inteiro. — Devlog Valadares">
+<meta property="og:description" content="As Profundezas, Casa de Leilão, Tinturaria, Pets, árvore de talentos de verdade, combate autoritativo e Arena PvP 1v1. Duas semanas em que o jogo deixou de ser &quot;jogável&quot; pra ter pra onde ir depois do primeiro boss.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://valadares.app.br/devlog/endgame-e-arena">
+<meta property="og:image" content="https://valadares.app.br/og.jpg">
+<meta property="og:site_name" content="Valadares">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Prometi uma dungeon. Saiu o endgame inteiro. — Devlog Valadares">
+<meta name="twitter:description" content="As Profundezas, Casa de Leilão, Tinturaria, Pets, árvore de talentos de verdade, combate autoritativo e Arena PvP 1v1. Duas semanas em que o jogo deixou de ser &quot;jogável&quot; pra ter pra onde ir depois do primeiro boss.">
+<meta name="twitter:image" content="https://valadares.app.br/og.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Prometi uma dungeon. Saiu o endgame inteiro.",
+  "description": "As Profundezas, Casa de Leilão, Tinturaria, Pets, árvore de talentos de verdade, combate autoritativo e Arena PvP 1v1. Duas semanas em que o jogo deixou de ser \"jogável\" pra ter pra onde ir depois do primeiro boss.",
+  "datePublished": "2026-06-04",
+  "author": { "@type": "Organization", "name": "Valadares" },
+  "publisher": { "@type": "Organization", "name": "Valadares", "url": "https://valadares.app.br/" },
+  "image": "https://valadares.app.br/og.jpg",
+  "url": "https://valadares.app.br/devlog/endgame-e-arena"
+}
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0805; --bg-card: #1a1410; --bg-elev: #241b14; --border: #3a2d20;
+  --gold: #d4a847; --gold-bright: #f0c060; --blood: #8b2020; --blood-bright: #c83030;
+  --text: #e0d8c8; --text-dim: #8a7e6a; --green: #4ab040;
+}
+html, body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.7; overflow-x: hidden; }
+body { background-image: radial-gradient(circle at 20% 10%, rgba(212, 168, 71, 0.06), transparent 40%), radial-gradient(circle at 80% 80%, rgba(139, 32, 32, 0.06), transparent 40%); background-attachment: fixed; }
+a { color: var(--gold); text-decoration: none; }
+a:hover { color: var(--gold-bright); text-decoration: underline; }
+nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 8, 5, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+.nav-brand { font-family: "Cinzel", Georgia, serif; font-size: 22px; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
+.nav-brand::before { content: "✦ "; color: var(--gold-bright); }
+.nav-links { display: flex; gap: 24px; }
+.nav-links a { color: var(--text-dim); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+.nav-links a:hover { color: var(--gold); text-decoration: none; }
+.nav-links a.active { color: var(--gold); }
+main { max-width: 820px; margin: 0 auto; padding: 60px 24px 80px; }
+.page-title { font-family: "Cinzel", Georgia, serif; font-size: clamp(36px, 6vw, 56px); color: var(--gold); letter-spacing: 4px; text-align: center; margin-bottom: 12px; text-shadow: 0 0 20px rgba(212, 168, 71, 0.3); }
+.page-sub { text-align: center; color: var(--text-dim); margin-bottom: 56px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+.post-list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+.post-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; transition: all 0.2s ease; display: block; color: inherit; text-decoration: none; }
+.post-card:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); text-decoration: none; color: inherit; }
+.post-card-meta { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+.post-card-title { font-family: "Cinzel", Georgia, serif; font-size: 22px; color: var(--gold-bright); margin-bottom: 10px; letter-spacing: 1px; }
+.post-card-summary { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+.tag { display: inline-block; background: var(--bg-elev); color: var(--gold); padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+article header { margin-bottom: 40px; text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
+article h1 { font-family: "Cinzel", Georgia, serif; font-size: clamp(28px, 5vw, 44px); color: var(--gold); letter-spacing: 2px; margin-bottom: 16px; line-height: 1.2; }
+article .meta { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+article h2 { font-family: "Cinzel", Georgia, serif; color: var(--gold-bright); font-size: 26px; margin: 48px 0 16px; letter-spacing: 1px; }
+article h3 { color: var(--gold-bright); font-size: 19px; margin: 32px 0 12px; }
+article h4 { color: var(--gold); font-size: 16px; margin: 24px 0 8px; }
+article p { margin-bottom: 16px; color: var(--text); }
+article ul, article ol { margin: 0 0 20px 24px; color: var(--text); }
+article li { margin-bottom: 6px; }
+article a { color: var(--gold-bright); border-bottom: 1px dotted var(--gold); }
+article a:hover { color: var(--gold); text-decoration: none; border-bottom-style: solid; }
+article code { background: var(--bg-elev); color: var(--gold); padding: 2px 6px; border-radius: 3px; font-size: 13px; font-family: ui-monospace, "Consolas", monospace; }
+article pre { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--gold); padding: 16px 20px; border-radius: 4px; overflow-x: auto; margin: 20px 0; }
+article pre code { background: none; padding: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+article blockquote { border-left: 3px solid var(--blood-bright); background: var(--bg-elev); padding: 12px 20px; margin: 20px 0; color: var(--text-dim); font-style: italic; }
+article hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+article strong { color: var(--gold-bright); }
+.back-link { display: inline-block; margin-top: 60px; padding: 12px 24px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 13px; }
+.back-link:hover { background: var(--gold); color: var(--bg); text-decoration: none; }
+footer { border-top: 1px solid var(--border); padding: 40px 24px; text-align: center; color: var(--text-dim); font-size: 13px; }
+footer a { margin: 0 12px; }
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+  main { padding: 40px 16px 60px; }
+  .page-title { letter-spacing: 2px; }
+  article h2 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-brand">VALADARES</a>
+  <div class="nav-links">
+    <a href="/" >Home</a>
+    <a href="/devlog" class="active">Devlog</a>
+    <a href="/ranking">Ranking</a>
+    <a href="/jogar">Jogar</a>
+  </div>
+</nav>
+<main>
+<article>
+  <header>
+    <h1>Prometi uma dungeon. Saiu o endgame inteiro.</h1>
+    <div class="meta">
+      <span>📅 4 Jun 2026</span>
+      <span class="tag">endgame</span> <span class="tag">pvp</span> <span class="tag">dungeon</span> <span class="tag">design</span> <span class="tag">anti-cheat</span>
+    </div>
+  </header>
+  <h2>📌 De onde a gente parou</h2>
+<p>O último post terminou assim: <em>&quot;Próxima sessão: feature P1. Provavelmente dungeons instanciadas ou casa de leilão.&quot;</em></p>
+<p>Fiz os dois. E não parei aí. Nas duas semanas seguintes o Valadares deixou de ser um jogo que você <strong>termina</strong> (mata os 3 bosses, forja +5, e aí?) pra um jogo que tem <strong>endgame</strong> — lugar pra ir, gente pra enfrentar, build pra otimizar. Esse post é o apanhado.</p>
+<h2>🕳 As Profundezas — a masmorra que NÃO é instanciada</h2>
+<p>A primeira decisão foi a mais importante, e foi de design, não de código.</p>
+<p>A tentação óbvia era fazer dungeon instanciada: você entra, é só seu, farma em paz. Mas num jogo com PvP isso é veneno — <strong>farm seguro = pay-to-win fácil</strong>. Quem joga mais horas em segurança vira intocável.</p>
+<p>Então As Profundezas é o contrário: masmorra <strong>aberta e mortal</strong>, estilo Tibia. 5 andares, cada um com cavernas <strong>geradas na hora</strong> (cellular automata semeado pelo número do andar — mesmo andar, mesmo mapa; andar novo, caverna nova). Pisou lá dentro, <strong>PvP liga sozinho</strong>. Os mobs (Sombra Errante, Carrasco Abissal) escalam <strong>+60% por andar</strong> — no quinto, são quase 3,5× os do primeiro. E lá no fundo mora o <strong>Senhor das Profundezas</strong>: 5000 de vida, loot de topo, dividido por quem mais bateu.</p>
+<p>Sem regra de morte nova: morreu pra mob, perde 15% das skills e volta pra cidade (perdeu a descida). Morreu pra player, o killer leva seu ouro. As penalidades que já existiam bastaram.</p>
+<h2>🏛 Casa de Leilão e 🎨 Tinturaria — a economia ganha vida</h2>
+<p>Com ouro entrando, ele precisa <strong>sair</strong>. Dois sumidouros novos:</p>
+<ul><li><strong>Casa de Leilão</strong> (NPC Leiloeiro): anuncia um item por 24h, o servidor segura no escrow, 5% de comissão na venda. Pela primeira vez o preço das coisas é decidido pelo mercado, não por mim numa tabela.</li><li><strong>Tinturaria</strong> (NPC Tintureira): 4 peças tingíveis, 12 cores. Puramente cosmético, puro gold sink. Vaidade é o melhor imposto.</li></ul>
+<h2>🐾 Pets que ajudam sem desequilibrar</h2>
+<p>Pet &quot;ter por ter&quot; é fraco. Pet que dá dano vira pay-to-win. Então os pets do Valadares dão poder <strong>fora do combate</strong>: Tatu-Cofre (+ouro), Vaga-lume (+XP), Gato Preto (+sorte no loot), Espírito Vital (+regen). Você adota no Domador, equipa um, e ele sobe de nível matando ao seu lado — economia e conveniência, nunca dano cru.</p>
+<p>Detalhe técnico que me deu trabalho: o bônus do pet é <strong>derivado no servidor</strong> na hora do uso, nunca gravado no personagem. Misturar buff de pet com os buffs permanentes teria reintroduzido uma casta de bugs de save que já tinham me mordido antes.</p>
+<h2>🌟 Talentos viram uma árvore de verdade</h2>
+<p>Um print de um jogador escancarou o problema: os 6 talentos antigos, <strong>todos maxados</strong>, e <strong>24 pontos parados</strong> sem onde investir. Endgame nenhum.</p>
+<p>Aí a árvore cresceu: <strong>14 talentos, até 5 ranks cada</strong>. Dano, crítico, mana, velocidade de ataque, vampirismo, redução de dano, sorte — e a 🕯️ <strong>Segunda Chance</strong>, que revive você uma vez por luta. Errou a build? <strong>Respec por 5000 de ouro</strong> redistribui tudo.</p>
+<p>Esse aqui me ensinou uma lição cara sobre persistência. Mudei talento de &quot;tem/não tem&quot; pra &quot;rank de 0 a 5&quot; e esqueci de atualizar <strong>um</strong> dos lugares que salvavam — e a cada save os ranks colapsavam pra 1. Quando você muda a forma de um dado, varre <strong>todos</strong> os pontos onde ele é gravado, não só o principal.</p>
+<h2>🔒 O dia em que o cliente parou de ser confiável</h2>
+<p>Conteúdo é bonito, mas teve uma onda que foi pura fundação: <strong>mover o combate e o movimento pro servidor</strong>.</p>
+<p>Antes, o cliente dizia &quot;andei pra cá&quot; e &quot;dei tanto de dano&quot; — e o servidor confiava. Em PvP isso é convite pra trapaça (teletransporte, dano inflado, atravessar parede). A reescrita validou tudo no servidor, com uma filosofia que evitou quebrar o jogo: <strong>capar, não recalcular</strong>. O número que você vê na tela continua o seu número — o servidor só barra o exagero. Subir skill ainda aumenta o dano; o que não dá mais é forjar um 999 no console.</p>
+<p>E um bug que só apareceu <strong>ao vivo</strong>: a morte por monstro deixava sua vida em zero <strong>no servidor</strong> (o respawn era só no cliente). Jogando, você nem percebia — relogar ou tomar uma poção consertava. Mas deixar o personagem <strong>parado farmando</strong> na masmorra virava um loop de morte drenando 15% de skill por ciclo. O tipo de coisa que teste automatizado nenhum pega e só um AFK de verdade revela.</p>
+<p>De quebra, a <strong>Battle List</strong> estilo Tibia: a janela de alvo virou uma lista clicável de tudo que está em volta, ordenada por distância. Achar o boss no meio da multidão deixou de ser sorte.</p>
+<h2>⚔ Arena PvP 1v1 — duelo limpo, com placar</h2>
+<p>E o mais recente: <strong>Arena</strong>. Fala com o Mestre da Arena, entra na fila, o sistema te casa com alguém. Aposta de ouro é opcional (vencedor leva o pote); o que sempre conta é o <strong>rating Elo</strong>. A luta acontece numa <strong>arena isolada</strong> — ninguém de fora interfere, ninguém te ganka no meio.</p>
+<p>O truque de implementação foi não construir nada novo: a arena <strong>reusa a máquina da masmorra</strong>. Um duelo é só uma &quot;masmorra&quot; de um andar só onde os dois entram, o PvP liga e o servidor cuida do resto — teleporte, isolamento, colisão, tudo de graça. Os dois bugs que escaparam (um mob de masmorra gigante aparecendo na arena, e a Zona Segura bloqueando ataque dentro do duelo) só apareceram no teste ao vivo — e renderam uma regra que eu repito agora: <strong>instância que reusa coordenadas da cidade precisa checar o andar, não só o lugar.</strong></p>
+<h2>🎒 Bônus: o inventário que respirava</h2>
+<p>Por último, um pedido direto de quem joga: itens forjados e raros tinham tantos atributos que o texto <strong>se sobrepunha</strong> e virava sopa de letrinha. Reorganizei pra duas linhas — nome em cima, atributos em &quot;chips&quot; embaixo. Raridade virou <strong>cor</strong> (dourado = lendário, roxo = mítico), o nível de forja virou um selo no ícone. Some o app que <strong>congelava ao perder o foco</strong> no Windows (corrigido), e o jogo ficou bem mais agradável de... usar.</p>
+<h2>🧠 A lição das duas semanas</h2>
+<p>A fase de lançamento é sobre <strong>não quebrar</strong>. A fase seguinte é sobre <strong>ter pra onde ir</strong>. As duas exigem disciplinas opostas: uma é paranoia (segurança, save, anti-cheat), a outra é generosidade (conteúdo, sistemas, recompensa). O erro é tentar as duas no mesmo dia com a mesma cabeça.</p>
+<p>E o melhor backlog continua sendo gente jogando: o print dos pontos parados pediu a árvore de talentos, o AFK na masmorra achou o loop de morte, o &quot;tá tudo embolado no inventário&quot; virou o redesign. Eu só fui atrás.</p>
+<p>Próxima parada: <strong>Arena 3v3</strong> em time, e um tier de endgame pra quem já maxou tudo. Conto como foi.</p>
+</article>
+<a href="/devlog" class="back-link">← Voltar ao Devlog</a>
+</main>
+<footer>
+  <div>
+    <a href="/">Home</a>·
+    <a href="/devlog">Devlog</a>·
+    <a href="/jogar">Jogar</a>·
+    <a href="/ranking">Ranking</a>·
+    <a href="/privacy">Privacidade</a>·
+    <a href="/terms">Termos</a>
+  </div>
+  <div style="margin-top: 12px;">© 2026 Valadares · RPG online tile-based</div>
+</footer>
+</body>
+</html>
