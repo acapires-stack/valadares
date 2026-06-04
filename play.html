@@ -545,13 +545,31 @@
         .boss-status-none  { color: #5a4818; }
 
         .inv-item {
-            display: flex; align-items: center; justify-content: space-between;
+            display: flex; flex-direction: column;
             padding: 3px 5px; margin-bottom: 2px;
             border: 1px solid transparent; border-radius: 1px;
-            transition: all 0.15s;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
         }
         .inv-item.equippable { background: #0a0a12; cursor: pointer; }
         .inv-item.equippable:hover { border-color: #8a6020; background: #1a1410; transform: translateX(2px); }
+        /* Linha 1: ícone + nome + quantidade. Linha 2 (.inv-stats): chips de
+           atributos com wrap próprio — antes os stats eram spans soltos na MESMA
+           flex row do nome e colidiam quando o item ganhava muitos modificadores. */
+        .inv-row1 { display: flex; align-items: center; gap: 4px; }
+        .inv-name { flex: 1; min-width: 0; color: #bbb; line-height: 1.15; overflow-wrap: break-word; }
+        .inv-qty  { flex-shrink: 0; color: #e0c060; font-weight: 600; font-size: 10px; }
+        .inv-stats { display: flex; flex-wrap: wrap; gap: 1px 7px; margin-left: 22px; margin-top: 1px; font-size: 9px; line-height: 1.35; }
+        /* Raridade vira COR do nome (★/★★ saem do texto); forja vira badge no ícone.
+           .rar-* são utilitárias usadas no inv lateral E no baú (mesma fonte de cor). */
+        .rar-leg  { color: #ffd040 !important; }
+        .rar-myth { color: #c77dff !important; }
+        .inv-forge-badge {
+            position: absolute; right: -4px; bottom: -4px;
+            background: #2a1e08; color: #ffcc40;
+            font-size: 8px; font-weight: 700; line-height: 1;
+            padding: 1px 2px; border-radius: 2px; border: 1px solid #5a4010;
+            pointer-events: none;
+        }
         .inv-cat-group { margin-top: 8px; }
         .inv-cat-group:first-child { margin-top: 0; }
         .inv-cat-head {
@@ -576,6 +594,7 @@
         }
         .inv-icon {
             display: inline-block;
+            position: relative;
             width: 18px; height: 18px;
             background-size: contain;
             background-repeat: no-repeat;
@@ -924,11 +943,16 @@
         .chest-list::-webkit-scrollbar-track { background: #0a0805; }
         .chest-list::-webkit-scrollbar-thumb { background: #3a2d10; border-radius: 2px; }
         .chest-row {
-            display: flex; align-items: center; padding: 4px 6px;
+            display: flex; flex-direction: column; align-items: stretch; padding: 4px 6px;
             border: 1px solid transparent; border-radius: 1px;
-            gap: 4px;
         }
         .chest-row:hover { background: #1a1410; border-color: #3a2d10; }
+        /* Linha 1 (●+nome+qtd+botões) + linha 2 de stats — espelha o inv lateral */
+        .chest-row1 { display: flex; align-items: center; gap: 4px; }
+        .chest-name { flex: 1; min-width: 0; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chest-qty  { color: #e0c060; min-width: 20px; text-align: right; }
+        .chest-stats { margin-left: 14px; margin-top: 1px; }
+        .forge-tag { color: #ffcc40; font-weight: 700; flex-shrink: 0; }
         .chest-qty-btn {
             background: #1a1408; border: 1px solid #3a2d10; color: #8a7438;
             padding: 1px 6px; font-size: 10px;
@@ -4605,6 +4629,20 @@ function itemStatsCompact(def){
     return parts.join(' ');
 }
 
+// Apresentação de raridade/forja: nome-base sem ★/+N, classe de cor de raridade
+// (★=lendário dourado, ★★=mítico roxo) e nível de forja. Compartilhado inv + baú.
+function itemDisplayMeta(key){
+    const tier = getUpgradeTier(key);
+    const baseDef = ITEMS[tier.base] || ITEMS[key] || {};
+    const nm = baseDef.name || key;
+    const starN = (nm.match(/★/g) || []).length;
+    return {
+        name: nm.replace(/\s*★+\s*$/, '').trim(),
+        rarCls: starN >= 2 ? 'rar-myth' : (starN === 1 ? 'rar-leg' : ''),
+        plus: tier.plus
+    };
+}
+
 // Descrição completa em texto puro (pra tooltip via title=)
 function itemFullDesc(def){
     if (!def) return '';
@@ -4830,11 +4868,17 @@ function renderChest(){
         if (qty >= 10) opts.push(10);
         const btns = opts.map(n => `<button class="chest-qty-btn" data-key="${key}" data-side="${side}" data-qty="${n}">${n}</button>`).join('');
         const allBtn = `<button class="chest-qty-btn" data-key="${key}" data-side="${side}" data-qty="all" title="tudo">all</button>`;
-        return `<div class="chest-row" data-key="${key}">
-            <span style="color:${def.color}">●</span>
-            <span style="flex:1;margin-left:6px;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${def.name}</span>
-            <span style="color:#e0c060;min-width:20px;text-align:right">${qty}</span>
-            ${btns}${allBtn}
+        const meta = itemDisplayMeta(key);
+        const extra = itemStatsCompact(def);
+        const forgeTag = meta.plus > 0 ? `<span class="forge-tag">+${meta.plus}</span>` : '';
+        return `<div class="chest-row" data-key="${key}" title="${escapeHtml(itemFullDesc(def))}">
+            <div class="chest-row1">
+                <span style="color:${def.color};flex-shrink:0">●</span>
+                <span class="chest-name ${meta.rarCls}">${escapeHtml(meta.name)}</span>${forgeTag}
+                <span class="chest-qty">${qty}</span>
+                ${btns}${allBtn}
+            </div>
+            ${extra ? `<div class="inv-stats chest-stats">${extra}</div>` : ''}
         </div>`;
     };
     const invEl = document.getElementById('chestInvList');
@@ -10070,11 +10114,17 @@ function renderInventoryIfChanged(){
             const equippable = ['weapon','offhand','armor','head','feet','neck','cosmetic'].includes(def.kind);
             const extra = itemStatsCompact(def);
             const tip = itemFullDesc(def) + (equippable ? '\n\nClick p/ equipar' : '');
+            // Raridade vira COR do nome e forja vira badge no ícone (helper compartilhado
+            // com o baú) — libera a 1ª linha pro nome e a 2ª (.inv-stats) pros modificadores.
+            const meta = itemDisplayMeta(k);
+            const forgeBadge = meta.plus > 0 ? `<span class="inv-forge-badge">+${meta.plus}</span>` : '';
             return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${escapeHtml(tip)}">
-                <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
-                <span style="flex:1;min-width:0;margin-left:4px;color:#bbb">${def.name}</span>
-                ${extra}
-                <span style="flex-shrink:0;color:#e0c060;margin-left:6px;font-weight:600">×${q}</span>
+                <div class="inv-row1">
+                    <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})">${forgeBadge}</span>
+                    <span class="inv-name ${meta.rarCls}">${escapeHtml(meta.name)}</span>
+                    <span class="inv-qty">×${q}</span>
+                </div>
+                ${extra ? `<div class="inv-stats">${extra}</div>` : ''}
             </div>`;
         };
         invEl.innerHTML = groups
