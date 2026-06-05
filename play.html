@@ -11889,6 +11889,19 @@ function pvpAttackPlayer(targetId){
     const crit = Math.random() < playerCritChance();
     if (crit) dmg *= critMultPlayer();
     dmg = applyAttackMults(dmg);
+    // Projétil visual em PvP pra arma à distância (wand = magia da cor do elemento; arco
+    // = flecha). Antes só mob/melee mostrava projétil — vs player não saía nada (gap do 007).
+    if (wItem && (wItem.kind === 'wand' || wItem.ranged)){
+        const col = wItem.kind === 'wand' ? (ELEMENT_COL[wItem.element] || wItem.color || '#c060ff') : '#d8c890';
+        projectiles.push({
+            x: player.renderX, y: player.renderY,
+            startX: player.renderX, startY: player.renderY,
+            endX: (tgt.renderX != null ? tgt.renderX : tgt.x),
+            endY: (tgt.renderY != null ? tgt.renderY : tgt.y),
+            color: col, glow: col,
+            life: 0, duration: Math.max(120, dist * 30),
+        });
+    }
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
     }
