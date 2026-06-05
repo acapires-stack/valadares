@@ -5571,10 +5571,20 @@ function tickRegen(dt){
     // — não é vetor crítico, e o cap em maxMp é validado server-side a cada pstats.
     // Pot de mana: UI-only countdown. MP é aplicado pelo server (tickPlayerRegen) e chega
     // via broadcastPstatsAll, então o cliente NÃO soma local pra evitar conflito com lockdown.
-    if (player.manaBuff && player.manaBuff.life > 0){
-        player.manaBuff.life -= dt;
+    if (player.manaBuff){
+        // Expira pelo RELÓGIO real (expiresAt), não por dt acumulado: se o game loop
+        // pausar (perda de foco / aba em background no navegador), o countdown não
+        // "congela" — senão a próxima poção de mana ficava travada bem além dos 10s
+        // reais (bug do dono 04/06: "hp cheio e a poção de mana não entrou").
+        player.manaBuff.life = (player.manaBuff.expiresAt || 0) - Date.now();
         if (player.manaBuff.life <= 0) player.manaBuff = null;
     }
+}
+
+// Regen de mana ativo? Checado pelo RELÓGIO (não pelo countdown, que congela com o
+// loop pausado) — usado pra não desperdiçar poção de mana empilhada.
+function manaBuffActive(){
+    return !!(player.manaBuff && player.manaBuff.expiresAt && Date.now() < player.manaBuff.expiresAt);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6100,7 +6110,7 @@ function handleMP(msg){
             }
             if (msg.consume.manaBuff){
                 const { mpPerSec, lifeMs } = msg.consume.manaBuff;
-                player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs };
+                player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs, expiresAt: Date.now() + lifeMs };
                 addFloat(player.x, player.y, `+${mpPerSec}/s por ${lifeMs/1000}s`, '#5599ff', false, -14);
                 log(`<span class="log-xp">Bebeu ${name} — regen ${mpPerSec} mp/s por ${lifeMs/1000}s</span>`);
             }
@@ -11888,7 +11898,7 @@ function eatBestFood(){
             sent = true;
         }
     }
-    if (needMp > 0 && !(player.manaBuff && player.manaBuff.life > 0)){
+    if (needMp > 0 && !manaBuffActive()){
         const mana = Object.entries(player.inv)
             .filter(([k,q]) => q > 0 && ITEMS[k] && ITEMS[k].manaheal)
             .map(([k,q]) => ({ k, q, mp: ITEMS[k].manaheal }));
@@ -11897,7 +11907,7 @@ function eatBestFood(){
             sent = true;
         }
     }
-    if (player.manaBuff && player.manaBuff.life > 0 && needMp > 0){
+    if (manaBuffActive() && needMp > 0){
         log('<span class="log-sys">Regen de mana ainda ativa — aguarde acabar.</span>');
     } else if (!sent){
         if (needHp <= 0 && needMp <= 0) log('<span class="log-sys">HP e MP já estão cheios.</span>');
