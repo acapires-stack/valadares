@@ -3917,6 +3917,13 @@ const ITEMS = {
 const ELEMENT_COL = { fire:'#ff7030', ice:'#50b0ff', energy:'#b080ff' };
 // Mana do tiro básico da wand (Fase 2b — descontada server-side no attackMob).
 const WAND_MANA_COST = 4;
+// Fase 2b — chance de status de controle por elemento (gelo→congela, raio→atordoa).
+const ELEM_STATUS_CHANCE = 0.22;
+function elementStatusRoll(element){
+    if (element === 'ice'    && Math.random() < ELEM_STATUS_CHANCE) return [{ type:'freeze' }];
+    if (element === 'energy' && Math.random() < ELEM_STATUS_CHANCE) return [{ type:'shock' }];
+    return undefined;
+}
 
 // Fase 2 — fraqueza/resistência elemental (só mobs icônicos; resto neutro = 1.0).
 // ×1.5 = fraco, ×0.5 = resiste. Espelha a matriz do design-magos.md.
@@ -4194,8 +4201,8 @@ function drawMonster(m, px, py){
     }
     // Ícones de DoT ativo (veneno/sangra/fogo) — debaixo do nome
     if (m.dots && m.dots.length){
-        const glyphMap = { poison:'☠', bleed:'🩸', burn:'🔥' };
-        const colorMap = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030' };
+        const glyphMap = { poison:'☠', bleed:'🩸', burn:'🔥', freeze:'❄', shock:'⚡' };
+        const colorMap = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030', freeze:'#50b0ff', shock:'#b080ff' };
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
         const cy = py - (m.unique ? 22 : 14);
@@ -5587,7 +5594,7 @@ function doAttack(m){
         gainSkillXpLocal('Magia', 1);
         player.attackTimer = effectiveAttackDelay();
         if (serverAuthMobs && ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgW, range: wItem.ranged || 5, crit: critW }));
+            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgW, range: wItem.ranged || 5, crit: critW, dots: elementStatusRoll(wItem.element) }));
             player.target = m.id; m.aggro = true;
         }
         return;
@@ -11077,7 +11084,7 @@ function castSpell(spellKey){
             // Fase 2: afinidade (magia==wand) × fraqueza/resistência do mob.
             dmg = Math.max(1, Math.floor(dmg * elementalMult(m.type, sp.element, wEq && wEq.element)));
             if (serverAuthMobs && ws && ws.readyState === 1){
-                ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false }));
+                ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false, dots: elementStatusRoll(sp.element) }));
                 m.aggro = true;
             }
             addFloat(m.x, m.y, `-${dmg}`, critA ? '#ffaa20' : sp.glow, true);
@@ -11221,7 +11228,7 @@ function castSpell(spellKey){
         // attackMob/aoe"). Sem este guard, o killMonster local criava "mob zumbi" (server
         // seguia com o mob vivo) e o dano local sumia no próximo snapshot — FIREBALL/RAIO
         // não causavam dano real online.
-        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false }));
+        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false, dots: elementStatusRoll(sp.element) }));
         m.aggro = true;
         log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name}</span>`);
     }

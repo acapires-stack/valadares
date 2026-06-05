@@ -2190,10 +2190,16 @@ function playerDodgeChanceServer(p){
     // player, não deve ser comida pelo teto. Teto de segurança 50% (anti-invencível).
     return Math.min(0.50, Math.min(0.25, skillBased) + perma);
 }
+// Fase 2b — status de controle elemental (gelo=freeze/lentidão, raio=shock/atordoa).
+const FREEZE_MS = 3000;        // gelo: lentidão por 3s
+const SHOCK_MS = 700;          // raio: atordoa (pula o turno) por 0.7s
+const FREEZE_SLOW_MULT = 1.8;  // mob frozen anda ~1.8× mais devagar
 function tickAI(){
     const now = Date.now();
     for (const m of monsters.values()){
         if (m.hp <= 0) continue;
+        // ⚡ Choque (raio): atordoado pula o turno (sem mover/atacar). DoT segue no tickMobDots.
+        if (m.shockedUntil && now < m.shockedUntil) continue;
         // Hunter (caçador HL): target hardcoded no player que triggou. Ignora aggro range,
         // PZ e mini-PZ — persegue pelo mapa inteiro até o target sair do jogo ou morrer.
         let target = null, td = Infinity;
@@ -2220,7 +2226,7 @@ function tickAI(){
         // Sem target: wandering leve (não vale pra bosses/unique — eles ficam no spot)
         if (!target){
             if (m.unique) continue;
-            const wanderCd = Math.floor(m.speed * 1.8);
+            const wanderCd = Math.floor(m.speed * 1.8 * ((m.frozenUntil && now < m.frozenUntil) ? FREEZE_SLOW_MULT : 1));
             if (now - m.lastMoveAt < wanderCd) continue;
             if (Math.random() > 0.25) continue;   // 25% chance por tentativa
             const sx = m.spawnX ?? m.x, sy = m.spawnY ?? m.y;
@@ -2340,7 +2346,7 @@ function tickAI(){
         }
         // mover 1 tile em direção (respeita speed)
         // Anti-kite: sprint quando perseguindo a >1 tile (counter pra spear/arco)
-        const effectiveSpeed = (td > 1) ? Math.floor(m.speed * 0.6) : m.speed;
+        const effectiveSpeed = Math.floor(((td > 1) ? m.speed * 0.6 : m.speed) * ((m.frozenUntil && now < m.frozenUntil) ? FREEZE_SLOW_MULT : 1));
         if (now - m.lastMoveAt < effectiveSpeed) continue;
         m.lastMoveAt = now;
         // Intel >=2 escolhe vaga adjacente ao player (cerca + flanco); intel 1 vai direto
@@ -2374,22 +2380,30 @@ function tickAI(){
 // ─── Snapshots ──────────────────────────────────────────────────────────────
 const SNAPSHOT_MS = 250;
 function snapshotMobs(floor){
+    const now = Date.now();
     return Array.from(monsters.values())
       .filter(m => floor === undefined || (m.floor || 0) === floor)
-      .map(m => ({
-        id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir, hp:m.hp, maxHp:m.maxHp, unique:!!m.unique,
-        level: m.level || 1,
-        hunter: m.hunter ? 1 : undefined,
-        dots: (m.dots && m.dots.length) ? m.dots.map(d => ({ type:d.type })) : undefined,
-    }));
+      .map(m => {
+        const ds = (m.dots && m.dots.length) ? m.dots.map(d => ({ type:d.type })) : [];
+        if (m.frozenUntil && now < m.frozenUntil) ds.push({ type:'freeze' });
+        if (m.shockedUntil && now < m.shockedUntil) ds.push({ type:'shock' });
+        return {
+            id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir, hp:m.hp, maxHp:m.maxHp, unique:!!m.unique,
+            level: m.level || 1,
+            hunter: m.hunter ? 1 : undefined,
+            dots: ds.length ? ds : undefined,
+        };
+    });
 }
 // Snapshot leve do estado de mobs pro skip-when-unchanged. Não inclui dots
 // detalhados (só count), pra reduzir custo de comparação. Se algum dot proc
 // fizer mob mudar de "tem dot" pra "não tem dot", o count diferencia.
 function mobsSignature(list){
+    const now = Date.now();
     let s = '';
     for (const m of list){
-        s += `${m.id}:${m.x},${m.y}:${m.hp}:${m.dir}:${(m.dots && m.dots.length) || 0};`;
+        const ctrl = (m.frozenUntil > now ? 'F' : '') + (m.shockedUntil > now ? 'S' : '');
+        s += `${m.id}:${m.x},${m.y}:${m.hp}:${m.dir}:${(m.dots && m.dots.length) || 0}${ctrl};`;
     }
     return s;
 }
@@ -7220,6 +7234,16 @@ wss.on('connection', (ws, request) => {
                     } else {
                         m.dots.push({ type: d.type, dmg: safeDmg, ticksLeft: safeTicks, nextTickAt: Date.now() + 3000, byId: id });
                     }
+                }
+            }
+            // Fase 2b: status de CONTROLE elemental (gelo=freeze, raio=shock). Vêm no msg.dots
+            // mas não são DoT de dano — setam timestamp no mob (lido no tickAI). Boss = imune.
+            if (Array.isArray(msg.dots) && !m.unique){
+                const nowS = Date.now();
+                for (const d of msg.dots){
+                    if (!d) continue;
+                    if (d.type === 'freeze') m.frozenUntil = nowS + FREEZE_MS;
+                    else if (d.type === 'shock') m.shockedUntil = nowS + SHOCK_MS;
                 }
             }
             // broadcast update do mob
