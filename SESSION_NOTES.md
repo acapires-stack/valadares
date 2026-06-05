@@ -7,6 +7,68 @@
 
 ---
 
+## 🗡️ Sessão 05/06/2026 — Fix de combate: EXORI (ordem do spellCast) + targeting PvP (estilo Tibia)
+
+Retomada "valadares". Antes, o dono mandou um clipe (REC) do gameplay; identifiquei spam visual do
+"Esquivou!" (empilha 2-3 em enxame) + que o "O Senhor de Valadares ★★" é o mega boss SENHOR_VALADARES
+(18000 HP, server.js:563), não título. Depois o dono reportou 3 sintomas de combate: (1) EXORI não
+pegava mob mais longe, (2) PvP ligado não dava dano em mob, (3) mobs "param na tela". Revisão a fundo
+(server+cliente) → **2 bugs reais, o 3º consequência. Tudo client-only (`play.html`).**
+
+**#1 EXORI (ordem de mensagem):** o `spellCast` (que abre `_spellWindow` no server, autorizando o
+range 3 do AoE — server.js:6567/7062) era enviado DEPOIS do burst de `attackMob` (via `gainMagiaXp` no
+fim do bloco AoE). WS processa em ordem → os `attackMob` chegavam com a janela FECHADA → server caía no
+range da ARMA (1) → rejeitava todo mob além de 1 tile. Cooldown do EXORI (4s) > janela (1s) ⟹ TODA
+investida falhava (só o anel colado). FIREBALL/RAIO já mandavam o spellCast ANTES (10997 antes do 11004)
+— o AoE estava invertido. Fix: coleta alvos → `spellCast` 1º → burst de `attackMob` depois.
+
+**#2 targeting PvP (decisão do dono, estilo Tibia Secure Mode):** o auto-mira dava score (dist−15) pra
+player inimigo (targetNearest:10617 + loop auto-engage:14106) → grudava em qualquer player/bot visível
+(o **007**/ClaudeBot reproduzia) e ignorava mob. Regra nova: player só é alvo se **PvP ligado E dentro
+do range de ataque** (`cheb ≤ wRange`); fora do range não é alvo (sem perseguir); dentro, prioridade
+igual a mob (sem o −15). Pesquisei o Tibia (Secure Mode / white skull) pra fundamentar. **Nota:** clicar
+player longe não persegue mais (pela regra). White-skull auto-flag ("atacar liga meu PvP") ficou OPCIONAL
+(recomendei manter o toggle P explícito — auto-flag arrisca flagar sem querer, ex.: EXORI pega aliado).
+
+**#3 "mobs param na tela":** consequência — mob não morria (#1/#2) → enxame acumulava → no tickAI o mob
+só anda pra tile livre (server.js:2225); enxame denso = body-block → parados. Sumiu com #1/#2.
+
+**Validação:** vm.Script 0 erros; boot do cliente no browser 0 erros de console. Tentei o harness local
+mas tropecei (usei `window.CLIENT_VERSION` em vez do `CLIENT_VERSION` bare + cliquei ENTRAR em vez de
+`tryLogin(true)` → version-gate bloqueou; e o screenshot do preview deu timeout) → caí na validação
+IN-GAME do dono, que cobre melhor o #2 (precisa de 2º player PvP = o 007). [harness local É viável — ver
+memória reference-valadares-local-test.] **DEPLOY `d1f7c48`** (client-only, +26/−8 em play.html) → Vercel
+confirmado no ar (~8s, `aoeTargets` na prod). **Dono validou in-game (PvP ATIVO + /manutencao + 007 via
+/spawn007): "deu tudo certo"** — 007 longe = bate em mob; 007 perto = vira alvo; EXORI raio inteiro;
+Esqueleto danificável durante o PvP. ✅
+
+**➡️ LOTE /manutencao em preparação (acumulado, NÃO deployado — dono escolheu subir tudo junto):** 4 fixes
+prontos no working tree, validados por vm.Script/node --check (in-game = pós-deploy do dono):
+- **🟢 "Esquivou! ×N" (`c020cac`, cliente):** o float de esquiva empilhava numa parede verde com esquiva alta +
+  enxame; agora `bumpDodgeFloat()` mescla num único contador (renova enquanto esquiva) + throttle 120ms no som.
+  Provado no preview (5 esquivas → 1 float "×5"; pós-expirar cria novo).
+- **🛑 Anti-loop de sessão (`52b084e`, cliente):** o cliente reconectava em QUALQUER queda, inclusive no close
+  `4031` "session-replaced" → duas sessões da MESMA conta se derrubavam em LOOP infinito (sintoma do dono:
+  Conectando→Autenticado→Desconectado repetindo, em qualquer mapa, com 1 só player logado). Agora o `onclose`
+  detecta 4031 (ou o aviso serverMsg, backup p/ proxy trocar o código) e PARA de reconectar. Workaround
+  imediato pré-deploy: fechar TODAS as instâncias + reabrir UMA.
+- **🛡️ Teto anti-enxame (server `tickAI`):** fix do "morri cercado" (pendente do 31/05). Os 2 combinados:
+  (1) máx de atacantes que ACERTAM por janela de cooldown (`SWARM_MAX_ATTACKERS`=4) + (2) teto de dano/s como
+  % do HP máx (`SWARM_DMG_PCT_PER_SEC`=0.30), ambos env-tunáveis. Hit absorvido vira 0 (sem mobHit; evita "-0").
+  Atacante único / boss raramente bate no cap (1 < K e 1 hit < 30%/s).
+- **🏴 White-skull (cliente):** atacar DIRETO (clicar/mirar) um player com PvP ligado liga o TEU PvP
+  automaticamente (`enablePvpWhiteSkull`, mesmo gate de ouro do toggle); AoE/EXORI NÃO liga (só acerta mob).
+  Relaxei o gate `if(player.pvp)` do clique-em-player (senão mirar inimigo com PvP off era impossível e o
+  white-skull ficava inalcançável). Alvo segue precisando de PvP on (consensual preservado).
+
+**Deploy:** o lote tem server (`tickAI`) → **precisa `/manutencao`** (o cliente vai junto no mesmo push).
+Pós-deploy, validar in-game: enxame não deleta mais; clicar player com PvP off liga o PvP e ataca; Esquivou×N;
+loop de sessão sumiu.
+
+**Pendências (fora do lote):** M7 fase 2 (3v3 + ladder), pwHash legacy removal, bot de arena turbinado.
+
+---
+
 ## ⚔ Sessão 04/06/2026 — M7 Arena PvP 1v1 (matchmaking) + Lote 1b (quest server-auth) + pwHash dual-format
 
 Retomada "valadares" → "fazer as coisas do M7". Escopo travado com o dono (AskUserQuestion): **1v1 núcleo**
