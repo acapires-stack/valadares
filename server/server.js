@@ -4233,6 +4233,9 @@ function weaponRangeServer(p){
 // skill relevante; ×4 cobre crit+mults, +7 cobre ammo/variância) mas MUITO mais
 // apertado que o flat 600 pra setup fraco. (Não reusa pvpDamageCapServer base×15+100:
 // aquele clipa build de Distância/forja alta de baixa base — risco de "número errado".)
+// Mana do tiro básico da wand (Fase 2b). Descontado no attackMob (ataque de arma sem
+// janela de magia). As magias de cooldown já pagam no spellCast.
+const WAND_MANA_COST = 4;
 // Base da wand equipada (0 se não for wand). Entra no cap de magia e no gate de ataque.
 function wandBaseServer(p){
     const wKey = p.equipped && p.equipped.weapon;
@@ -7127,6 +7130,16 @@ wss.on('connection', (ws, request) => {
             if (!spellWin){
                 if (nowAtk - (p._lastAttackActionAt || 0) < ATTACK_ACTION_MIN_MS) return;
                 p._lastAttackActionAt = nowAtk;
+                // Fase 2b: tiro básico da wand custa mana (server-autoritativo). Ataque de arma
+                // sem janela de magia + arma é wand → desconta. Magias pagam no spellCast.
+                if (wandBaseServer(p) > 0){
+                    if ((p.mp || 0) < WAND_MANA_COST){
+                        sendTo(id, { t:'serverMsg', level:'warn', text:'Sem mana.' });
+                        return;
+                    }
+                    p.mp -= WAND_MANA_COST;
+                    broadcastPstatsAll(p);
+                }
             }
             // ─── N3 fase 2: consumo de munição/lança autoritativo ────
             // Munição (arco/besta): cliente indica ammoKey usado; server decrementa.

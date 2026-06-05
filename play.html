@@ -3915,6 +3915,8 @@ const ITEMS = {
 };
 // Cores por elemento (tiro/projétil/sprite). Afinidade e fraqueza usam estas chaves na Fase 2.
 const ELEMENT_COL = { fire:'#ff7030', ice:'#50b0ff', energy:'#b080ff' };
+// Mana do tiro básico da wand (Fase 2b — descontada server-side no attackMob).
+const WAND_MANA_COST = 4;
 
 // Fase 2 — fraqueza/resistência elemental (só mobs icônicos; resto neutro = 1.0).
 // ×1.5 = fraco, ×0.5 = resiste. Espelha a matriz do design-magos.md.
@@ -4735,7 +4737,8 @@ function itemFullDesc(def){
         if (def.def) lines.push(`+${def.def} defesa`);
         if (def.atkSpd) lines.push(`Velocidade de ataque +${Math.round(def.atkSpd*100)}%`);
         if (def.meleeRange && def.meleeRange > 1) lines.push(`Alcance corpo a corpo: ${def.meleeRange} tiles`);
-        if (def.ranged) lines.push(`Alcance: ${def.ranged} tiles (consome flechas)`);
+        if (def.ranged && def.kind !== 'wand') lines.push(`Alcance: ${def.ranged} tiles (consome flechas)`);
+        if (def.kind === 'wand') lines.push(`Alcance: ${def.ranged} tiles · tiro básico: ${WAND_MANA_COST} mana`);
         if (def.poison) lines.push(`☠ ${Math.round(def.poison.chance*100)}% chance de veneno (${def.poison.dmg} dano × ${def.poison.ticks} ticks)`);
         if (def.bleed)  lines.push(`🩸 ${Math.round(def.bleed.chance*100)}% chance de sangra (${def.bleed.dmg} × ${def.bleed.ticks})`);
         if (def.burn)   lines.push(`🔥 ${Math.round(def.burn.chance*100)}% chance de fogo (${def.burn.dmg} × ${def.burn.ticks})`);
@@ -5548,6 +5551,15 @@ function doAttack(m){
             }
             return;
         }
+        if (player.mp < WAND_MANA_COST){
+            if (!doAttack._manaWarn || Date.now() - doAttack._manaWarn > 1500){
+                log('<span class="log-sys">Sem mana pro tiro mágico.</span>');
+                doAttack._manaWarn = Date.now();
+            }
+            player.attackTimer = effectiveAttackDelay();
+            return;
+        }
+        player.mp -= WAND_MANA_COST;   // otimista; o server desconta + broadcasta o mp real
         if (Math.random() < m.dodge){
             log(`<span class="log-sys">${m.name} esquivou do tiro.</span>`);
             gainSkillXpLocal('Magia', 1);
@@ -10271,13 +10283,15 @@ function renderInventoryIfChanged(){
     const slotGrid   = { head:'1/2', neck:'1/3', weapon:'2/1', armor:'2/2', offhand:'2/3', feet:'3/2', cosmetic:'3/3' };
     const eqEl = document.getElementById('equipment');
     let hasRanged = false;
+    let hasWand = false;
 
     const slotHtml = ['head','weapon','armor','offhand','neck','feet','cosmetic'].map(slot => {
         const k = player.equipped[slot];
         const area = slotGrid[slot];
         if (k){
             const def = ITEMS[k];
-            if (def.ranged) hasRanged = true;
+            if (def.ranged && def.kind !== 'wand') hasRanged = true;
+            if (def.kind === 'wand') hasWand = true;
             const tip = itemFullDesc(def) + '\n\nClick p/ desequipar';
             return `<div class="paper-slot filled" data-slot="${slot}" style="grid-area:${area}" title="${escapeHtml(tip)}">
                 <span class="paper-slot-label">${slotLabels[slot]}</span>
@@ -10296,6 +10310,8 @@ function renderInventoryIfChanged(){
     if (hasRanged){
         const fl = (player.inv.FLECHA || 0) + (player.inv.FLECHA_PERF || 0);
         ammoLine = `<div class="paper-ammo ${fl>0?'':'low'}">▶ ${fl} flechas</div>`;
+    } else if (hasWand){
+        ammoLine = `<div class="paper-ammo ${player.mp < WAND_MANA_COST ? 'low':''}">✦ ${WAND_MANA_COST} mana/tiro</div>`;
     }
     eqEl.innerHTML = `<div class="paper-doll">${slotHtml}</div>${ammoLine}`;
 
