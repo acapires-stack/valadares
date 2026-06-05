@@ -10141,7 +10141,7 @@ function drawAmmoIcon(P, c, dark, light){
 let invSignature = null;
 // Categorização compartilhada entre inventário e baús
 const ITEM_CATEGORIES = [
-    { label: 'Armas',        kinds: ['weapon'] },
+    { label: 'Armas',        kinds: ['weapon','wand'] },
     { label: 'Equipamento',  kinds: ['offhand','armor','head','feet','neck'] },
     { label: 'Cosméticos',   kinds: ['cosmetic'] },
     { label: 'Bênçãos',      kinds: ['blessing'] },
@@ -10263,7 +10263,7 @@ function renderInventoryIfChanged(){
     } else {
         const renderItem = ([k,q]) => {
             const def = ITEMS[k];
-            const equippable = ['weapon','offhand','armor','head','feet','neck','cosmetic'].includes(def.kind);
+            const equippable = ['weapon','wand','offhand','armor','head','feet','neck','cosmetic'].includes(def.kind);
             const extra = itemStatsCompact(def);
             const tip = itemFullDesc(def) + (equippable ? '\n\nClick p/ equipar' : '');
             // Raridade vira COR do nome e forja vira badge no ícone (helper compartilhado
