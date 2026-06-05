@@ -3916,6 +3916,34 @@ const ITEMS = {
 // Cores por elemento (tiro/projétil/sprite). Afinidade e fraqueza usam estas chaves na Fase 2.
 const ELEMENT_COL = { fire:'#ff7030', ice:'#50b0ff', energy:'#b080ff' };
 
+// Fase 2 — fraqueza/resistência elemental (só mobs icônicos; resto neutro = 1.0).
+// ×1.5 = fraco, ×0.5 = resiste. Espelha a matriz do design-magos.md.
+const MOB_ELEM = {
+    DRAKE:       { fire:0.5, ice:1.5 },
+    DRAKE_LIDER: { fire:0.5, ice:1.5 },
+    GOLEM:       { fire:0.5, energy:1.5 },
+    GOLEM_REI:   { fire:0.5, energy:1.5 },
+    SKELETON:    { fire:1.5, energy:0.5 },
+    SPIDER:      { fire:1.5, ice:0.5 },
+    SNAKE:       { fire:1.5, ice:0.5 },
+    SCORPION:    { fire:1.5, ice:0.5 },
+    SOMBRA:      { energy:1.5 },
+    CARRASCO:    { energy:1.5 },
+    SENHOR_PROFUNDEZAS: { fire:0.5, ice:0.5, energy:1.5 },
+};
+// Multiplicador do mob pro elemento (1.0 = neutro). element null/'' = físico (sem mod).
+function elemMult(mobType, element){
+    if (!element) return 1;
+    const t = MOB_ELEM[mobType];
+    return (t && t[element]) || 1;
+}
+// Afinidade da wand (+20% no elemento dela) × fraqueza/resistência do mob.
+function elementalMult(mobType, atkElement, wandElement){
+    if (!atkElement) return 1;
+    const aff = (wandElement && atkElement === wandElement) ? 1.20 : 1;
+    return aff * elemMult(mobType, atkElement);
+}
+
 const DROPS = {
     RAT:    [ ['CHEESE', 0.7, 1, 1], ['PORRETE', 0.04, 1, 1] ],
     SNAKE:  [ ['EGG',    0.5, 1, 1], ['GOLD', 0.6, 1, 4], ['ADAGA', 0.05, 1, 1], ['LANCA', 0.06, 1, 1], ['PORRETE', 0.05, 1, 1] ],
@@ -5531,6 +5559,8 @@ function doAttack(m){
         const critW = Math.random() < playerCritChance();
         if (critW) dmgW = Math.floor(dmgW * critMultPlayer());
         dmgW = applyAttackMults(dmgW);
+        // Fase 2: afinidade da wand (sempre, é o elemento dela) × fraqueza/resistência do mob.
+        dmgW = Math.max(1, Math.floor(dmgW * elementalMult(m.type, wItem.element, wItem.element)));
         const eCol = ELEMENT_COL[wItem.element] || wItem.color || '#c060ff';
         addFloat(m.x, m.y, `-${dmgW}`, critW ? '#ffaa20' : eCol, true, critW ? -10 : 0);
         if (critW) sndCrit(); else sndSpell();
@@ -9176,6 +9206,22 @@ function getBattleList(){
     return out;
 }
 
+// Ícones de fraqueza/resistência elemental do mob (Fase 2) — ajuda o player a escolher
+// a wand/magia certa. Vazio pra mobs neutros e players (MOB_ELEM não tem a chave).
+function mobWeaknessIcons(mobType){
+    const t = MOB_ELEM[mobType];
+    if (!t) return '';
+    const EMO = { fire:'🔥', ice:'❄', energy:'⚡' };
+    let weak = '', resist = '';
+    for (const el of ['fire','ice','energy']){
+        if (t[el] > 1) weak += EMO[el];
+        else if (t[el] < 1) resist += EMO[el];
+    }
+    let html = '';
+    if (weak)   html += `<span style="font-size:10px;margin-left:2px" title="Fraco: +50% de dano desse elemento">${weak}</span>`;
+    if (resist) html += `<span style="font-size:10px;margin-left:2px;opacity:0.38" title="Resiste: -50% desse elemento">${resist}</span>`;
+    return html;
+}
 // Painel "Combate" = Battle List clicável. Cada linha mira o inimigo (clique, via
 // listener delegado abaixo); o alvo atual fica destacado. PZ → zona segura; vazio → aviso.
 function renderTargetWidget(){
@@ -9202,6 +9248,7 @@ function renderTargetWidget(){
         return `<div class="bl-row${isCur?' active':''}" data-bid="${e.id}" data-btype="${e.type}">
             <span class="bl-dot" style="background:${e.color}"></span>
             <span class="bl-name${e.isPlayer?' player':''}">${e.isPlayer?'☠ ':''}${escapeHtml(e.name)}${lvl}</span>
+            ${mobWeaknessIcons(e.ref && e.ref.type)}
             <span class="bl-hp"><span class="bl-hp-fill" style="width:${pct}%;background:${color}"></span><span class="bl-hp-txt">${Math.max(0,e.hp)}/${e.maxHp}</span></span>
             ${auto}
         </div>`;
@@ -10881,7 +10928,7 @@ const SPELLS = {
     FIREBALL: {
         name: 'Bola de Fogo',
         manaCost: 20, cooldown: 1500,
-        range: 8, damage: 12,
+        range: 8, damage: 12, element: 'fire',
         color: '#ff8030', glow: '#ffcc40',
         switchCost: 200,
         desc: 'Lança bola de fogo no alvo. Range 8 tiles.',
@@ -10906,7 +10953,7 @@ const SPELLS = {
     RAIO: {
         name: 'Raio Místico',
         manaCost: 15, cooldown: 1100,
-        range: 10, damage: 8,
+        range: 10, damage: 8, element: 'energy',
         color: '#7090ff', glow: '#ccddff',
         projType: 'beam',
         switchCost: 250,
@@ -10915,7 +10962,7 @@ const SPELLS = {
     EXORI: {
         name: 'Exori',
         manaCost: 40, cooldown: 4000,
-        aoeRange: 3, damage: 11,
+        aoeRange: 3, damage: 11, element: 'fire',
         color: '#ff6020', glow: '#ffaa30',
         switchCost: 400,
         desc: 'Explosão em área — acerta todos mobs em 3 tiles ao redor. Sem alvo necessário.',
@@ -11011,6 +11058,8 @@ function castSpell(spellKey){
             const critA = Math.random() < playerCritChance();
             if (critA) dmg = Math.floor(dmg * critMultPlayer());
             dmg = applyAttackMults(dmg);
+            // Fase 2: afinidade (magia==wand) × fraqueza/resistência do mob.
+            dmg = Math.max(1, Math.floor(dmg * elementalMult(m.type, sp.element, wEq && wEq.element)));
             if (serverAuthMobs && ws && ws.readyState === 1){
                 ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false }));
                 m.aggro = true;
@@ -11138,6 +11187,8 @@ function castSpell(spellKey){
     const crit = Math.random() < playerCritChance();
     if (crit) dmg = Math.floor(dmg * critMultPlayer());
     dmg = applyAttackMults(dmg);
+    // Fase 2: afinidade (magia==wand) × fraqueza/resistência do mob.
+    dmg = Math.max(1, Math.floor(dmg * elementalMult(m.type, sp.element, wEq && wEq.element)));
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : sp.glow, true, crit ? -10 : 0);
     projectiles.push({
         x: player.renderX, y: player.renderY,
