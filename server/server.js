@@ -2118,6 +2118,12 @@ function tickRespawns(){
 // ─── Tick AI ────────────────────────────────────────────────────────────────
 const TICK_AI_MS = 300;
 const ATTACK_CD_MS = 1100;
+// 🛡️ Anti-enxame (fix "morri cercado") — caps tunáveis por env, aplicados no tickAI quando
+// vários mobs cercam um player: (1) máx de mobs que ACERTAM por janela de cooldown;
+// (2) teto de dano por SEGUNDO como % do HP máx (rede de segurança contra burst).
+// Atacante único / boss raramente bate nos caps (1 < K e 1 hit < 30%/s). Hits absorvidos = 0.
+const SWARM_MAX_ATTACKERS   = parseInt(process.env.SWARM_MAX_ATTACKERS, 10)   || 4;
+const SWARM_DMG_PCT_PER_SEC = parseFloat(process.env.SWARM_DMG_PCT_PER_SEC)   || 0.30;
 // Pega vaga adjacente ao player que melhor espalhe os mobs (intel >=2 cerca,
 // intel 3 prefere flanco atrás do player). Retorna {x,y} ou null se nada livre.
 function pickSurroundSlot(m, target){
@@ -2266,7 +2272,21 @@ function tickAI(){
                     const def = totalDefenseServer(target);
                     const reduction = def > 0 ? def / (def + 30) : 0;
                     const tRed = Math.min(0.5, (target.permaBuffs && target.permaBuffs.dmgReduction) || 0);   // Pele de Pedra (teto seg. 50%)
-                    const actual = Math.max(1, Math.round(raw * (1 - reduction) * (1 - tRed)));
+                    let actual = Math.max(1, Math.round(raw * (1 - reduction) * (1 - tRed)));
+                    // 🛡️ Anti-enxame: (1) máx de atacantes por janela de cooldown + (2) teto de dano/s (% HP máx).
+                    // Hit absorvido vira 0 (o mob já gastou o cooldown acima). Por player, tunável por env.
+                    if (now - (target._atkWinStart || 0) > ATTACK_CD_MS){ target._atkWinStart = now; target._atkCount = 0; }
+                    if ((target._atkCount || 0) >= SWARM_MAX_ATTACKERS){ actual = 0; }
+                    else { target._atkCount = (target._atkCount || 0) + 1; }
+                    if (actual > 0){
+                        if (now - (target._dmgSecStart || 0) > 1000){ target._dmgSecStart = now; target._dmgSecTotal = 0; }
+                        const secCap = Math.max(1, Math.round((target.maxHp || 100) * SWARM_DMG_PCT_PER_SEC));
+                        const room = secCap - (target._dmgSecTotal || 0);
+                        actual = room <= 0 ? 0 : Math.min(actual, room);
+                        target._dmgSecTotal = (target._dmgSecTotal || 0) + actual;
+                    }
+                    // Absorvido pelo cap → sem dano, sem mobHit (evita "-0"); o mob segue em cooldown.
+                    if (actual <= 0) continue;
                     if ((target.hp ?? 100) > 0){
                         const newHp = Math.max(0, (target.hp ?? 100) - actual);
                         // 🕯️ Segunda Chance: se o golpe MATARIA, tenta reviver no lugar (só PvE).
