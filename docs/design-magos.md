@@ -159,7 +159,11 @@ Mobs reais (`server.js:541-561`):
   ESPADA_HL — fecha o gap do endgame, que não tinha fonte nenhuma). Loja mantida (decisão do
   dono: craft + loja = mat-sink E gold-sink). Custo de ouro do craft = base×8+def×12 (~128g
   elemental / ~312g Eterno).
-- ⏳ **Ajuste fino de balance** — números acima são chute informado; afinar com o dono in-game.
+- ✅ **Ajuste fino de balance** — DEPLOYADO + VALIDADO in-game 05/06 (dono: "ficou bem forte").
+  **Decisão: deixar rodar forte** (o problema era o mago ser fraco → errar pro forte é melhor pra
+  retenção). Nerf só se desequilibrar vs melee — knobs prontos (do mais pro menos impactante):
+  dano base (Glacial 13 / Tempestade 20) · Tempestade nuke (dano↓ ou mana/cd↑) · freeze garantido
+  da Glacial → virar chance ~60% · mults elementais (afinidade ×1.2 × fraqueza ×1.5).
 
 ---
 

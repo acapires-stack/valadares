@@ -90,8 +90,12 @@ já dizia; agora com causa-raiz no log: `[auth] electron desatualizado bloqueado
 (precisa combate fora da PZ; pipeline da Fase 2b inalterado) e craft consumindo mats→entregando wand
 (sem `/give` admin; `invCraft` é código inalterado + índice verificado).
 
-**➡️ DEPLOY:** pendente — via /manutencao com 0 player + dono valida o feel in-game (regra de ouro
-`feedback-valadares-deploy`). Acumular com qualquer outra mudança. Magos = rework 100% codado.
+**✅ DEPLOYADO + VALIDADO IN-GAME (05/06, `67ff4b6`):** dono rodou `/manutencao 5` → monitorei
+`/api/status` até `maintenance:true` (countdown desloga todos = sem fantasma, anti-30/05) → re-confirmei
+e pushei na janela do lock. Vercel (cliente novo, grep `Nova Glacial`/`aoeStatusRoll`) + Railway (boot
+novo `maintenance:false` ~1.5min, zero-downtime) confirmados por curl. **Dono testou tudo in-game:
+"funcionando, ficou BEM FORTE".** Decisão: **deixar rodar forte** (mago saiu de inviável→forte; nerf só
+se desequilibrar vs melee — knobs em `design-magos.md` / memória). Rework de magos (Fases 1→3) FECHADO.
 
 ---
 
