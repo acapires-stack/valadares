@@ -5716,10 +5716,24 @@ function connectMP(){
             sendJoinNow();
         }
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
         if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+        // 🛑 Sessão substituída: a MESMA conta autenticou em outro lugar e o server encerrou ESTA
+        // (close 4031, ou _sessionReplaced setado pelo aviso serverMsg caso o proxy troque o código).
+        // NÃO reconectar — senão as duas sessões entram num LOOP infinito (uma autentica → mata a
+        // outra → a outra reconecta → mata a primeira → …). Para aqui; o player recarrega se foi engano.
+        if ((ev && ev.code === 4031) || (_sessionReplaced && Date.now() - _sessionReplaced < 5000)){
+            mpDisconnected = true;
+            _sessionReplaced = 0;
+            if (_overlayDelayTimer){ clearTimeout(_overlayDelayTimer); _overlayDelayTimer = null; }
+            if (_reconnectTimer){ clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+            showReconnectOverlay(false);
+            log('<span class="log-dmg">⚠ Sua conta foi aberta em outro lugar — esta janela parou (sem reconexão automática, pra não duelar com a outra sessão). Feche as cópias extras; recarregue (F5) se foi engano.</span>');
+            if (typeof showServerToast === 'function') showServerToast('admin', '⚠ Conta aberta em outro lugar — esta janela foi desconectada. Feche as cópias extras ou recarregue (F5).', null, 15000);
+            return;
+        }
         // Se já estava com mobs do server, marca como queda pra bloquear farm offline
         if (mpWasConnected && serverAuthMobs){
             mpDisconnected = true;
@@ -6565,6 +6579,9 @@ function handleMP(msg){
         showServerToast('event', msg.text);
         log(`<span class="log-up">${escapeHtml(msg.text)}</span>`);
     } else if (msg.t === 'serverMsg'){
+        // Backup do close 4031 (caso o proxy troque o código de close): o server manda este
+        // aviso logo ANTES de encerrar a sessão duplicada. Marca pra o onclose NÃO reconectar.
+        if (typeof msg.text === 'string' && msg.text.includes('entrou em outro lugar')) _sessionReplaced = Date.now();
         showServerToast(msg.level || 'info', msg.text, msg.from);
         const logClass = {info:'log-sys', warn:'log-die', event:'log-up', admin:'log-up'}[msg.level] || 'log-sys';
         const prefix = msg.from ? `<b style="color:#ffaa20">[${escapeHtml(msg.from)}]</b> ` : '';
@@ -6850,6 +6867,7 @@ let _reconnectAttempt = 0;
 let _overlayDelayTimer = null;  // atraso de 3s antes de mostrar overlay "RECONECTANDO"
 let _heartbeatTimer = null;     // ping app-level cliente→server pra evitar idle timeout de proxy
 let _lastServerMsgAt = 0;       // timestamp da última msg recebida — watchdog de WS zumbi
+let _sessionReplaced = 0;       // ts: server avisou que a conta entrou em outro lugar (anti-loop de duelo de sessão)
 
 function scheduleReconnect(){
     if (_reconnectTimer) return;
