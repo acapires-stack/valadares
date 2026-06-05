@@ -65,6 +65,18 @@
             min-width: 0;   /* #1: flex-item não estica além do canvas quando o #log tem linha longa (loot do boss) → não empurra mais o layout */
         }
         canvas { display: block; }
+        /* Botão de gravar gameplay — clipe limpo do canvas (sem HUD, sem tela do PC) */
+        #recBtn {
+            position: absolute; top: 6px; right: 6px; z-index: 30;
+            background: rgba(18,10,10,0.66); color: #d09090;
+            border: 1px solid #5a3030; border-radius: 3px;
+            font-size: 10px; font-weight: 700; font-family: inherit; letter-spacing: 1px;
+            padding: 4px 8px; cursor: pointer; opacity: 0.5;
+            transition: opacity .15s, color .15s, border-color .15s;
+        }
+        #recBtn:hover { opacity: 1; color: #ff8c8c; border-color: #8a4040; }
+        #recBtn.recording { opacity: 1; color: #fff; background: rgba(190,30,30,0.9); border-color: #ff5454; animation: recPulse 1.2s infinite; }
+        @keyframes recPulse { 0%,100%{ box-shadow:0 0 0 0 rgba(255,60,60,.5); } 50%{ box-shadow:0 0 9px 2px rgba(255,60,60,.75); } }
         /* Canvas no tamanho natural (720×528). Quem quiser maior usa zoom
            do navegador (Ctrl+= / Ctrl+-) — funciona sem perder coords. */
         canvas#canvas {
@@ -1895,6 +1907,7 @@
     <!-- GAME -->
     <div id="gameContainer">
         <canvas id="canvas"></canvas>
+        <button id="recBtn" title="Gravar um clipe do gameplay (só a tela do jogo, sem HUD)" onclick="toggleRecording()">● REC</button>
 
         <!-- LOG / CHAT — abaixo do canvas -->
         <div id="chatPanel">
@@ -11914,6 +11927,72 @@ function eatBestFood(){
         else log('<span class="log-sys">Sem comida/poção disponível.</span>');
     }
 }
+
+// ─── Gravador de gameplay — clipe LIMPO do canvas (sem HUD, sem tela do PC) ──
+// canvas.captureStream + MediaRecorder (nativo Chromium/Electron). O áudio do jogo
+// (Web Audio) entra via um MediaStreamDestination derivado do masterGain — o som
+// continua tocando E vai pro clipe. Saída .webm baixada nos Downloads.
+let _recorder = null, _recChunks = [], _recStartAt = 0, _recTimer = null, _recAudioDest = null;
+function toggleRecording(){
+    if (_recorder && _recorder.state === 'recording') stopRecording();
+    else startRecording();
+}
+function startRecording(){
+    if (typeof MediaRecorder === 'undefined' || !canvas.captureStream){
+        log('<span class="log-sys">Gravação não suportada neste cliente.</span>'); return;
+    }
+    try {
+        let tracks = canvas.captureStream(30).getVideoTracks();
+        try {
+            if (audioCtx && masterGain){
+                _recAudioDest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(_recAudioDest);           // toca nos alto-falantes E grava no clipe
+                tracks = tracks.concat(_recAudioDest.stream.getAudioTracks());
+            }
+        } catch {}
+        const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+        const mime = types.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || 'video/webm';
+        _recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: mime, videoBitsPerSecond: 6000000 });
+        _recChunks = [];
+        _recorder.ondataavailable = e => { if (e.data && e.data.size) _recChunks.push(e.data); };
+        _recorder.onstop = finishRecording;
+        _recorder.start();
+        _recStartAt = performance.now();
+        const btn = document.getElementById('recBtn');
+        if (btn) btn.classList.add('recording');
+        if (_recTimer) clearInterval(_recTimer);
+        _recTimer = setInterval(updateRecLabel, 500); updateRecLabel();
+        log('<span class="log-sys">🔴 Gravando o gameplay — clique em REC de novo pra parar e baixar o clipe.</span>');
+    } catch (e){
+        log('<span class="log-sys">Falha ao gravar: ' + (e && e.message || e) + '</span>');
+    }
+}
+function updateRecLabel(){
+    const btn = document.getElementById('recBtn');
+    if (!btn || !_recorder || _recorder.state !== 'recording') return;
+    const s = Math.max(0, Math.floor((performance.now() - _recStartAt) / 1000));
+    btn.textContent = '● ' + Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+function stopRecording(){
+    if (_recorder && _recorder.state === 'recording'){ try { _recorder.stop(); } catch {} }
+}
+function finishRecording(){
+    if (_recTimer){ clearInterval(_recTimer); _recTimer = null; }
+    const btn = document.getElementById('recBtn');
+    if (btn){ btn.classList.remove('recording'); btn.textContent = '● REC'; }
+    try { if (_recAudioDest && masterGain) masterGain.disconnect(_recAudioDest); } catch {}
+    _recAudioDest = null;
+    const blob = new Blob(_recChunks, { type: 'video/webm' });
+    _recChunks = [];
+    if (!blob.size){ log('<span class="log-sys">Clipe vazio — nada foi gravado.</span>'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'valadares_clip_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.webm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    log('<span class="log-sys">✅ Clipe salvo (' + (blob.size/1048576).toFixed(1) + ' MB) — está nos Downloads. Posta direto ou me manda que eu deixo vertical.</span>');
+}
+window.toggleRecording = toggleRecording;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VIGNETTE
