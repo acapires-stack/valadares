@@ -4327,6 +4327,24 @@ function addFloat(x,y,text,color,big,offsetY){
     }
 }
 
+// Esquiva MESCLA num único float "Esquivou! ×N" (em vez de 1 por evento — com esquiva alta +
+// enxame empilhava numa parede verde ilegível por cima do boneco). Renova enquanto você esquiva;
+// quando para de chover ataque, ele sobe e some normal.
+let _dodgeFloat = null;
+let _lastDodgeSnd = 0;
+function bumpDodgeFloat(){
+    if (_dodgeFloat && _dodgeFloat.life > 0 && floatTexts.indexOf(_dodgeFloat) !== -1){
+        _dodgeFloat._n = (_dodgeFloat._n || 1) + 1;
+        _dodgeFloat.text = `Esquivou! ×${_dodgeFloat._n}`;
+        _dodgeFloat.life = 900;                                 // renova: contador fica visível enquanto esquiva
+        _dodgeFloat.x = player.x; _dodgeFloat.y = player.y;     // acompanha se o player anda
+    } else {
+        addFloat(player.x, player.y, 'Esquivou!', '#80ffd0', true, -8);   // 1º da sequência (também faz o broadcast MP)
+        _dodgeFloat = floatTexts[floatTexts.length - 1];
+        if (_dodgeFloat) _dodgeFloat._n = 1;
+    }
+}
+
 let _lastHitBy = null;   // último a bater no player (mob ou player) — usado pra spectator
 // ─── Death replay buffer ─────────────────────────────────────────────────
 // Rolling log dos últimos 5s antes da morte (hits recebidos, magias, status).
@@ -6699,8 +6717,9 @@ function handleMP(msg){
         const defName = (MTYPE[msg.mobType] && MTYPE[msg.mobType].name) || msg.mobType;
         // Esquiva (server-side agora) — sem dano, FX próprio. Antes a esquiva era invisível.
         if (msg.dodged){
-            addFloat(player.x, player.y, 'Esquivou!', '#80ffd0', true, -8);
-            if (typeof sndDodge === 'function') sndDodge();
+            bumpDodgeFloat();   // mescla em "Esquivou! ×N" (não vira parede com esquiva alta + enxame)
+            // throttle do som: sem isso vira metralhadora no enxame (mesmo motivo da parede)
+            if (typeof sndDodge === 'function' && Date.now() - _lastDodgeSnd > 120){ sndDodge(); _lastDodgeSnd = Date.now(); }
             log(`<span class="log-sys">🌀 Você esquivou de ${defName}!</span>`);
             return;
         }
