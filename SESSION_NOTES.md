@@ -7,6 +7,59 @@
 
 ---
 
+## 🪄 Sessão 05/06/2026 (noite) — REWORK DE MAGOS (Fases 1 + 2a + 2b) ✅ TODO DEPLOYADO
+
+> Estado completo + commits + gotchas na memória `project_valadares.md` (status do topo). Resumo:
+
+**Problema (dono):** caster não escalava — EXORI/Fireball ~35 @Magia80 vs espada ~55-70 grátis que crita.
+3 causas: base da magia congelada (8-12 pra sempre vs arma 3→30), magia não critava, magia pulava
+`applyAttackMults`. **Design fechado com o dono** (doc `docs/design-magos.md`): wand OBRIGATÓRIA + tiro
+básico spammável + magia crita+talentos + +2 AoE novas + elemental MÉDIO (fraqueza só em mobs icônicos)
++ HÍBRIDO (elemento fixo por magia, wand dá afinidade +20%).
+
+**Deployado (em ordem):**
+- `a55e8bd` **Fase 1** — classe `kind:'wand'` (skill Magia, 2h, ranged, 6 tiers base6→30) cliente+server;
+  tiro básico no `doAttack` (escala wand.base+Magia/3, crita, applyAttackMults); gate (magia de ataque
+  exige wand, cliente+server); magia soma wandBase+crit+mults; cap server wand-aware (×6 spell, melee
+  via weaponSkillOf→Magia); wands na loja. Validado E2E local + via /manutencao.
+- `1840da2` **fix UI equipar** (client-only) — wand caía em "Outros"/não equipava: faltava em
+  `ITEM_CATEGORIES` 'Armas' + lista de equipáveis (~play.html:10266).
+- `8040c19` **fix projétil PvP/007** (client-only) — `pvpAttackPlayer` não tinha `projectiles.push`
+  (dano+alcance já ok); add projétil pra wand/arco vs player.
+- `da8e229` **Fase 2a elemental** (client-only) — `MOB_ELEM` (Drake fraco gelo/resiste fogo, Golem fraco
+  raio, Esqueleto/Aranha/Cobra fracos fogo, Sombra/Carrasco fracos raio) + `elementalMult` (afinidade
+  ×1.2 × fraqueza ×1.5/resist ×0.5) aplicado no tiro básico + magias; elemento fixo (FIREBALL/EXORI=fire,
+  RAIO=energy); tooltip de fraqueza na Battle List (`mobWeaknessIcons`, lê `e.ref.type`).
+- `7618316` **Fase 2b-mana** (server) — tiro básico custa **4 mana** (`WAND_MANA_COST`, descontado no
+  `attackMob` quando `!spellWin` + arma é wand; magias pagam no spellCast) + conserta a UI das "flechas"
+  (hasRanged/tooltip excluem wand → "✦ 4 mana/tiro").
+- `0464882` **Fase 2b-status** (server) — ❄️ congelar (gelo, mob ×1.8 lento 3s) + ⚡ choque (raio, mob
+  pula o turno 0.7s) no `tickAI`; 22% chance/hit (`elementStatusRoll`); boss(`unique`)=IMUNE; aplica
+  `m.frozenUntil`/`m.shockedUntil` no attackMob; glifo ❄/⚡ reusa o pipeline de DoT (`glyphMap`/sync/
+  `mobsSignature`). 2b (mana+status) DEPLOYADO SEM /manutencao (dono "pode subir, sai do jogo" +
+  precedente 03/06; Vercel confirmado por curl, Railway zero-downtime sem gap).
+
+**⚠️ Confirmação do SERVER pendente:** não testei behavioral em prod (sem creds; testmago é só local).
+Dono confirma in-game: atacar c/ wand = −4 mana; wand de gelo/raio = glifo ❄/⚡; boss imune.
+
+**Lições do harness de teste (recorrentes):**
+1. **Testar o CAMINHO DE UI, não só a função** — 2 bugs (equipar via clique; tooltip `e.type` vs
+   `e.ref.type`) passaram porque o teste E2E chamava a função direto via eval (bypass da UI). Kind novo
+   precisa entrar em TODAS as listas de UI (categoria + equipável + sprite dispatch + glifo), não só em
+   SLOT_OF_KIND/ITEMS/WEAPON_SKILL.
+2. **Movimento por-eval sofre snap-back** do server (pos autoritativa) → fazer walk+ação num ÚNICO eval
+   async atômico (sem janela pro snap-back). Eval async muito longo às vezes estoura o timeout de 30s
+   (game loop ocupada, 500+ mobs) → manter curto (sleeps ~370ms, poucos passos).
+3. **Harness local:** `node server/server.js` :8080 com `ADMIN_NAME=...,testmago` + preview python/npx
+   :3333; login `CLIENT_VERSION='1.0.10'` bare + `tryLogin(true)`; sair da PZ por oeste-2-depois-norte
+   (a coluna central tem NPCs altar/domador). Status server → reiniciar o WS (cliente só precisa reload).
+
+**➡️ PRÓXIMA SESSÃO — Fase 3 (fecha o rework):** as 2 AoE novas (**Nova Glacial** gelo + **Tempestade**
+raio, statadas no design-magos.md) + **variantes de wand elementais com craft** (hoje as elementais só
+vêm da loja) + ajuste fino de balance. Tudo já desenhado no `docs/design-magos.md`.
+
+---
+
 ## 🗡️ Sessão 05/06/2026 — Fix de combate: EXORI (ordem do spellCast) + targeting PvP (estilo Tibia)
 
 Retomada "valadares". Antes, o dono mandou um clipe (REC) do gameplay; identifiquei spam visual do
