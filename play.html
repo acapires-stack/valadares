@@ -10279,19 +10279,20 @@ canvas.addEventListener('click', e => {
             return;
         }
     }
-    // Player PvP no tile (só com PvP ligado)
-    if (player.pvp){
-        for (const id in remotePlayers){
-            const rp = remotePlayers[id];
-            if (Math.round(rp.renderX ?? rp.x) === tileX && Math.round(rp.renderY ?? rp.y) === tileY){
-                if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
-                player.target = parseInt(id, 10);
-                player.targetType = 'player';
-                player.autoAttack = true;
-                log(`<span class="log-dmg">Alvo PvP: ${escapeHtml(rp.name)} ☠ [AUTO]</span>`);
-                renderTargetWidget();
-                return;
-            }
+    // Player no tile. White-skull: clicar (direto) num player com PvP ligado LIGA o teu PvP
+    // automaticamente (não precisa do toggle P). O mob tem prioridade (checado acima, dá return),
+    // então só cai aqui clicando EXATO num player. AoE/EXORI não passa por este caminho.
+    for (const id in remotePlayers){
+        const rp = remotePlayers[id];
+        if (Math.round(rp.renderX ?? rp.x) === tileX && Math.round(rp.renderY ?? rp.y) === tileY){
+            if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
+            if (!player.pvp && !enablePvpWhiteSkull()) return;   // liga teu PvP (gate de ouro) ou aborta
+            player.target = parseInt(id, 10);
+            player.targetType = 'player';
+            player.autoAttack = true;
+            log(`<span class="log-dmg">Alvo PvP: ${escapeHtml(rp.name)} ☠ [AUTO]</span>`);
+            renderTargetWidget();
+            return;
         }
     }
 });
@@ -11658,6 +11659,21 @@ function togglePvP(){
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pvp', pvp:player.pvp, selos:player.selos, highlander:player.highlander}));
 }
 
+// 🏴 White-skull: liga o PvP automaticamente ao mirar/atacar (DIRETO) um player com PvP ligado,
+// sem precisar do toggle P. Respeita o mesmo gate de ouro do togglePvP. AoE/EXORI NÃO chama isto
+// (só acerta mob). Retorna true se o PvP ficou (ou já estava) ligado; false se barrou (sem ouro).
+function enablePvpWhiteSkull(){
+    if (player.pvp) return true;
+    if (player.gold < PVP_MIN_GOLD){
+        log(`<span class="log-sys">PvP exige ${PVP_MIN_GOLD}g pra atacar um player (você tem ${player.gold}g).</span>`);
+        return false;
+    }
+    player.pvp = true;
+    log('<span class="log-dmg">⚔ PvP LIGADO automaticamente (você atacou um player).</span>');
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pvp', pvp:true, selos:player.selos, highlander:player.highlander}));
+    return true;
+}
+
 // Verifica se player está em PZ lock e força saída se for o caso
 function checkPzLock(){
     if (Date.now() < player.pzLockUntil && playerInSafeZone()){
@@ -11746,10 +11762,12 @@ window.togglePvP = togglePvP;
 
 // Calcula dano de ataque PvP (igual ao melee normal)
 function pvpAttackPlayer(targetId){
-    if (!player.pvp){ log('<span class="log-sys">Seu PvP está desligado (tecla P).</span>'); return; }
     const tgt = remotePlayers[targetId];
     if (!tgt){ return; }
     if (!tgt.pvp){ log('<span class="log-sys">Este player não está com PvP ligado.</span>'); return; }
+    // 🏴 White-skull: atacar (direto) um player com PvP ligado liga o TEU PvP automaticamente.
+    // (Normalmente o PvP já foi ligado no clique/mira; aqui cobre o resto dos caminhos diretos.)
+    if (!player.pvp && !enablePvpWhiteSkull()) return;
     // PZ só existe no floor 0 (cidade). Na arena/masmorra (floor>0) NÃO há PZ — e como a região
     // da arena (e da masmorra) se sobrepõe às COORDS da PZ (46-54), o inSafeZone(alvo) cru
     // bloqueava o ataque indevidamente ("Não pode PvP na PZ" mesmo lutando). Gate por floor
