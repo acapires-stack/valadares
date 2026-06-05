@@ -10615,15 +10615,20 @@ function targetNearest(cycle, silent){
     }
     // Players (PvP) — score próprio, sem penalidade de range (você caminha até)
     if (player.pvp){
+        // Regra do dono (estilo Tibia/Secure Mode): player só é alvo se PvP ligado E dentro do
+        // range de ataque. Fora do range NÃO é alvo (não persegue player do outro lado da tela).
+        // Dentro, prioridade IGUAL a mob (sem o antigo viés -15 que sequestrava o auto-mira).
+        const _wK = player.equipped.weapon, _wI = _wK ? ITEMS[_wK] : null;
+        const _wRange = _wI ? (_wI.ranged || _wI.meleeRange || 1) : 1;
         for (const idK in remotePlayers){
             const rp = remotePlayers[idK];
             if (!rp.pvp) continue;
             if (rp.x<cam.x||rp.x>=cam.x+VP_W||rp.y<cam.y||rp.y>=cam.y+VP_H) continue;
+            const cheb = Math.max(Math.abs(rp.x-player.x), Math.abs(rp.y-player.y));
+            if (cheb > _wRange) continue;   // fora do range de ataque → não é alvo
             const idN = parseInt(idK, 10);
             if (cycle && player.target && player.targetType==='player' && idN === player.target) continue;
-            // Player remoto: dist puro - bônus de prioridade alto (sempre vence mob)
-            const d = Math.abs(rp.x-player.x) + Math.abs(rp.y-player.y);
-            const s = d - 15;
+            const s = Math.abs(rp.x-player.x) + Math.abs(rp.y-player.y);   // mesma métrica dos mobs (sem -15)
             if (s < bestS){ bestS = s; best = rp; bestType = 'player'; bestId = idN; }
         }
     }
@@ -10848,12 +10853,24 @@ function castSpell(spellKey){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
         sndSpell();
-        let hits = 0;
+        // Coleta os alvos no raio ANTES de mandar qualquer coisa: o spellCast precisa chegar
+        // ao server ANTES dos attackMob, porque é ele que abre a janela de magia que autoriza
+        // o range do AoE (server.js: _spellWindow). Mandando attackMob primeiro, eles chegam
+        // com a janela fechada → o server usa o range da ARMA (1) e rejeita mob além de 1 tile
+        // ("Exori só pega o colado"). FIREBALL/RAIO já mandam spellCast antes — o AoE estava invertido.
+        const aoeTargets = [];
         for (const m of monsters){
             if (m.hp <= 0) continue;
             const d = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
             if (d > sp.aoeRange || d === 0) continue;
             if (!hasLineOfSight(player.x, player.y, m.x, m.y)) continue;   // explosão não passa parede
+            aoeTargets.push(m);
+        }
+        const hits = aoeTargets.length;
+        // 1º) abre a janela de magia no server (mana + XP de Magia + range do AoE)
+        if (hits > 0) gainMagiaXp(spellKey, hits);
+        // 2º) agora o burst de attackMob — chega com a janela aberta → server aceita o range 3
+        for (const m of aoeTargets){
             let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
             dmg = Math.max(1, Math.floor(dmg * buffMult().dmg));
             if (serverAuthMobs && ws && ws.readyState === 1){
@@ -10861,7 +10878,6 @@ function castSpell(spellKey){
                 m.aggro = true;
             }
             addFloat(m.x, m.y, `-${dmg}`, sp.glow, true);
-            hits++;
         }
         // Visual AoE: anel grande mostrando o raio real (3 tiles)
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 600, maxR: sp.aoeRange * TS });
@@ -10878,7 +10894,6 @@ function castSpell(spellKey){
             });
         }
         log(`<span class="log-dmg">${sp.name}: ${hits} alvo(s) atingido(s)</span>`);
-        if (hits > 0) gainMagiaXp(spellKey, hits);
         return;
     }
 
@@ -14091,12 +14106,15 @@ function loop(ts){
                 if (s < bestS){ bestS = s; chosen = mm; chosenType='monster'; chosenId = mm.id; }
             }
             if (player.pvp){
+                // Regra do dono: player só entra como alvo se estiver DENTRO do range de ataque
+                // (wRange acima). Fora → não é alvo (sem perseguir). Prioridade igual a mob (sem -15).
                 for (const idK in remotePlayers){
                     const rp = remotePlayers[idK];
                     if (!rp.pvp) continue;
                     if (rp.x<cam.x||rp.x>=cam.x+VP_W||rp.y<cam.y||rp.y>=cam.y+VP_H) continue;
-                    const d = Math.abs(rp.x-player.x) + Math.abs(rp.y-player.y);
-                    const s = d - 15;
+                    const cheb = Math.max(Math.abs(rp.x-player.x), Math.abs(rp.y-player.y));
+                    if (cheb > wRange) continue;   // fora do range → não é alvo
+                    const s = Math.abs(rp.x-player.x) + Math.abs(rp.y-player.y);
                     if (s < bestS){ bestS = s; chosen = rp; chosenType='player'; chosenId = parseInt(idK,10); }
                 }
             }
