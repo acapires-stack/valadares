@@ -728,6 +728,11 @@ const RECIPES = [
     { out:'ESPADA_HL',      in:{ ESPADA_DRACO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 } },
     { out:'ARMADURA_TRONO', in:{ ARMADURA_ESCAMA:1, CORACAO_HL:2, PEDRA_GOLEM:4, OSSO:8 } },
     { out:'COROA_VENDEDOR', in:{ ELMO_DRACO:1, CORACAO_HL:1, ESCAMA:3, CHIFRE:2 } },
+    // Fase 3 (rework de magos) — craft de wands. MESMA ORDEM/ÍNDICE do cliente (RECIPES).
+    { out:'CAJADO_FOGO',    in:{ ESCAMA:4, GARRA:2, OSSO:6 } },
+    { out:'CAJADO_GELO',    in:{ SILK:8, ASA_MORCEGO:4, OSSO:6 } },
+    { out:'CAJADO_RAIO',    in:{ PEDRA_GOLEM:4, CHIFRE:2, OSSO:6 } },
+    { out:'CAJADO_ETERNO',  in:{ CAJADO_RUNICO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 } },
 ];
 
 // ─── QUESTS (N3 fase 3) ──────────────────────────────────────────────────
@@ -6613,6 +6618,9 @@ wss.on('connection', (ws, request) => {
                 EXORI:    { manaCost: 40, range: 3, damage: 11 },   // range = aoeRange
                 PROVOCACAO: { manaCost: 25 },
                 FURIA:    { manaCost: 35 },
+                // Fase 3 — AoE novas (range = aoeRange; abre a janela que autoriza o attackMob)
+                GLACIAL:    { manaCost: 45, range: 3, damage: 13 },
+                TEMPESTADE: { manaCost: 60, range: 4, damage: 20 },
             };
             const spellKey = String(msg.spellKey || '');
             const sp = SPELLS_META[spellKey];

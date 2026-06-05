@@ -2744,6 +2744,11 @@ const RECIPES = [
     { out:'ESPADA_HL',      in:{ ESPADA_DRACO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 }, name:'Espada do Highlander ★' },
     { out:'ARMADURA_TRONO', in:{ ARMADURA_ESCAMA:1, CORACAO_HL:2, PEDRA_GOLEM:4, OSSO:8 }, name:'Armadura do Trono ★' },
     { out:'COROA_VENDEDOR', in:{ ELMO_DRACO:1, CORACAO_HL:1, ESCAMA:3, CHIFRE:2 },     name:'Coroa do Vendedor de Almas ★' },
+    // ── Wands (Fase 3 magos) — craft elemental + endgame. MESMA ORDEM/ÍNDICE do server ──
+    { out:'CAJADO_FOGO',    in:{ ESCAMA:4, GARRA:2, OSSO:6 },                          name:'Cajado de Fogo 🔥' },
+    { out:'CAJADO_GELO',    in:{ SILK:8, ASA_MORCEGO:4, OSSO:6 },                      name:'Cajado de Gelo ❄️ (seda gélida)' },
+    { out:'CAJADO_RAIO',    in:{ PEDRA_GOLEM:4, CHIFRE:2, OSSO:6 },                     name:'Cajado de Raio ⚡' },
+    { out:'CAJADO_ETERNO',  in:{ CAJADO_RUNICO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 }, name:'Cajado Eterno ★★' },
 ];
 
 // Cavernas — declaradas cedo porque genMap() esculpe o mapa com elas
@@ -3923,6 +3928,17 @@ function elementStatusRoll(element){
     if (element === 'ice'    && Math.random() < ELEM_STATUS_CHANCE) return [{ type:'freeze' }];
     if (element === 'energy' && Math.random() < ELEM_STATUS_CHANCE) return [{ type:'shock' }];
     return undefined;
+}
+// Fase 3 — status de uma magia AoE. Se a magia define statusChance (ex: Nova Glacial
+// congela garantido = 1.0; Tempestade = 0 = nuke puro) ela manda; senão cai na chance
+// padrão do elemento (mesma do tiro básico). Boss segue imune (filtrado no server).
+function aoeStatusRoll(sp){
+    if (sp.statusChance != null){
+        if (sp.element === 'ice'    && Math.random() < sp.statusChance) return [{ type:'freeze' }];
+        if (sp.element === 'energy' && Math.random() < sp.statusChance) return [{ type:'shock' }];
+        return undefined;
+    }
+    return elementStatusRoll(sp.element);
 }
 
 // Fase 2 — fraqueza/resistência elemental (só mobs icônicos; resto neutro = 1.0).
@@ -11006,6 +11022,25 @@ const SPELLS = {
         switchCost: 450,
         desc: 'Buff temporário: +25% dano e +25% velocidade. Duração 12s + Magia. Cooldown 30s.',
     },
+    // Fase 3 (rework de magos) — 2 AoE novas. Reusam o ramo sp.aoeRange do castSpell.
+    GLACIAL: {
+        name: 'Nova Glacial',
+        manaCost: 45, cooldown: 4500,
+        aoeRange: 3, damage: 13, element: 'ice',
+        statusChance: 1.0,   // congela GARANTIDO (lentidão 3s) — é a identidade da magia; boss imune (server)
+        color: '#50b0ff', glow: '#c0e8ff',
+        switchCost: 600,
+        desc: 'Explosão de gelo em área (raio 3) + congela (lentidão 3s). Boss imune ao congelamento.',
+    },
+    TEMPESTADE: {
+        name: 'Tempestade',
+        manaCost: 60, cooldown: 8000,
+        aoeRange: 4, damage: 20, element: 'energy',
+        statusChance: 0,     // nuke puro — troca atordoamento por maior dano + alcance
+        color: '#b080ff', glow: '#e0c8ff',
+        switchCost: 1200,
+        desc: 'Tempestade elétrica em área (raio 4). Maior dano e alcance entre as AoE; mana e cooldown altos.',
+    },
 };
 const auraEffects = [];   // { entity, color, life, duration }
 const spellCooldowns = {};   // { FIREBALL: ms restante }
@@ -11084,7 +11119,7 @@ function castSpell(spellKey){
             // Fase 2: afinidade (magia==wand) × fraqueza/resistência do mob.
             dmg = Math.max(1, Math.floor(dmg * elementalMult(m.type, sp.element, wEq && wEq.element)));
             if (serverAuthMobs && ws && ws.readyState === 1){
-                ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false, dots: elementStatusRoll(sp.element) }));
+                ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false, dots: aoeStatusRoll(sp) }));
                 m.aggro = true;
             }
             addFloat(m.x, m.y, `-${dmg}`, critA ? '#ffaa20' : sp.glow, true);

@@ -54,9 +54,44 @@ Dono confirma in-game: atacar c/ wand = −4 mana; wand de gelo/raio = glifo ❄
    :3333; login `CLIENT_VERSION='1.0.10'` bare + `tryLogin(true)`; sair da PZ por oeste-2-depois-norte
    (a coluna central tem NPCs altar/domador). Status server → reiniciar o WS (cliente só precisa reload).
 
-**➡️ PRÓXIMA SESSÃO — Fase 3 (fecha o rework):** as 2 AoE novas (**Nova Glacial** gelo + **Tempestade**
-raio, statadas no design-magos.md) + **variantes de wand elementais com craft** (hoje as elementais só
-vêm da loja) + ajuste fino de balance. Tudo já desenhado no `docs/design-magos.md`.
+---
+
+## 🪄 Sessão 05/06/2026 (continuação) — REWORK DE MAGOS Fase 3 ✅ FEITA (verificada local, NÃO deployada)
+
+**Fecha o rework.** Tudo em paridade cliente (`play.html`) + server (`server/server.js`), commit pendente.
+
+- **2 AoE novas** (ramo `sp.aoeRange` do `castSpell` já era genérico → só plugar na tabela):
+  - **Nova Glacial** ❄️ (ice, raio 3, 13 dano, 45 mana, cd 4.5s) — **congela GARANTIDO** (slow 3s)
+    via `statusChance:1.0`; boss imune (`!m.unique`). Novo helper `aoeStatusRoll(sp)` (statusChance
+    da magia manda; senão cai no default do elemento). Reusa o freeze que já existe da Fase 2b.
+  - **Tempestade** ⚡ (energy, raio 4, 20 dano, 60 mana, cd 8s) — nuke puro (`statusChance:0`).
+  - Espelhadas no `SPELLS_META` do server (`GLACIAL`/`TEMPESTADE`, range=aoeRange autoriza o
+    attackMob via `_spellWindow`). Aparecem sozinhas no Altar (switchCost 600/1200). Cap ×6
+    wand-aware já comporta sem clipar.
+- **Receitas de craft de wand** (cliente + server `RECIPES`, **index-sincronizado** — conferido com
+  diff, 32 entradas idênticas): Cajado de Fogo `{ESCAMA:4,GARRA:2,OSSO:6}`, Cajado de Gelo
+  `{SILK:8,ASA_MORCEGO:4,OSSO:6}` (seda gélida — não há mob de gelo, decisão do dono), Cajado de Raio
+  `{PEDRA_GOLEM:4,CHIFRE:2,OSSO:6}`, **Cajado Eterno ★★** `{CAJADO_RUNICO:1,CORACAO_HL:3,ESCAMA:5,
+  PEDRA_GOLEM:5}` (espelha ESPADA_HL — fecha o gap do endgame que não tinha fonte). **Loja mantida**
+  (decisão do dono: craft + loja = mat-sink E gold-sink).
+
+**Verificação local (server :8080 + preview :3333, testmago admin Magia 80):**
+- ✅ Sintaxe (server `node --check`; JS inline do play.html via `vm.Script`). RECIPES index-sync (diff). Chaves SPELLS_META batem.
+- ✅ Runtime: `aoeStatusRoll(GLACIAL)`→`[{freeze}]`, `(TEMPESTADE)`→undefined. Console limpo.
+- ✅ Altar renderiza as 2 magias (stats/cor/custo); Bancada renderiza as 4 receitas (mats/custo). Screenshots.
+- ✅ Server reconhece as 2 magias: `spellCast GLACIAL` desconta 45 mana, `TEMPESTADE` 60; controle (magia fake) desconta 0. Wand-gate OK (Cajado de Gelo equipado).
+
+**⚠️ Gotcha do harness (confirmado):** o browser do preview roda em **Electron** (UA `Electron/41.6.1`)
+→ o server aplica o gate de versão do app desktop e bloqueia `app=v?` (CLIENT_VERSION null). **Bypass:
+setar `CLIENT_VERSION='1.0.10'` ANTES de `tryLogin(true)`** (a memória `reference_valadares_local_test`
+já dizia; agora com causa-raiz no log: `[auth] electron desatualizado bloqueado`).
+
+**NÃO testado in-game (deferido ao dono — infra inalterada + provada):** freeze aplicado num mob vivo
+(precisa combate fora da PZ; pipeline da Fase 2b inalterado) e craft consumindo mats→entregando wand
+(sem `/give` admin; `invCraft` é código inalterado + índice verificado).
+
+**➡️ DEPLOY:** pendente — via /manutencao com 0 player + dono valida o feel in-game (regra de ouro
+`feedback-valadares-deploy`). Acumular com qualquer outra mudança. Magos = rework 100% codado.
 
 ---
 

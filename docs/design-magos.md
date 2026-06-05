@@ -1,6 +1,7 @@
 # Rework de Magos — Wands, Escalonamento e Dano Elemental
 
-> Design doc — 2026-06-05. Status: APROVADO pelo dono, Fase 1 em implementação.
+> Design doc — 2026-06-05. Status: ✅ COMPLETO — Fases 1, 2a, 2b e 3 implementadas e
+> verificadas localmente. Falta só o dono validar o feel in-game + deploy via /manutencao.
 > Origem: o caster não escala. No Magia 80 o EXORI/Fireball tira ~35 por mob enquanto
 > uma espada intermediária bate ~55-70 de graça, mais rápido e crita. Mago é inviável
 > como classe-núcleo (não dá pra "upar" com magia). Este doc fecha a solução.
@@ -144,10 +145,21 @@ Mobs reais (`server.js:541-561`):
 - Tabela de fraqueza nos mobs icônicos.
 - Dica de fraqueza no tooltip do mob.
 
-### Fase 3 — Conteúdo
-- Nova Glacial + Tempestade.
-- Variantes de wand elementais + receitas de craft.
-- Ajuste fino de balance.
+### Fase 3 — Conteúdo ✅ FEITA (2026-06-05, verificada local)
+- ✅ **Nova Glacial** (ice, AoE raio 3, 13 dano base, 45 mana, cd 4.5s) — **congela GARANTIDO**
+  (slow 3s) via `statusChance:1.0`; boss imune (`!m.unique` no server).
+- ✅ **Tempestade** (energy, AoE raio 4, 20 dano base, 60 mana, cd 8s) — nuke puro
+  (`statusChance:0`, troca CC por dano+alcance). Reusam o ramo `sp.aoeRange` do `castSpell`;
+  espelhadas no `SPELLS_META` do server (range=aoeRange autoriza o attackMob); aparecem
+  sozinhas no Altar (switchCost 600 / 1200). Novo helper `aoeStatusRoll(sp)`.
+- ✅ **Receitas de craft de wand** (cliente + server `RECIPES`, index-sincronizado):
+  Cajado de Fogo `{ESCAMA:4,GARRA:2,OSSO:6}`, Cajado de Gelo `{SILK:8,ASA_MORCEGO:4,OSSO:6}`
+  (seda gélida — não há mob de gelo), Cajado de Raio `{PEDRA_GOLEM:4,CHIFRE:2,OSSO:6}`,
+  **Cajado Eterno ★★** `{CAJADO_RUNICO:1,CORACAO_HL:3,ESCAMA:5,PEDRA_GOLEM:5}` (espelha
+  ESPADA_HL — fecha o gap do endgame, que não tinha fonte nenhuma). Loja mantida (decisão do
+  dono: craft + loja = mat-sink E gold-sink). Custo de ouro do craft = base×8+def×12 (~128g
+  elemental / ~312g Eterno).
+- ⏳ **Ajuste fino de balance** — números acima são chute informado; afinar com o dono in-game.
 
 ---
 
