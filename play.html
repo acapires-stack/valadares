@@ -3154,6 +3154,17 @@ function drawWeaponSprite(px, py, weapon){
     const def = ITEMS[weapon] || ITEMS[base]; if (!def) return;
     weapon = base;
     const wx = px + 38;
+    // Wand (cajado) na mão — haste + orbe brilhante (cor do elemento)
+    if (def.kind === 'wand'){
+        const orb = (typeof ELEMENT_COL !== 'undefined' && ELEMENT_COL[def.element]) || def.color;
+        ctx.fillStyle = '#5a3818';
+        ctx.fillRect(wx, py+8, 3, 30);     // haste
+        ctx.fillStyle = orb;
+        ctx.beginPath(); ctx.arc(wx+1.5, py+7, 4, 0, Math.PI*2); ctx.fill();   // orbe
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(wx, py+5, 1, 1);      // brilho
+        return;
+    }
     // Arcos/bestas: arco curvo na mão
     if (def.ranged){
         if (weapon === 'BESTA'){
@@ -3891,7 +3902,19 @@ const ITEMS = {
     CORACAO_HL:    { name:'Coração do Highlander', color:'#cc1010', kind:'neck' },
     FLECHA:        { name:'Flecha',           color:'#a08050', kind:'ammo', ammoBonus:2 },
     FLECHA_PERF:   { name:'Flecha perfurante',color:'#c0c0d0', kind:'ammo', ammoBonus:4 },
+    // ── WANDS (cajados — skill Magia, 2 mãos, tiro mágico à distância, sem munição) ──
+    // kind:'wand' faz o ataque normal virar tiro mágico (doAttack) e habilita as magias
+    // de ataque (gate em castSpell). element é cosmético na Fase 1 (afinidade/fraqueza =
+    // Fase 2). ranged = alcance do tiro básico. Espelhado no server (ITEM_META/WEAPON_SKILL).
+    VARINHA_APRENDIZ: { name:'Varinha de Aprendiz', color:'#b89048', kind:'wand', hand:'2h', skill:'Magia', base:6,  def:1, ranged:5, element:null },
+    CAJADO_FOGO:      { name:'Cajado de Fogo',       color:'#ff7030', kind:'wand', hand:'2h', skill:'Magia', base:13, def:2, ranged:5, element:'fire' },
+    CAJADO_GELO:      { name:'Cajado de Gelo',       color:'#50b0ff', kind:'wand', hand:'2h', skill:'Magia', base:13, def:2, ranged:5, element:'ice' },
+    CAJADO_RAIO:      { name:'Cajado de Raio',       color:'#b080ff', kind:'wand', hand:'2h', skill:'Magia', base:13, def:2, ranged:5, element:'energy' },
+    CAJADO_RUNICO:    { name:'Cajado Rúnico ★',      color:'#c060ff', kind:'wand', hand:'2h', skill:'Magia', base:20, def:4, ranged:6, element:'energy' },
+    CAJADO_ETERNO:    { name:'Cajado Eterno ★★',     color:'#ffd0ff', kind:'wand', hand:'2h', skill:'Magia', base:30, def:6, ranged:6, element:'fire' },
 };
+// Cores por elemento (tiro/projétil/sprite). Afinidade e fraqueza usam estas chaves na Fase 2.
+const ELEMENT_COL = { fire:'#ff7030', ice:'#50b0ff', energy:'#b080ff' };
 
 const DROPS = {
     RAT:    [ ['CHEESE', 0.7, 1, 1], ['PORRETE', 0.04, 1, 1] ],
@@ -4717,7 +4740,7 @@ function totalDefense(){
 }
 
 // Mapeia kind do item para slot
-const SLOT_OF_KIND = { weapon:'weapon', offhand:'offhand', armor:'armor', head:'head', feet:'feet', neck:'neck', cosmetic:'cosmetic' };
+const SLOT_OF_KIND = { weapon:'weapon', wand:'weapon', offhand:'offhand', armor:'armor', head:'head', feet:'feet', neck:'neck', cosmetic:'cosmetic' };
 
 function returnToInv(itemKey){
     if (!itemKey) return;
@@ -5473,9 +5496,60 @@ function doAttack(m){
     }
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
-    const isRanged = wItem && wItem.ranged;
+    const isWand = wItem && wItem.kind === 'wand';
+    const isRanged = wItem && wItem.ranged && !isWand;
     const w  = activeWeapon();
     const sk = player.skills[w.skill];
+
+    // WAND — tiro mágico à distância (skill Magia, sem munição, sem mana, spammável).
+    // Escala wand.base + Magia/3, crita e recebe talentos de dano (igual melee). O server
+    // capa pelo ramo de arma (weaponSkillOf→Magia) e autoriza o alcance via ranged.
+    if (isWand){
+        const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
+        if (dist > (wItem.ranged || 5)){
+            if (!doAttack._rangeWarn || Date.now() - doAttack._rangeWarn > 1500){
+                log(`<span class="log-sys">Muito longe (${dist}/${wItem.ranged}).</span>`);
+                doAttack._rangeWarn = Date.now();
+            }
+            return;
+        }
+        if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
+            if (!doAttack._losWarn || Date.now() - doAttack._losWarn > 1500){
+                log(`<span class="log-sys">Sem linha de visão — a magia bate na parede.</span>`);
+                doAttack._losWarn = Date.now();
+            }
+            return;
+        }
+        if (Math.random() < m.dodge){
+            log(`<span class="log-sys">${m.name} esquivou do tiro.</span>`);
+            gainSkillXpLocal('Magia', 1);
+            player.attackTimer = effectiveAttackDelay();
+            return;
+        }
+        const baseW = w.base + Math.floor(sk.val / 3);
+        let dmgW = Math.max(1, baseW + Math.floor(Math.random()*5) - 2);
+        const critW = Math.random() < playerCritChance();
+        if (critW) dmgW = Math.floor(dmgW * critMultPlayer());
+        dmgW = applyAttackMults(dmgW);
+        const eCol = ELEMENT_COL[wItem.element] || wItem.color || '#c060ff';
+        addFloat(m.x, m.y, `-${dmgW}`, critW ? '#ffaa20' : eCol, true, critW ? -10 : 0);
+        if (critW) sndCrit(); else sndSpell();
+        log(`<span class="log-dmg">${critW?'★ ':''}${wItem.name}: -${dmgW} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
+        projectiles.push({
+            x: player.renderX, y: player.renderY,
+            startX: player.renderX, startY: player.renderY,
+            endX: m.renderX, endY: m.renderY,
+            color: eCol, glow: eCol,
+            life: 0, duration: Math.max(120, dist * 30),
+        });
+        gainSkillXpLocal('Magia', 1);
+        player.attackTimer = effectiveAttackDelay();
+        if (serverAuthMobs && ws && ws.readyState === 1){
+            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgW, range: wItem.ranged || 5, crit: critW }));
+            player.target = m.id; m.aggro = true;
+        }
+        return;
+    }
 
     // RANGED (arco/besta): exige range + flecha
     if (isRanged){
@@ -8165,6 +8239,12 @@ const SHOP_BUY = [
     { item:'HAM',       price:30 },
     { item:'BOTAS',     price:120 },
     { item:'COURO',     price:180 },
+    // ── Wands (Fase Magos) — Varinha barata = migração; elementais/Rúnico = gold sink ──
+    { item:'VARINHA_APRENDIZ', price:150,   label:'Varinha de Aprendiz (mago iniciante)' },
+    { item:'CAJADO_FOGO',      price:4000,  label:'Cajado de Fogo 🔥' },
+    { item:'CAJADO_GELO',      price:4000,  label:'Cajado de Gelo ❄️' },
+    { item:'CAJADO_RAIO',      price:4000,  label:'Cajado de Raio ⚡' },
+    { item:'CAJADO_RUNICO',    price:18000, label:'Cajado Rúnico ★' },
     { item:'BENCAO_FENIX', price:15000 },
     { item:'BENCAO_FENIX', price:65000,  qty:5,  label:'Bênção da Fênix × 5 (pacote -13%)' },
     { item:'BENCAO_FENIX', price:120000, qty:10, label:'Bênção da Fênix × 10 (pacote -20%)' },
@@ -9634,6 +9714,7 @@ function drawItemSprite(ctx, def, key, S){
     }
 
     switch (def.kind){
+        case 'wand':
         case 'weapon': return drawWeaponIcon(ctx, def, key, S, P, c, dark, light);
         case 'offhand': return drawShieldIcon(P, c, dark, light);
         case 'armor': return drawArmorIcon(P, c, dark, light);
@@ -9713,6 +9794,15 @@ function drawWeaponIcon(ctx, def, key, S, P, c, dark, light){
     const grip = '#5a3818';
     const grip2 = '#3a2410';
     const guard = '#a08030';
+    // Wand (cajado) — haste diagonal + orbe brilhante (cor do elemento)
+    if (def.kind === 'wand'){
+        const orb = (typeof ELEMENT_COL !== 'undefined' && ELEMENT_COL[def.element]) || c;
+        for (let i=0;i<13;i++){ P(4+i, 18-i, 2, 2, grip); }   // haste
+        P(15,2,6,6,orb);            // orbe
+        P(16,2,3,2,light);          // brilho
+        P(17,4,1,1,'#ffffff');
+        return;
+    }
     // Ranged
     if (def.ranged){
         if (key === 'BESTA'){
@@ -10885,6 +10975,13 @@ function castSpell(spellKey){
         log(`<span class="log-sys">Sem mana (${player.mp}/${sp.manaCost}).</span>`); return;
     }
     const sk = player.skills['Magia'];
+    // WAND obrigatória pra magia de ATAQUE (dano/AoE). Cura/buff/taunt seguem livres.
+    const wEq = ITEMS[player.equipped.weapon];
+    const isWand = wEq && wEq.kind === 'wand';
+    const wandBase = isWand ? wEq.base : 0;
+    if ((sp.damage || sp.aoeRange) && !isWand){
+        log('<span class="log-sys">Precisa de uma wand equipada pra usar magia de ataque.</span>'); return;
+    }
 
     // ─── AOE (Exori) ────────────────────────────────────────────
     if (sp.aoeRange){
@@ -10909,13 +11006,16 @@ function castSpell(spellKey){
         if (hits > 0) gainMagiaXp(spellKey, hits);
         // 2º) agora o burst de attackMob — chega com a janela aberta → server aceita o range 3
         for (const m of aoeTargets){
-            let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
-            dmg = Math.max(1, Math.floor(dmg * buffMult().dmg));
+            let dmg = wandBase + sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
+            dmg = Math.max(1, dmg);
+            const critA = Math.random() < playerCritChance();
+            if (critA) dmg = Math.floor(dmg * critMultPlayer());
+            dmg = applyAttackMults(dmg);
             if (serverAuthMobs && ws && ws.readyState === 1){
                 ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false }));
                 m.aggro = true;
             }
-            addFloat(m.x, m.y, `-${dmg}`, sp.glow, true);
+            addFloat(m.x, m.y, `-${dmg}`, critA ? '#ffaa20' : sp.glow, true);
         }
         // Visual AoE: anel grande mostrando o raio real (3 tiles)
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 600, maxR: sp.aoeRange * TS });
@@ -11033,11 +11133,11 @@ function castSpell(spellKey){
     player.mp -= sp.manaCost;
     spellCooldowns[spellKey] = sp.cooldown;
     sndSpell();
-    let dmg = sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
+    let dmg = wandBase + sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
     dmg = Math.max(1, dmg);
     const crit = Math.random() < playerCritChance();
-    if (crit) dmg *= critMultPlayer();
-    dmg = Math.floor(dmg * buffMult().dmg);
+    if (crit) dmg = Math.floor(dmg * critMultPlayer());
+    dmg = applyAttackMults(dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : sp.glow, true, crit ? -10 : 0);
     projectiles.push({
         x: player.renderX, y: player.renderY,

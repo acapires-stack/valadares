@@ -634,6 +634,14 @@ const ITEM_META = {
     ARCO:      { kind:'weapon', hand:'2h', base:4, def:1, ranged:6 },
     ARCO_CACA: { kind:'weapon', hand:'2h', base:6, def:1, ranged:7 },
     BESTA:     { kind:'weapon', hand:'2h', base:9, def:2, ranged:8 },
+    // wands (cajado — skill via WEAPON_SKILL→Magia; ranged habilita o alcance do tiro
+    // básico no weaponRangeServer; sem munição. base entra no cap de dano).
+    VARINHA_APRENDIZ: { kind:'wand', hand:'2h', base:6,  def:1, ranged:5 },
+    CAJADO_FOGO:      { kind:'wand', hand:'2h', base:13, def:2, ranged:5 },
+    CAJADO_GELO:      { kind:'wand', hand:'2h', base:13, def:2, ranged:5 },
+    CAJADO_RAIO:      { kind:'wand', hand:'2h', base:13, def:2, ranged:5 },
+    CAJADO_RUNICO:    { kind:'wand', hand:'2h', base:20, def:4, ranged:6 },
+    CAJADO_ETERNO:    { kind:'wand', hand:'2h', base:30, def:6, ranged:6 },
     // offhand/armaduras
     ESCUDO_MAD:   { kind:'offhand', def:3 },
     ESCUDO_FERRO: { kind:'offhand', def:6 },
@@ -851,6 +859,12 @@ const SHOP_BUY = [
     { item:'HAM',       price:30 },
     { item:'BOTAS',     price:120 },
     { item:'COURO',     price:180 },
+    // wands (Fase Magos) — espelha o cliente NA MESMA ORDEM (o buy usa o índice)
+    { item:'VARINHA_APRENDIZ', price:150 },
+    { item:'CAJADO_FOGO',      price:4000 },
+    { item:'CAJADO_GELO',      price:4000 },
+    { item:'CAJADO_RAIO',      price:4000 },
+    { item:'CAJADO_RUNICO',    price:18000 },
     { item:'BENCAO_FENIX', price:15000 },
     { item:'BENCAO_FENIX', price:65000,  qty:5 },
     { item:'BENCAO_FENIX', price:120000, qty:10 },
@@ -1075,7 +1089,7 @@ function grantItemByName(name, itemKey, qty, reason){
 
 // Slot derivado do tipo de item (espelha SLOT_OF_KIND do cliente)
 const SLOT_OF_KIND = {
-    weapon:'weapon', offhand:'offhand', armor:'armor',
+    weapon:'weapon', wand:'weapon', offhand:'offhand', armor:'armor',
     head:'head', feet:'feet', neck:'neck', cosmetic:'cosmetic',
 };
 // Posição dos 4 baús (espelha CHESTS do cliente)
@@ -2597,6 +2611,9 @@ const WEAPON_SKILL = {
     MARRETA:'Clava', MARTELO:'Clava', MARTELO_GOLEM:'Clava', PORRETE:'Clava',
     // Machado
     MACHADO:'Machado', MACHADO_MINO:'Machado',
+    // Magia (wands/cajados — ataque mágico à distância, sem munição)
+    VARINHA_APRENDIZ:'Magia', CAJADO_FOGO:'Magia', CAJADO_GELO:'Magia', CAJADO_RAIO:'Magia',
+    CAJADO_RUNICO:'Magia', CAJADO_ETERNO:'Magia',
 };
 function weaponSkillOf(p){
     // Strip sufixo _PLUS_N (forja) — ESPADA_HL_PLUS_2 → ESPADA_HL
@@ -4216,10 +4233,23 @@ function weaponRangeServer(p){
 // skill relevante; ×4 cobre crit+mults, +7 cobre ammo/variância) mas MUITO mais
 // apertado que o flat 600 pra setup fraco. (Não reusa pvpDamageCapServer base×15+100:
 // aquele clipa build de Distância/forja alta de baixa base — risco de "número errado".)
+// Base da wand equipada (0 se não for wand). Entra no cap de magia e no gate de ataque.
+function wandBaseServer(p){
+    const wKey = p.equipped && p.equipped.weapon;
+    if (!wKey) return 0;
+    const base = String(wKey).replace(/_PLUS_\d+$/, '');
+    const meta = ITEM_META[base];
+    return (meta && meta.kind === 'wand') ? (meta.base || 0) : 0;
+}
 function attackDamageCapServer(p, spellWin){
     if (spellWin){
         const magia = (p.skills && p.skills.Magia && p.skills.Magia.val) || 10;
-        return (spellWin.damage + Math.floor(magia / 3)) * 4 + 50;
+        // spellWin.damage já inclui a base da wand (janela aberta no spellCast). ×6 cobre
+        // crit×2 + afinidade×1.2 + fraqueza×1.5 (Fase 2) + variância; slack cobre talentos.
+        const dmgB  = (p.permaBuffs && p.permaBuffs.damageBonus)  || 0;
+        const critB = (p.permaBuffs && p.permaBuffs.critDmgBonus) || 0;
+        const slack = (1 + dmgB) * (1 + critB / 2);
+        return Math.round(((spellWin.damage + Math.floor(magia / 3)) * 6 + 50) * slack);
     }
     const wKey = p.equipped && p.equipped.weapon;
     const tier = wKey ? getUpgradeTier(wKey) : { base: null, plus: 0 };
@@ -6570,6 +6600,11 @@ wss.on('connection', (ws, request) => {
             const spellKey = String(msg.spellKey || '');
             const sp = SPELLS_META[spellKey];
             if (!sp) return;
+            // Fase Magos: magia de ATAQUE exige wand equipada (o cliente também gateia p/ UX).
+            if (sp.range && sp.damage && wandBaseServer(p) === 0){
+                sendTo(id, { t:'serverMsg', level:'warn', text:'Precisa de uma wand equipada.' });
+                return;
+            }
             const now = Date.now();
             p._lastSpellAt = p._lastSpellAt || 0;
             if (now - p._lastSpellAt < 600) return;
@@ -6584,7 +6619,7 @@ wss.on('connection', (ws, request) => {
             // seguinte a usar o range/cap da MAGIA (não o da arma). A mana já foi paga e
             // validada acima → não dá pra forjar range de magia sem castar de verdade.
             // Exori (AoE) dispara vários attackMob no mesmo tick → a janela de 1s cobre o burst.
-            if (sp.range) p._spellWindow = { range: sp.range, damage: sp.damage || 12, until: now + 1000 };
+            if (sp.range) p._spellWindow = { range: sp.range, damage: (sp.damage || 12) + wandBaseServer(p), until: now + 1000 };
             // Cura em grupo — AoE de heal, alcança QUALQUER player em raio groupRange
             // (não precisa party). Cura o caster + outros players. Skipa bots e ghosts.
             let healedAmount = 0;
