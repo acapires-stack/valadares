@@ -42,8 +42,8 @@ confirmado no ar (~8s, `aoeTargets` na prod). **Dono validou in-game (PvP ATIVO 
 /spawn007): "deu tudo certo"** — 007 longe = bate em mob; 007 perto = vira alvo; EXORI raio inteiro;
 Esqueleto danificável durante o PvP. ✅
 
-**➡️ LOTE /manutencao em preparação (acumulado, NÃO deployado — dono escolheu subir tudo junto):** 4 fixes
-prontos no working tree, validados por vm.Script/node --check (in-game = pós-deploy do dono):
+**✅ LOTE DEPLOYADO via /manutencao (05/06) — push `dccbe71` no instante `maintenance:true` (fast-forward `d1f7c48..dccbe71`, git local==origin).** 4 fixes,
+validados por vm.Script/node --check; **cliente CONFIRMADO no ar no Vercel** (grep `bumpDodgeFloat`/`_sessionReplaced`/`enablePvpWhiteSkull` no play.html da prod); server pushado + reachable estável:
 - **🟢 "Esquivou! ×N" (`c020cac`, cliente):** o float de esquiva empilhava numa parede verde com esquiva alta +
   enxame; agora `bumpDodgeFloat()` mescla num único contador (renova enquanto esquiva) + throttle 120ms no som.
   Provado no preview (5 esquivas → 1 float "×5"; pós-expirar cria novo).
@@ -61,9 +61,11 @@ prontos no working tree, validados por vm.Script/node --check (in-game = pós-de
   Relaxei o gate `if(player.pvp)` do clique-em-player (senão mirar inimigo com PvP off era impossível e o
   white-skull ficava inalcançável). Alvo segue precisando de PvP on (consensual preservado).
 
-**Deploy:** o lote tem server (`tickAI`) → **precisa `/manutencao`** (o cliente vai junto no mesmo push).
-Pós-deploy, validar in-game: enxame não deleta mais; clicar player com PvP off liga o PvP e ataca; Esquivou×N;
-loop de sessão sumiu.
+**Deploy:** ✅ feito via /manutencao (dono disparou ~1min; monitor de `/api/status` pushou na trava; git local==origin).
+Cliente no ar (Vercel, confirmado por grep). **⚠️ FALTA VALIDAR IN-GAME na próxima** — dono deu confirmação LEVE
+("acredito que deu tudo certo"), sem teste cercado de verdade. Conferir: (1) **teto do enxame** (server) — ficar
+cercado NÃO deleta (máx 4 batem + 30%/s do HP); (2) **white-skull** — clicar player com PvP off liga teu PvP e
+ataca, AoE não liga; (3) **Esquivou! ×N** sem parede; (4) **loop de sessão** sumiu (abrir 2 janelas → a 2ª para).
 
 **Pendências (fora do lote):** M7 fase 2 (3v3 + ladder), pwHash legacy removal, bot de arena turbinado.
 
