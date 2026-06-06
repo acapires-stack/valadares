@@ -4684,6 +4684,15 @@ const MTYPE = {
     // Boss de evento semanal (sábado 20h-22h BRT) — só spawna pelo servidor
     ARAUTO: { name:'O Arauto', hp:3000, dmg:30, speed:320, xp:1500, color:'#a880ff', size:1.5, dodge:0.10, crit:0.20, unique:true, intel:3 },
 };
+// i18n Fase 3 — nomes de mob em EN (chave = tipo). mobName() prefere EN; fallback PT.
+const MTYPE_EN = {
+    RAT:'Rat', SNAKE:'Snake', SPIDER:'Spider', WOLF:'Wolf', ORC:'Orc', ORC_LIDER:'Orc Leader',
+    BAT:'Bat', MINOTAUR:'Minotaur', SKELETON:'Skeleton', TROLL:'Troll', LIZARD:'Lizard', SCORPION:'Scorpion',
+    DRAKE:'Drake', DRAKE_LIDER:'Elder Drake', GOLEM:'Golem', GOLEM_REI:'Golem King',
+    CACADOR:'Bounty Hunter', SOMBRA:'Wandering Shadow', CARRASCO:'Abyssal Executioner',
+    SENHOR_PROFUNDEZAS:'The Lord of the Depths ★', SENHOR_VALADARES:'The Lord of Valadares ★★', ARAUTO:'The Herald',
+};
+function mobName(type){ return (LANG === 'en' && MTYPE_EN[type]) || (MTYPE[type] && MTYPE[type].name) || type; }
 
 
 // ─── Itens e drop tables ─────────────────────────────────────────────────────
@@ -7071,7 +7080,7 @@ function handleMP(msg){
                 parts.push(`${bl.items[type]}× ${escapeHtml(itemDisplayName(type))}`);
             }
             if (parts.length){
-                const bossName = (MTYPE[bl.boss] && MTYPE[bl.boss].name) || 'boss';
+                const bossName = mobName(bl.boss) || 'boss';
                 log(tr('log.boss_loot_share', {boss: escapeHtml(bossName), parts: parts.join(', ')}));
                 // Toast COMPACTO (resumo). A lista completa fica no log. Antes o toast listava
                 // tudo + um 2º toast de "ouro creditado" empilhavam 2 banners gigantes na tela.
@@ -7704,7 +7713,7 @@ function handleMP(msg){
         // sou o killer — loot + xp (server creditou skills authoritative; vem em msg.skill)
         const def = MTYPE[msg.mobType];
         if (def){
-            const fakeMob = { id: msg.mobId, type: msg.mobType, name: def.name, x: msg.x, y: msg.y, xpReward: msg.xpGained || msg.xp, skill: msg.skill };
+            const fakeMob = { id: msg.mobId, type: msg.mobType, name: mobName(msg.mobType), x: msg.x, y: msg.y, xpReward: msg.xpGained || msg.xp, skill: msg.skill };
             mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null);
         }
         // Build de escudo: o servidor também creditou Escudo (mesmo XP) — loga pra confirmar.
@@ -7732,7 +7741,7 @@ function handleMP(msg){
         // T2: dano aplicado server-side (vem via pstats). Cliente usa msg.actual
         // pro float/log/FX. Fallback pra cálculo local se server não mandou actual
         // (Electron v1.0.0/v1.0.1 conversando com server novo: server SEMPRE manda).
-        const defName = (MTYPE[msg.mobType] && MTYPE[msg.mobType].name) || msg.mobType;
+        const defName = mobName(msg.mobType);
         // Esquiva (server-side agora) — sem dano, FX próprio. Antes a esquiva era invisível.
         if (msg.dodged){
             bumpDodgeFloat();   // mescla em "Esquivou! ×N" (não vira parede com esquiva alta + enxame)
@@ -7779,7 +7788,7 @@ function applyMobsSnapshot(list){
             const lvl = srv.level || 1;
             const tag = (srv.unique && lvl > 1) ? ` ★ Lv${lvl}` : '';
             m = {
-                id: srv.id, type: srv.type, name: def.name + tag, color: def.color, size: def.size,
+                id: srv.id, type: srv.type, name: mobName(srv.type) + tag, color: def.color, size: def.size,
                 x: srv.x, y: srv.y, dir: srv.dir || 'down',
                 renderX: srv.x, renderY: srv.y, prevX: srv.x, prevY: srv.y,
                 moveProgress: 1, moveDuration: 0,
