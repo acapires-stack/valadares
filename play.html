@@ -2603,7 +2603,238 @@ const I18N = {
     'hud.combat': 'Combate', 'hud.no_target': 'Nenhum alvo', 'hud.connecting': 'Conectando...',
     'hud.inventory': 'Inventário', 'hud.click_equip': 'click p/ equipar', 'hud.empty': 'vazio',
     'lang.pt': 'Português',
-    'lang.en': 'English'
+    'lang.en': 'English',
+    'float.dodged': 'Esquivou!',
+    'float.dodged_n': 'Esquivou! ×{n}',
+    'float.reborn': '✨ RENASCIDO',
+    'float.no_arrows': 'SEM FLECHAS',
+    'float.second_chance': '🕯️ SEGUNDA CHANCE',
+    'float.fail': 'FALHA',
+    'float.poison': 'VENENO',
+    'float.bleed': 'SANGRA',
+    'float.stun': 'STUN',
+    'float.updating': 'ATUALIZANDO',
+    /* ===== log.* (Fase 2) ===== */
+    'log.hl_hunt_start': '<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>',
+    'log.blessing_saved': '<span class="log-up">✨ ━━ A Bênção da Fênix te salvou! ━━ ✨</span>',
+    'log.you_died': '<span class="log-die">━━ Você morreu ━━</span>',
+    'log.lost_skills': '<span class="log-die">Perdeu: {list}</span>',
+    'log.no_skill_loss': '<span class="log-die">Sem perdas de skill (nada treinado).</span>',
+    'log.arena_header': '<span class="log-die">━━ ARENA · vs {opp} ━━</span>',
+    'log.depths_header': '<span class="log-die">━━ AS PROFUNDEZAS · Andar {floor} ━━</span>',
+    'log.back_to_surface': '<span class="log-sys">Você voltou à superfície.</span>',
+    'log.shield_stowed': '<span class="log-sys">Escudo guardado (arma 2H)</span>',
+    'log.shield_def_up': '<span class="log-up">Defesa de Escudo +{n}</span>',
+    'log.weapon_stowed': '<span class="log-sys">{name} guardado (escudo precisa de mão livre)</span>',
+    'log.equipped': '<span class="log-sys">Equipou {name}</span>',
+    'log.no_arrows_equip': '<span class="log-dmg">⚠ Sem flechas! Use automaticamente quando tiver no inventário.</span>',
+    'log.unequipped': '<span class="log-sys">Desequipou {name}</span>',
+    'log.near_chest': '<span class="log-sys">Aproxime-se de um baú.</span>',
+    'log.chest_deposited': '<span class="log-sys">Guardou {n} itens em {chest}.</span>',
+    'log.chest_withdrawn': '<span class="log-sys">Retirou {n} itens de {chest}.</span>',
+    'log.near_bench': '<span class="log-sys">Aproxime-se da bancada.</span>',
+    'log.near_merchant': '<span class="log-sys">Aproxime-se do Mercador.</span>',
+    'log.craft_no_conn': '<span class="log-sys">Sem conexão com o servidor — craft não disponível.</span>',
+    'log.no_attack_pz': '<span class="log-sys">Não pode atacar na PZ.</span>',
+    'log.equip_spear': '<span class="log-sys">Equipe uma lança pra arremessar.</span>',
+    'log.no_target_key': '<span class="log-sys">Sem alvo (SPACE/TAB).</span>',
+    'log.too_far_throw': '<span class="log-sys">Muito longe pra arremessar ({d}/{max}).</span>',
+    'log.los_spear': '<span class="log-sys">Sem linha de visão — a lança bateria na parede.</span>',
+    'log.dodged_spear': '<span class="log-sys">{mob} desviou da lança.</span>',
+    'log.dmg_spear': '<span class="log-dmg">{star}{weapon} arremessada: -{dmg} em {mob}</span>',
+    'log.last_spear': '<span class="log-sys">Última {weapon} arremessada.</span>',
+    'log.no_attack_safezone': '<span class="log-sys">Não pode atacar dentro da zona segura.</span>',
+    'log.too_far': '<span class="log-sys">Muito longe ({d}/{max}).</span>',
+    'log.los_magic': '<span class="log-sys">Sem linha de visão — a magia bate na parede.</span>',
+    'log.no_mana_shot': '<span class="log-sys">Sem mana pro tiro mágico.</span>',
+    'log.dodged_shot': '<span class="log-sys">{mob} esquivou do tiro.</span>',
+    'log.dmg_hit': '<span class="log-dmg">{star}{weapon}: -{dmg} em {mob} ({hp}/{maxhp})</span>',
+    'log.los_arrow': '<span class="log-sys">Sem linha de visão — algo bloqueia a flecha.</span>',
+    'log.no_arrows_craft': '<span class="log-sys">Sem flechas! Fabrique na bancada (C) ou colete (Aranha/Lobo/Orc dropam).</span>',
+    'log.dodged_arrow': '<span class="log-sys">{mob} esquivou da flecha.</span>',
+    'log.los_spear2': '<span class="log-sys">Sem linha de visão — a lança não passa.</span>',
+    'log.dodged_melee': '<span class="log-sys">{mob} esquivou.</span>',
+    'log.ws_server_set': '<span class="log-sys">WS server: {url} — reconecte</span>',
+    'log.connecting': '<span class="log-sys">Conectando em {url}…</span>',
+    'log.connect_fail': '<span class="log-sys">Não foi possível conectar ao servidor — verifique o endereço.</span>',
+    'log.zombie_conn': '<span class="log-sys">Conexão zumbi detectada — reconectando…</span>',
+    'log.auth_timeout': '<span class="log-sys">Server não respondeu auth — entrando sem sync de save.</span>',
+    'log.session_replaced': '<span class="log-dmg">⚠ Sua conta foi aberta em outro lugar — esta janela parou (sem reconexão automática, pra não duelar com a outra sessão). Feche as cópias extras; recarregue (F5) se foi engano.</span>',
+    'log.disconnected': '<span class="log-sys">Desconectado.</span>',
+    'log.conn_error': '<span class="log-sys">Erro de conexão.</span>',
+    'log.authed_reconnect': '<span class="log-sys">Autenticado (reconexão) — sincronizando estado local.</span>',
+    'log.char_restored': '<span class="log-sys">✦ Personagem restaurado do servidor.</span>',
+    'log.account_synced': '<span class="log-sys">Conta sincronizada com o servidor.</span>',
+    'log.second_chance_survived': '<span class="log-up">🕯️ ━━ Segunda Chance — você sobreviveu! ━━</span>',
+    /* ===== log.* lote 2 ===== */
+    'log.player_joined': '<span class="log-sys">{name} entrou!</span>',
+    'log.player_left': '<span class="log-sys">{name} saiu.</span>',
+    'log.player_logged_off': '<span class="log-die">💤 {name} deslogou (corpo fica 3 min)</span>',
+    'log.item_received': '<span class="log-up">📦 +{qty}× {item} ({reason})</span>',
+    'log.boss_loot_share': '<span class="log-up">🏆 Sua parte do loot de {boss}: {parts}</span>',
+    'log.equip_rejected': '<span class="log-sys">Servidor rejeitou a operação de equip.</span>',
+    'log.gold_picked': '<span class="log-xp">+{g} ouro ({total})</span>',
+    'log.gold_rain': '<span class="log-up">💰 Chuva de Ouro: +{g}g</span>',
+    'log.gold_credited': '<span class="log-up">💰 +{g} de ouro creditados ({reason})!</span>',
+    'log.ate': '<span class="log-xp">Comeu {name} (+{n} HP)</span>',
+    'log.drank': '<span class="log-xp">Bebeu {name} (+{n} MP)</span>',
+    'log.forged': '<span class="log-up">✨ Forjou {item}! (custo {cost}g)</span>',
+    'log.forge_failed': '<span class="log-die">💥 Forja falhou! 1× {item} destruído. -{cost}g</span>',
+    'log.crafted': '<span class="log-xp">Fabricou {item} (-{cost}g)</span>',
+    'log.shop_sell': '<span class="log-sys">Vendeu {qty}× {name} (+{total}g)</span>',
+    'log.world_changed': '<span class="log-sys">⚡ Algo mudou no mundo…</span>',
+    'log.perma_buff': '<span class="log-up">💎 Buff permanente: {k} +{pct}%</span>',
+    'log.talent_acquired': '<span class="log-up">⚜ {name}{rankinfo} adquirido!</span>',
+    'log.talents_respec': '<span class="log-up">↺ Talentos redistribuídos — pontos devolvidos (−5000g).</span>',
+    'log.season_champion': '<span class="log-up">🏆 VOCÊ É O CAMPEÃO DA TEMPORADA {id}! +1× Coroa de Temporada</span>',
+    'log.hunters_defeated': '<span class="log-up">🏆 Caçadores eliminados! Recompensa: {g}g</span>',
+    'log.hunt_cooldown': '<span class="log-sys">⏳ Recompensa da caçada em cooldown ({min}min)</span>',
+    'log.hunt_no_spawn': '<span class="log-sys">⚠ Server não achou onde spawnar caçadores — tentando de novo em {min}min</span>',
+    'log.warn_text': '<span class="log-sys">⚠ {text}</span>',
+    'log.duel_started': '<span class="log-up">⚔ Duelo iniciado contra {opp}! Aposta {amount}g cada. 3 min máx.</span>',
+    'log.duel_draw': '<span class="log-sys">⚔ Duelo contra {opp} terminou empate. Aposta devolvida.</span>',
+    'log.duel_won': '<span class="log-up">🏆 Você venceu o duelo contra {opp}! +{g}g</span>',
+    'log.duel_lost': '<span class="log-die">💀 Você perdeu o duelo contra {opp}. Aposta perdida ({amount}g).</span>',
+    'log.arena_match': '<span class="log-up">⚔ ARENA! Oponente: {opp}{wager}. Prepare-se!</span>',
+    'log.arena_draw': '<span class="log-sys">⚔ Arena: empate contra {opp}. Aposta devolvida. Rating {rating}.</span>',
+    'log.arena_won': '<span class="log-up">🏆 Venceu a Arena contra {opp}!{bonus} Rating {rating}.</span>',
+    'log.arena_lost': '<span class="log-die">💀 Perdeu a Arena contra {opp}.{bonus} Rating {rating}.</span>',
+    'log.auth_rejected': '<span class="log-dmg">{txt} ({reason})</span>',
+    'log.trade_done': '<span class="log-up">🤝 Trade concluído!</span>',
+    'log.trade_cancelled': '<span class="log-sys">Trade cancelado: {reason}</span>',
+    'log.shield_xp': '<span class="log-up">+{n} xp Escudo</span>',
+    'log.pet_levelup': '<span class="log-up">🐾 {name} subiu pro nível {lvl}! ({buff})</span>',
+    'log.you_dodged': '<span class="log-sys">🌀 Você esquivou de {mob}!</span>',
+    'log.mob_dmg': '<span class="log-dmg">⚠ {crit}{mob}: {dmg} dano</span>',
+    'log.mob_killed': '<span class="log-kill">☠ {mob} morreu! (+{xp} xp {skill})</span>',
+    'log.server_updating': '<span class="log-sys">⚙ Servidor atualizando — aguarde…</span>',
+    'log.near_arena_master': '<span class="log-sys">Aproxime-se do Mestre da Arena.</span>',
+    'lbl.crit': '★ CRÍTICO',
+    'lbl.wager': 'aposta',
+    'lbl.received': 'recebido',
+    'lbl.bought': 'comprado',
+    'lbl.auction_expired': 'leilão expirado',
+    /* ===== log.* lotes 3-5 + status ===== */
+    'log.poisoned_by': '<span class="log-dmg">☠ Envenenado por {src}!</span>',
+    'log.bleeding_by': '<span class="log-dmg">🩸 Sangrando por {src}!</span>',
+    'log.poison_ended': '<span class="log-sys">Veneno passou.</span>',
+    'log.bleed_ended': '<span class="log-sys">Sangramento parou.</span>',
+    'log.stunned_by': '<span class="log-dmg">⚡ Atordoado por {src}! ({s}s)</span>',
+    'log.pvp_dmg_taken': '<span class="log-dmg">⚠ {from} (PvP): {dmg} dano</span>',
+    'log.achievement': '<span class="log-up">🏆 Conquista desbloqueada: {icon} <b>{name}</b></span>',
+    'log.quest_accepted_stage': '<span class="log-up">📜 Aceitou: {name}</span>',
+    'log.delivering': '<span class="log-sys">Entregando: {name}…</span>',
+    'log.return_to_npc': '<span class="log-up">✓ Volte ao NPC: {name}</span>',
+    'log.place_visited': '<span class="log-up">✓ Local visitado: {name}. Volte ao NPC.</span>',
+    'log.dailies_renewed': '<span class="log-up">🌅 Quests diárias renovadas!</span>',
+    'log.receiving_reward': '<span class="log-sys">Recebendo recompensa: {name}…</span>',
+    'log.quest_accepted': '<span class="log-sys">Quest aceita: <b>{name}</b></span>',
+    'log.quest_ready': '<span class="log-up">✓ Quest pronta pra entregar: {name}</span>',
+    'log.daily_ready': '<span class="log-up">✓ Diária pronta: {name}</span>',
+    'log.not_enough_gold_price': '<span class="log-sys">Sem ouro suficiente ({price}g).</span>',
+    'log.no_conn': '<span class="log-sys">Sem conexão com o servidor.</span>',
+    'log.max_level': '<span class="log-sys">Já no nível máximo (+{n}).</span>',
+    'log.need_3x': '<span class="log-sys">Precisa de 3× {name}.</span>',
+    'log.forge_no_conn': '<span class="log-sys">Sem conexão com o servidor — forja não disponível.</span>',
+    'log.blessing_saved_from': '<span class="log-up">✨ Bênção te salvou de {killer}!</span>',
+    'log.avenged_by': '<span class="log-die">⚠ Vingado por {killer}! Perda dobrada de skills.</span>',
+    'log.you_killed': '<span class="log-up">⚔ Você matou {victim}! +{g}g</span>',
+    'log.vengeance': '<span class="log-up">⚔ Vingança! Skills recuperadas.</span>',
+    'log.pz_locked_seal': '<span class="log-die">⚠ PZ bloqueada por 5 min (selo {n})!</span>',
+    'log.got_heart': '<span class="log-up">💎 Ganhou um Coração do Highlander!</span>',
+    'log.looted': '<span class="log-up">💀 Saqueou: {item}</span>',
+    'log.party_online_only': '<span class="log-sys">Party só online.</span>',
+    'log.no_conn_invite': '<span class="log-sys">Sem conexão — convite não pode ser aceito.</span>',
+    'log.no_conn_party_leave': '<span class="log-sys">Sem conexão com o servidor — não dá pra sair da party agora.</span>',
+    'log.target_auto': '<span class="log-sys">Alvo: {name} [AUTO]</span>',
+    'log.player_no_pvp': '<span class="log-sys">Este player não está com PvP.</span>',
+    'log.target_pvp_auto': '<span class="log-dmg">Alvo PvP: {name} ☠ [AUTO]</span>',
+    'log.trade_unavailable': '<span class="log-sys">Trade indisponível ({hint}).</span>',
+    'log.deciding': '<span class="log-sys">Decidindo: {label}…</span>',
+    'log.go_altar': '<span class="log-sys">Vá ao altar (tecla M) e compre uma magia.</span>',
+    'log.no_target_visible': '<span class="log-sys">Nenhum alvo visível.</span>',
+    'log.target_cancelled': '<span class="log-sys">Alvo cancelado.</span>',
+    'log.no_enemy': '<span class="log-sys">Nenhum inimigo à vista.</span>',
+    'log.buff_ended': '<span class="log-sys">{name} acabou.</span>',
+    'log.spell_cooldown': '<span class="log-sys">{name} em cooldown.</span>',
+    'log.no_mana': '<span class="log-sys">Sem mana ({mp}/{cost}).</span>',
+    'log.need_wand': '<span class="log-sys">Precisa de uma wand equipada pra usar magia de ataque.</span>',
+    'log.spell_hits': '<span class="log-dmg">{name}: {hits} alvo(s) atingido(s)</span>',
+    'log.spell_taunt': '<span class="log-sys">{name}: provocou {count} mob(s)</span>',
+    'log.spell_buff': '<span class="log-up">{name}: +{dmg}% dmg / +{spd}% spd por {s}s</span>',
+    'log.spell_healing_group': '<span class="log-xp">{name}: curando players em raio {r}…</span>',
+    'log.hp_full': '<span class="log-sys">HP já está cheio.</span>',
+    'log.spell_heal': '<span class="log-xp">{name}: +{n} HP</span>',
+    'log.no_target_press': '<span class="log-sys">Sem alvo. Aperte SPACE/TAB primeiro.</span>',
+    'log.target_too_far': '<span class="log-sys">Alvo muito longe ({d}/{max}).</span>',
+    'log.dmg_spell': '<span class="log-dmg">{star}{name}: -{dmg} em {mob}</span>',
+    'log.near_altar': '<span class="log-sys">Aproxime-se do altar.</span>',
+    'log.already_equipped': '<span class="log-sys">Já está equipada.</span>',
+    'log.no_gold_cost': '<span class="log-sys">Sem ouro ({have}/{cost}).</span>',
+    'log.learned_spell': '<span class="log-up">★ Aprendeu {name} (-{cost}g)</span>',
+    'log.near_dummy': '<span class="log-sys">Aproxime-se do boneco de treino.</span>',
+    'log.left_station': '<span class="log-sys">Saiu do {place}.</span>',
+    'log.select_skill': '<span class="log-sys">Selecione uma skill.</span>',
+    'log.not_enough_gold': '<span class="log-sys">Sem ouro suficiente.</span>',
+    'log.training': '<span class="log-sys">Treinando {skill}: {n} sessões ({g}g total)</span>',
+    'log.pvp_requires': '<span class="log-sys">PvP exige {req}g (você tem {have}g).</span>',
+    'log.pvp_requires_attack': '<span class="log-sys">PvP exige {req}g pra atacar um player (você tem {have}g).</span>',
+    'log.pvp_auto_on': '<span class="log-dmg">⚔ PvP LIGADO automaticamente (você atacou um player).</span>',
+    'log.pz_locked_pk': '<span class="log-dmg">⚠ PZ bloqueada por PK! {s}s</span>',
+    'log.entered_pz': '<span class="log-sys">Entrou na PZ — alvo cancelado.</span>',
+    'log.seal_earned': '<span class="log-up">★ Selo {n}/5 conquistado!</span>',
+    'log.became_highlander': '<span class="log-up">👑 VOCÊ ASCENDEU AO HIGHLANDER!</span>',
+    'log.hunters_incoming': '<span class="log-die">☠ Caçadores serão enviados em 3 minutos...</span>',
+    'log.pvp_lost_skills': '<span class="log-die">PvP: perdeu {list}</span>',
+    'log.player_no_pvp_on': '<span class="log-sys">Este player não está com PvP ligado.</span>',
+    'log.no_pvp_pz': '<span class="log-sys">Não pode PvP na PZ.</span>',
+    'log.pvp_dmg': '<span class="log-dmg">{star}PvP: -{dmg} em {name}</span>',
+    'log.training_done': '<span class="log-sys">Treino terminou ({reason}): {done}/{total} sessões.</span>',
+    'log.hp_mp_full': '<span class="log-sys">HP e MP já estão cheios.</span>',
+    'log.no_food_potion': '<span class="log-sys">Sem comida/poção disponível.</span>',
+    'log.rec_unsupported': '<span class="log-sys">Gravação não suportada neste cliente.</span>',
+    'log.rec_started': '<span class="log-sys">🔴 Gravando o gameplay — clique em REC de novo pra parar e baixar o clipe.</span>',
+    'log.rec_failed': '<span class="log-sys">Falha ao gravar: {err}</span>',
+    'log.clip_empty': '<span class="log-sys">Clipe vazio — nada foi gravado.</span>',
+    'log.clip_saved': '<span class="log-sys">✅ Clipe salvo ({mb} MB) — está nos Downloads. Posta direto ou me manda que eu deixo vertical.</span>',
+    'log.trade_online_only': '<span class="log-sys">Trade só disponível online.</span>',
+    'log.trade_in_progress': '<span class="log-sys">Já tem trade em andamento.</span>',
+    'log.trade_self': '<span class="log-sys">Não dá pra trocar consigo mesmo.</span>',
+    'log.trade_invite_sent': '<span class="log-sys">Convite de trade enviado para {name}.</span>',
+    'log.invite_expired': '<span class="log-sys">Convite de {name} expirou.</span>',
+    'log.invite_declined': '<span class="log-sys">Você recusou o convite de {name}.</span>',
+    'log.cant_add_self': '<span class="log-sys">Não pode adicionar você mesmo.</span>',
+    'log.already_friend': '<span class="log-sys">{name} já é amigo.</span>',
+    'log.friend_added': '<span class="log-up">👥 {name} adicionado.</span>',
+    'log.friend_removed': '<span class="log-sys">{name} removido.</span>',
+    'log.talent_max': '<span class="log-sys">Talento já está no rank máximo.</span>',
+    'log.no_points': '<span class="log-sys">Sem pontos disponíveis.</span>',
+    'log.talent_buying': '<span class="log-sys">{verb} {name}…</span>',
+    'log.respec_cost': '<span class="log-sys">Respec custa 5000g — você não tem.</span>',
+    'log.respec_doing': '<span class="log-sys">Redistribuindo talentos…</span>',
+    'log.fullscreen_blocked': '<span class="log-sys">Fullscreen bloqueado pelo navegador.</span>',
+    'log.cant_logout_active': '<span class="log-dmg">⚠ Não pode sair com {s} ativos. Morra ou aguarde.</span>',
+    'log.cant_logout_combat': '<span class="log-dmg">⚠ Em combate — não pode sair agora.</span>',
+    'log.server_slow': '<span class="log-sys">Servidor demorando a responder — tentando reconectar…</span>',
+    'log.welcome': '<span class="log-sys">Bem-vindo a Valadares, {name}!</span>',
+    'log.progress_restored': '<span class="log-sys">Progresso restaurado.</span>',
+    'log.new_version': '<span class="log-sys">🔄 Nova versão pronta — recarrega assim que você sair da masmorra/combate.</span>',
+    'log.save_restored': '<span class="log-sys">✦ Save restaurado do backup automático.</span>',
+    'log.save_deleted': '<span class="log-sys">Save deletado.</span>',
+    'log.no_backup': '<span class="log-sys">Sem backup disponível.</span>',
+    'log.backup_empty': '<span class="log-sys">Backup também está vazio.</span>',
+    'log.backup_restored': '<span class="log-up">✦ Backup restaurado. Recarregando…</span>',
+    'log.no_hp_item': '<span class="log-sys">Sem poção/comida pra HP.</span>',
+    'log.no_mana_item': '<span class="log-sys">Sem poção de mana.</span>',
+    'log.no_food': '<span class="log-sys">Sem comida no inventário.</span>',
+    'lbl.target': 'Alvo',
+    'lbl.on': '⚔ LIGADO',
+    'lbl.off': 'desligado',
+    'lbl.altar': 'altar',
+    'lbl.dummy': 'boneco',
+    'lbl.upgrading': 'Subindo',
+    'lbl.acquiring': 'Adquirindo',
+    /*F2PT*/
   },
   en: {
     'login.char_ph': 'Character name',
@@ -2698,7 +2929,238 @@ const I18N = {
     'hud.combat': 'Combat', 'hud.no_target': 'No target', 'hud.connecting': 'Connecting...',
     'hud.inventory': 'Inventory', 'hud.click_equip': 'click to equip', 'hud.empty': 'empty',
     'lang.pt': 'Português',
-    'lang.en': 'English'
+    'lang.en': 'English',
+    'float.dodged': 'Dodged!',
+    'float.dodged_n': 'Dodged! ×{n}',
+    'float.reborn': '✨ REBORN',
+    'float.no_arrows': 'NO ARROWS',
+    'float.second_chance': '🕯️ SECOND CHANCE',
+    'float.fail': 'FAIL',
+    'float.poison': 'POISON',
+    'float.bleed': 'BLEED',
+    'float.stun': 'STUN',
+    'float.updating': 'UPDATING',
+    /* ===== log.* (Fase 2) ===== */
+    'log.hl_hunt_start': '<span class="log-die">☠ Highlander Hunt! 3 Bounty Hunters have been sent!</span>',
+    'log.blessing_saved': '<span class="log-up">✨ ━━ The Phoenix Blessing saved you! ━━ ✨</span>',
+    'log.you_died': '<span class="log-die">━━ You died ━━</span>',
+    'log.lost_skills': '<span class="log-die">Lost: {list}</span>',
+    'log.no_skill_loss': '<span class="log-die">No skill loss (nothing trained).</span>',
+    'log.arena_header': '<span class="log-die">━━ ARENA · vs {opp} ━━</span>',
+    'log.depths_header': '<span class="log-die">━━ THE DEPTHS · Floor {floor} ━━</span>',
+    'log.back_to_surface': '<span class="log-sys">You returned to the surface.</span>',
+    'log.shield_stowed': '<span class="log-sys">Shield stowed (2H weapon)</span>',
+    'log.shield_def_up': '<span class="log-up">Shield Defense +{n}</span>',
+    'log.weapon_stowed': '<span class="log-sys">{name} stowed (shield needs a free hand)</span>',
+    'log.equipped': '<span class="log-sys">Equipped {name}</span>',
+    'log.no_arrows_equip': '<span class="log-dmg">⚠ No arrows! Used automatically once you have some.</span>',
+    'log.unequipped': '<span class="log-sys">Unequipped {name}</span>',
+    'log.near_chest': '<span class="log-sys">Get closer to a chest.</span>',
+    'log.chest_deposited': '<span class="log-sys">Stored {n} items in {chest}.</span>',
+    'log.chest_withdrawn': '<span class="log-sys">Took {n} items from {chest}.</span>',
+    'log.near_bench': '<span class="log-sys">Get closer to the bench.</span>',
+    'log.near_merchant': '<span class="log-sys">Get closer to the Merchant.</span>',
+    'log.craft_no_conn': '<span class="log-sys">No server connection — crafting unavailable.</span>',
+    'log.no_attack_pz': '<span class="log-sys">Cannot attack in the PZ.</span>',
+    'log.equip_spear': '<span class="log-sys">Equip a spear to throw.</span>',
+    'log.no_target_key': '<span class="log-sys">No target (SPACE/TAB).</span>',
+    'log.too_far_throw': '<span class="log-sys">Too far to throw ({d}/{max}).</span>',
+    'log.los_spear': '<span class="log-sys">No line of sight — the spear would hit the wall.</span>',
+    'log.dodged_spear': '<span class="log-sys">{mob} dodged the spear.</span>',
+    'log.dmg_spear': '<span class="log-dmg">{star}{weapon} thrown: -{dmg} on {mob}</span>',
+    'log.last_spear': '<span class="log-sys">Last {weapon} thrown.</span>',
+    'log.no_attack_safezone': '<span class="log-sys">Cannot attack inside the safe zone.</span>',
+    'log.too_far': '<span class="log-sys">Too far ({d}/{max}).</span>',
+    'log.los_magic': '<span class="log-sys">No line of sight — the spell hits the wall.</span>',
+    'log.no_mana_shot': '<span class="log-sys">Not enough mana for the magic shot.</span>',
+    'log.dodged_shot': '<span class="log-sys">{mob} dodged the shot.</span>',
+    'log.dmg_hit': '<span class="log-dmg">{star}{weapon}: -{dmg} on {mob} ({hp}/{maxhp})</span>',
+    'log.los_arrow': '<span class="log-sys">No line of sight — something blocks the arrow.</span>',
+    'log.no_arrows_craft': '<span class="log-sys">No arrows! Craft them at the bench (C) or collect (Spider/Wolf/Orc drop them).</span>',
+    'log.dodged_arrow': '<span class="log-sys">{mob} dodged the arrow.</span>',
+    'log.los_spear2': '<span class="log-sys">No line of sight — the spear cannot pass.</span>',
+    'log.dodged_melee': '<span class="log-sys">{mob} dodged.</span>',
+    'log.ws_server_set': '<span class="log-sys">WS server: {url} — reconnect</span>',
+    'log.connecting': '<span class="log-sys">Connecting to {url}…</span>',
+    'log.connect_fail': '<span class="log-sys">Could not connect to the server — check the address.</span>',
+    'log.zombie_conn': '<span class="log-sys">Zombie connection detected — reconnecting…</span>',
+    'log.auth_timeout': '<span class="log-sys">Server did not answer auth — entering without save sync.</span>',
+    'log.session_replaced': '<span class="log-dmg">⚠ Your account was opened elsewhere — this window stopped (no auto-reconnect, to avoid dueling the other session). Close the extra copies; reload (F5) if it was a mistake.</span>',
+    'log.disconnected': '<span class="log-sys">Disconnected.</span>',
+    'log.conn_error': '<span class="log-sys">Connection error.</span>',
+    'log.authed_reconnect': '<span class="log-sys">Authenticated (reconnect) — syncing local state.</span>',
+    'log.char_restored': '<span class="log-sys">✦ Character restored from the server.</span>',
+    'log.account_synced': '<span class="log-sys">Account synced with the server.</span>',
+    'log.second_chance_survived': '<span class="log-up">🕯️ ━━ Second Chance — you survived! ━━</span>',
+    /* ===== log.* lote 2 ===== */
+    'log.player_joined': '<span class="log-sys">{name} joined!</span>',
+    'log.player_left': '<span class="log-sys">{name} left.</span>',
+    'log.player_logged_off': '<span class="log-die">💤 {name} logged off (body stays 3 min)</span>',
+    'log.item_received': '<span class="log-up">📦 +{qty}× {item} ({reason})</span>',
+    'log.boss_loot_share': '<span class="log-up">🏆 Your loot share from {boss}: {parts}</span>',
+    'log.equip_rejected': '<span class="log-sys">Server rejected the equip operation.</span>',
+    'log.gold_picked': '<span class="log-xp">+{g} gold ({total})</span>',
+    'log.gold_rain': '<span class="log-up">💰 Gold Rain: +{g}g</span>',
+    'log.gold_credited': '<span class="log-up">💰 +{g} gold credited ({reason})!</span>',
+    'log.ate': '<span class="log-xp">Ate {name} (+{n} HP)</span>',
+    'log.drank': '<span class="log-xp">Drank {name} (+{n} MP)</span>',
+    'log.forged': '<span class="log-up">✨ Forged {item}! (cost {cost}g)</span>',
+    'log.forge_failed': '<span class="log-die">💥 Forge failed! 1× {item} destroyed. -{cost}g</span>',
+    'log.crafted': '<span class="log-xp">Crafted {item} (-{cost}g)</span>',
+    'log.shop_sell': '<span class="log-sys">Sold {qty}× {name} (+{total}g)</span>',
+    'log.world_changed': '<span class="log-sys">⚡ Something changed in the world…</span>',
+    'log.perma_buff': '<span class="log-up">💎 Permanent buff: {k} +{pct}%</span>',
+    'log.talent_acquired': '<span class="log-up">⚜ {name}{rankinfo} acquired!</span>',
+    'log.talents_respec': '<span class="log-up">↺ Talents reset — points refunded (−5000g).</span>',
+    'log.season_champion': '<span class="log-up">🏆 YOU ARE THE SEASON {id} CHAMPION! +1× Season Crown</span>',
+    'log.hunters_defeated': '<span class="log-up">🏆 Hunters defeated! Reward: {g}g</span>',
+    'log.hunt_cooldown': '<span class="log-sys">⏳ Hunt reward on cooldown ({min}min)</span>',
+    'log.hunt_no_spawn': '<span class="log-sys">⚠ Server could not find where to spawn hunters — retrying in {min}min</span>',
+    'log.warn_text': '<span class="log-sys">⚠ {text}</span>',
+    'log.duel_started': '<span class="log-up">⚔ Duel started against {opp}! Wager {amount}g each. 3 min max.</span>',
+    'log.duel_draw': '<span class="log-sys">⚔ Duel against {opp} ended in a draw. Wager refunded.</span>',
+    'log.duel_won': '<span class="log-up">🏆 You won the duel against {opp}! +{g}g</span>',
+    'log.duel_lost': '<span class="log-die">💀 You lost the duel against {opp}. Wager lost ({amount}g).</span>',
+    'log.arena_match': '<span class="log-up">⚔ ARENA! Opponent: {opp}{wager}. Get ready!</span>',
+    'log.arena_draw': '<span class="log-sys">⚔ Arena: draw against {opp}. Wager refunded. Rating {rating}.</span>',
+    'log.arena_won': '<span class="log-up">🏆 Won the Arena against {opp}!{bonus} Rating {rating}.</span>',
+    'log.arena_lost': '<span class="log-die">💀 Lost the Arena against {opp}.{bonus} Rating {rating}.</span>',
+    'log.auth_rejected': '<span class="log-dmg">{txt} ({reason})</span>',
+    'log.trade_done': '<span class="log-up">🤝 Trade complete!</span>',
+    'log.trade_cancelled': '<span class="log-sys">Trade cancelled: {reason}</span>',
+    'log.shield_xp': '<span class="log-up">+{n} Shield xp</span>',
+    'log.pet_levelup': '<span class="log-up">🐾 {name} leveled up to {lvl}! ({buff})</span>',
+    'log.you_dodged': '<span class="log-sys">🌀 You dodged {mob}!</span>',
+    'log.mob_dmg': '<span class="log-dmg">⚠ {crit}{mob}: {dmg} dmg</span>',
+    'log.mob_killed': '<span class="log-kill">☠ {mob} died! (+{xp} xp {skill})</span>',
+    'log.server_updating': '<span class="log-sys">⚙ Server updating — please wait…</span>',
+    'log.near_arena_master': '<span class="log-sys">Get closer to the Arena Master.</span>',
+    'lbl.crit': '★ CRITICAL',
+    'lbl.wager': 'wager',
+    'lbl.received': 'received',
+    'lbl.bought': 'bought',
+    'lbl.auction_expired': 'auction expired',
+    /* ===== log.* lotes 3-5 + status ===== */
+    'log.poisoned_by': '<span class="log-dmg">☠ Poisoned by {src}!</span>',
+    'log.bleeding_by': '<span class="log-dmg">🩸 Bleeding from {src}!</span>',
+    'log.poison_ended': '<span class="log-sys">Poison wore off.</span>',
+    'log.bleed_ended': '<span class="log-sys">Bleeding stopped.</span>',
+    'log.stunned_by': '<span class="log-dmg">⚡ Stunned by {src}! ({s}s)</span>',
+    'log.pvp_dmg_taken': '<span class="log-dmg">⚠ {from} (PvP): {dmg} dmg</span>',
+    'log.achievement': '<span class="log-up">🏆 Achievement unlocked: {icon} <b>{name}</b></span>',
+    'log.quest_accepted_stage': '<span class="log-up">📜 Accepted: {name}</span>',
+    'log.delivering': '<span class="log-sys">Delivering: {name}…</span>',
+    'log.return_to_npc': '<span class="log-up">✓ Return to the NPC: {name}</span>',
+    'log.place_visited': '<span class="log-up">✓ Place visited: {name}. Return to the NPC.</span>',
+    'log.dailies_renewed': '<span class="log-up">🌅 Daily quests renewed!</span>',
+    'log.receiving_reward': '<span class="log-sys">Claiming reward: {name}…</span>',
+    'log.quest_accepted': '<span class="log-sys">Quest accepted: <b>{name}</b></span>',
+    'log.quest_ready': '<span class="log-up">✓ Quest ready to turn in: {name}</span>',
+    'log.daily_ready': '<span class="log-up">✓ Daily ready: {name}</span>',
+    'log.not_enough_gold_price': '<span class="log-sys">Not enough gold ({price}g).</span>',
+    'log.no_conn': '<span class="log-sys">No server connection.</span>',
+    'log.max_level': '<span class="log-sys">Already at max level (+{n}).</span>',
+    'log.need_3x': '<span class="log-sys">Need 3× {name}.</span>',
+    'log.forge_no_conn': '<span class="log-sys">No server connection — forge unavailable.</span>',
+    'log.blessing_saved_from': '<span class="log-up">✨ The Blessing saved you from {killer}!</span>',
+    'log.avenged_by': '<span class="log-die">⚠ Avenged by {killer}! Doubled skill loss.</span>',
+    'log.you_killed': '<span class="log-up">⚔ You killed {victim}! +{g}g</span>',
+    'log.vengeance': '<span class="log-up">⚔ Vengeance! Skills recovered.</span>',
+    'log.pz_locked_seal': '<span class="log-die">⚠ PZ locked for 5 min (seal {n})!</span>',
+    'log.got_heart': '<span class="log-up">💎 Got a Highlander Heart!</span>',
+    'log.looted': '<span class="log-up">💀 Looted: {item}</span>',
+    'log.party_online_only': '<span class="log-sys">Party only online.</span>',
+    'log.no_conn_invite': '<span class="log-sys">No connection — invite cannot be accepted.</span>',
+    'log.no_conn_party_leave': '<span class="log-sys">No server connection — cannot leave the party now.</span>',
+    'log.target_auto': '<span class="log-sys">Target: {name} [AUTO]</span>',
+    'log.player_no_pvp': '<span class="log-sys">This player is not in PvP.</span>',
+    'log.target_pvp_auto': '<span class="log-dmg">PvP target: {name} ☠ [AUTO]</span>',
+    'log.trade_unavailable': '<span class="log-sys">Trade unavailable ({hint}).</span>',
+    'log.deciding': '<span class="log-sys">Deciding: {label}…</span>',
+    'log.go_altar': '<span class="log-sys">Go to the altar (key M) and buy a spell.</span>',
+    'log.no_target_visible': '<span class="log-sys">No target visible.</span>',
+    'log.target_cancelled': '<span class="log-sys">Target cancelled.</span>',
+    'log.no_enemy': '<span class="log-sys">No enemy in sight.</span>',
+    'log.buff_ended': '<span class="log-sys">{name} ended.</span>',
+    'log.spell_cooldown': '<span class="log-sys">{name} on cooldown.</span>',
+    'log.no_mana': '<span class="log-sys">Not enough mana ({mp}/{cost}).</span>',
+    'log.need_wand': '<span class="log-sys">You need a wand equipped to cast attack spells.</span>',
+    'log.spell_hits': '<span class="log-dmg">{name}: {hits} target(s) hit</span>',
+    'log.spell_taunt': '<span class="log-sys">{name}: taunted {count} mob(s)</span>',
+    'log.spell_buff': '<span class="log-up">{name}: +{dmg}% dmg / +{spd}% spd for {s}s</span>',
+    'log.spell_healing_group': '<span class="log-xp">{name}: healing players in radius {r}…</span>',
+    'log.hp_full': '<span class="log-sys">HP is already full.</span>',
+    'log.spell_heal': '<span class="log-xp">{name}: +{n} HP</span>',
+    'log.no_target_press': '<span class="log-sys">No target. Press SPACE/TAB first.</span>',
+    'log.target_too_far': '<span class="log-sys">Target too far ({d}/{max}).</span>',
+    'log.dmg_spell': '<span class="log-dmg">{star}{name}: -{dmg} on {mob}</span>',
+    'log.near_altar': '<span class="log-sys">Get closer to the altar.</span>',
+    'log.already_equipped': '<span class="log-sys">Already equipped.</span>',
+    'log.no_gold_cost': '<span class="log-sys">Not enough gold ({have}/{cost}).</span>',
+    'log.learned_spell': '<span class="log-up">★ Learned {name} (-{cost}g)</span>',
+    'log.near_dummy': '<span class="log-sys">Get closer to the training dummy.</span>',
+    'log.left_station': '<span class="log-sys">Left the {place}.</span>',
+    'log.select_skill': '<span class="log-sys">Select a skill.</span>',
+    'log.not_enough_gold': '<span class="log-sys">Not enough gold.</span>',
+    'log.training': '<span class="log-sys">Training {skill}: {n} sessions ({g}g total)</span>',
+    'log.pvp_requires': '<span class="log-sys">PvP requires {req}g (you have {have}g).</span>',
+    'log.pvp_requires_attack': '<span class="log-sys">PvP requires {req}g to attack a player (you have {have}g).</span>',
+    'log.pvp_auto_on': '<span class="log-dmg">⚔ PvP turned ON automatically (you attacked a player).</span>',
+    'log.pz_locked_pk': '<span class="log-dmg">⚠ PZ locked by PK! {s}s</span>',
+    'log.entered_pz': '<span class="log-sys">Entered the PZ — target cancelled.</span>',
+    'log.seal_earned': '<span class="log-up">★ Seal {n}/5 earned!</span>',
+    'log.became_highlander': '<span class="log-up">👑 YOU ASCENDED TO HIGHLANDER!</span>',
+    'log.hunters_incoming': '<span class="log-die">☠ Hunters will be sent in 3 minutes...</span>',
+    'log.pvp_lost_skills': '<span class="log-die">PvP: lost {list}</span>',
+    'log.player_no_pvp_on': '<span class="log-sys">This player does not have PvP on.</span>',
+    'log.no_pvp_pz': '<span class="log-sys">Cannot PvP in the PZ.</span>',
+    'log.pvp_dmg': '<span class="log-dmg">{star}PvP: -{dmg} on {name}</span>',
+    'log.training_done': '<span class="log-sys">Training ended ({reason}): {done}/{total} sessions.</span>',
+    'log.hp_mp_full': '<span class="log-sys">HP and MP are already full.</span>',
+    'log.no_food_potion': '<span class="log-sys">No food/potion available.</span>',
+    'log.rec_unsupported': '<span class="log-sys">Recording not supported on this client.</span>',
+    'log.rec_started': '<span class="log-sys">🔴 Recording gameplay — click REC again to stop and download the clip.</span>',
+    'log.rec_failed': '<span class="log-sys">Recording failed: {err}</span>',
+    'log.clip_empty': '<span class="log-sys">Empty clip — nothing was recorded.</span>',
+    'log.clip_saved': '<span class="log-sys">✅ Clip saved ({mb} MB) — it is in your Downloads.</span>',
+    'log.trade_online_only': '<span class="log-sys">Trade only available online.</span>',
+    'log.trade_in_progress': '<span class="log-sys">Already have a trade in progress.</span>',
+    'log.trade_self': '<span class="log-sys">Cannot trade with yourself.</span>',
+    'log.trade_invite_sent': '<span class="log-sys">Trade invite sent to {name}.</span>',
+    'log.invite_expired': '<span class="log-sys">Invite from {name} expired.</span>',
+    'log.invite_declined': '<span class="log-sys">You declined the invite from {name}.</span>',
+    'log.cant_add_self': '<span class="log-sys">Cannot add yourself.</span>',
+    'log.already_friend': '<span class="log-sys">{name} is already a friend.</span>',
+    'log.friend_added': '<span class="log-up">👥 {name} added.</span>',
+    'log.friend_removed': '<span class="log-sys">{name} removed.</span>',
+    'log.talent_max': '<span class="log-sys">Talent is already at max rank.</span>',
+    'log.no_points': '<span class="log-sys">No points available.</span>',
+    'log.talent_buying': '<span class="log-sys">{verb} {name}…</span>',
+    'log.respec_cost': '<span class="log-sys">Respec costs 5000g — you cannot afford it.</span>',
+    'log.respec_doing': '<span class="log-sys">Redistributing talents…</span>',
+    'log.fullscreen_blocked': '<span class="log-sys">Fullscreen blocked by the browser.</span>',
+    'log.cant_logout_active': '<span class="log-dmg">⚠ Cannot log out with {s} active. Die or wait.</span>',
+    'log.cant_logout_combat': '<span class="log-dmg">⚠ In combat — cannot log out now.</span>',
+    'log.server_slow': '<span class="log-sys">Server slow to respond — trying to reconnect…</span>',
+    'log.welcome': '<span class="log-sys">Welcome to Valadares, {name}!</span>',
+    'log.progress_restored': '<span class="log-sys">Progress restored.</span>',
+    'log.new_version': '<span class="log-sys">🔄 New version ready — reloads once you leave the dungeon/combat.</span>',
+    'log.save_restored': '<span class="log-sys">✦ Save restored from automatic backup.</span>',
+    'log.save_deleted': '<span class="log-sys">Save deleted.</span>',
+    'log.no_backup': '<span class="log-sys">No backup available.</span>',
+    'log.backup_empty': '<span class="log-sys">Backup is also empty.</span>',
+    'log.backup_restored': '<span class="log-up">✦ Backup restored. Reloading…</span>',
+    'log.no_hp_item': '<span class="log-sys">No potion/food for HP.</span>',
+    'log.no_mana_item': '<span class="log-sys">No mana potion.</span>',
+    'log.no_food': '<span class="log-sys">No food in inventory.</span>',
+    'lbl.target': 'Target',
+    'lbl.on': '⚔ ON',
+    'lbl.off': 'off',
+    'lbl.altar': 'altar',
+    'lbl.dummy': 'dummy',
+    'lbl.upgrading': 'Upgrading',
+    'lbl.acquiring': 'Acquiring',
+    /*F2EN*/
   }
 };
 let LANG = (function(){
@@ -4379,7 +4841,7 @@ function tickHighlanderHunt(dt){
             hlHuntTimer = 0;
             if (ws && ws.readyState === 1 && _wsAuthed){
                 try { ws.send(JSON.stringify({ t:'hlHuntTrigger' })); } catch {}
-                log('<span class="log-die">☠ Caçada ao Highlander! 3 Caçadores de Recompensa foram enviados!</span>');
+                log(tr('log.hl_hunt_start'));
             }
         }
         return;
@@ -4660,11 +5122,11 @@ let _lastDodgeSnd = 0;
 function bumpDodgeFloat(){
     if (_dodgeFloat && _dodgeFloat.life > 0 && floatTexts.indexOf(_dodgeFloat) !== -1){
         _dodgeFloat._n = (_dodgeFloat._n || 1) + 1;
-        _dodgeFloat.text = `Esquivou! ×${_dodgeFloat._n}`;
+        _dodgeFloat.text = tr('float.dodged_n', {n: _dodgeFloat._n});
         _dodgeFloat.life = 900;                                 // renova: contador fica visível enquanto esquiva
         _dodgeFloat.x = player.x; _dodgeFloat.y = player.y;     // acompanha se o player anda
     } else {
-        addFloat(player.x, player.y, 'Esquivou!', '#80ffd0', true, -8);   // 1º da sequência (também faz o broadcast MP)
+        addFloat(player.x, player.y, tr('float.dodged'), '#80ffd0', true, -8);   // 1º da sequência (também faz o broadcast MP)
         _dodgeFloat = floatTexts[floatTexts.length - 1];
         if (_dodgeFloat) _dodgeFloat._n = 1;
     }
@@ -4766,10 +5228,10 @@ function applyBlessingRevive(){
     player.target = null; player.autoAttack = false;
     snapRender(player);
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
-    log('<span class="log-up">✨ ━━ A Bênção da Fênix te salvou! ━━ ✨</span>');
+    log(tr('log.blessing_saved'));
     if (typeof showServerToast === 'function') showServerToast('event', '✨ Bênção da Fênix consumida! Você renasceu.');
     if (typeof sndLevelUp === 'function') sndLevelUp();
-    addFloat(player.x, player.y, '✨ RENASCIDO', '#ffcc40', true, -10);
+    addFloat(player.x, player.y, tr('float.reborn'), '#ffcc40', true, -10);
     saveState();
 }
 
@@ -4786,7 +5248,7 @@ async function playerDie(){
     snapshotDeathReplay();
     clearStatusEffects();
     sndDeath();
-    log(`<span class="log-die">━━ Você morreu ━━</span>`);
+    log(tr('log.you_died'));
     // Perda leve: 15% dos pontos de skill ACIMA de 10 (mínimo de -1 se subiu algo).
     // Mantém XP da skill (não perde o que tava cozinhando).
     const lost = [];
@@ -4801,8 +5263,8 @@ async function playerDie(){
             sk.xpNext = Math.floor(50 * Math.pow(1.15, newVal - 10));
         }
     }
-    if (lost.length) log(`<span class="log-die">Perdeu: ${lost.join(', ')}</span>`);
-    else log(`<span class="log-die">Sem perdas de skill (nada treinado).</span>`);
+    if (lost.length) log(tr('log.lost_skills', {list: lost.join(', ')}));
+    else log(tr('log.no_skill_loss'));
     recomputeStats();
     buildSkillList();
     // #5: morreu na masmorra → sai pro overworld localmente (o server manda dungeonExit
@@ -4860,11 +5322,11 @@ function enterDungeonClient(msg){
         dungeonStairs = null;
         player._arena = player._arena || { opponentName: msg.opponentName };
         if (typeof showServerToast === 'function') showServerToast('warn', `⚔ ARENA vs ${msg.opponentName || '?'} — sem fuga. Vença!`, null, 4000);
-        log(`<span class="log-die">━━ ARENA · vs ${escapeHtml(msg.opponentName || '?')} ━━</span>`);
+        log(tr('log.arena_header', {opp: escapeHtml(msg.opponentName || '?')}));
     } else {
         const goingDown = msg.dir !== 'up';
         if (typeof showServerToast === 'function') showServerToast('warn', goingDown ? `⬇ Andar ${player.floor} das Profundezas — PvP FORÇADO. Cuidado.` : `⬆ Subiu pro Andar ${player.floor}.`, null, 4500);
-        log(`<span class="log-die">━━ AS PROFUNDEZAS · Andar ${player.floor} ━━</span>`);
+        log(tr('log.depths_header', {floor: player.floor}));
     }
 }
 function exitDungeonClient(msg){
@@ -4884,7 +5346,7 @@ function exitDungeonClient(msg){
     groundItems.length = 0;   // #5: loot do andar não vaza pra cidade
     if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }); }
     if (typeof showServerToast === 'function') showServerToast('event', '⬆ De volta à cidade.', null, 4000);
-    log('<span class="log-sys">Você voltou à superfície.</span>');
+    log(tr('log.back_to_surface'));
 }
 
 // Distância Chebyshev = melee (8 tiles em volta, incluindo diagonais)
@@ -4949,7 +5411,7 @@ function recomputeStats(){
     player.maxMp = newMaxMp;
     const newDef = Math.max(0, Math.floor((s['Escudo'].val - 10) / 3));
     if (newDef > (player.shieldDefense||0)){
-        log(`<span class="log-up">Defesa de Escudo +${newDef - (player.shieldDefense||0)}</span>`);
+        log(tr('log.shield_def_up', {n: newDef - (player.shieldDefense||0)}));
     }
     player.shieldDefense = newDef;
     // log de ganho (só quando aumenta)
@@ -5060,14 +5522,14 @@ function equip(itemKey){
     // Conflito 2h ↔ escudo
     if (slot === 'weapon' && def.hand === '2h' && player.equipped.offhand){
         returnToInv(player.equipped.offhand);
-        log(`<span class="log-sys">Escudo guardado (arma 2H)</span>`);
+        log(tr('log.shield_stowed'));
         player.equipped.offhand = null;
     }
     if (slot === 'offhand' && player.equipped.weapon){
         const w = ITEMS[player.equipped.weapon];
         if (w.hand === '2h'){
             returnToInv(player.equipped.weapon);
-            log(`<span class="log-sys">${w.name} guardado (escudo precisa de mão livre)</span>`);
+            log(tr('log.weapon_stowed', {name: w.name}));
             player.equipped.weapon = null;
             player.weapon = null;
         }
@@ -5078,10 +5540,10 @@ function equip(itemKey){
     if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
     player.equipped[slot] = itemKey;
     if (slot === 'weapon') player.weapon = itemKey;
-    log(`<span class="log-sys">Equipou ${def.name}</span>`);
+    log(tr('log.equipped', {name: def.name}));
     // Aviso ao equipar arco sem munição
     if (def.ranged && !findArrow()){
-        log('<span class="log-dmg">⚠ Sem flechas! Use automaticamente quando tiver no inventário.</span>');
+        log(tr('log.no_arrows_equip'));
     }
     buildSkillList();
     // N3 fase 2: server é dono — envia intenção. invUpdate volta com inv/equipped autoritativos.
@@ -5097,7 +5559,7 @@ function unequip(slot){
     returnToInv(k);
     player.equipped[slot] = null;
     if (slot === 'weapon') player.weapon = null;
-    log(`<span class="log-sys">Desequipou ${ITEMS[k].name}</span>`);
+    log(tr('log.unequipped', {name: ITEMS[k].name}));
     buildSkillList();
     if (ws && ws.readyState === 1){
         try { ws.send(JSON.stringify({ t:'invUnequip', slot })); } catch {}
@@ -5111,7 +5573,7 @@ window.unequip = unequip;
 let currentChest = null;
 function openChest(){
     const c = nearestChest();
-    if (!c){ log('<span class="log-sys">Aproxime-se de um baú.</span>'); return; }
+    if (!c){ log(tr('log.near_chest')); return; }
     currentChest = c;
     document.getElementById('chestModal').style.display = 'flex';
     document.getElementById('chestTitleLabel').textContent = `🗝 ${c.name}`;
@@ -5193,7 +5655,7 @@ function depositAll(){
     }
     renderChest();
     invSignature = null;
-    log(`<span class="log-sys">Guardou ${moved} itens em ${currentChest.name}.</span>`);
+    log(tr('log.chest_deposited', {n: moved, chest: currentChest.name}));
     sendChestOp('depositAll');
 }
 // Pegar tudo — só do baú aberto
@@ -5210,7 +5672,7 @@ function withdrawAll(){
     player.chests[currentChest.id] = {};
     renderChest();
     invSignature = null;
-    log(`<span class="log-sys">Retirou ${moved} itens de ${currentChest.name}.</span>`);
+    log(tr('log.chest_withdrawn', {n: moved, chest: currentChest.name}));
     sendChestOp('withdrawAll');
 }
 
@@ -5265,7 +5727,7 @@ window.withdrawAll = withdrawAll;
 
 // ─── Crafting ────────────────────────────────────────────────────────────────
 function openCraft(){
-    if (!atCraft()){ log('<span class="log-sys">Aproxime-se da bancada.</span>'); return; }
+    if (!atCraft()){ log(tr('log.near_bench')); return; }
     document.getElementById('craftModal').style.display = 'flex';
     renderCraft();
 }
@@ -5281,7 +5743,7 @@ function closeAllModals(){
 
 // ─── SHOP modal (Mercador) ─────────────────────────────────────────────────
 function openShop(){
-    if (!atShop()){ log('<span class="log-sys">Aproxime-se do Mercador.</span>'); return; }
+    if (!atShop()){ log(tr('log.near_merchant')); return; }
     closeAllModals();
     document.getElementById('shopModal').style.display = 'flex';
     renderShop();
@@ -5591,7 +6053,7 @@ function doCraft(idx){
     const r = RECIPES[idx];
     if (!r || !canCraft(r)) return;
     if (!ws || ws.readyState !== 1){
-        log('<span class="log-sys">Sem conexão com o servidor — craft não disponível.</span>');
+        log(tr('log.craft_no_conn'));
         return;
     }
     ws.send(JSON.stringify({ t:'invCraft', idx }));
@@ -5709,31 +6171,31 @@ function findArrow(){
 function throwSpear(){
     if (blockedByDisconnect()) return;
     if (playerInSafeZone()){
-        log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
+        log(tr('log.no_attack_pz')); return;
     }
     player.lastAttackAt = Date.now();
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
     if (!wItem || !wItem.throwable){
-        log('<span class="log-sys">Equipe uma lança pra arremessar.</span>'); return;
+        log(tr('log.equip_spear')); return;
     }
     if (!player.target){
-        log('<span class="log-sys">Sem alvo (SPACE/TAB).</span>'); return;
+        log(tr('log.no_target_key')); return;
     }
     const m = monsters.find(x => x.id === player.target);
     if (!m) return;
     const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
     if (dist > wItem.throwable){
-        log(`<span class="log-sys">Muito longe pra arremessar (${dist}/${wItem.throwable}).</span>`);
+        log(tr('log.too_far_throw', {d: dist, max: wItem.throwable}));
         return;
     }
     if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
-        log(`<span class="log-sys">Sem linha de visão — a lança bateria na parede.</span>`);
+        log(tr('log.los_spear'));
         return;
     }
     // Esquiva
     if (Math.random() < m.dodge){
-        log(`<span class="log-sys">${m.name} desviou da lança.</span>`);
+        log(tr('log.dodged_spear', {mob: m.name}));
         gainSkillXpLocal('Distância', 1);
     } else {
         const sk = player.skills['Distância'];
@@ -5742,7 +6204,7 @@ function throwSpear(){
         const crit = Math.random() < playerCritChance();
         if (crit) dmg *= critMultPlayer();
         addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#cce0a0', crit, crit ? -10 : 0);
-        log(`<span class="log-dmg">${crit?'★ ':''}${wItem.name} arremessada: -${dmg} em ${m.name}</span>`);
+        log(tr('log.dmg_spear', {star: crit?'★ ':'', weapon: wItem.name, dmg, mob: m.name}));
         gainSkillXpLocal('Distância', 1);
         if (serverAuthMobs && ws && ws.readyState === 1){
             // server aplica dano + consome a lança equipada (throwSpear:true)
@@ -5769,7 +6231,7 @@ function throwSpear(){
         player.equipped.weapon = wasKey;
         player.weapon = wasKey;
     } else {
-        log(`<span class="log-sys">Última ${wItem.name} arremessada.</span>`);
+        log(tr('log.last_spear', {weapon: wItem.name}));
         buildSkillList();
     }
     invSignature = null;
@@ -5783,7 +6245,7 @@ function doAttack(m){
     if (player._spectate && player._spectate.until > Date.now()) return;   // espectando
     if (playerInSafeZone()){
         if (!doAttack._warned || Date.now() - doAttack._warned > 2000){
-            log(`<span class="log-sys">Não pode atacar dentro da zona segura.</span>`);
+            log(tr('log.no_attack_safezone'));
             doAttack._warned = Date.now();
         }
         return;
@@ -5811,21 +6273,21 @@ function doAttack(m){
         const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
         if (dist > (wItem.ranged || 5)){
             if (!doAttack._rangeWarn || Date.now() - doAttack._rangeWarn > 1500){
-                log(`<span class="log-sys">Muito longe (${dist}/${wItem.ranged}).</span>`);
+                log(tr('log.too_far', {d: dist, max: wItem.ranged}));
                 doAttack._rangeWarn = Date.now();
             }
             return;
         }
         if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
             if (!doAttack._losWarn || Date.now() - doAttack._losWarn > 1500){
-                log(`<span class="log-sys">Sem linha de visão — a magia bate na parede.</span>`);
+                log(tr('log.los_magic'));
                 doAttack._losWarn = Date.now();
             }
             return;
         }
         if (player.mp < WAND_MANA_COST){
             if (!doAttack._manaWarn || Date.now() - doAttack._manaWarn > 1500){
-                log('<span class="log-sys">Sem mana pro tiro mágico.</span>');
+                log(tr('log.no_mana_shot'));
                 doAttack._manaWarn = Date.now();
             }
             player.attackTimer = effectiveAttackDelay();
@@ -5833,7 +6295,7 @@ function doAttack(m){
         }
         player.mp -= WAND_MANA_COST;   // otimista; o server desconta + broadcasta o mp real
         if (Math.random() < m.dodge){
-            log(`<span class="log-sys">${m.name} esquivou do tiro.</span>`);
+            log(tr('log.dodged_shot', {mob: m.name}));
             gainSkillXpLocal('Magia', 1);
             player.attackTimer = effectiveAttackDelay();
             return;
@@ -5848,7 +6310,7 @@ function doAttack(m){
         const eCol = ELEMENT_COL[wItem.element] || wItem.color || '#c060ff';
         addFloat(m.x, m.y, `-${dmgW}`, critW ? '#ffaa20' : eCol, true, critW ? -10 : 0);
         if (critW) sndCrit(); else sndSpell();
-        log(`<span class="log-dmg">${critW?'★ ':''}${wItem.name}: -${dmgW} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
+        log(tr('log.dmg_hit', {star: critW?'★ ':'', weapon: wItem.name, dmg: dmgW, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
             startX: player.renderX, startY: player.renderY,
@@ -5870,14 +6332,14 @@ function doAttack(m){
         const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
         if (dist > wItem.ranged){
             if (!doAttack._rangeWarn || Date.now() - doAttack._rangeWarn > 1500){
-                log(`<span class="log-sys">Muito longe (${dist}/${wItem.ranged}).</span>`);
+                log(tr('log.too_far', {d: dist, max: wItem.ranged}));
                 doAttack._rangeWarn = Date.now();
             }
             return;
         }
         if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
             if (!doAttack._losWarn || Date.now() - doAttack._losWarn > 1500){
-                log(`<span class="log-sys">Sem linha de visão — algo bloqueia a flecha.</span>`);
+                log(tr('log.los_arrow'));
                 doAttack._losWarn = Date.now();
             }
             return;
@@ -5885,8 +6347,8 @@ function doAttack(m){
         const arrowKey = findArrow();
         if (!arrowKey){
             if (!doAttack._ammoWarn || Date.now() - doAttack._ammoWarn > 2500){
-                log(`<span class="log-sys">Sem flechas! Fabrique na bancada (C) ou colete (Aranha/Lobo/Orc dropam).</span>`);
-                addFloat(player.x, player.y, 'SEM FLECHAS', '#ff5050', true);
+                log(tr('log.no_arrows_craft'));
+                addFloat(player.x, player.y, tr('float.no_arrows'), '#ff5050', true);
                 doAttack._ammoWarn = Date.now();
             }
             player.attackTimer = effectiveAttackDelay();
@@ -5899,7 +6361,7 @@ function doAttack(m){
         if (player.inv[arrowKey] <= 0) delete player.inv[arrowKey];
         invSignature = null;
         if (Math.random() < m.dodge){
-            log(`<span class="log-sys">${m.name} esquivou da flecha.</span>`);
+            log(tr('log.dodged_arrow', {mob: m.name}));
             gainSkillXpLocal('Distância', 1);
             player.attackTimer = effectiveAttackDelay();
             return;
@@ -5911,7 +6373,7 @@ function doAttack(m){
         dmgR = Math.floor(dmgR * buffMult().dmg);
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
         if (critR) sndCrit(); else sndHit();
-        log(`<span class="log-dmg">${critR?'★ ':''}${wItem.name}: -${dmgR} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
+        log(tr('log.dmg_hit', {star: critR?'★ ':'', weapon: wItem.name, dmg: dmgR, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
             startX: player.renderX, startY: player.renderY,
@@ -5937,7 +6399,7 @@ function doAttack(m){
         const distM = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
         if (distM > 1 && !hasLineOfSight(player.x, player.y, m.x, m.y)){
             if (!doAttack._losWarn || Date.now() - doAttack._losWarn > 1500){
-                log(`<span class="log-sys">Sem linha de visão — a lança não passa.</span>`);
+                log(tr('log.los_spear2'));
                 doAttack._losWarn = Date.now();
             }
             return;
@@ -5945,7 +6407,7 @@ function doAttack(m){
     }
     // Monstro esquivou?
     if (Math.random() < m.dodge){
-        log(`<span class="log-sys">${m.name} esquivou.</span>`);
+        log(tr('log.dodged_melee', {mob: m.name}));
         gainSkillXpLocal(w.skill, 1);
         player.attackTimer = effectiveAttackDelay();
         return;
@@ -5957,7 +6419,7 @@ function doAttack(m){
     dmg = applyAttackMults(dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
     if (crit) sndCrit(); else sndHit();
-    log(`<span class="log-dmg">${crit?'★ ':''}${w.skill}: -${dmg} em ${m.name} (${m.hp}/${m.maxHp})</span>`);
+    log(tr('log.dmg_hit', {star: crit?'★ ':'', weapon: w.skill, dmg, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
     gainSkillXpLocal(w.skill, 1);
     if (player.equipped.offhand && ITEMS[player.equipped.offhand].kind === 'offhand'){
         gainSkillXpLocal('Escudo', 1);
@@ -6023,7 +6485,7 @@ function resolveWsUrl(){
     // Produção: usa Railway
     return PRODUCTION_WS_URL;
 }
-window.setWsUrl = (url) => { localStorage.setItem('valadares:ws', url); log(`<span class="log-sys">WS server: ${url} — reconecte</span>`); };
+window.setWsUrl = (url) => { localStorage.setItem('valadares:ws', url); log(tr('log.ws_server_set', {url})); };
 
 function connectMP(){
     // Se já existe um socket abrindo/aberto, não cria outro (evita race em
@@ -6032,9 +6494,9 @@ function connectMP(){
     const wsUrl = resolveWsUrl();
     try {
         ws = new WebSocket(wsUrl);
-        log(`<span class="log-sys">Conectando em ${escapeHtml(wsUrl)}…</span>`);
+        log(tr('log.connecting', {url: escapeHtml(wsUrl)}));
     } catch (e){
-        log('<span class="log-sys">Não foi possível conectar ao servidor — verifique o endereço.</span>');
+        log(tr('log.connect_fail'));
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
         return;
@@ -6062,7 +6524,7 @@ function connectMP(){
             // do heartbeat. Se >10s sem nenhuma mensagem, WS está zumbi (TCP morreu mas
             // socket não detectou). Força close pra disparar scheduleReconnect.
             if (ws && ws.readyState === 1 && Date.now() - _lastServerMsgAt > 10000){
-                log('<span class="log-sys">Conexão zumbi detectada — reconectando…</span>');
+                log(tr('log.zombie_conn'));
                 try { ws.close(4002, 'stale'); } catch {}
             }
         }, 4000);
@@ -6076,7 +6538,7 @@ function connectMP(){
             const wsAtAuth = ws;
             setTimeout(() => {
                 if (wsAtAuth === ws && wsAtAuth?.readyState === 1 && !_wsAuthed){
-                    log('<span class="log-sys">Server não respondeu auth — entrando sem sync de save.</span>');
+                    log(tr('log.auth_timeout'));
                     sendJoinNow();
                 }
             }, 8000);
@@ -6099,7 +6561,7 @@ function connectMP(){
             if (_overlayDelayTimer){ clearTimeout(_overlayDelayTimer); _overlayDelayTimer = null; }
             if (_reconnectTimer){ clearTimeout(_reconnectTimer); _reconnectTimer = null; }
             showReconnectOverlay(false);
-            log('<span class="log-dmg">⚠ Sua conta foi aberta em outro lugar — esta janela parou (sem reconexão automática, pra não duelar com a outra sessão). Feche as cópias extras; recarregue (F5) se foi engano.</span>');
+            log(tr('log.session_replaced'));
             if (typeof showServerToast === 'function') showServerToast('admin', '⚠ Conta aberta em outro lugar — esta janela foi desconectada. Feche as cópias extras ou recarregue (F5).', null, 15000);
             return;
         }
@@ -6112,7 +6574,7 @@ function connectMP(){
             _overlayDelayTimer = setTimeout(() => {
                 if (mpDisconnected){
                     showReconnectOverlay(true);
-                    log('<span class="log-sys">Desconectado.</span>');
+                    log(tr('log.disconnected'));
                 }
                 _overlayDelayTimer = null;
             }, 3000);
@@ -6120,7 +6582,7 @@ function connectMP(){
         }
     };
     ws.onerror = () => {
-        log('<span class="log-sys">Erro de conexão.</span>');
+        log(tr('log.conn_error'));
         // Em alguns browsers onerror dispara sem onclose — limpa heartbeat aqui
         // pra não acumular timers órfãos
         if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
@@ -6140,7 +6602,7 @@ function connectMP(){
 function sendJoinNow(){
     if (!ws || ws.readyState !== 1) return;
     try {
-        ws.send(JSON.stringify({t:'join', name:player.name, x:player.x, y:player.y, pvp:player.pvp,
+        ws.send(JSON.stringify({t:'join', name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
                                 hp:player.hp, maxHp:player.maxHp, equipped:player.equipped,
                                 badges: (player.equippedBadges || []).slice(0, 2)}));
     } catch {}
@@ -6152,13 +6614,13 @@ function handleMP(msg){
         // Reconexão durante jogo: NÃO sobrescreve com save server (pode estar atrasado
         // se o player jogou offline). Em vez disso, faz push do estado atual.
         if (_didInitialAuth){
-            log('<span class="log-sys">Autenticado (reconexão) — sincronizando estado local.</span>');
+            log(tr('log.authed_reconnect'));
             try { saveState(); } catch {}
         } else if (msg.save && typeof msg.save === 'object'){
             applyServerSave(msg.save);
-            log('<span class="log-sys">✦ Personagem restaurado do servidor.</span>');
+            log(tr('log.char_restored'));
         } else if (msg.isNew){
-            log('<span class="log-sys">Conta sincronizada com o servidor.</span>');
+            log(tr('log.account_synced'));
             try { saveState(); } catch {}
         }
         _didInitialAuth = true;
@@ -6171,8 +6633,8 @@ function handleMP(msg){
         // Como o hp vem > 0, o handler de pstats NÃO dispara playerDie() (sem tela de morte/penalidade).
         if (typeof msg.hp === 'number') player.hp = msg.hp;
         if (typeof msg.readyAt === 'number') player.scReadyAt = msg.readyAt;
-        log('<span class="log-up">🕯️ ━━ Segunda Chance — você sobreviveu! ━━</span>');
-        if (typeof addFloat === 'function') addFloat(player.x, player.y, '🕯️ SEGUNDA CHANCE', '#ffcc40', true, -10);
+        log(tr('log.second_chance_survived'));
+        if (typeof addFloat === 'function') addFloat(player.x, player.y, tr('float.second_chance'), '#ffcc40', true, -10);
         if (typeof sndLevelUp === 'function') sndLevelUp();
         if (typeof showServerToast === 'function') showServerToast('event', '🕯️ Segunda Chance! Você renasceu no lugar.');
         if (document.getElementById('talentsModal')?.style.display === 'flex' && typeof renderTalents === 'function') renderTalents();
@@ -6196,7 +6658,7 @@ function handleMP(msg){
             bad_name: '⚠ Nome inválido.',
         };
         const txt = msgs[reason] || '⚠ Autenticação rejeitada.';
-        log(`<span class="log-dmg">${txt} (${escapeHtml(reason)})</span>`);
+        log(tr('log.auth_rejected', {txt, reason: escapeHtml(reason)}));
         showServerToast(reason === 'maintenance' ? 'warn' : 'admin', txt, null, 4000);
         _wsAuthed = false;
         _authPwHash = null;
@@ -6307,14 +6769,14 @@ function handleMP(msg){
         }
     } else if (msg.t === 'join'){
         remotePlayers[msg.player.id] = msg.player;
-        log(`<span class="log-sys">${escapeHtml(msg.player.name)} entrou!</span>`);
+        log(tr('log.player_joined', {name: escapeHtml(msg.player.name)}));
     } else if (msg.t === 'leave'){
-        if (remotePlayers[msg.id]) log(`<span class="log-sys">${escapeHtml(remotePlayers[msg.id].name)} saiu.</span>`);
+        if (remotePlayers[msg.id]) log(tr('log.player_left', {name: escapeHtml(remotePlayers[msg.id].name)}));
         delete remotePlayers[msg.id];
     } else if (msg.t === 'ghost'){
         if (remotePlayers[msg.id]){
             remotePlayers[msg.id].ghost = true;
-            log(`<span class="log-die">💤 ${escapeHtml(remotePlayers[msg.id].name)} deslogou (corpo fica 3 min)</span>`);
+            log(tr('log.player_logged_off', {name: escapeHtml(remotePlayers[msg.id].name)}));
         }
     } else if (msg.t === 'pos'){
         if (remotePlayers[msg.id]){
@@ -6427,8 +6889,8 @@ function handleMP(msg){
         // M8: itemDelta — pingou um item no inv (compra ou listing expirada).
         if (msg.itemDelta && msg.itemDelta.qty > 0){
             const d = msg.itemDelta;
-            const reasonLabel = d.reason === 'auction_expired' ? 'leilão expirado' : (d.reason === 'auction_buy' ? 'comprado' : 'recebido');
-            log(`<span class="log-up">📦 +${d.qty}× ${escapeHtml(itemDisplayName(d.itemKey))} (${reasonLabel})</span>`);
+            const reasonLabel = d.reason === 'auction_expired' ? tr('lbl.auction_expired') : (d.reason === 'auction_buy' ? tr('lbl.bought') : tr('lbl.received'));
+            log(tr('log.item_received', {qty: d.qty, item: escapeHtml(itemDisplayName(d.itemKey)), reason: reasonLabel}));
         }
         // M4: loot de boss distribuído por dano (direto no inv) — feedback bonito
         if (msg.bossLoot){
@@ -6440,7 +6902,7 @@ function handleMP(msg){
             }
             if (parts.length){
                 const bossName = (MTYPE[bl.boss] && MTYPE[bl.boss].name) || 'boss';
-                log(`<span class="log-up">🏆 Sua parte do loot de ${escapeHtml(bossName)}: ${parts.join(', ')}</span>`);
+                log(tr('log.boss_loot_share', {boss: escapeHtml(bossName), parts: parts.join(', ')}));
                 // Toast COMPACTO (resumo). A lista completa fica no log. Antes o toast listava
                 // tudo + um 2º toast de "ouro creditado" empilhavam 2 banners gigantes na tela.
                 const _nItems = Object.values(bl.items || {}).reduce((a, b) => a + b, 0);
@@ -6465,14 +6927,14 @@ function handleMP(msg){
         }
         // Feedback opcional de equip op (rejeitada por server)
         if (msg.equipOp && !msg.equipOp.ok){
-            log('<span class="log-sys">Servidor rejeitou a operação de equip.</span>');
+            log(tr('log.equip_rejected'));
         }
         // N3 fase 2: pickup do chão — feedback (som + log).
         // Server já enviou inv/gold atualizados acima; groundRemove veio separado e limpou local.
         if (msg.pickup && Array.isArray(msg.pickup.ids) && msg.pickup.ids.length){
             if (typeof sndPickup === 'function') sndPickup();
             if (msg.pickup.gold > 0){
-                log(`<span class="log-xp">+${msg.pickup.gold} ouro (${player.gold})</span>`);
+                log(tr('log.gold_picked', {g: msg.pickup.gold, total: player.gold}));
             }
         }
         // N3 fase 2: chests autoritativos
@@ -6495,11 +6957,11 @@ function handleMP(msg){
         if (msg.goldDelta && msg.goldDelta.amount > 0){
             const reason = msg.goldDelta.reason || 'sistema';
             if (reason === 'gold_rain'){
-                log(`<span class="log-up">💰 Chuva de Ouro: +${msg.goldDelta.amount}g</span>`);
+                log(tr('log.gold_rain', {g: msg.goldDelta.amount}));
                 addFloat(player.x, player.y, '+' + msg.goldDelta.amount + 'g', '#ffcc40', false, -28);
                 // Sem som de level up e sem toast (acontece a cada 30s, ia poluir)
             } else {
-                log(`<span class="log-up">💰 +${msg.goldDelta.amount.toLocaleString('pt-BR')} de ouro creditados (${reason})!</span>`);
+                log(tr('log.gold_credited', {g: msg.goldDelta.amount.toLocaleString('pt-BR'), reason}));
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, `+${msg.goldDelta.amount}g`, '#ffcc40', true, -20);
                 // Não duplica banner quando o ouro já veio no toast de loot de boss (mesma msg).
@@ -6520,13 +6982,13 @@ function handleMP(msg){
             if (healed > 0){
                 player.hp = Math.min(player.maxHp, player.hp + healed);
                 addFloat(player.x, player.y, `+${healed}`, '#66cc66', false, 0);
-                log(`<span class="log-xp">Comeu ${name} (+${healed} HP)</span>`);
+                log(tr('log.ate', {name, n: healed}));
             }
             const manaHealed = msg.consume.manaHealed | 0;
             if (manaHealed > 0){
                 player.mp = Math.min(player.maxMp, player.mp + manaHealed);
                 addFloat(player.x, player.y, `+${manaHealed} MP`, '#5599ff', false, -14);
-                log(`<span class="log-xp">Bebeu ${name} (+${manaHealed} MP)</span>`);
+                log(tr('log.drank', {name, n: manaHealed}));
             }
         }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
@@ -6537,15 +6999,15 @@ function handleMP(msg){
             if (msg.forge.ok){
                 const item = ITEMS[msg.forge.newKey];
                 const itemName = item ? item.name : msg.forge.newKey;
-                log(`<span class="log-up">✨ Forjou ${itemName}! (custo ${msg.forge.cost}g)</span>`);
+                log(tr('log.forged', {item: itemName, cost: msg.forge.cost}));
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, '★ +' + msg.forge.plus, '#ffcc40', true, -10);
                 checkAchievements();
             } else {
                 const itemName = ITEMS[msg.forge.itemKey]?.name || msg.forge.itemKey;
-                log(`<span class="log-die">💥 Forja falhou! 1× ${itemName} destruído. -${msg.forge.cost}g</span>`);
+                log(tr('log.forge_failed', {item: itemName, cost: msg.forge.cost}));
                 if (typeof sndDeath === 'function') sndDeath();
-                addFloat(player.x, player.y, 'FALHA', '#ff3030', true, -10);
+                addFloat(player.x, player.y, tr('float.fail'), '#ff3030', true, -10);
             }
             _forgeResult = msg.forge.ok
                 ? { ok:true,  text:`✨ Sucesso! ${ITEMS[msg.forge.newKey]?.name || msg.forge.newKey} +${msg.forge.plus}`, at: Date.now() }
@@ -6555,7 +7017,7 @@ function handleMP(msg){
         // Craft: feedback
         if (msg.craft && msg.craft.ok){
             const out = ITEMS[msg.craft.out];
-            log(`<span class="log-xp">Fabricou ${out ? out.name : msg.craft.out} (-${msg.craft.cost}g)</span>`);
+            log(tr('log.crafted', {item: out ? out.name : msg.craft.out, cost: msg.craft.cost}));
             if (typeof renderCraft === 'function') renderCraft();
         }
         // Shop: feedback
@@ -6565,7 +7027,7 @@ function handleMP(msg){
             if (msg.shop.op === 'buy'){
                 log(`<span class="log-up">+${msg.shop.qty} ${name} (-${msg.shop.price}g)</span>`);
             } else if (msg.shop.op === 'sell'){
-                log(`<span class="log-sys">Vendeu ${msg.shop.qty}× ${name} (+${msg.shop.total}g)</span>`);
+                log(tr('log.shop_sell', {qty: msg.shop.qty, name, total: msg.shop.total}));
                 if (typeof sndPickup === 'function') sndPickup();
             }
             if (typeof renderShop === 'function') renderShop();
@@ -6592,9 +7054,9 @@ function handleMP(msg){
                 const it = ITEMS[k];
                 log(`<span class="log-up">+${n}× ${it ? it.name : k}</span>`);
             }
-            if (d.flag) log('<span class="log-sys">⚡ Algo mudou no mundo…</span>');
+            if (d.flag) log(tr('log.world_changed'));
             if (d.permaBuffs) for (const [k, v] of Object.entries(d.permaBuffs)){
-                log(`<span class="log-up">💎 Buff permanente: ${k} +${(v*100).toFixed(0)}%</span>`);
+                log(tr('log.perma_buff', {k, pct: (v*100).toFixed(0)}));
             }
             if (typeof recomputeStats === 'function') recomputeStats();
             if (typeof renderQuests === 'function') renderQuests();
@@ -6607,7 +7069,7 @@ function handleMP(msg){
         if (msg.talentResult && msg.talentResult.ok){
             const def = TALENT_DEFS_CLIENT[msg.talentResult.talentId];
             if (def){
-                log(`<span class="log-up">⚜ ${def.name}${msg.talentResult.rank?` — rank ${msg.talentResult.rank}${msg.talentResult.max?'/'+msg.talentResult.max:''}`:''} adquirido!</span>`);
+                log(tr('log.talent_acquired', {name: def.name, rankinfo: msg.talentResult.rank?` — rank ${msg.talentResult.rank}${msg.talentResult.max?'/'+msg.talentResult.max:''}`:''}));
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, '⚜ ' + def.name, '#ffd060', true, -20);
             }
@@ -6617,7 +7079,7 @@ function handleMP(msg){
         }
         // Respec: server devolveu talents={} + permaBuffs ajustados (auras de quest preservadas).
         if (msg.talentRespec && msg.talentRespec.ok){
-            log('<span class="log-up">↺ Talentos redistribuídos — pontos devolvidos (−5000g).</span>');
+            log(tr('log.talents_respec'));
             if (typeof recomputeStats === 'function') recomputeStats();
             if (document.getElementById('talentsModal')?.style.display === 'flex') renderTalents();
             saveState();
@@ -6627,7 +7089,7 @@ function handleMP(msg){
             const id = String(msg.seasonReward.id);
             player.seasonsWon = Array.isArray(player.seasonsWon) ? player.seasonsWon : [];
             if (!player.seasonsWon.includes(id)) player.seasonsWon.push(id);
-            log(`<span class="log-up">🏆 VOCÊ É O CAMPEÃO DA TEMPORADA ${id}! +1× Coroa de Temporada</span>`);
+            log(tr('log.season_champion', {id}));
             if (typeof showServerToast === 'function') showServerToast('event', `🏆 Campeão da temporada ${id}!`, null, 10000);
             if (typeof sndLevelUp === 'function') sndLevelUp();
             saveState();
@@ -6639,17 +7101,17 @@ function handleMP(msg){
             // Aqui só fecha o estado local pra o timer voltar a contar.
             hlHuntActive = false;
             hlHuntTimer = 0;
-            log(`<span class="log-up">🏆 Caçadores eliminados! Recompensa: ${msg.amount}g</span>`);
+            log(tr('log.hunters_defeated', {g: msg.amount}));
         } else if (msg.reason === 'cooldown'){
             const min = Math.ceil(((msg.retryAt || 0) - Date.now()) / 60000);
-            log(`<span class="log-sys">⏳ Recompensa da caçada em cooldown (${min}min)</span>`);
+            log(tr('log.hunt_cooldown', {min}));
             hlHuntActive = false;   // libera p/ próximo ciclo (mesmo no cooldown, evita travar)
         } else if (msg.reason === 'already_active' || msg.reason === 'no_spawn'){
             // já tem hunters vivos no server, ou server falhou em spawnar — sincroniza estado
             hlHuntActive = (msg.reason === 'already_active');
             if (msg.reason === 'no_spawn'){
                 hlHuntTimer = 0;
-                log(`<span class="log-sys">⚠ Server não achou onde spawnar caçadores — tentando de novo em ${Math.floor(HL_HUNT_DELAY_MS/60000)}min</span>`);
+                log(tr('log.hunt_no_spawn', {min: Math.floor(HL_HUNT_DELAY_MS/60000)}));
             }
         }
     } else if (msg.t === 'questResult'){
@@ -6671,7 +7133,7 @@ function handleMP(msg){
             not_done:'Você ainda não completou os objetivos da quest.',
         };
         const text = reasons[msg.reason] || 'Servidor rejeitou a entrega.';
-        log(`<span class="log-sys">⚠ ${text}</span>`);
+        log(tr('log.warn_text', {text}));
         // Toast visível no centro — o log vai pra aba COMBATE e o player pode
         // estar na aba CHAT, fazendo a falha parecer silenciosa ("não dá nada").
         if (typeof showServerToast === 'function') showServerToast('warn', `⚠ ${text} (${msg.reason})`, null, 5000);
@@ -6741,7 +7203,7 @@ function handleMP(msg){
     } else if (msg.t === 'duelStart'){
         player._duel = { opponentId: msg.opponentId, opponentName: msg.opponentName, amount: msg.amount, until: msg.until };
         if (typeof msg.gold === 'number') player.gold = msg.gold;
-        log(`<span class="log-up">⚔ Duelo iniciado contra ${escapeHtml(msg.opponentName)}! Aposta ${msg.amount}g cada. 3 min máx.</span>`);
+        log(tr('log.duel_started', {opp: escapeHtml(msg.opponentName), amount: msg.amount}));
         if (typeof showServerToast === 'function') showServerToast('event', `⚔ DUELO contra ${msg.opponentName} (${msg.amount}g)`);
     } else if (msg.t === 'duelEnd'){
         player._duel = null;
@@ -6751,15 +7213,15 @@ function handleMP(msg){
         player.mp = player.maxMp;
         if (typeof clearStatusEffects === 'function') clearStatusEffects();
         if (msg.draw){
-            log(`<span class="log-sys">⚔ Duelo contra ${escapeHtml(msg.opponentName)} terminou empate. Aposta devolvida.</span>`);
+            log(tr('log.duel_draw', {opp: escapeHtml(msg.opponentName)}));
         } else if (msg.winner){
-            log(`<span class="log-up">🏆 Você venceu o duelo contra ${escapeHtml(msg.opponentName)}! +${msg.amount * 2}g</span>`);
+            log(tr('log.duel_won', {opp: escapeHtml(msg.opponentName), g: msg.amount * 2}));
             if (typeof sndLevelUp === 'function') sndLevelUp();
             // Contador local pra achievements (server tem authoritative em ranking)
             player.duelWins = (player.duelWins || 0) + 1;
             if (typeof checkAchievements === 'function') checkAchievements();
         } else {
-            log(`<span class="log-die">💀 Você perdeu o duelo contra ${escapeHtml(msg.opponentName)}. Aposta perdida (${msg.amount}g).</span>`);
+            log(tr('log.duel_lost', {opp: escapeHtml(msg.opponentName), amount: msg.amount}));
         }
         saveState();
     } else if (msg.t === 'arenaStats'){
@@ -6788,7 +7250,7 @@ function handleMP(msg){
         player._arena = { opponentName: msg.opponentName, wager: msg.wager, fightAt: msg.until };
         closeArenaModal();
         _arenaShowCountdown(msg.until, msg.opponentName);
-        log(`<span class="log-up">⚔ ARENA! Oponente: ${escapeHtml(msg.opponentName)}${msg.wager > 0 ? ` · aposta ${msg.wager}g` : ''}. Prepare-se!</span>`);
+        log(tr('log.arena_match', {opp: escapeHtml(msg.opponentName), wager: msg.wager > 0 ? ' · '+tr('lbl.wager')+' '+msg.wager+'g' : ''}));
     } else if (msg.t === 'arenaEnd'){
         player._arena = null;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
@@ -6798,15 +7260,15 @@ function handleMP(msg){
         const ov = document.getElementById('arenaOverlay'); if (ov) ov.style.display = 'none';
         if (_arenaCountTimer){ clearInterval(_arenaCountTimer); _arenaCountTimer = null; }
         if (msg.draw){
-            log(`<span class="log-sys">⚔ Arena: empate contra ${escapeHtml(msg.opponentName)}. Aposta devolvida. Rating ${msg.rating}.</span>`);
+            log(tr('log.arena_draw', {opp: escapeHtml(msg.opponentName), rating: msg.rating}));
         } else if (msg.winner){
             player.arenaWins = (player.arenaWins || 0) + 1;
-            log(`<span class="log-up">🏆 Venceu a Arena contra ${escapeHtml(msg.opponentName)}!${msg.wager > 0 ? ` +${msg.wager * 2}g` : ''} Rating ${msg.rating}.</span>`);
+            log(tr('log.arena_won', {opp: escapeHtml(msg.opponentName), bonus: msg.wager > 0 ? ` +${msg.wager * 2}g` : '', rating: msg.rating}));
             if (typeof sndLevelUp === 'function') sndLevelUp();
             if (typeof checkAchievements === 'function') checkAchievements();
         } else {
             player.arenaLosses = (player.arenaLosses || 0) + 1;
-            log(`<span class="log-die">💀 Perdeu a Arena contra ${escapeHtml(msg.opponentName)}.${msg.wager > 0 ? ` -${msg.wager}g` : ''} Rating ${msg.rating}.</span>`);
+            log(tr('log.arena_lost', {opp: escapeHtml(msg.opponentName), bonus: msg.wager > 0 ? ` -${msg.wager}g` : '', rating: msg.rating}));
         }
     } else if (msg.t === 'auctions'){
         // M8 — snapshot do servidor (browse + mine + serverNow).
@@ -6890,28 +7352,28 @@ function handleMP(msg){
         // ícones de status (☠/🩸/🔥). dmg/ticks são autoritativos no server.
         if (msg.type === 'poison'){
             player.poison = { dmgPerTick: 0, ticksLeft: 999, intervalMs: 99999, nextTickAt: Infinity, source: msg.source || '?' };
-            log(`<span class="log-dmg">☠ Envenenado por ${escapeHtml(msg.source || '?')}!</span>`);
-            addFloat(player.x, player.y, 'VENENO', '#74d176', false, -28);
+            log(tr('log.poisoned_by', {src: escapeHtml(msg.source || '?')}));
+            addFloat(player.x, player.y, tr('float.poison'), '#74d176', false, -28);
         } else if (msg.type === 'bleed'){
             player.bleed = { dmgPerTick: 0, ticksLeft: 999, intervalMs: 99999, nextTickAt: Infinity, source: msg.source || '?' };
-            log(`<span class="log-dmg">🩸 Sangrando por ${escapeHtml(msg.source || '?')}!</span>`);
-            addFloat(player.x, player.y, 'SANGRA', '#cc3030', false, -28);
+            log(tr('log.bleeding_by', {src: escapeHtml(msg.source || '?')}));
+            addFloat(player.x, player.y, tr('float.bleed'), '#cc3030', false, -28);
         }
     } else if (msg.t === 'playerDotEnd'){
         if (msg.type === 'poison'){
             player.poison = null;
-            log(`<span class="log-sys">Veneno passou.</span>`);
+            log(tr('log.poison_ended'));
         } else if (msg.type === 'bleed'){
             player.bleed = null;
-            log(`<span class="log-sys">Sangramento parou.</span>`);
+            log(tr('log.bleed_ended'));
         }
     } else if (msg.t === 'playerStun'){
         const dur = msg.durationMs | 0;
         const endAt = Date.now() + dur;
         if (!player.stun || player.stun.endAt < endAt){
             player.stun = { endAt };
-            log(`<span class="log-dmg">⚡ Atordoado por ${escapeHtml(msg.source || '?')}! (${(dur/1000).toFixed(1)}s)</span>`);
-            addFloat(player.x, player.y, 'STUN', '#ffaa20', true, -28);
+            log(tr('log.stunned_by', {src: escapeHtml(msg.source || '?'), s: (dur/1000).toFixed(1)}));
+            addFloat(player.x, player.y, tr('float.stun'), '#ffaa20', true, -28);
         }
     } else if (msg.t === 'playerFloat'){
         // Float sobre um player (DoT tick, etc) — vindo de server tickPlayerDots
@@ -6935,7 +7397,7 @@ function handleMP(msg){
         }
         addFloat(player.x, player.y, `-${actual}`, '#ff3030', true);
         player.hurtTimer = 300;
-        log(`<span class="log-dmg">⚠ ${escapeHtml(msg.fromName)} (PvP): ${actual} dano</span>`);
+        log(tr('log.pvp_dmg_taken', {from: escapeHtml(msg.fromName), dmg: actual}));
         // pkDeath é disparado via pstats com hp=0 (handler self). Fallback legacy:
         if (msg.actual == null && player.hp === 0){
             pkDeathBy(msg.from, msg.fromName);
@@ -7008,14 +7470,14 @@ function handleMP(msg){
             if (msg.given.gold) player.gold = Math.max(0, player.gold - msg.given.gold);
         }
         invSignature = null;
-        log('<span class="log-up">🤝 Trade concluído!</span>');
+        log(tr('log.trade_done'));
         if (typeof sndLevelUp === 'function') sndLevelUp();
         _trade = null;
         document.getElementById('tradeModal').style.display = 'none';
         saveState();
     } else if (msg.t === 'tradeCancelled'){
         if (_trade){
-            log(`<span class="log-sys">Trade cancelado: ${msg.reason || ''}</span>`);
+            log(tr('log.trade_cancelled', {reason: msg.reason || ''}));
             _trade = null;
             document.getElementById('tradeModal').style.display = 'none';
         }
@@ -7076,7 +7538,7 @@ function handleMP(msg){
             mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null);
         }
         // Build de escudo: o servidor também creditou Escudo (mesmo XP) — loga pra confirmar.
-        if (msg.shieldXp > 0) log(`<span class="log-up">+${msg.shieldXp} xp Escudo</span>`);
+        if (msg.shieldXp > 0) log(tr('log.shield_xp', {n: msg.shieldXp}));
         // M6 Pet — server concedeu xp ao pet equipado. Atualiza barra + avisa level-up.
         if (msg.petGain && msg.petGain.key){
             const g = msg.petGain;
@@ -7085,7 +7547,7 @@ function handleMP(msg){
             if (g.leveled){
                 const pdef = PET_DEFS[g.key];
                 if (pdef){
-                    log(`<span class="log-up">🐾 ${pdef.name} subiu pro nível ${g.lvl}! (${petBuffText(pdef, g.lvl)})</span>`);
+                    log(tr('log.pet_levelup', {name: pdef.name, lvl: g.lvl, buff: petBuffText(pdef, g.lvl)}));
                     if (typeof addFloat === 'function') addFloat(player.x, player.y, `🐾 Lv ${g.lvl}`, '#aef0ae', true, -22);
                 }
             }
@@ -7106,7 +7568,7 @@ function handleMP(msg){
             bumpDodgeFloat();   // mescla em "Esquivou! ×N" (não vira parede com esquiva alta + enxame)
             // throttle do som: sem isso vira metralhadora no enxame (mesmo motivo da parede)
             if (typeof sndDodge === 'function' && Date.now() - _lastDodgeSnd > 120){ sndDodge(); _lastDodgeSnd = Date.now(); }
-            log(`<span class="log-sys">🌀 Você esquivou de ${defName}!</span>`);
+            log(tr('log.you_dodged', {mob: defName}));
             return;
         }
         // 🕯️ Imune (grace de connect / janela de 2s da Segunda Chance): server manda actual:0+immune.
@@ -7125,7 +7587,7 @@ function handleMP(msg){
         player.hurtTimer = crit ? 450 : 300;
         sndDmg();
         addFloat(player.x, player.y, `${crit ? '★ ' : ''}-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
-        log(`<span class="log-dmg">⚠ ${crit ? '★ CRÍTICO ' : ''}${defName}: ${actual} dano</span>`);
+        log(tr('log.mob_dmg', {crit: crit ? tr('lbl.crit')+' ' : '', mob: defName, dmg: actual}));
         rollAttackerStatus(msg.mobType);
         // playerDie é disparado via pstats com hp===0 (handler self acima).
         // Fallback pra modo legacy se chegamos aqui sem msg.actual.
@@ -7218,7 +7680,7 @@ function mobKilledByServer(m, serverLoot, serverDrops){
     // Em modo offline (sem ws), fallback continua aplicando local.
     const wKey = player.equipped.weapon;
     const skill = m.skill || (wKey ? ITEMS[wKey].skill : 'Punho');
-    log(`<span class="log-kill">☠ ${m.name} morreu! (+${m.xpReward||0} xp ${skill})</span>`);
+    log(tr('log.mob_killed', {mob: m.name, xp: m.xpReward||0, skill}));
     addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
     if (player.target === m.id){ player.target = null; /* mantém autoAttack */ }
     // #3/#6: coleta o loot recém-caído NA HORA da morte. Antes o pickup só rodava ao MOVER
@@ -7276,8 +7738,8 @@ function showReconnectOverlay(show){
 function blockedByDisconnect(){
     if (!mpDisconnected) return false;
     if (!doAttack._discWarn || Date.now() - doAttack._discWarn > 2500){
-        log('<span class="log-sys">⚙ Servidor atualizando — aguarde…</span>');
-        addFloat(player.x, player.y, 'ATUALIZANDO', '#ffc060', true, -10);
+        log(tr('log.server_updating'));
+        addFloat(player.x, player.y, tr('float.updating'), '#ffc060', true, -10);
         doAttack._discWarn = Date.now();
     }
     return true;
@@ -7446,7 +7908,7 @@ window.rejectDuelInvite = rejectDuelInvite;
 let _arenaCountTimer = null;
 function openArenaQueue(){
     const n = npcAt(player.x, player.y);
-    if (!n || n.action !== 'arena'){ log('<span class="log-sys">Aproxime-se do Mestre da Arena.</span>'); return; }
+    if (!n || n.action !== 'arena'){ log(tr('log.near_arena_master')); return; }
     closeAllModals();
     document.getElementById('arenaModal').style.display = 'flex';
     _renderArenaStatus(player._arenaQueued ? 'queued' : 'idle');
@@ -8123,7 +8585,7 @@ function checkAchievements(){
     }
     // Anúncios
     for (const a of unlocked){
-        log(`<span class="log-up">🏆 Conquista desbloqueada: ${a.icon} <b>${a.name}</b></span>`);
+        log(tr('log.achievement', {icon: a.icon, name: a.name}));
         addFloat(player.x, player.y, '🏆 ' + a.name, '#ffcc40', true, -22);
     }
     if (typeof sndLevelUp === 'function') sndLevelUp();
@@ -8327,7 +8789,7 @@ function startStage(chainId, stage){
     player.questFlags = player.questFlags || {};
     player.questFlags[chainId] = player.questFlags[chainId] || {};
     player.questFlags[chainId][stage.id + '_started'] = true;
-    log(`<span class="log-up">📜 Aceitou: ${stage.name}</span>`);
+    log(tr('log.quest_accepted_stage', {name: stage.name}));
     if (typeof showServerToast === 'function') showServerToast('event', `✦ ${stage.name}`, null, 4000);
     saveState();
 }
@@ -8335,7 +8797,7 @@ function completeStage(chainId, stage){
     // N3 fase 3: online → server valida + aplica reward. Cliente só dispara intent.
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id })); } catch {}
-        log(`<span class="log-sys">Entregando: ${stage.name}…</span>`);
+        log(tr('log.delivering', {name: stage.name}));
         return;
     }
 }
@@ -8352,7 +8814,7 @@ function notifyMobKillForChains(type){
         if (cur < stage.count){
             player.questFlags[chainId][key] = cur + 1;
             if (cur + 1 === stage.count){
-                log(`<span class="log-up">✓ Volte ao NPC: ${stage.name}</span>`);
+                log(tr('log.return_to_npc', {name: stage.name}));
             }
         }
     }
@@ -8369,7 +8831,7 @@ function notifyVisitForChains(x, y){
             player.questFlags[chainId] = player.questFlags[chainId] || {};
             if (!player.questFlags[chainId][stage.id + '_visited']){
                 player.questFlags[chainId][stage.id + '_visited'] = true;
-                log(`<span class="log-up">✓ Local visitado: ${stage.name}. Volte ao NPC.</span>`);
+                log(tr('log.place_visited', {name: stage.name}));
             }
         }
     }
@@ -8440,7 +8902,7 @@ function ensureDailyQuests(){
         player.quests.daily.date = today;
         player.quests.daily.list = rollDailyQuests();
         player.quests.daily.progress = {};
-        log('<span class="log-up">🌅 Quests diárias renovadas!</span>');
+        log(tr('log.dailies_renewed'));
         if (typeof showServerToast === 'function') showServerToast('event', '🌅 Novas quests diárias disponíveis!', null, 5000);
     }
 }
@@ -8462,7 +8924,7 @@ function claimDaily(id){
     // N3 fase 3: online → server autoritativo
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'daily', dailyId:id })); } catch {}
-        log(`<span class="log-sys">Recebendo recompensa: ${q.name}…</span>`);
+        log(tr('log.receiving_reward', {name: q.name}));
         return true;
     }
 }
@@ -8478,7 +8940,7 @@ function questIsDone(id){ return player.quests.completed.includes(id); }
 function acceptQuest(id){
     if (questIsActive(id) || questIsDone(id)) return false;
     player.quests.active[id] = { progress: 0 };
-    log(`<span class="log-sys">Quest aceita: <b>${questById(id).name}</b></span>`);
+    log(tr('log.quest_accepted', {name: questById(id).name}));
     return true;
 }
 function turnInQuest(id){
@@ -8487,7 +8949,7 @@ function turnInQuest(id){
     // N3 fase 3: online → server é a autoridade. Cliente só envia intent + espera invUpdate.
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'simple', questId:id })); } catch {}
-        log(`<span class="log-sys">Entregando: ${q.name}…</span>`);
+        log(tr('log.delivering', {name: q.name}));
         return true;
     }
 }
@@ -8502,7 +8964,7 @@ function notifyMobKilledForQuests(type){
         if (st.progress < q.goal.count){
             st.progress++;
             if (st.progress === q.goal.count){
-                log(`<span class="log-up">✓ Quest pronta pra entregar: ${q.name}</span>`);
+                log(tr('log.quest_ready', {name: q.name}));
             }
         }
     }
@@ -8515,7 +8977,7 @@ function notifyMobKilledForQuests(type){
         if (isDailyClaimed(q.id)) continue;
         daily.progress[q.id] = (daily.progress[q.id] || 0) + 1;
         if (daily.progress[q.id] === q.goal.count){
-            log(`<span class="log-up">✓ Diária pronta: ${q.name}</span>`);
+            log(tr('log.daily_ready', {name: q.name}));
         }
     }
 }
@@ -8551,11 +9013,11 @@ function buyFromShop(idx){
     const offer = SHOP_BUY[i];
     if (!offer) return;
     if (player.gold < offer.price){
-        log(`<span class="log-sys">Sem ouro suficiente (${offer.price}g).</span>`);
+        log(tr('log.not_enough_gold_price', {price: offer.price}));
         return;
     }
     if (!ws || ws.readyState !== 1){
-        log('<span class="log-sys">Sem conexão com o servidor.</span>');
+        log(tr('log.no_conn'));
         return;
     }
     ws.send(JSON.stringify({ t:'invShop', op:'buy', idx: i }));
@@ -8655,16 +9117,16 @@ function attemptForge(itemKey){
     const tier = getUpgradeTier(itemKey);
     const targetPlus = tier.plus + 1;
     if (targetPlus > UPGRADE_MAX){
-        log('<span class="log-sys">Já no nível máximo (+' + UPGRADE_MAX + ').</span>');
+        log(tr('log.max_level', {n: UPGRADE_MAX}));
         return;
     }
     const have = player.inv[itemKey] || 0;
     if (have < 3){
-        log('<span class="log-sys">Precisa de 3× ' + ITEMS[itemKey].name + '.</span>');
+        log(tr('log.need_3x', {name: ITEMS[itemKey].name}));
         return;
     }
     if (!ws || ws.readyState !== 1){
-        log('<span class="log-sys">Sem conexão com o servidor — forja não disponível.</span>');
+        log(tr('log.forge_no_conn'));
         return;
     }
     ws.send(JSON.stringify({ t:'invForge', itemKey }));
@@ -8790,7 +9252,7 @@ function sellToShop(itemKey, qtyStr){
     const have = player.inv[itemKey] || 0;
     if (have <= 0) return;
     if (!ws || ws.readyState !== 1){
-        log('<span class="log-sys">Sem conexão com o servidor.</span>');
+        log(tr('log.no_conn'));
         return;
     }
     let qty = 1;
@@ -9035,7 +9497,7 @@ async function pkDeathBy(killerId, killerName){
         const blessed = await tryUseBlessing();
         if (blessed){
             applyBlessingRevive();
-            log(`<span class="log-up">✨ Bênção te salvou de ${escapeHtml(killerName)}!</span>`);
+            log(tr('log.blessing_saved_from', {killer: escapeHtml(killerName)}));
             return;
         }
     if (player.stats) player.stats.pkDeaths = (player.stats.pkDeaths || 0) + 1;
@@ -9054,7 +9516,7 @@ async function pkDeathBy(killerId, killerName){
         // Eu (killer original) tô sendo morto em vingança → perde 60% skills
         applyPvpPenalty(true);
         delete player.vengeance[killerId];
-        log(`<span class="log-die">⚠ Vingado por ${escapeHtml(killerName)}! Perda dobrada de skills.</span>`);
+        log(tr('log.avenged_by', {killer: escapeHtml(killerName)}));
     } else {
         applyPvpPenalty(false);
     }
@@ -9089,14 +9551,14 @@ function pkKilledSomeone(msg){
     if (player.stats) player.stats.pkKills = (player.stats.pkKills || 0) + 1;
     // N3 fase 2: server já creditou gold via invUpdate (pvpGain). Não soma local pra evitar dupla contagem.
     // Mantém só o log.
-    log(`<span class="log-up">⚔ Você matou ${escapeHtml(msg.victimName)}! +${msg.goldGain}g</span>`);
+    log(tr('log.you_killed', {victim: escapeHtml(msg.victimName), g: msg.goldGain}));
     // Se eu havia sido morto por essa pessoa recentemente, é vingança → recupera skills
     const prevKill = player.lastKilledBy;
     if (prevKill && prevKill.id === msg.victimId && (Date.now() - prevKill.time) < PVP_VENGEANCE_MS){
         if (player._lostSkillsSnap){
             restoreSkills(player._lostSkillsSnap);
             player._lostSkillsSnap = null;
-            log(`<span class="log-up">⚔ Vingança! Skills recuperadas.</span>`);
+            log(tr('log.vengeance'));
         }
         player.lastKilledBy = null;
     } else {
@@ -9108,11 +9570,11 @@ function pkKilledSomeone(msg){
     // Aplica PZ lock se 3+ selos
     if (player.selos >= 3){
         player.pzLockUntil = Date.now() + PVP_PZ_LOCK_MS;
-        log(`<span class="log-die">⚠ PZ bloqueada por 5 min (selo ${player.selos})!</span>`);
+        log(tr('log.pz_locked_seal', {n: player.selos}));
     }
     // Drop do Coração se a vítima era Highlander (N3 fase 2: server credita via invUpdate)
     if (msg.dropHighlander){
-        log(`<span class="log-up">💎 Ganhou um Coração do Highlander!</span>`);
+        log(tr('log.got_heart'));
     }
     // Drop de item ao matar um ghost — server credita via invUpdate; só log/sfx aqui
     if (msg.ghost && msg.droppedItem){
@@ -9120,7 +9582,7 @@ function pkKilledSomeone(msg){
         const tier = getUpgradeTier(msg.droppedItem);
         if (tier.plus > 0 && !ITEMS[msg.droppedItem]) ensureUpgradeItem(tier.base, tier.plus);
         if (ITEMS[msg.droppedItem]){
-            log(`<span class="log-up">💀 Saqueou: ${escapeHtml(ITEMS[msg.droppedItem].name)}</span>`);
+            log(tr('log.looted', {item: escapeHtml(ITEMS[msg.droppedItem].name)}));
         }
     }
     checkAchievements();
@@ -9205,19 +9667,19 @@ function quickWhisper(name){
 window.quickWhisper = quickWhisper;
 
 function partyInvite(name){
-    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Party só online.</span>'); return; }
+    if (!ws || ws.readyState !== 1){ log(tr('log.party_online_only')); return; }
     if (!name || name === player.name) return;
     ws.send(JSON.stringify({ t:'chat', text: `/party invite ${name}` }));
 }
 window.partyInvite = partyInvite;
 function partyAccept(){
-    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Sem conexão — convite não pode ser aceito.</span>'); return; }
+    if (!ws || ws.readyState !== 1){ log(tr('log.no_conn_invite')); return; }
     ws.send(JSON.stringify({ t:'chat', text: '/party accept' }));
 }
 window.partyAccept = partyAccept;
 function partyLeave(){
     if (!ws || ws.readyState !== 1){
-        log('<span class="log-sys">Sem conexão com o servidor — não dá pra sair da party agora.</span>');
+        log(tr('log.no_conn_party_leave'));
         return;
     }
     ws.send(JSON.stringify({ t:'chat', text: '/party leave' }));
@@ -10680,7 +11142,7 @@ canvas.addEventListener('click', e => {
         const mm = monsters.find(m => Math.round(m.renderX ?? m.x) === tileX && Math.round(m.renderY ?? m.y) === tileY);
         if (mm){
             player.target = mm.id; player.targetType = 'monster'; player.autoAttack = true; mm.aggro = true;
-            log(`<span class="log-sys">Alvo: ${escapeHtml(mm.name)} [AUTO]</span>`);
+            log(tr('log.target_auto', {name: escapeHtml(mm.name)}));
             renderTargetWidget();
             return;
         }
@@ -10691,12 +11153,12 @@ canvas.addEventListener('click', e => {
     for (const id in remotePlayers){
         const rp = remotePlayers[id];
         if (Math.round(rp.renderX ?? rp.x) === tileX && Math.round(rp.renderY ?? rp.y) === tileY){
-            if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
+            if (!rp.pvp){ log(tr('log.player_no_pvp')); return; }
             if (!player.pvp && !enablePvpWhiteSkull()) return;   // liga teu PvP (gate de ouro) ou aborta
             player.target = parseInt(id, 10);
             player.targetType = 'player';
             player.autoAttack = true;
-            log(`<span class="log-dmg">Alvo PvP: ${escapeHtml(rp.name)} ☠ [AUTO]</span>`);
+            log(tr('log.target_pvp_auto', {name: escapeHtml(rp.name)}));
             renderTargetWidget();
             return;
         }
@@ -10713,7 +11175,7 @@ document.getElementById('targetWidget')?.addEventListener('click', e => {
     if (type === 'player'){
         const rp = remotePlayers[id];
         if (!rp) return;
-        if (!rp.pvp){ log('<span class="log-sys">Este player não está com PvP.</span>'); return; }
+        if (!rp.pvp){ log(tr('log.player_no_pvp')); return; }
     } else if (!monsters.find(m => m.id === id)){
         return;
     }
@@ -10722,7 +11184,7 @@ document.getElementById('targetWidget')?.addEventListener('click', e => {
     player.autoAttack = true;
     if (type === 'monster'){ const mm = monsters.find(m => m.id === id); if (mm) mm.aggro = true; }
     const nm = type === 'player' ? (remotePlayers[id]?.name || 'Player') : (monsters.find(m => m.id === id)?.name || 'inimigo');
-    log(`<span class="${type==='player'?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(nm)}${type==='player'?' ☠':''} [AUTO]</span>`);
+    log(`<span class="${type==='player'?'log-dmg':'log-sys'}">${tr('lbl.target')}: ${escapeHtml(nm)}${type==='player'?' ☠':''} [AUTO]</span>`);
     renderTargetWidget();
 });
 
@@ -10804,7 +11266,7 @@ function showPlayerMenu(rp, screenX, screenY){
             const action = it.dataset.action;
             closePlayerMenu();
             if (action === 'trade'){
-                if (!canTrade){ log(`<span class="log-sys">Trade indisponível (${tradeHint}).</span>`); return; }
+                if (!canTrade){ log(tr('log.trade_unavailable', {hint: tradeHint})); return; }
                 startTradeFlow(rp.name);
             } else if (action === 'msg'){
                 quickWhisper(rp.name);
@@ -10863,7 +11325,7 @@ document.addEventListener('click', e => {
             // N3 fase 3: online → server valida + aplica. Cliente só dispara intent.
             if (ws && ws.readyState === 1 && _wsAuthed){
                 try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id, choiceId: idx })); } catch {}
-                log(`<span class="log-sys">Decidindo: ${stage.choices[idx].label}…</span>`);
+                log(tr('log.deciding', {label: stage.choices[idx].label}));
                 return;
             }
         }
@@ -10959,7 +11421,7 @@ document.addEventListener('keydown', e => {
     if (e.key==='b' || e.key==='B') openChest();
     if (e.key==='c' || e.key==='C') openCraft();
     if (e.key==='r' || e.key==='R'){
-        if (!player.activeSpell) log('<span class="log-sys">Vá ao altar (tecla M) e compre uma magia.</span>');
+        if (!player.activeSpell) log(tr('log.go_altar'));
         else castSpell(player.activeSpell);
     }
     if (e.key==='m' || e.key==='M') openAltar();
@@ -11082,18 +11544,18 @@ function targetNearest(cycle, silent){
         player.autoAttack = true;
         if (!silent){
             if (bestType === 'player')
-                log(`<span class="log-dmg">Alvo PvP: ${best.name} ☠ [AUTO]</span>`);
+                log(tr('log.target_pvp_auto', {name: best.name}));
             else
-                log(`<span class="log-sys">Alvo: ${best.name} [AUTO]</span>`);
+                log(tr('log.target_auto', {name: best.name}));
         }
     } else if (!silent){
-        log('<span class="log-sys">Nenhum alvo visível.</span>');
+        log(tr('log.no_target_visible'));
     }
 }
 function clearTarget(){
     player.target = null;
     player.autoAttack = false;
-    log('<span class="log-sys">Alvo cancelado.</span>');
+    log(tr('log.target_cancelled'));
 }
 
 // Espaço/Tab: anda pela Battle List em ordem (distância). Sem alvo → pega o 1º (mais
@@ -11118,8 +11580,8 @@ function engage(){
     const npc = npcAt(player.x, player.y);
     if (npc){ interactNpc(npc); return; }
     const next = cycleBattleList();
-    if (!next){ log('<span class="log-sys">Nenhum inimigo à vista.</span>'); return; }
-    log(`<span class="${next.isPlayer?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(next.name)}${next.isPlayer?' ☠':''} [AUTO]</span>`);
+    if (!next){ log(tr('log.no_enemy')); return; }
+    log(`<span class="${next.isPlayer?'log-dmg':'log-sys'}">${tr('lbl.target')}: ${escapeHtml(next.name)}${next.isPlayer?' ☠':''} [AUTO]</span>`);
     if (next.type === 'monster' && next.ref && melee(next.ref, player) <= 1 && player.attackTimer <= 0){
         doAttack(next.ref);
     }
@@ -11282,7 +11744,7 @@ function tickSpellCooldowns(dt){
     }
     // Buff temporário (Fúria) — limpa quando expira
     if (player.buff && Date.now() >= player.buff.expiresAt){
-        log(`<span class="log-sys">${player.buff.name} acabou.</span>`);
+        log(tr('log.buff_ended', {name: player.buff.name}));
         player.buff = null;
         if (typeof updateSidebar === 'function') updateSidebar();   // tira o destaque do painel ao expirar
     }
@@ -11299,15 +11761,15 @@ function castSpell(spellKey){
     if (sp.damage && blockedByDisconnect()) return;
     // Cura é permitida na PZ; ataque não
     if (sp.damage && playerInSafeZone()){
-        log('<span class="log-sys">Não pode atacar na PZ.</span>'); return;
+        log(tr('log.no_attack_pz')); return;
     }
     // Magias ofensivas/AoE/taunt quebram mini-PZ do NPC
     if (sp.damage || sp.aoeRange || sp.tauntRange) player.lastAttackAt = Date.now();
     if ((spellCooldowns[spellKey] || 0) > 0){
-        log(`<span class="log-sys">${sp.name} em cooldown.</span>`); return;
+        log(tr('log.spell_cooldown', {name: sp.name})); return;
     }
     if (player.mp < sp.manaCost){
-        log(`<span class="log-sys">Sem mana (${player.mp}/${sp.manaCost}).</span>`); return;
+        log(tr('log.no_mana', {mp: player.mp, cost: sp.manaCost})); return;
     }
     const sk = player.skills['Magia'];
     // WAND obrigatória pra magia de ATAQUE (dano/AoE). Cura/buff/taunt seguem livres.
@@ -11315,7 +11777,7 @@ function castSpell(spellKey){
     const isWand = wEq && wEq.kind === 'wand';
     const wandBase = isWand ? wEq.base : 0;
     if ((sp.damage || sp.aoeRange) && !isWand){
-        log('<span class="log-sys">Precisa de uma wand equipada pra usar magia de ataque.</span>'); return;
+        log(tr('log.need_wand')); return;
     }
 
     // ─── AOE (Exori) ────────────────────────────────────────────
@@ -11368,7 +11830,7 @@ function castSpell(spellKey){
                 color: sp.glow, life: 500, maxLife: 500,
             });
         }
-        log(`<span class="log-dmg">${sp.name}: ${hits} alvo(s) atingido(s)</span>`);
+        log(tr('log.spell_hits', {name: sp.name, hits}));
         return;
     }
 
@@ -11392,7 +11854,7 @@ function castSpell(spellKey){
         // Visual AoE: anel grande do raio de provocação
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: tauntRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
-        log(`<span class="log-sys">${sp.name}: provocou ${count} mob(s)</span>`);
+        log(tr('log.spell_taunt', {name: sp.name, count}));
         gainMagiaXp(spellKey, Math.max(1, count));
         return;
     }
@@ -11413,7 +11875,7 @@ function castSpell(spellKey){
         };
         if (typeof updateSidebar === 'function') updateSidebar();   // painel reflete +spd na hora (Vel. ataque/Velocidade)
         addFloat(player.x, player.y, `★ ${sp.name}`, sp.glow, true, -10);
-        log(`<span class="log-up">${sp.name}: +${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd por ${Math.round(buffDur/1000)}s</span>`);
+        log(tr('log.spell_buff', {name: sp.name, dmg: Math.round(sp.buff.dmg*100), spd: Math.round(sp.buff.spd*100), s: Math.round(buffDur/1000)}));
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
         gainMagiaXp(spellKey, 2);
         return;
@@ -11429,7 +11891,7 @@ function castSpell(spellKey){
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.groupRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
         addFloat(player.x, player.y, `✦ ${sp.name}`, sp.glow, true, -10);
-        log(`<span class="log-xp">${sp.name}: curando players em raio ${sp.groupRange}…</span>`);
+        log(tr('log.spell_healing_group', {name: sp.name, r: sp.groupRange}));
         if (ws && ws.readyState === 1){
             try { ws.send(JSON.stringify({ t:'spellCast', spellKey, hits: 1 })); } catch {}
         }
@@ -11441,14 +11903,14 @@ function castSpell(spellKey){
         const amount = sp.heal + Math.floor(sk.val / 2) + Math.floor(Math.random()*4) - 1;
         const healed = Math.min(Math.max(1, amount), player.maxHp - player.hp);
         if (healed <= 0){
-            log('<span class="log-sys">HP já está cheio.</span>'); return;
+            log(tr('log.hp_full')); return;
         }
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
         sndSpell();
         player.hp += healed;
         addFloat(player.x, player.y, `+${healed}`, sp.glow, true);
-        log(`<span class="log-xp">${sp.name}: +${healed} HP</span>`);
+        log(tr('log.spell_heal', {name: sp.name, n: healed}));
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 500 });
         gainMagiaXp(spellKey, 1);
         return;
@@ -11456,16 +11918,16 @@ function castSpell(spellKey){
 
     // ─── DANO (alvo a distância) ───────────────────────────────
     if (!player.target){
-        log('<span class="log-sys">Sem alvo. Aperte SPACE/TAB primeiro.</span>'); return;
+        log(tr('log.no_target_press')); return;
     }
     const m = monsters.find(x => x.id === player.target);
     if (!m){ player.target = null; return; }
     const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
     if (dist > sp.range){
-        log(`<span class="log-sys">Alvo muito longe (${dist}/${sp.range}).</span>`); return;
+        log(tr('log.target_too_far', {d: dist, max: sp.range})); return;
     }
     if (!hasLineOfSight(player.x, player.y, m.x, m.y)){
-        log(`<span class="log-sys">Sem linha de visão — a magia bateria na parede.</span>`); return;
+        log(tr('log.los_magic')); return;
     }
     player.mp -= sp.manaCost;
     spellCooldowns[spellKey] = sp.cooldown;
@@ -11495,7 +11957,7 @@ function castSpell(spellKey){
         // não causavam dano real online.
         ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false, dots: elementStatusRoll(sp.element) }));
         m.aggro = true;
-        log(`<span class="log-dmg">${crit?'★ ':''}${sp.name}: -${dmg} em ${m.name}</span>`);
+        log(tr('log.dmg_spell', {star: crit?'★ ':'', name: sp.name, dmg, mob: m.name}));
     }
 }
 
@@ -11904,7 +12366,7 @@ window.castSpell = castSpell;
 
 // ─── Altar de magias ─────────────────────────────────────────────────────────
 function openAltar(){
-    if (!atAltar()){ log('<span class="log-sys">Aproxime-se do altar.</span>'); return; }
+    if (!atAltar()){ log(tr('log.near_altar')); return; }
     document.getElementById('altarModal').style.display = 'flex';
     renderAltar();
 }
@@ -11912,14 +12374,14 @@ function closeAltar(){ document.getElementById('altarModal').style.display = 'no
 function switchSpell(key){
     const sp = SPELLS[key]; if (!sp) return;
     if (key === player.activeSpell){
-        log('<span class="log-sys">Já está equipada.</span>'); return;
+        log(tr('log.already_equipped')); return;
     }
     if (player.gold < sp.switchCost){
-        log(`<span class="log-sys">Sem ouro (${player.gold}/${sp.switchCost}).</span>`); return;
+        log(tr('log.no_gold_cost', {have: player.gold, cost: sp.switchCost})); return;
     }
     player.gold -= sp.switchCost;
     player.activeSpell = key;
-    log(`<span class="log-up">★ Aprendeu ${sp.name} (-${sp.switchCost}g)</span>`);
+    log(tr('log.learned_spell', {name: sp.name, cost: sp.switchCost}));
     renderAltar();
     saveState();
 }
@@ -12003,7 +12465,7 @@ function getTrainableSkills(){
 }
 
 function openTraining(){
-    if (!atDummy()){ log('<span class="log-sys">Aproxime-se do boneco de treino.</span>'); return; }
+    if (!atDummy()){ log(tr('log.near_dummy')); return; }
     document.getElementById('trainingModal').style.display = 'flex';
     const skills = getTrainableSkills();
     if (!skills.includes(trainingSelectedSkill)) trainingSelectedSkill = skills[0];
@@ -12045,19 +12507,19 @@ function startTraining(count, opts){
     const loc = opts.location || 'dummy';
     const skill = opts.skill || trainingSelectedSkill;
     const atOk = loc === 'altar' ? atAltar() : atDummy();
-    if (!atOk){ log(`<span class="log-sys">Saiu do ${loc==='altar'?'altar':'boneco'}.</span>`); return; }
-    if (!skill || !player.skills[skill]){ log('<span class="log-sys">Selecione uma skill.</span>'); return; }
+    if (!atOk){ log(tr('log.left_station', {place: loc==='altar'?tr('lbl.altar'):tr('lbl.dummy')})); return; }
+    if (!skill || !player.skills[skill]){ log(tr('log.select_skill')); return; }
     const cost = trainingCostPerSession(skill);
     const maxAfford = Math.floor(player.gold / cost);
     const actual = Math.min(count, maxAfford);
-    if (actual < 1){ log('<span class="log-sys">Sem ouro suficiente.</span>'); return; }
+    if (actual < 1){ log(tr('log.not_enough_gold')); return; }
     training = {
         remaining: actual, total: actual, skill, cost, location: loc,
         lastTick: performance.now(),
     };
     closeTraining();
     closeAltar();
-    log(`<span class="log-sys">Treinando ${skill}: ${actual} sessões (${actual*cost}g total)</span>`);
+    log(tr('log.training', {skill, n: actual, g: actual*cost}));
 }
 function startMagicTraining(count){
     startTraining(count, { location:'altar', skill:'Magia' });
@@ -12090,11 +12552,11 @@ function pvpMults(){
 
 function togglePvP(){
     if (!player.pvp && player.gold < PVP_MIN_GOLD){
-        log(`<span class="log-sys">PvP exige ${PVP_MIN_GOLD}g (você tem ${player.gold}g).</span>`);
+        log(tr('log.pvp_requires', {req: PVP_MIN_GOLD, have: player.gold}));
         return;
     }
     player.pvp = !player.pvp;
-    log(`<span class="log-${player.pvp?'dmg':'sys'}">PvP: ${player.pvp?'⚔ LIGADO':'desligado'}</span>`);
+    log(`<span class="log-${player.pvp?'dmg':'sys'}">PvP: ${player.pvp?tr('lbl.on'):tr('lbl.off')}</span>`);
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pvp', pvp:player.pvp, selos:player.selos, highlander:player.highlander}));
 }
 
@@ -12104,11 +12566,11 @@ function togglePvP(){
 function enablePvpWhiteSkull(){
     if (player.pvp) return true;
     if (player.gold < PVP_MIN_GOLD){
-        log(`<span class="log-sys">PvP exige ${PVP_MIN_GOLD}g pra atacar um player (você tem ${player.gold}g).</span>`);
+        log(tr('log.pvp_requires_attack', {req: PVP_MIN_GOLD, have: player.gold}));
         return false;
     }
     player.pvp = true;
-    log('<span class="log-dmg">⚔ PvP LIGADO automaticamente (você atacou um player).</span>');
+    log(tr('log.pvp_auto_on'));
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pvp', pvp:true, selos:player.selos, highlander:player.highlander}));
     return true;
 }
@@ -12117,7 +12579,7 @@ function enablePvpWhiteSkull(){
 function checkPzLock(){
     if (Date.now() < player.pzLockUntil && playerInSafeZone()){
         // Empurra pra fora da PZ — escolhe direção sul (longe do spawn)
-        log(`<span class="log-dmg">⚠ PZ bloqueada por PK! ${Math.ceil((player.pzLockUntil-Date.now())/1000)}s</span>`);
+        log(tr('log.pz_locked_pk', {s: Math.ceil((player.pzLockUntil-Date.now())/1000)}));
         // teleporta pra borda da PZ + 1
         const dy = SAFE_RADIUS + 2;
         player.y = SAFE_CY + dy;
@@ -12129,7 +12591,7 @@ function checkPzLock(){
     if (inSafe && !player._lastInSafe && (player.target || player.autoAttack)){
         player.target = null;
         player.autoAttack = false;
-        log('<span class="log-sys">Entrou na PZ — alvo cancelado.</span>');
+        log(tr('log.entered_pz'));
     }
     player._lastInSafe = inSafe;
 }
@@ -12143,7 +12605,7 @@ function gainSelo(victimHadSelos){
     }
     player.selos++;
     const m = pvpMults();
-    log(`<span class="log-up">★ Selo ${player.selos}/5 conquistado!</span>`);
+    log(tr('log.seal_earned', {n: player.selos}));
     // tenta ascender ao Highlander se chegou no 5 e vítima tinha selo
     if (player.selos === 5) tryAscendHighlander(victimHadSelos);
     // notifica servidor
@@ -12157,8 +12619,8 @@ function tryAscendHighlander(victimHadSelos){
     if (!player.flags) player.flags = {};
     player.flags.everHighlander = true;
     hlHuntActive = false; hlHuntTimer = 0;
-    log(`<span class="log-up">👑 VOCÊ ASCENDEU AO HIGHLANDER!</span>`);
-    log(`<span class="log-die">☠ Caçadores serão enviados em 3 minutos...</span>`);
+    log(tr('log.became_highlander'));
+    log(tr('log.hunters_incoming'));
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvp', pvp:player.pvp, selos:player.selos, highlander:true}));
         ws.send(JSON.stringify({t:'announce', text:`⚔ ${player.name} ascendeu ao Highlander!`}));
@@ -12182,7 +12644,7 @@ function applyPvpPenalty(double){
     }
     recomputeStats();
     buildSkillList();
-    if (lost.length) log(`<span class="log-die">PvP: perdeu ${lost.join(', ')}</span>`);
+    if (lost.length) log(tr('log.pvp_lost_skills', {list: lost.join(', ')}));
     return lost;
 }
 function snapshotSkills(){
@@ -12203,7 +12665,7 @@ window.togglePvP = togglePvP;
 function pvpAttackPlayer(targetId){
     const tgt = remotePlayers[targetId];
     if (!tgt){ return; }
-    if (!tgt.pvp){ log('<span class="log-sys">Este player não está com PvP ligado.</span>'); return; }
+    if (!tgt.pvp){ log(tr('log.player_no_pvp_on')); return; }
     // 🏴 White-skull: atacar (direto) um player com PvP ligado liga o TEU PvP automaticamente.
     // (Normalmente o PvP já foi ligado no clique/mira; aqui cobre o resto dos caminhos diretos.)
     if (!player.pvp && !enablePvpWhiteSkull()) return;
@@ -12212,14 +12674,14 @@ function pvpAttackPlayer(targetId){
     // bloqueava o ataque indevidamente ("Não pode PvP na PZ" mesmo lutando). Gate por floor
     // (espelha playerInSafeZone, que já é floor-gated). Os 2 lutadores estão sempre no mesmo floor.
     if ((player.floor || 0) === 0 && (inSafeZone(player.x, player.y) || inSafeZone(tgt.x, tgt.y))){
-        log('<span class="log-sys">Não pode PvP na PZ.</span>'); return;
+        log(tr('log.no_pvp_pz')); return;
     }
     if (player.attackTimer > 0) return;
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
     const range = wItem ? (wItem.ranged || wItem.meleeRange || 1) : 1;
     const dist = Math.max(Math.abs(tgt.x - player.x), Math.abs(tgt.y - player.y));
-    if (dist > range){ log(`<span class="log-sys">Muito longe (${dist}/${range}).</span>`); return; }
+    if (dist > range){ log(tr('log.too_far', {d: dist, max: range})); return; }
     // dano: usa fórmula melee normal + multiplicadores
     const w  = activeWeapon();
     const sk = player.skills[w.skill];
@@ -12244,7 +12706,7 @@ function pvpAttackPlayer(targetId){
     if (ws && ws.readyState === 1){
         ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
     }
-    log(`<span class="log-dmg">${crit?'★ ':''}PvP: -${dmg} em ${escapeHtml(tgt.name)}</span>`);
+    log(tr('log.pvp_dmg', {star: crit?'★ ':'', dmg, name: escapeHtml(tgt.name)}));
     gainSkillXpLocal(w.skill, 1);
     player.attackTimer = effectiveAttackDelay();
 }
@@ -12253,7 +12715,7 @@ window.pvpAttackPlayer = pvpAttackPlayer;
 function stopTraining(reason){
     if (training){
         const done = training.total - training.remaining;
-        log(`<span class="log-sys">Treino terminou (${reason}): ${done}/${training.total} sessões.</span>`);
+        log(tr('log.training_done', {reason, done, total: training.total}));
     }
     training = null;
 }
@@ -12417,7 +12879,7 @@ function eatBestFood(){
     // N3: server valida cada consumo. Cliente identifica candidato e envia invConsume.
     // Server desconta + envia invUpdate.consume; cliente aplica efeito ao receber confirmação.
     if (!ws || ws.readyState !== 1){
-        log('<span class="log-sys">Sem conexão com o servidor.</span>');
+        log(tr('log.no_conn'));
         return;
     }
     const needHp = player.maxHp - player.hp;
@@ -12443,8 +12905,8 @@ function eatBestFood(){
         }
     }
     if (!sent){
-        if (needHp <= 0 && needMp <= 0) log('<span class="log-sys">HP e MP já estão cheios.</span>');
-        else log('<span class="log-sys">Sem comida/poção disponível.</span>');
+        if (needHp <= 0 && needMp <= 0) log(tr('log.hp_mp_full'));
+        else log(tr('log.no_food_potion'));
     }
 }
 
@@ -12459,7 +12921,7 @@ function toggleRecording(){
 }
 function startRecording(){
     if (typeof MediaRecorder === 'undefined' || !canvas.captureStream){
-        log('<span class="log-sys">Gravação não suportada neste cliente.</span>'); return;
+        log(tr('log.rec_unsupported')); return;
     }
     try {
         let tracks = canvas.captureStream(30).getVideoTracks();
@@ -12482,9 +12944,9 @@ function startRecording(){
         if (btn) btn.classList.add('recording');
         if (_recTimer) clearInterval(_recTimer);
         _recTimer = setInterval(updateRecLabel, 500); updateRecLabel();
-        log('<span class="log-sys">🔴 Gravando o gameplay — clique em REC de novo pra parar e baixar o clipe.</span>');
+        log(tr('log.rec_started'));
     } catch (e){
-        log('<span class="log-sys">Falha ao gravar: ' + (e && e.message || e) + '</span>');
+        log(tr('log.rec_failed', {err: (e && e.message || e)}));
     }
 }
 function updateRecLabel(){
@@ -12504,13 +12966,13 @@ function finishRecording(){
     _recAudioDest = null;
     const blob = new Blob(_recChunks, { type: 'video/webm' });
     _recChunks = [];
-    if (!blob.size){ log('<span class="log-sys">Clipe vazio — nada foi gravado.</span>'); return; }
+    if (!blob.size){ log(tr('log.clip_empty')); return; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'valadares_clip_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.webm';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    log('<span class="log-sys">✅ Clipe salvo (' + (blob.size/1048576).toFixed(1) + ' MB) — está nos Downloads. Posta direto ou me manda que eu deixo vertical.</span>');
+    log(tr('log.clip_saved', {mb: (blob.size/1048576).toFixed(1)}));
 }
 window.toggleRecording = toggleRecording;
 
@@ -12920,11 +13382,11 @@ function openSettings(){
 // ─── TRADE direto player↔player ───────────────────────────────────────────
 let _trade = null;   // { id, otherName, myOffer:{items:{},gold:0}, otherOffer:{}, confirmedMe, confirmedOther }
 function startTradeFlow(targetName){
-    if (!ws || ws.readyState !== 1){ log('<span class="log-sys">Trade só disponível online.</span>'); return; }
-    if (_trade){ log('<span class="log-sys">Já tem trade em andamento.</span>'); return; }
-    if (targetName === player.name){ log('<span class="log-sys">Não dá pra trocar consigo mesmo.</span>'); return; }
+    if (!ws || ws.readyState !== 1){ log(tr('log.trade_online_only')); return; }
+    if (_trade){ log(tr('log.trade_in_progress')); return; }
+    if (targetName === player.name){ log(tr('log.trade_self')); return; }
     ws.send(JSON.stringify({ t:'tradeRequest', toName: targetName }));
-    log(`<span class="log-sys">Convite de trade enviado para ${escapeHtml(targetName)}.</span>`);
+    log(tr('log.trade_invite_sent', {name: escapeHtml(targetName)}));
 }
 window.startTradeFlow = startTradeFlow;
 
@@ -12949,7 +13411,7 @@ function showTradeInvite(fromName, fromId){
         if (secondsLeft <= 0){
             // auto-rejeita
             ws.send(JSON.stringify({ t:'tradeReject', fromId }));
-            log(`<span class="log-sys">Convite de ${escapeHtml(fromName)} expirou.</span>`);
+            log(tr('log.invite_expired', {name: escapeHtml(fromName)}));
             closeTradeInvite();
         }
     }, 1000);
@@ -12960,7 +13422,7 @@ function showTradeInvite(fromName, fromId){
     };
     document.getElementById('tradeInviteReject').onclick = () => {
         ws.send(JSON.stringify({ t:'tradeReject', fromId }));
-        log(`<span class="log-sys">Você recusou o convite de ${escapeHtml(fromName)}.</span>`);
+        log(tr('log.invite_declined', {name: escapeHtml(fromName)}));
         closeTradeInvite();
     };
 }
@@ -13088,18 +13550,18 @@ function saveFriends(list){
 function addFriend(name){
     name = String(name || '').trim().substring(0, 14);
     if (!name) return false;
-    if (name === player.name){ log('<span class="log-sys">Não pode adicionar você mesmo.</span>'); return false; }
+    if (name === player.name){ log(tr('log.cant_add_self')); return false; }
     const list = loadFriends();
-    if (list.includes(name)){ log(`<span class="log-sys">${escapeHtml(name)} já é amigo.</span>`); return false; }
+    if (list.includes(name)){ log(tr('log.already_friend', {name: escapeHtml(name)})); return false; }
     list.push(name);
     saveFriends(list);
-    log(`<span class="log-up">👥 ${escapeHtml(name)} adicionado.</span>`);
+    log(tr('log.friend_added', {name: escapeHtml(name)}));
     return true;
 }
 function removeFriend(name){
     const list = loadFriends().filter(n => n !== name);
     saveFriends(list);
-    log(`<span class="log-sys">${escapeHtml(name)} removido.</span>`);
+    log(tr('log.friend_removed', {name: escapeHtml(name)}));
 }
 function addFriendFromInput(){
     const inp = document.getElementById('friendNameInput');
@@ -13287,20 +13749,20 @@ function buyTalent(id){
     const def = TALENT_DEFS_CLIENT[id];
     if (!def) return;
     const rank = Math.max(0, Math.floor(Number(player.talents && player.talents[id]) || 0));
-    if (rank >= (def.max || 1)){ log('<span class="log-sys">Talento já está no rank máximo.</span>'); return; }
-    if (talentPointsAvailable() < 1){ log('<span class="log-sys">Sem pontos disponíveis.</span>'); return; }
+    if (rank >= (def.max || 1)){ log(tr('log.talent_max')); return; }
+    if (talentPointsAvailable() < 1){ log(tr('log.no_points')); return; }
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'talentAlloc', talentId:id })); } catch {}
-        log(`<span class="log-sys">${rank>0?'Subindo':'Adquirindo'} ${def.name}…</span>`);
+        log(tr('log.talent_buying', {verb: rank>0?tr('lbl.upgrading'):tr('lbl.acquiring'), name: def.name}));
     }
 }
 function respecTalents(){
     if (talentPointsUsed() < 1) return;
-    if ((player.gold || 0) < 5000){ log('<span class="log-sys">Respec custa 5000g — você não tem.</span>'); return; }
+    if ((player.gold || 0) < 5000){ log(tr('log.respec_cost')); return; }
     if (!confirm('Redistribuir TODOS os talentos? Devolve os pontos e custa 5000g.')) return;
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'talentRespec' })); } catch {}
-        log('<span class="log-sys">Redistribuindo talentos…</span>');
+        log(tr('log.respec_doing'));
     }
 }
 window.openTalents = openTalents;
@@ -13727,7 +14189,7 @@ async function uiToggleFullscreen(){
     }
     // Fallback browser fullscreen
     if (!document.fullscreenElement){
-        document.documentElement.requestFullscreen?.().catch(e => log('<span class="log-sys">Fullscreen bloqueado pelo navegador.</span>'));
+        document.documentElement.requestFullscreen?.().catch(e => log(tr('log.fullscreen_blocked')));
     } else {
         document.exitFullscreen?.();
     }
@@ -14011,11 +14473,11 @@ function logout(){
     // Bloqueia logout se tem selos OU é Highlander OU foi atacado recentemente
     if (player.selos > 0 || player.highlander){
         const s = player.selos > 0 ? `${player.selos} selo(s)` : 'Highlander';
-        log(`<span class="log-dmg">⚠ Não pode sair com ${s} ativos. Morra ou aguarde.</span>`);
+        log(tr('log.cant_logout_active', {s}));
         return;
     }
     if (player.hurtTimer > 0){
-        log('<span class="log-dmg">⚠ Em combate — não pode sair agora.</span>');
+        log(tr('log.cant_logout_combat'));
         return;
     }
     saveState();
@@ -14184,11 +14646,11 @@ function startGame(multiplayer, name){
     // Se o server demorar, avisa — NAO gera mundo local (a reconexao cuida)
     setTimeout(() => {
         if (!serverAuthMobs && monsters.length === 0){
-            log('<span class="log-sys">Servidor demorando a responder — tentando reconectar…</span>');
+            log(tr('log.server_slow'));
         }
     }, 8000);
-    log('<span class="log-sys">Bem-vindo a Valadares, '+player.name+'!</span>');
-    if (restored) log('<span class="log-sys">Progresso restaurado.</span>');
+    log(tr('log.welcome', {name: player.name}));
+    if (restored) log(tr('log.progress_restored'));
     log('Use WASD para mover, ESPAÇO para atacar.');
     started = true;
     // Tutorial só na primeira vez por usuário (flag em localStorage).
@@ -14304,7 +14766,7 @@ async function checkClientUpdate(){
         if (!isSafeToReload() && !deferredTooLong){
             if (!_updateDeferNotified){
                 _updateDeferNotified = true;
-                log('<span class="log-sys">🔄 Nova versão pronta — recarrega assim que você sair da masmorra/combate.</span>');
+                log(tr('log.new_version'));
             }
             return;
         }
@@ -14416,7 +14878,7 @@ function loadState(){
             if (bkp && !isEmptyDefaultSave(bkp)){
                 d = bkp;
                 try { localStorage.setItem(saveKey(), JSON.stringify(bkp)); } catch {}
-                setTimeout(() => log('<span class="log-up">✦ Save restaurado do backup automático.</span>'), 100);
+                setTimeout(() => log(tr('log.save_restored')), 100);
             }
         }
         if (!d) return false;
@@ -14531,7 +14993,7 @@ function wipeSave(){
     if (!player.name) return;
     localStorage.removeItem(saveKey());
     localStorage.removeItem(backupKey());
-    log('<span class="log-sys">Save deletado.</span>');
+    log(tr('log.save_deleted'));
 }
 window.wipeSave = wipeSave;
 
@@ -14541,17 +15003,17 @@ function restoreFromBackup(){
     if (!player.name) return false;
     const bkp = readSaveRaw(backupKey());
     if (!bkp){
-        log('<span class="log-sys">Sem backup disponível.</span>');
+        log(tr('log.no_backup'));
         return false;
     }
     if (isEmptyDefaultSave(bkp)){
-        log('<span class="log-sys">Backup também está vazio.</span>');
+        log(tr('log.backup_empty'));
         return false;
     }
     // Move backup → main; recarrega
     try {
         localStorage.setItem(saveKey(), JSON.stringify(bkp));
-        log('<span class="log-up">✦ Backup restaurado. Recarregando…</span>');
+        log(tr('log.backup_restored'));
         setTimeout(() => window.location.reload(), 800);
         return true;
     } catch { return false; }
@@ -15320,16 +15782,16 @@ function loop(ts){
     const MP_KEYS_ORDER   = ['POTION_MP'];
     const FOOD_KEYS_ORDER = ['HAM', 'MEAT', 'CARNE_LAGARTO', 'EGG', 'CHEESE'];
     bindBtn('mhbSlotHp', () => {
-        if (!useBestKey(HP_KEYS_ORDER)) log('<span class="log-sys">Sem poção/comida pra HP.</span>');
+        if (!useBestKey(HP_KEYS_ORDER)) log(tr('log.no_hp_item'));
     });
     bindBtn('mhbSlotMp', () => {
-        if (!useBestKey(MP_KEYS_ORDER)) log('<span class="log-sys">Sem poção de mana.</span>');
+        if (!useBestKey(MP_KEYS_ORDER)) log(tr('log.no_mana_item'));
     });
     bindBtn('mhbSlotFood', () => {
-        if (!useBestKey(FOOD_KEYS_ORDER)) log('<span class="log-sys">Sem comida no inventário.</span>');
+        if (!useBestKey(FOOD_KEYS_ORDER)) log(tr('log.no_food'));
     });
     bindBtn('mhbSlotMagic', () => {
-        if (!player.activeSpell) log('<span class="log-sys">Vá ao altar (tecla M) e compre uma magia.</span>');
+        if (!player.activeSpell) log(tr('log.go_altar'));
         else castSpell(player.activeSpell);
     });
     bindBtn('mhbSlotSpear', () => throwSpear());

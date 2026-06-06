@@ -137,3 +137,37 @@ Até lá: **PT-BR é o padrão e está certo.** Este doc é só o roteiro guarda
   · mensagens do server (locale no server) · páginas avulsas (index/terms/privacy). Padrão pronto:
   marcar `data-i18n*` + chave no dict pt/en.
 - **Deploy (quando o dono aprovar):** `git push origin main` — **cliente-only, SEM /manutenção**.
+
+---
+
+## 9. Fase 2 — FEITA (06/06)
+
+**Mensagens dinâmicas traduzidas: `log()` + floats (cliente) + `serverMsg` (server).**
+
+### Cliente (`play.html`) — ✅ pronto, deploy SEM /manutenção
+- **~230 chaves** `log.*` / `float.*` / `lbl.*` no dict `pt`/`en` (paridade 227/227, **0 vazamentos**).
+- **247 `log()`** player-facing → `tr('log.x', {params})`. Sobraram 25 intencionais: 3 já
+  traduzidos via `tr('lbl.*')` (classe CSS dinâmica), 7 sem PT (interpolação/`serverMsg` relay),
+  **15 admin** (`[admin]`, "Só admin", "Digite o nome da conta") deixados em PT (operador).
+- **10 floats** de texto (Esquivou!/SEM FLECHAS/VENENO/…); numéricos não traduzem.
+- `join` agora manda `lang: LANG` pro server (Opção B).
+
+### Server (`server/server.js`) — ✅ pronto, deploy **EXIGE /manutenção**
+- **Opção B**: `p.lang` capturado no join (fallback PT = zero regressão p/ cliente legado).
+  `I18N_SRV {pt,en}` + `trp(p,key,params)` + `broadcastMsgKey()` (traduz por destinatário).
+- **97 chaves** `srv.*` (paridade 97/97, 0 vazamentos). ~95 `serverMsg` player-facing → `trp(...)`.
+- Deixados PT de propósito: bloco **admin** (`/say`,`/deluser`,`/setskills`… ~36), maintenance,
+  e **`5656`** ("entrou em outro lugar") — o cliente detecta sessão-duplicada por `text.includes`,
+  traduzir quebraria o anti-loop.
+
+### Verificação
+- Cliente: preview console limpo, flip PT/EN OK, render de amostras OK, paridade+leak OK.
+- Server: `node --check` OK, **boota limpo** (585 mobs), paridade+leak OK.
+
+### Ordem de deploy (importante)
+1. **Cliente primeiro** (Vercel, sem /manutenção): novo cliente manda `lang`; server velho ignora → PT, sem regressão.
+2. **Server depois** (Railway, watch paths) sob **/manutenção** + 0 players: aí o EN do server passa a fluir.
+
+### Fase 2.5 (pendente — NÃO feito): toasts client-side `showServerToast('event','PT…')` +
+dicts de erro inline (dye/auction/pet/arena-cancel/dungeon) + auth `msgs` + questResult `reasons`.
+São banners/labels separados do log; ficam PT até a 2.5. **Fase 3** segue = conteúdo (itens/magias/mobs ~330).
