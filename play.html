@@ -4809,6 +4809,60 @@ const ITEMS = {
     CAJADO_RUNICO:    { name:'Cajado Rúnico ★',      color:'#c060ff', kind:'wand', hand:'2h', skill:'Magia', base:20, def:4, ranged:6, element:'energy' },
     CAJADO_ETERNO:    { name:'Cajado Eterno ★★',     color:'#ffd0ff', kind:'wand', hand:'2h', skill:'Magia', base:30, def:6, ranged:6, element:'fire' },
 };
+// i18n Fase 3 — nomes/descrições de item em EN (chave = id). itemName()/itemDescEn() preferem EN.
+const ITEM_EN = {
+    CHEESE:{name:'Cheese'}, EGG:{name:'Snake Egg'}, MEAT:{name:'Wolf Meat'}, HAM:{name:'Ham'},
+    POTION:{name:'Health Potion'}, POTION_MP:{name:'Mana Potion'},
+    BENCAO_FENIX:{name:'Phoenix Blessing', desc:'Saves you from your next death. Consumed automatically.'},
+    BENCAO_FENIX_TEMP:{name:'Phoenix Blessing (24h)', desc:'Saves you from your next death. Expires in 24h if unused.'},
+    COROA_TEMPORADA:{name:'Season Crown', desc:'Granted to the #1 on the monthly leaderboard. Tooltip shows which seasons you won.'},
+    CAPA_REAL:{name:'Royal Cape', desc:'Golden cape behind your character.'},
+    CAPA_SOMBRA:{name:'Shadow Cape', desc:'Black cape. Dark look.'},
+    AURA_FOGO:{name:'Fire Aura', desc:'Pulsing orange ring around you.'},
+    AURA_GELO:{name:'Ice Aura', desc:'Pulsing blue ring around you.'},
+    NOME_DOURADO:{name:'Golden Name', desc:'Your character name in gold.'},
+    TRAIL_OURO:{name:'Golden Trail', desc:'Leaves a golden trail where you walk.'},
+    TRAIL_GELO:{name:'Glacial Trail', desc:'Leaves a shimmering blue trail.'},
+    PART_FOGO:{name:'Fire Sparks', desc:'Sheds orange sparks when attacking.'},
+    PART_TROVAO:{name:'Thunder Sparks', desc:'Sheds electric sparks when attacking.'},
+    AURA_VIDENTE:{name:"Seer's Aura", desc:'Pulsing cyan-blue aura. Reward from Madame Twilight.'},
+    CAPA_CETICO:{name:"Skeptic's Cape", desc:'Cream-white cape. Reward from Madame Twilight.'},
+    COROA_SOMBRIA:{name:'Dark Crown', desc:'Sinister purple aura. Mark of those who pact with the Ambassador.'},
+    MANTO_JUSTO:{name:'Mantle of the Just', desc:'White cape with a golden glow. Mark of those who exposed the betrayal.'},
+    GOLD:{name:'Gold'}, SILK:{name:'Silk'},
+    ADAGA:{name:'Dagger'}, ESPADA:{name:'Sword'}, PORRETE:{name:'Cudgel'}, CLAVA:{name:'Club'}, MACA:{name:'Mace'},
+    MACHADO:{name:'Axe 2H'}, ESPADA_LONGA:{name:'Longsword'}, MARTELO:{name:'Hammer 2H'}, MARRETA:{name:'Sledgehammer 2H'}, MACA_GIGANTE:{name:'Giant Mace'},
+    ARCO:{name:'Bow'}, ARCO_CACA:{name:'Hunting Bow'}, BESTA:{name:'Crossbow'},
+    LANCA:{name:'Spear'}, LANCA_LONGA:{name:'Long Spear'},
+    ESCUDO_MAD:{name:'Wooden Shield'}, ESCUDO_FERRO:{name:'Iron Shield'},
+    COURO:{name:'Leather Tunic'}, ARMADURA:{name:'Armor'}, ELMO:{name:'Helmet'}, BOTAS:{name:'Boots'},
+    ASA_MORCEGO:{name:'Bat Wing'}, OSSO:{name:'Bone'}, CHIFRE:{name:'Horn'},
+    ESPADA_OSSO:{name:'Bone Sword'}, MACHADO_MINO:{name:'Minotaur Axe'},
+    ARMADURA_OSSO:{name:'Bone Armor'}, ELMO_CHIFRES:{name:'Horned Helmet'}, ESCUDO_OSSO:{name:'Bone Shield'},
+    BOTAS_COURO:{name:'Leather Boots'}, BOTAS_VENTO:{name:'Wind Boots'}, BOTAS_RAPIDA:{name:'Swift Boots'},
+    ESCAMA:{name:'Drake Scale'}, GARRA:{name:'Lizard Claw'}, CARNE_LAGARTO:{name:'Lizard Meat'}, PEDRA_GOLEM:{name:'Golem Stone'},
+    SABRE:{name:'Saber'}, ADAGA_DUPLA:{name:'Twin Daggers'}, BORDAO:{name:'Stone Staff'},
+    ESPADA_ACO:{name:'Steel Sword'}, LAMINA_DRACO_1H:{name:'Draconic Blade'}, ESPADA_GUARDIAO:{name:"Guardian's Sword ★"},
+    ESPADA_DRACO:{name:'Draconic Sword'}, MARTELO_GOLEM:{name:'Golem Hammer'},
+    ESPADA_HL:{name:"Highlander's Sword ★"}, ARMADURA_TRONO:{name:'Throne Armor ★'}, COROA_VENDEDOR:{name:"Soul Seller's Crown ★"},
+    ESPADA_ETERNA:{name:'Eternal Sword ★★'}, COROA_VALADARES:{name:'Crown of Valadares ★★'}, ESSENCIA:{name:'Essence of Valadares'},
+    ARMADURA_ESCAMA:{name:'Scale Armor'}, ESCUDO_PEDRA:{name:'Stone Shield'}, ESCUDO_GUARDIAO:{name:"Guardian's Shield ★"}, ELMO_DRACO:{name:'Draconic Helmet'},
+    CORACAO_HL:{name:"Highlander's Heart"}, FLECHA:{name:'Arrow'}, FLECHA_PERF:{name:'Piercing Arrow'},
+    VARINHA_APRENDIZ:{name:'Apprentice Wand'}, CAJADO_FOGO:{name:'Fire Staff'}, CAJADO_GELO:{name:'Ice Staff'}, CAJADO_RAIO:{name:'Lightning Staff'},
+    CAJADO_RUNICO:{name:'Runic Staff ★'}, CAJADO_ETERNO:{name:'Eternal Staff ★★'},
+};
+function itmName(key){
+    if (!key) return key;
+    const en = LANG === 'en';
+    if (ITEMS[key]) return (en && ITEM_EN[key] && ITEM_EN[key].name) || ITEMS[key].name || key;
+    if (key.includes('_PLUS_')){
+        const [base, plus] = key.split('_PLUS_');
+        const bn = (en && ITEM_EN[base] && ITEM_EN[base].name) || (ITEMS[base] && ITEMS[base].name) || base;
+        return bn + ' +' + plus;
+    }
+    return key;
+}
+function itemDescEn(key){ return (LANG === 'en' && ITEM_EN[key] && ITEM_EN[key].desc) || (ITEMS[key] && ITEMS[key].desc) || ''; }
 // Cores por elemento (tiro/projétil/sprite). Afinidade e fraqueza usam estas chaves na Fase 2.
 const ELEMENT_COL = { fire:'#ff7030', ice:'#50b0ff', energy:'#b080ff' };
 // Mana do tiro básico da wand (Fase 2b — descontada server-side no attackMob).
@@ -5631,7 +5685,7 @@ function itemStatsCompact(def){
 function itemDisplayMeta(key){
     const tier = getUpgradeTier(key);
     const baseDef = ITEMS[tier.base] || ITEMS[key] || {};
-    const nm = baseDef.name || key;
+    const nm = (LANG === 'en' && ITEM_EN[tier.base] && ITEM_EN[tier.base].name) || baseDef.name || key;
     const starN = (nm.match(/★/g) || []).length;
     return {
         name: nm.replace(/\s*★+\s*$/, '').trim(),
@@ -5708,7 +5762,7 @@ function equip(itemKey){
         const w = ITEMS[player.equipped.weapon];
         if (w.hand === '2h'){
             returnToInv(player.equipped.weapon);
-            log(tr('log.weapon_stowed', {name: w.name}));
+            log(tr('log.weapon_stowed', {name: itmName(player.equipped.weapon)}));
             player.equipped.weapon = null;
             player.weapon = null;
         }
@@ -5719,7 +5773,7 @@ function equip(itemKey){
     if (player.inv[itemKey] <= 0) delete player.inv[itemKey];
     player.equipped[slot] = itemKey;
     if (slot === 'weapon') player.weapon = itemKey;
-    log(tr('log.equipped', {name: def.name}));
+    log(tr('log.equipped', {name: itmName(itemKey)}));
     // Aviso ao equipar arco sem munição
     if (def.ranged && !findArrow()){
         log(tr('log.no_arrows_equip'));
@@ -5738,7 +5792,7 @@ function unequip(slot){
     returnToInv(k);
     player.equipped[slot] = null;
     if (slot === 'weapon') player.weapon = null;
-    log(tr('log.unequipped', {name: ITEMS[k].name}));
+    log(tr('log.unequipped', {name: itmName(k)}));
     buildSkillList();
     if (ws && ws.readyState === 1){
         try { ws.send(JSON.stringify({ t:'invUnequip', slot })); } catch {}
@@ -5935,7 +5989,7 @@ function renderShop(){
     buyEl.innerHTML = SHOP_BUY.map((o, i) => {
         const def = ITEMS[o.item];
         const canBuy = player.gold >= o.price;
-        const label = o.label || def.name;
+        const label = o.label || itmName(o.item);
         return `<div class="shop-row">
             <div class="shop-info">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(o.item, 18)})"></span>
@@ -5958,7 +6012,7 @@ function renderShop(){
             return `<div class="shop-row">
                 <div class="shop-info">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
-                    <span class="shop-name">${def.name}</span>
+                    <span class="shop-name">${itmName(k)}</span>
                 </div>
                 <span class="shop-qty">${q}× · ${unit}g</span>
                 <div class="shop-sell-btns">
@@ -6383,7 +6437,7 @@ function throwSpear(){
         const crit = Math.random() < playerCritChance();
         if (crit) dmg *= critMultPlayer();
         addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#cce0a0', crit, crit ? -10 : 0);
-        log(tr('log.dmg_spear', {star: crit?'★ ':'', weapon: wItem.name, dmg, mob: m.name}));
+        log(tr('log.dmg_spear', {star: crit?'★ ':'', weapon: itmName(wKey), dmg, mob: m.name}));
         gainSkillXpLocal('Distância', 1);
         if (serverAuthMobs && ws && ws.readyState === 1){
             // server aplica dano + consome a lança equipada (throwSpear:true)
@@ -6410,7 +6464,7 @@ function throwSpear(){
         player.equipped.weapon = wasKey;
         player.weapon = wasKey;
     } else {
-        log(tr('log.last_spear', {weapon: wItem.name}));
+        log(tr('log.last_spear', {weapon: itmName(wKey)}));
         buildSkillList();
     }
     invSignature = null;
@@ -6489,7 +6543,7 @@ function doAttack(m){
         const eCol = ELEMENT_COL[wItem.element] || wItem.color || '#c060ff';
         addFloat(m.x, m.y, `-${dmgW}`, critW ? '#ffaa20' : eCol, true, critW ? -10 : 0);
         if (critW) sndCrit(); else sndSpell();
-        log(tr('log.dmg_hit', {star: critW?'★ ':'', weapon: wItem.name, dmg: dmgW, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
+        log(tr('log.dmg_hit', {star: critW?'★ ':'', weapon: itmName(wKey), dmg: dmgW, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
             startX: player.renderX, startY: player.renderY,
@@ -6552,7 +6606,7 @@ function doAttack(m){
         dmgR = Math.floor(dmgR * buffMult().dmg);
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
         if (critR) sndCrit(); else sndHit();
-        log(tr('log.dmg_hit', {star: critR?'★ ':'', weapon: wItem.name, dmg: dmgR, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
+        log(tr('log.dmg_hit', {star: critR?'★ ':'', weapon: itmName(wKey), dmg: dmgR, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
             startX: player.renderX, startY: player.renderY,
@@ -7156,7 +7210,7 @@ function handleMP(msg){
         // Aqui só float/log + soma local pra UI snappy (server confirma via pstats).
         if (msg.consume && msg.consume.ok){
             const def = ITEMS[msg.consume.key];
-            const name = def ? def.name : msg.consume.key;
+            const name = itmName(msg.consume.key);
             const healed = msg.consume.healed | 0;
             if (healed > 0){
                 player.hp = Math.min(player.maxHp, player.hp + healed);
@@ -7178,13 +7232,13 @@ function handleMP(msg){
             if (msg.forge.ok){
                 const item = ITEMS[msg.forge.newKey];
                 const itemName = item ? item.name : msg.forge.newKey;
-                log(tr('log.forged', {item: itemName, cost: msg.forge.cost}));
+                log(tr('log.forged', {item: itmName(msg.forge.newKey), cost: msg.forge.cost}));
                 if (typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, '★ +' + msg.forge.plus, '#ffcc40', true, -10);
                 checkAchievements();
             } else {
                 const itemName = ITEMS[msg.forge.itemKey]?.name || msg.forge.itemKey;
-                log(tr('log.forge_failed', {item: itemName, cost: msg.forge.cost}));
+                log(tr('log.forge_failed', {item: itmName(msg.forge.itemKey), cost: msg.forge.cost}));
                 if (typeof sndDeath === 'function') sndDeath();
                 addFloat(player.x, player.y, tr('float.fail'), '#ff3030', true, -10);
             }
@@ -7196,13 +7250,13 @@ function handleMP(msg){
         // Craft: feedback
         if (msg.craft && msg.craft.ok){
             const out = ITEMS[msg.craft.out];
-            log(tr('log.crafted', {item: out ? out.name : msg.craft.out, cost: msg.craft.cost}));
+            log(tr('log.crafted', {item: itmName(msg.craft.out), cost: msg.craft.cost}));
             if (typeof renderCraft === 'function') renderCraft();
         }
         // Shop: feedback
         if (msg.shop){
             const item = ITEMS[msg.shop.item];
-            const name = item ? item.name : msg.shop.item;
+            const name = itmName(msg.shop.item);
             if (msg.shop.op === 'buy'){
                 log(`<span class="log-up">+${msg.shop.qty} ${name} (-${msg.shop.price}g)</span>`);
             } else if (msg.shop.op === 'sell'){
@@ -8333,7 +8387,7 @@ function renderDye(){
         const cfg = DYE_SLOT_LABELS[slot];
         const itemKey = eq[slot];
         const current = dyes[slot] || null;
-        const itemName = itemKey ? ((ITEMS[itemKey] && ITEMS[itemKey].name) || itemKey) : '— vazio —';
+        const itemName = itemKey ? itmName(itemKey) : '— vazio —';
         html += `<div style="margin-bottom:10px;padding:10px;background:#0a0805;border:1px solid #3a2d20;border-radius:4px">`;
         html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
         html += `<div style="color:#c8a050;font-weight:600;font-size:13px">${cfg.icon} ${cfg.label}</div>`;
@@ -8425,15 +8479,7 @@ function fmtRemaining(expiresAt, now){
     return `${m}m`;
 }
 function itemDisplayName(itemKey){
-    const def = ITEMS[itemKey];
-    if (def && def.name) return def.name;
-    // _PLUS_N variants
-    if (itemKey.includes('_PLUS_')){
-        const [base, plus] = itemKey.split('_PLUS_');
-        const baseDef = ITEMS[base];
-        return (baseDef ? baseDef.name : base) + ' +' + plus;
-    }
-    return itemKey;
+    return itmName(itemKey);
 }
 function renderAuction(){
     const body = document.getElementById('auctionBody');
@@ -9301,7 +9347,7 @@ function attemptForge(itemKey){
     }
     const have = player.inv[itemKey] || 0;
     if (have < 3){
-        log(tr('log.need_3x', {name: ITEMS[itemKey].name}));
+        log(tr('log.need_3x', {name: itmName(itemKey)}));
         return;
     }
     if (!ws || ws.readyState !== 1){
@@ -9402,7 +9448,7 @@ function renderForja(){
             return `<div class="craft-row">
                 <div class="craft-out">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
-                    <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(def.name)}</span>
+                    <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(itmName(k))}</span>
                     <span style="margin-left:6px;color:#888;font-size:10px">${q}× disponíveis</span>
                 </div>
                 <div class="craft-in" style="color:#aaa;font-size:10.5px;line-height:1.5">
@@ -9761,7 +9807,7 @@ function pkKilledSomeone(msg){
         const tier = getUpgradeTier(msg.droppedItem);
         if (tier.plus > 0 && !ITEMS[msg.droppedItem]) ensureUpgradeItem(tier.base, tier.plus);
         if (ITEMS[msg.droppedItem]){
-            log(tr('log.looted', {item: escapeHtml(ITEMS[msg.droppedItem].name)}));
+            log(tr('log.looted', {item: escapeHtml(itmName(msg.droppedItem))}));
         }
     }
     checkAchievements();
@@ -13626,7 +13672,7 @@ function renderTradeUI(){
             const def = ITEMS[k]; if (!def) return '';
             return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid #1a1408;cursor:pointer" onclick="removeFromMyOffer('${k}')" title="click p/ remover 1">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 16)});width:16px;height:16px"></span>
-                <span style="flex:1;color:#c8a050">${escapeHtml(def.name)}</span>
+                <span style="flex:1;color:#c8a050">${escapeHtml(itmName(k))}</span>
                 <span style="color:#e0c060">${q}×</span>
             </div>`;
           }).join('')
@@ -13636,7 +13682,7 @@ function renderTradeUI(){
             const def = ITEMS[k] || { name: k, color: '#aaa' };
             return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid #1a1408">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 16)});width:16px;height:16px"></span>
-                <span style="flex:1;color:#c8a050">${escapeHtml(def.name)}</span>
+                <span style="flex:1;color:#c8a050">${escapeHtml(itmName(k))}</span>
                 <span style="color:#e0c060">${q}×</span>
             </div>`;
           }).join('')
@@ -13655,7 +13701,7 @@ function renderTradeUI(){
             const avail = q - offered;
             return `<div style="display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:${avail>0?'pointer':'not-allowed'};opacity:${avail>0?1:0.4}" onclick="${avail>0?`addToMyOffer('${k}')`:''}" title="${avail>0?'click p/ ofertar 1':'já tudo ofertado'}">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 14)});width:14px;height:14px"></span>
-                <span style="flex:1;color:#aaa">${escapeHtml(def.name)}</span>
+                <span style="flex:1;color:#aaa">${escapeHtml(itmName(k))}</span>
                 <span style="color:#888;font-size:10px">${avail}/${q}</span>
             </div>`;
         }).join('');
