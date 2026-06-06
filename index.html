@@ -338,169 +338,336 @@
     .btn { padding: 14px 22px; font-size: 14px; letter-spacing: 1px; }
     .section-title { letter-spacing: 2px; }
   }
+  /* ─── i18n: toggle de idioma + badge traduzido ─── */
+  .lang-switch { display: inline-flex; gap: 4px; }
+  .lang-switch button {
+    background: var(--bg-elev); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 4px;
+    font: 700 12px/1 inherit; letter-spacing: 1px;
+    padding: 7px 10px; cursor: pointer; transition: all .15s ease;
+  }
+  .lang-switch button:hover { color: var(--gold); border-color: var(--gold); }
+  .lang-switch button.lang-active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+  html[data-lang="en"] .dl-card.recommended::before { content: "RECOMMENDED"; }
 </style>
 </head>
 <body>
 
+<script>
+// ─── i18n da landing (PT padrão · EN auto-detect + toggle). Mesma chave de idioma
+//     do jogo (localStorage 'valadares_lang') → escolha consistente entre site e game.
+//     UI: data-i18n=textContent · data-i18n-html=innerHTML (p/ <strong>/<code>/<a>). ───
+const I18N_LANDING = {
+  pt: {
+    'doc.title': `Valadares — RPG online tile-based no navegador (PC e Celular)`,
+    'nav.features': `Recursos`, 'nav.how': `Como jogar`, 'nav.devlog': `Devlog`,
+    'nav.ranking': `Ranking`, 'nav.download': `Download`, 'nav.play': `Jogar`,
+    'hero.tagline': `RPG tile-based online direto no navegador — agora também no celular.`,
+    'hero.sub': `PvP · Raid bosses · Forja · Guilds · Party · Trade · Mobile`,
+    'hero.play': `⚔ Jogar agora`, 'hero.download': `⬇ Baixar cliente desktop`,
+    'hero.m1': `Grátis`, 'hero.m2': `Sem cadastro de email`, 'hero.m3': `Roda no navegador`,
+    'hero.m4': `📱 Celular & PC`, 'hero.m5': `Multiplayer real`,
+    'feat.title': `RECURSOS`, 'feat.subtitle': `tudo que um RPG precisa, nada que ele não precisa`,
+    'feat.depths_t': `As Profundezas`,
+    'feat.depths_d': `Masmorra vertical de 5 andares com cavernas geradas a cada descida. Mobs escalam +60% por andar, PvP é forçado e no fundo espera o Senhor das Profundezas. Loot melhor, perigo maior.`,
+    'feat.arena_t': `Arena PvP 1v1`,
+    'feat.arena_d': `Entre na fila e o sistema te casa com um oponente. Rating Elo, aposta de ouro opcional (vencedor leva o pote) e arena isolada — duelo limpo, sem ninguém interferindo.`,
+    'feat.auction_t': `Casa de Leilão`,
+    'feat.auction_d': `Anuncie itens por 24h e deixe o mercado decidir o preço. Compre de outros players, venda o que sobra. Economia viva movida a ouro, com o Leiloeiro segurando o escrow.`,
+    'feat.talents_t': `Árvore de Talentos`,
+    'feat.talents_d': `14 talentos com até 5 ranks cada: dano, crítico, mana, velocidade, vampirismo, segunda chance e mais. Errou a build? Redistribua tudo por ouro e recomece.`,
+    'feat.pets_t': `Pets de Companhia`,
+    'feat.pets_d': `Adote no Domador: Tatu-Cofre (+ouro), Vaga-lume (+XP), Gato Preto (+sorte) ou Espírito Vital (+regen). Seguem você pelo mundo e sobem de nível matando ao seu lado.`,
+    'feat.seals_t': `PvP com Selos`,
+    'feat.seals_d': `Sistema de Selos PvP estilo Tibia: matou indefeso? Selo. 3 selos = PZ-lock 5min. Vingança recupera skills perdidas.`,
+    'feat.bosses_t': `5 Bosses + Mega Raid`,
+    'feat.bosses_d': `Orc Líder, Drake Ancião, Golem Rei — 3 bosses normais que sobem de nível ao morrer. Maxados desbloqueiam o Senhor de Valadares.`,
+    'feat.forge_t': `Forja +5`,
+    'feat.forge_d': `Combine 3× do mesmo item pra forjar +1. Sobe até +5 com DoTs (veneno, sangra, fogo). Falhas existem — vale o risco.`,
+    'feat.party_t': `Party 1-4 Players`,
+    'feat.party_d': `Forme grupo com até 4 amigos. XP compartilhado no raio 12 tiles. HP da party visível no minimap.`,
+    'feat.guilds_t': `Guilds & Trade`,
+    'feat.guilds_d': `Crie guilda, recrute membros, chat exclusivo. Trade consensual de items/gold entre players na Zona Segura.`,
+    'feat.cosmetics_t': `Cosméticos & Tinturaria`,
+    'feat.cosmetics_d': `Capas, auras, trails e partículas no ataque — e tinja seu equipamento em 12 cores na Tinturaria. Eventos diários: Chuva de Ouro, Cerco Demoníaco, Bênção da Sabedoria.`,
+    'feat.mobile_t': `Joga no Celular`,
+    'feat.mobile_d': `Mesmo jogo, mesmo mundo, mesma conta. Joystick virtual + botões de ação na tela. Caminha no ônibus, batalha boss no sofá.`,
+    'how.title': `COMO JOGAR`, 'how.subtitle': `do zero ao primeiro boss em 5 minutos`,
+    'how.s1_t': `Crie seu personagem`,
+    'how.s1_d': `Clica em <strong>Jogar Agora</strong>, escolhe um nome único (até 14 letras) e senha. Sem email, sem cadastro chato.`,
+    'how.s2_t': `Aprenda os comandos`,
+    'how.s2_d': `<strong style="color:var(--gold-bright)">No PC:</strong> movimento <code>WASD</code> ou setas, atacar <code>ESPAÇO</code>, magia <code>R</code>, comer <code>E</code>, inventário <code>I</code>, quests <code>Q</code>.<br><strong style="color:var(--gold-bright)">📱 No celular:</strong> joystick virtual pra andar, botão <strong>⚔ ATK</strong> pra atacar, <strong>✦ MAG</strong> pra magia, <strong>↗ LCA</strong> pra lança, <strong>🍖</strong> pra comer. Hambúrguer <strong>≡</strong> abre stats, inv e quests.`,
+    'how.s3_t': `Suba de nível e explore`,
+    'how.s3_d': `Mate ratos no spawn (Punho XP), evolua pra Espada/Arco/Magia. Desça As Profundezas atrás de loot, encare bosses, forme party e teste a Arena PvP. Tudo persistido no servidor.`,
+    'dl.title': `DOWNLOAD DESKTOP`, 'dl.subtitle': `cliente nativo Windows · janela limpa · sem distração de browser`,
+    'dl.installer_t': `Installer`,
+    'dl.installer_d': `Instala em pasta, cria atalho no Desktop + Menu Iniciar. Recomendado pra uso diário.`,
+    'dl.installer_btn': `⬇ Baixar Setup`, 'dl.version_fallback': `última versão`,
+    'dl.portable_t': `Portable`,
+    'dl.portable_d': `Executável único. Roda direto sem instalar. Bom pra pen drive ou teste rápido.`,
+    'dl.portable_btn': `⬇ Baixar Portable`,
+    'dl.web_t': `Navegador & Celular`,
+    'dl.web_d': `Sem download. Joga direto: PC, Mac, Linux, iPhone, Android — qualquer browser moderno. Mesma conta em todos.`,
+    'dl.web_btn': `⚔ Jogar no Browser`, 'dl.web_size': `0 MB · Universal`,
+    'dl.smartscreen': `<strong>⚠ Aviso do Windows SmartScreen:</strong> Como o jogo é indie e o .exe não é assinado por certificado pago (~US$300/ano), o Windows vai mostrar uma tela <strong>"O Windows protegeu seu PC"</strong>. É falso-positivo normal pra apps indie. <strong>Pra instalar:</strong> clica em <code>Mais informações</code> → <code>Executar mesmo assim</code>. É seguro — o código todo é <a href="https://github.com/acapires-stack/valadares" target="_blank">open source no GitHub</a>.`,
+    'foot.play': `Jogar`, 'foot.ranking': `Ranking`, 'foot.download': `Download`,
+    'foot.privacy': `Privacidade`, 'foot.terms': `Termos`,
+    'foot.credit': `Valadares · feito com ♥ em Paranaguá/PR · 2026`
+  },
+  en: {
+    'doc.title': `Valadares — tile-based online RPG in your browser (PC & Mobile)`,
+    'nav.features': `Features`, 'nav.how': `How to play`, 'nav.devlog': `Devlog`,
+    'nav.ranking': `Ranking`, 'nav.download': `Download`, 'nav.play': `Play`,
+    'hero.tagline': `A tile-based online RPG right in your browser — now on mobile too.`,
+    'hero.sub': `PvP · Raid bosses · Forging · Guilds · Party · Trade · Mobile`,
+    'hero.play': `⚔ Play now`, 'hero.download': `⬇ Download desktop client`,
+    'hero.m1': `Free`, 'hero.m2': `No email signup`, 'hero.m3': `Runs in the browser`,
+    'hero.m4': `📱 Mobile & PC`, 'hero.m5': `True multiplayer`,
+    'feat.title': `FEATURES`, 'feat.subtitle': `everything an RPG needs, nothing it doesn't`,
+    'feat.depths_t': `The Depths`,
+    'feat.depths_d': `A 5-floor vertical dungeon with caves regenerated on every descent. Mobs scale +60% per floor, PvP is forced, and the Lord of the Depths waits at the bottom. Better loot, greater danger.`,
+    'feat.arena_t': `1v1 PvP Arena`,
+    'feat.arena_d': `Join the queue and the system matches you with an opponent. Elo rating, optional gold wager (winner takes the pot) and an isolated arena — a clean duel, nobody interfering.`,
+    'feat.auction_t': `Auction House`,
+    'feat.auction_d': `List items for 24h and let the market set the price. Buy from other players, sell your spare loot. A living gold-driven economy, with the Auctioneer holding the escrow.`,
+    'feat.talents_t': `Talent Tree`,
+    'feat.talents_d': `14 talents with up to 5 ranks each: damage, crit, mana, speed, lifesteal, second chance and more. Botched your build? Respec everything for gold and start over.`,
+    'feat.pets_t': `Companion Pets`,
+    'feat.pets_d': `Adopt one from the Tamer: Vault Armadillo (+gold), Firefly (+XP), Black Cat (+luck) or Vital Spirit (+regen). They follow you across the world and level up fighting at your side.`,
+    'feat.seals_t': `Seal-based PvP`,
+    'feat.seals_d': `Tibia-style PvP seal system: killed someone defenseless? That's a seal. 3 seals = a 5-min PZ-lock. Revenge recovers your lost skills.`,
+    'feat.bosses_t': `5 Bosses + Mega Raid`,
+    'feat.bosses_d': `Orc Leader, Elder Drake, Golem King — 3 normal bosses that level up when they die. Maxed out, they unlock the Lord of Valadares.`,
+    'feat.forge_t': `+5 Forging`,
+    'feat.forge_d': `Combine 3× of the same item to forge +1. Goes up to +5 with DoTs (poison, bleed, fire). Failures happen — worth the risk.`,
+    'feat.party_t': `1–4 Player Party`,
+    'feat.party_d': `Group up with up to 4 friends. Shared XP within a 12-tile radius. Party HP shown on the minimap.`,
+    'feat.guilds_t': `Guilds & Trade`,
+    'feat.guilds_d': `Create a guild, recruit members, get an exclusive chat. Consensual item/gold trading between players in the Safe Zone.`,
+    'feat.cosmetics_t': `Cosmetics & Dye Shop`,
+    'feat.cosmetics_d': `Capes, auras, trails and attack particles — and dye your gear in 12 colors at the Dye Shop. Daily events: Gold Rain, Demonic Siege, Blessing of Wisdom.`,
+    'feat.mobile_t': `Play on Mobile`,
+    'feat.mobile_d': `Same game, same world, same account. Virtual joystick + on-screen action buttons. Walk on the bus, fight a boss on the couch.`,
+    'how.title': `HOW TO PLAY`, 'how.subtitle': `from zero to your first boss in 5 minutes`,
+    'how.s1_t': `Create your character`,
+    'how.s1_d': `Click <strong>Play Now</strong>, pick a unique name (up to 14 letters) and a password. No email, no annoying signup.`,
+    'how.s2_t': `Learn the controls`,
+    'how.s2_d': `<strong style="color:var(--gold-bright)">On PC:</strong> move with <code>WASD</code> or arrows, attack <code>SPACE</code>, spell <code>R</code>, eat <code>E</code>, inventory <code>I</code>, quests <code>Q</code>.<br><strong style="color:var(--gold-bright)">📱 On mobile:</strong> virtual joystick to walk, <strong>⚔ ATK</strong> to attack, <strong>✦ MAG</strong> for spells, <strong>↗ LCA</strong> for the spear, <strong>🍖</strong> to eat. The hamburger <strong>≡</strong> opens stats, inventory and quests.`,
+    'how.s3_t': `Level up and explore`,
+    'how.s3_d': `Kill rats at spawn (Fist XP), then move up to Sword/Bow/Magic. Descend into The Depths for loot, take on bosses, form a party and try the PvP Arena. Everything is saved on the server.`,
+    'dl.title': `DESKTOP DOWNLOAD`, 'dl.subtitle': `native Windows client · clean window · no browser distractions`,
+    'dl.installer_t': `Installer`,
+    'dl.installer_d': `Installs to a folder, creates a Desktop + Start Menu shortcut. Recommended for daily use.`,
+    'dl.installer_btn': `⬇ Download Setup`, 'dl.version_fallback': `latest version`,
+    'dl.portable_t': `Portable`,
+    'dl.portable_d': `Single executable. Runs without installing. Great for a USB stick or a quick test.`,
+    'dl.portable_btn': `⬇ Download Portable`,
+    'dl.web_t': `Browser & Mobile`,
+    'dl.web_d': `No download. Play instantly: PC, Mac, Linux, iPhone, Android — any modern browser. Same account everywhere.`,
+    'dl.web_btn': `⚔ Play in Browser`, 'dl.web_size': `0 MB · Universal`,
+    'dl.smartscreen': `<strong>⚠ Windows SmartScreen notice:</strong> Since the game is indie and the .exe isn't signed with a paid certificate (~US$300/yr), Windows shows a <strong>"Windows protected your PC"</strong> screen. It's a normal false positive for indie apps. <strong>To install:</strong> click <code>More info</code> → <code>Run anyway</code>. It's safe — the entire code is <a href="https://github.com/acapires-stack/valadares" target="_blank">open source on GitHub</a>.`,
+    'foot.play': `Play`, 'foot.ranking': `Ranking`, 'foot.download': `Download`,
+    'foot.privacy': `Privacy`, 'foot.terms': `Terms`,
+    'foot.credit': `Valadares · made with ♥ in Paranaguá/PR · 2026`
+  }
+};
+let LANG = (function(){
+  try {
+    const s = localStorage.getItem('valadares_lang');
+    if (s === 'pt' || s === 'en') return s;
+    return (navigator.language || 'pt').toLowerCase().startsWith('en') ? 'en' : 'pt';
+  } catch(e){ return 'pt'; }
+})();
+function tr(key){
+  const d = I18N_LANDING;
+  let s = (d[LANG] && d[LANG][key]);
+  if (s == null) s = (d.pt && d.pt[key]);
+  return s == null ? key : s;
+}
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
+  document.title = tr('doc.title');
+  document.documentElement.lang = (LANG === 'en') ? 'en' : 'pt-BR';
+  document.documentElement.setAttribute('data-lang', LANG);
+}
+function updateLangButtons(){
+  document.querySelectorAll('[data-lang-btn]').forEach(b => {
+    b.classList.toggle('lang-active', b.getAttribute('data-lang-btn') === LANG);
+  });
+}
+function setLang(l){
+  if (l !== 'pt' && l !== 'en') return;
+  LANG = l;
+  try { localStorage.setItem('valadares_lang', l); } catch(e){}
+  applyI18n(); updateLangButtons();
+}
+window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLangButtons(); } catch(e){} });
+</script>
+
 <nav>
   <a href="/" class="nav-brand">VALADARES</a>
   <div class="nav-links">
-    <a href="#features">Recursos</a>
-    <a href="#como-jogar">Como jogar</a>
-    <a href="/devlog">Devlog</a>
-    <a href="/ranking">Ranking</a>
-    <a href="#download">Download</a>
-    <a href="/jogar">Jogar</a>
+    <a href="#features" data-i18n="nav.features">Recursos</a>
+    <a href="#como-jogar" data-i18n="nav.how">Como jogar</a>
+    <a href="/devlog" data-i18n="nav.devlog">Devlog</a>
+    <a href="/ranking" data-i18n="nav.ranking">Ranking</a>
+    <a href="#download" data-i18n="nav.download">Download</a>
+    <a href="/jogar" data-i18n="nav.play">Jogar</a>
   </div>
+  <span class="lang-switch">
+    <button type="button" data-lang-btn="pt" onclick="setLang('pt')">PT</button>
+    <button type="button" data-lang-btn="en" onclick="setLang('en')">EN</button>
+  </span>
 </nav>
 
 <header class="hero">
   <h1 class="hero-title">VALADARES</h1>
-  <p class="hero-tagline">RPG tile-based online direto no navegador — agora também no celular.</p>
-  <p class="hero-sub">PvP · Raid bosses · Forja · Guilds · Party · Trade · Mobile</p>
+  <p class="hero-tagline" data-i18n="hero.tagline">RPG tile-based online direto no navegador — agora também no celular.</p>
+  <p class="hero-sub" data-i18n="hero.sub">PvP · Raid bosses · Forja · Guilds · Party · Trade · Mobile</p>
   <div class="hero-buttons">
-    <a href="/jogar" class="btn btn-primary">⚔ Jogar agora</a>
-    <a href="#download" class="btn btn-secondary">⬇ Baixar cliente desktop</a>
+    <a href="/jogar" class="btn btn-primary" data-i18n="hero.play">⚔ Jogar agora</a>
+    <a href="#download" class="btn btn-secondary" data-i18n="hero.download">⬇ Baixar cliente desktop</a>
   </div>
   <div class="hero-meta">
-    <span>Grátis</span>
-    <span>Sem cadastro de email</span>
-    <span>Roda no navegador</span>
-    <span>📱 Celular &amp; PC</span>
-    <span>Multiplayer real</span>
+    <span data-i18n="hero.m1">Grátis</span>
+    <span data-i18n="hero.m2">Sem cadastro de email</span>
+    <span data-i18n="hero.m3">Roda no navegador</span>
+    <span data-i18n="hero.m4">📱 Celular &amp; PC</span>
+    <span data-i18n="hero.m5">Multiplayer real</span>
   </div>
 </header>
 
 <section id="features">
-  <h2 class="section-title">RECURSOS</h2>
-  <p class="section-subtitle">tudo que um RPG precisa, nada que ele não precisa</p>
+  <h2 class="section-title" data-i18n="feat.title">RECURSOS</h2>
+  <p class="section-subtitle" data-i18n="feat.subtitle">tudo que um RPG precisa, nada que ele não precisa</p>
   <div class="features">
     <div class="feature">
       <span class="feature-icon">🕳</span>
-      <h3 class="feature-title">As Profundezas</h3>
-      <p class="feature-desc">Masmorra vertical de 5 andares com cavernas geradas a cada descida. Mobs escalam +60% por andar, PvP é forçado e no fundo espera o Senhor das Profundezas. Loot melhor, perigo maior.</p>
+      <h3 class="feature-title" data-i18n="feat.depths_t">As Profundezas</h3>
+      <p class="feature-desc" data-i18n="feat.depths_d">Masmorra vertical de 5 andares com cavernas geradas a cada descida. Mobs escalam +60% por andar, PvP é forçado e no fundo espera o Senhor das Profundezas. Loot melhor, perigo maior.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🏟</span>
-      <h3 class="feature-title">Arena PvP 1v1</h3>
-      <p class="feature-desc">Entre na fila e o sistema te casa com um oponente. Rating Elo, aposta de ouro opcional (vencedor leva o pote) e arena isolada — duelo limpo, sem ninguém interferindo.</p>
+      <h3 class="feature-title" data-i18n="feat.arena_t">Arena PvP 1v1</h3>
+      <p class="feature-desc" data-i18n="feat.arena_d">Entre na fila e o sistema te casa com um oponente. Rating Elo, aposta de ouro opcional (vencedor leva o pote) e arena isolada — duelo limpo, sem ninguém interferindo.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🏛</span>
-      <h3 class="feature-title">Casa de Leilão</h3>
-      <p class="feature-desc">Anuncie itens por 24h e deixe o mercado decidir o preço. Compre de outros players, venda o que sobra. Economia viva movida a ouro, com o Leiloeiro segurando o escrow.</p>
+      <h3 class="feature-title" data-i18n="feat.auction_t">Casa de Leilão</h3>
+      <p class="feature-desc" data-i18n="feat.auction_d">Anuncie itens por 24h e deixe o mercado decidir o preço. Compre de outros players, venda o que sobra. Economia viva movida a ouro, com o Leiloeiro segurando o escrow.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🌟</span>
-      <h3 class="feature-title">Árvore de Talentos</h3>
-      <p class="feature-desc">14 talentos com até 5 ranks cada: dano, crítico, mana, velocidade, vampirismo, segunda chance e mais. Errou a build? Redistribua tudo por ouro e recomece.</p>
+      <h3 class="feature-title" data-i18n="feat.talents_t">Árvore de Talentos</h3>
+      <p class="feature-desc" data-i18n="feat.talents_d">14 talentos com até 5 ranks cada: dano, crítico, mana, velocidade, vampirismo, segunda chance e mais. Errou a build? Redistribua tudo por ouro e recomece.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🐾</span>
-      <h3 class="feature-title">Pets de Companhia</h3>
-      <p class="feature-desc">Adote no Domador: Tatu-Cofre (+ouro), Vaga-lume (+XP), Gato Preto (+sorte) ou Espírito Vital (+regen). Seguem você pelo mundo e sobem de nível matando ao seu lado.</p>
+      <h3 class="feature-title" data-i18n="feat.pets_t">Pets de Companhia</h3>
+      <p class="feature-desc" data-i18n="feat.pets_d">Adote no Domador: Tatu-Cofre (+ouro), Vaga-lume (+XP), Gato Preto (+sorte) ou Espírito Vital (+regen). Seguem você pelo mundo e sobem de nível matando ao seu lado.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">⚔</span>
-      <h3 class="feature-title">PvP com Selos</h3>
-      <p class="feature-desc">Sistema de Selos PvP estilo Tibia: matou indefeso? Selo. 3 selos = PZ-lock 5min. Vingança recupera skills perdidas.</p>
+      <h3 class="feature-title" data-i18n="feat.seals_t">PvP com Selos</h3>
+      <p class="feature-desc" data-i18n="feat.seals_d">Sistema de Selos PvP estilo Tibia: matou indefeso? Selo. 3 selos = PZ-lock 5min. Vingança recupera skills perdidas.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">👹</span>
-      <h3 class="feature-title">5 Bosses + Mega Raid</h3>
-      <p class="feature-desc">Orc Líder, Drake Ancião, Golem Rei — 3 bosses normais que sobem de nível ao morrer. Maxados desbloqueiam o Senhor de Valadares.</p>
+      <h3 class="feature-title" data-i18n="feat.bosses_t">5 Bosses + Mega Raid</h3>
+      <p class="feature-desc" data-i18n="feat.bosses_d">Orc Líder, Drake Ancião, Golem Rei — 3 bosses normais que sobem de nível ao morrer. Maxados desbloqueiam o Senhor de Valadares.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🔨</span>
-      <h3 class="feature-title">Forja +5</h3>
-      <p class="feature-desc">Combine 3× do mesmo item pra forjar +1. Sobe até +5 com DoTs (veneno, sangra, fogo). Falhas existem — vale o risco.</p>
+      <h3 class="feature-title" data-i18n="feat.forge_t">Forja +5</h3>
+      <p class="feature-desc" data-i18n="feat.forge_d">Combine 3× do mesmo item pra forjar +1. Sobe até +5 com DoTs (veneno, sangra, fogo). Falhas existem — vale o risco.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🛡</span>
-      <h3 class="feature-title">Party 1-4 Players</h3>
-      <p class="feature-desc">Forme grupo com até 4 amigos. XP compartilhado no raio 12 tiles. HP da party visível no minimap.</p>
+      <h3 class="feature-title" data-i18n="feat.party_t">Party 1-4 Players</h3>
+      <p class="feature-desc" data-i18n="feat.party_d">Forme grupo com até 4 amigos. XP compartilhado no raio 12 tiles. HP da party visível no minimap.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">🏰</span>
-      <h3 class="feature-title">Guilds & Trade</h3>
-      <p class="feature-desc">Crie guilda, recrute membros, chat exclusivo. Trade consensual de items/gold entre players na Zona Segura.</p>
+      <h3 class="feature-title" data-i18n="feat.guilds_t">Guilds & Trade</h3>
+      <p class="feature-desc" data-i18n="feat.guilds_d">Crie guilda, recrute membros, chat exclusivo. Trade consensual de items/gold entre players na Zona Segura.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">✨</span>
-      <h3 class="feature-title">Cosméticos & Tinturaria</h3>
-      <p class="feature-desc">Capas, auras, trails e partículas no ataque — e tinja seu equipamento em 12 cores na Tinturaria. Eventos diários: Chuva de Ouro, Cerco Demoníaco, Bênção da Sabedoria.</p>
+      <h3 class="feature-title" data-i18n="feat.cosmetics_t">Cosméticos & Tinturaria</h3>
+      <p class="feature-desc" data-i18n="feat.cosmetics_d">Capas, auras, trails e partículas no ataque — e tinja seu equipamento em 12 cores na Tinturaria. Eventos diários: Chuva de Ouro, Cerco Demoníaco, Bênção da Sabedoria.</p>
     </div>
     <div class="feature">
       <span class="feature-icon">📱</span>
-      <h3 class="feature-title">Joga no Celular</h3>
-      <p class="feature-desc">Mesmo jogo, mesmo mundo, mesma conta. Joystick virtual + botões de ação na tela. Caminha no ônibus, batalha boss no sofá.</p>
+      <h3 class="feature-title" data-i18n="feat.mobile_t">Joga no Celular</h3>
+      <p class="feature-desc" data-i18n="feat.mobile_d">Mesmo jogo, mesmo mundo, mesma conta. Joystick virtual + botões de ação na tela. Caminha no ônibus, batalha boss no sofá.</p>
     </div>
   </div>
 </section>
 
 <section id="como-jogar">
-  <h2 class="section-title">COMO JOGAR</h2>
-  <p class="section-subtitle">do zero ao primeiro boss em 5 minutos</p>
+  <h2 class="section-title" data-i18n="how.title">COMO JOGAR</h2>
+  <p class="section-subtitle" data-i18n="how.subtitle">do zero ao primeiro boss em 5 minutos</p>
   <div class="steps">
     <div class="step">
-      <h3 class="step-title">Crie seu personagem</h3>
-      <p class="step-desc">Clica em <strong>Jogar Agora</strong>, escolhe um nome único (até 14 letras) e senha. Sem email, sem cadastro chato.</p>
+      <h3 class="step-title" data-i18n="how.s1_t">Crie seu personagem</h3>
+      <p class="step-desc" data-i18n-html="how.s1_d">Clica em <strong>Jogar Agora</strong>, escolhe um nome único (até 14 letras) e senha. Sem email, sem cadastro chato.</p>
     </div>
     <div class="step">
-      <h3 class="step-title">Aprenda os comandos</h3>
-      <p class="step-desc">
+      <h3 class="step-title" data-i18n="how.s2_t">Aprenda os comandos</h3>
+      <p class="step-desc" data-i18n-html="how.s2_d">
         <strong style="color:var(--gold-bright)">No PC:</strong> movimento <code>WASD</code> ou setas, atacar <code>ESPAÇO</code>, magia <code>R</code>, comer <code>E</code>, inventário <code>I</code>, quests <code>Q</code>.<br>
         <strong style="color:var(--gold-bright)">📱 No celular:</strong> joystick virtual pra andar, botão <strong>⚔ ATK</strong> pra atacar, <strong>✦ MAG</strong> pra magia, <strong>↗ LCA</strong> pra lança, <strong>🍖</strong> pra comer. Hambúrguer <strong>≡</strong> abre stats, inv e quests.
       </p>
     </div>
     <div class="step">
-      <h3 class="step-title">Suba de nível e explore</h3>
-      <p class="step-desc">Mate ratos no spawn (Punho XP), evolua pra Espada/Arco/Magia. Desça As Profundezas atrás de loot, encare bosses, forme party e teste a Arena PvP. Tudo persistido no servidor.</p>
+      <h3 class="step-title" data-i18n="how.s3_t">Suba de nível e explore</h3>
+      <p class="step-desc" data-i18n="how.s3_d">Mate ratos no spawn (Punho XP), evolua pra Espada/Arco/Magia. Desça As Profundezas atrás de loot, encare bosses, forme party e teste a Arena PvP. Tudo persistido no servidor.</p>
     </div>
   </div>
 </section>
 
 <section id="download">
-  <h2 class="section-title">DOWNLOAD DESKTOP</h2>
-  <p class="section-subtitle">cliente nativo Windows · janela limpa · sem distração de browser</p>
+  <h2 class="section-title" data-i18n="dl.title">DOWNLOAD DESKTOP</h2>
+  <p class="section-subtitle" data-i18n="dl.subtitle">cliente nativo Windows · janela limpa · sem distração de browser</p>
   <div class="download-grid">
     <div class="dl-card recommended">
       <span class="dl-icon">💾</span>
-      <h3 class="dl-title">Installer</h3>
-      <p class="dl-desc">Instala em pasta, cria atalho no Desktop + Menu Iniciar. Recomendado pra uso diário.</p>
-      <a id="dlSetupBtn" href="https://github.com/acapires-stack/valadares/releases/latest" class="btn btn-primary">⬇ Baixar Setup</a>
-      <div class="dl-size"><span id="dlSetupSize">Windows x64</span> · <span id="dlVersionLabel">última versão</span></div>
+      <h3 class="dl-title" data-i18n="dl.installer_t">Installer</h3>
+      <p class="dl-desc" data-i18n="dl.installer_d">Instala em pasta, cria atalho no Desktop + Menu Iniciar. Recomendado pra uso diário.</p>
+      <a id="dlSetupBtn" href="https://github.com/acapires-stack/valadares/releases/latest" class="btn btn-primary" data-i18n="dl.installer_btn">⬇ Baixar Setup</a>
+      <div class="dl-size"><span id="dlSetupSize">Windows x64</span> · <span id="dlVersionLabel" data-i18n="dl.version_fallback">última versão</span></div>
     </div>
     <div class="dl-card">
       <span class="dl-icon">📦</span>
-      <h3 class="dl-title">Portable</h3>
-      <p class="dl-desc">Executável único. Roda direto sem instalar. Bom pra pen drive ou teste rápido.</p>
-      <a id="dlPortableBtn" href="https://github.com/acapires-stack/valadares/releases/latest" class="btn btn-primary">⬇ Baixar Portable</a>
+      <h3 class="dl-title" data-i18n="dl.portable_t">Portable</h3>
+      <p class="dl-desc" data-i18n="dl.portable_d">Executável único. Roda direto sem instalar. Bom pra pen drive ou teste rápido.</p>
+      <a id="dlPortableBtn" href="https://github.com/acapires-stack/valadares/releases/latest" class="btn btn-primary" data-i18n="dl.portable_btn">⬇ Baixar Portable</a>
       <div class="dl-size"><span id="dlPortableSize">Windows x64</span></div>
     </div>
     <div class="dl-card">
       <span class="dl-icon">🌐</span>
-      <h3 class="dl-title">Navegador & Celular</h3>
-      <p class="dl-desc">Sem download. Joga direto: PC, Mac, Linux, iPhone, Android — qualquer browser moderno. Mesma conta em todos.</p>
-      <a href="/jogar" class="btn btn-secondary">⚔ Jogar no Browser</a>
-      <div class="dl-size">0 MB · Universal</div>
+      <h3 class="dl-title" data-i18n="dl.web_t">Navegador & Celular</h3>
+      <p class="dl-desc" data-i18n="dl.web_d">Sem download. Joga direto: PC, Mac, Linux, iPhone, Android — qualquer browser moderno. Mesma conta em todos.</p>
+      <a href="/jogar" class="btn btn-secondary" data-i18n="dl.web_btn">⚔ Jogar no Browser</a>
+      <div class="dl-size" data-i18n="dl.web_size">0 MB · Universal</div>
     </div>
   </div>
-  <div class="smartscreen">
+  <div class="smartscreen" data-i18n-html="dl.smartscreen">
     <strong>⚠ Aviso do Windows SmartScreen:</strong> Como o jogo é indie e o .exe não é assinado por certificado pago (~US$300/ano), o Windows vai mostrar uma tela <strong>"O Windows protegeu seu PC"</strong>. É falso-positivo normal pra apps indie. <strong>Pra instalar:</strong> clica em <code>Mais informações</code> → <code>Executar mesmo assim</code>. É seguro — o código todo é <a href="https://github.com/acapires-stack/valadares" target="_blank">open source no GitHub</a>.
   </div>
 </section>
 
 <footer>
   <p>
-    <a href="/jogar">Jogar</a> ·
-    <a href="/ranking">Ranking</a> ·
-    <a href="#download">Download</a> ·
-    <a href="/privacy">Privacidade</a> ·
-    <a href="/terms">Termos</a> ·
+    <a href="/jogar" data-i18n="foot.play">Jogar</a> ·
+    <a href="/ranking" data-i18n="foot.ranking">Ranking</a> ·
+    <a href="#download" data-i18n="foot.download">Download</a> ·
+    <a href="/privacy" data-i18n="foot.privacy">Privacidade</a> ·
+    <a href="/terms" data-i18n="foot.terms">Termos</a> ·
     <a href="https://github.com/acapires-stack/valadares" target="_blank">GitHub</a>
   </p>
-  <p style="margin-top: 12px; font-size: 11px;">
+  <p style="margin-top: 12px; font-size: 11px;" data-i18n="foot.credit">
     Valadares · feito com ♥ em Paranaguá/PR · 2026
   </p>
 </footer>
