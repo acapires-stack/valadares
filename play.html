@@ -1712,6 +1712,10 @@
         body.touch {
             padding-bottom: env(safe-area-inset-bottom);
         }
+        /* i18n — botões de idioma (toggle PT/EN) */
+        .lang-btn { opacity: 0.6; transition: opacity .15s ease, box-shadow .15s ease; }
+        .lang-btn:hover { opacity: 0.9; }
+        .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
 </head>
 <body>
@@ -1791,23 +1795,27 @@
 <div id="login">
     <div class="box">
         <h2>⚔ VALADARES ⚔</h2>
-        <input type="text" id="charInput" placeholder="Nome do personagem" maxlength="14" autocomplete="off">
-        <input type="password" id="pwdInput" placeholder="Senha" maxlength="40" autocomplete="off">
-        <input type="email" id="emailInput" placeholder="Email (opcional — recuperar senha)" maxlength="120" autocomplete="email" style="font-size:11px">
-        <div class="opt" id="loginStatus">— digite seu nome —</div>
+        <input type="text" id="charInput" placeholder="Nome do personagem" data-i18n-ph="login.char_ph" maxlength="14" autocomplete="off">
+        <input type="password" id="pwdInput" placeholder="Senha" data-i18n-ph="login.pwd_ph" maxlength="40" autocomplete="off">
+        <input type="email" id="emailInput" placeholder="Email (opcional — recuperar senha)" data-i18n-ph="login.email_ph" maxlength="120" autocomplete="email" style="font-size:11px">
+        <div class="opt" id="loginStatus" data-i18n="login.status_default">— digite seu nome —</div>
         <div id="loginError" style="color:#d04040;font-size:11px;margin-bottom:8px;min-height:14px"></div>
-        <button onclick="tryLogin(true)" style="width:100%">ENTRAR</button>
+        <button onclick="tryLogin(true)" style="width:100%" data-i18n="login.enter">ENTRAR</button>
         <div class="opt" style="margin-top:10px;font-size:10px">
-            <a href="#" onclick="event.preventDefault(); openForgotPwd()" style="color:#888;text-decoration:none">esqueci minha senha</a>
+            <a href="#" onclick="event.preventDefault(); openForgotPwd()" style="color:#888;text-decoration:none" data-i18n="login.forgot">esqueci minha senha</a>
         </div>
         <div class="opt" style="margin-top:8px;font-size:9px">
-            <a href="#" onclick="event.preventDefault(); showServerInput()" style="color:#555;text-decoration:none">servidor</a> &nbsp;·&nbsp;
-            <a href="#" onclick="event.preventDefault(); deleteAccount()" style="color:#555;text-decoration:none">excluir conta</a>
+            <a href="#" onclick="event.preventDefault(); showServerInput()" style="color:#555;text-decoration:none" data-i18n="login.server">servidor</a> &nbsp;·&nbsp;
+            <a href="#" onclick="event.preventDefault(); deleteAccount()" style="color:#555;text-decoration:none" data-i18n="login.delete_acc">excluir conta</a>
         </div>
         <div id="serverInputWrap" style="display:none;margin-top:14px">
-            <input type="text" id="serverInput" placeholder="ws://localhost:8080 ou wss://..." style="font-size:11px;text-align:left;width:280px" autocomplete="off">
-            <div style="font-size:9px;color:#666;margin-top:4px">↑ URL do servidor (deixa vazio pra padrão localhost). Salva no navegador.</div>
-            <button onclick="saveServerInput()" style="font-size:10px;padding:5px 12px;margin-top:6px">salvar servidor</button>
+            <input type="text" id="serverInput" placeholder="ws://localhost:8080 ou wss://..." data-i18n-ph="login.server_ph" style="font-size:11px;text-align:left;width:280px" autocomplete="off">
+            <div style="font-size:9px;color:#666;margin-top:4px" data-i18n="login.server_hint">↑ URL do servidor (deixa vazio pra padrão localhost). Salva no navegador.</div>
+            <button onclick="saveServerInput()" style="font-size:10px;padding:5px 12px;margin-top:6px" data-i18n="login.server_save">salvar servidor</button>
+        </div>
+        <div class="opt lang-toggle" style="margin-top:16px">
+            <button type="button" class="lang-btn" data-lang-btn="pt" onclick="setLang('pt')">Português</button>
+            <button type="button" class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
         </div>
     </div>
 </div>
@@ -2337,47 +2345,53 @@
 
 <div id="settingsModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:580px">
-        <div class="chest-title">⚙ OPÇÕES</div>
+        <div class="chest-title" data-i18n="settings.title">⚙ OPÇÕES</div>
 
-        <div class="chest-head">ÁUDIO</div>
+        <div class="chest-head" data-i18n="settings.language">IDIOMA / LANGUAGE</div>
+        <div class="settings-row" style="gap:8px">
+            <button type="button" class="chest-btn lang-btn" data-lang-btn="pt" style="flex:1" onclick="setLang('pt')">Português</button>
+            <button type="button" class="chest-btn lang-btn" data-lang-btn="en" style="flex:1" onclick="setLang('en')">English</button>
+        </div>
+
+        <div class="chest-head" data-i18n="settings.audio">ÁUDIO</div>
         <div class="settings-row">
-            <div class="settings-label">Volume geral</div>
+            <div class="settings-label" data-i18n="settings.vol_master">Volume geral</div>
             <input id="setVolMaster" type="range" min="0" max="100" value="70" class="settings-slider">
             <div class="settings-val" id="setVolMasterVal">70</div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">Efeitos</div>
+            <div class="settings-label" data-i18n="settings.vol_effects">Efeitos</div>
             <input id="setVolEffects" type="range" min="0" max="100" value="80" class="settings-slider">
             <div class="settings-val" id="setVolEffectsVal">80</div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">Ambient (bioma)</div>
+            <div class="settings-label" data-i18n="settings.vol_ambient">Ambient (bioma)</div>
             <input id="setVolMusic" type="range" min="0" max="100" value="40" class="settings-slider">
             <div class="settings-val" id="setVolMusicVal">40</div>
         </div>
 
-        <div class="chest-head" style="margin-top:14px">ACESSIBILIDADE</div>
-        <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px">Aumenta toda a interface (texto, ícones, janela). Útil pra quem tem dificuldade de enxergar.</div>
+        <div class="chest-head" style="margin-top:14px" data-i18n="settings.accessibility">ACESSIBILIDADE</div>
+        <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px" data-i18n="settings.access_desc">Aumenta toda a interface (texto, ícones, janela). Útil pra quem tem dificuldade de enxergar.</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('in')">🔍+ Aumentar</button>
-            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('out')">🔍− Diminuir</button>
-            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('reset')">↺ Padrão</button>
+            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('in')" data-i18n="settings.zoom_in">🔍+ Aumentar</button>
+            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('out')" data-i18n="settings.zoom_out">🔍− Diminuir</button>
+            <button class="chest-btn" style="flex:1;min-width:120px" onclick="uiZoom('reset')" data-i18n="settings.zoom_reset">↺ Padrão</button>
         </div>
-        <button class="chest-btn" style="margin-top:6px" onclick="uiToggleFullscreen()" id="uiFullscreenBtn">⛶ Tela cheia (F11)</button>
-        <div style="color:#666;font-size:10px;padding:6px 6px 0;letter-spacing:0.3px">atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia</div>
+        <button class="chest-btn" style="margin-top:6px" onclick="uiToggleFullscreen()" id="uiFullscreenBtn" data-i18n="settings.fullscreen">⛶ Tela cheia (F11)</button>
+        <div style="color:#666;font-size:10px;padding:6px 6px 0;letter-spacing:0.3px" data-i18n-html="settings.access_hint">atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia</div>
 
-        <div id="systemSectionHead" class="chest-head" style="margin-top:14px;display:none">SISTEMA (DESKTOP)</div>
+        <div id="systemSectionHead" class="chest-head" style="margin-top:14px;display:none" data-i18n="settings.system">SISTEMA (DESKTOP)</div>
         <div id="systemSection" style="display:none">
             <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px">Versão instalada: <span id="appVersion" style="color:#ffd060;font-weight:bold">—</span></div>
-            <button class="chest-btn" onclick="checkUpdateNow()">🔄 Verificar atualizações</button>
+            <button class="chest-btn" onclick="checkUpdateNow()" data-i18n="settings.check_updates">🔄 Verificar atualizações</button>
             <div id="updateStatus" style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:6px 6px 0;min-height:14px"></div>
         </div>
 
-        <div class="chest-head" style="margin-top:14px">TUTORIAL</div>
-        <button class="chest-btn" onclick="openTutorial(true)">▶ Ver tutorial inicial novamente</button>
-        <button class="chest-btn" onclick="openMobileTut(true)">📱 Ver tutorial mobile (touch)</button>
+        <div class="chest-head" style="margin-top:14px" data-i18n="settings.tutorial_head">TUTORIAL</div>
+        <button class="chest-btn" onclick="openTutorial(true)" data-i18n="settings.tut_initial">▶ Ver tutorial inicial novamente</button>
+        <button class="chest-btn" onclick="openMobileTut(true)" data-i18n="settings.tut_mobile">📱 Ver tutorial mobile (touch)</button>
 
-        <div class="chest-head" style="margin-top:14px">TECLAS</div>
+        <div class="chest-head" style="margin-top:14px" data-i18n="settings.keys">TECLAS</div>
         <div class="key-grid" id="keyGrid"></div>
 
         <div id="adminSection" style="display:none">
@@ -2385,7 +2399,7 @@
             <div id="adminBody"></div>
         </div>
 
-        <div class="chest-hint" style="margin-top:12px"><kbd>O</kbd> ou <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" style="margin-top:12px" data-i18n-html="settings.close_hint"><kbd>O</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeSettings()">×</button>
     </div>
 </div>
@@ -2473,7 +2487,7 @@
     </div>
 </div>
 
-<div id="controls">
+<div id="controls" data-i18n-html="controls.bar">
     <kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>K</kbd> talentos &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>N</kbd> amigos &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP
 </div>
 
@@ -2487,6 +2501,124 @@ const TILE_NAMES = ['grama','terra','árvore','água','pedra','caverna','rocha',
 const walkable = t => t===T.GRASS||t===T.DIRT||t===T.STONE||t===T.CAVE||t===T.SNOW||t===T.SAND;
 // Tile bloqueia projétil/visão? (TREE e CAVE_WALL bloqueiam; WATER passa transparente)
 const blocksLineOfSight = t => t===T.TREE || t===T.CAVE_WALL;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// i18n — internacionalização (PT padrão · EN opcional). Fallback: lang → pt → chave.
+// UI ESTÁTICA: marque o elemento com data-i18n="chave" (texto), data-i18n-ph (placeholder),
+//   data-i18n-title (title) ou data-i18n-html (innerHTML, p/ texto com <kbd>/<b>); chame applyI18n().
+// UI DINÂMICA (montada por JS): use tr('chave'[, {param:val}]).
+// ⚠️ a função se chama tr() (NÃO t()) porque 't' já é param de tile no código.
+// ═══════════════════════════════════════════════════════════════════════════
+const I18N = {
+  pt: {
+    'login.char_ph': 'Nome do personagem',
+    'login.pwd_ph': 'Senha',
+    'login.email_ph': 'Email (opcional — recuperar senha)',
+    'login.status_default': '— digite seu nome —',
+    'login.enter': 'ENTRAR',
+    'login.forgot': 'esqueci minha senha',
+    'login.server': 'servidor',
+    'login.delete_acc': 'excluir conta',
+    'login.server_ph': 'ws://localhost:8080 ou wss://...',
+    'login.server_hint': '↑ URL do servidor (deixa vazio pra padrão localhost). Salva no navegador.',
+    'login.server_save': 'salvar servidor',
+    'controls.bar': '<kbd>WASD</kbd> mover &nbsp; <kbd>SPACE</kbd> engaja &nbsp; <kbd>R</kbd> magia &nbsp; <kbd>F</kbd> lança &nbsp; <kbd>E</kbd> comer &nbsp; <kbd>B</kbd> baú &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> treino &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>K</kbd> talentos &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>N</kbd> amigos &nbsp; <kbd>O</kbd> opções &nbsp; <kbd>P</kbd> PvP',
+    'settings.title': '⚙ OPÇÕES',
+    'settings.audio': 'ÁUDIO',
+    'settings.vol_master': 'Volume geral',
+    'settings.vol_effects': 'Efeitos',
+    'settings.vol_ambient': 'Ambient (bioma)',
+    'settings.accessibility': 'ACESSIBILIDADE',
+    'settings.access_desc': 'Aumenta toda a interface (texto, ícones, janela). Útil pra quem tem dificuldade de enxergar.',
+    'settings.zoom_in': '🔍+ Aumentar',
+    'settings.zoom_out': '🔍− Diminuir',
+    'settings.zoom_reset': '↺ Padrão',
+    'settings.fullscreen': '⛶ Tela cheia (F11)',
+    'settings.access_hint': 'atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia',
+    'settings.system': 'SISTEMA (DESKTOP)',
+    'settings.check_updates': '🔄 Verificar atualizações',
+    'settings.tutorial_head': 'TUTORIAL',
+    'settings.tut_initial': '▶ Ver tutorial inicial novamente',
+    'settings.tut_mobile': '📱 Ver tutorial mobile (touch)',
+    'settings.keys': 'TECLAS',
+    'settings.close_hint': '<kbd>O</kbd> ou <kbd>ESC</kbd> fechar',
+    'settings.language': 'IDIOMA / LANGUAGE',
+    'lang.pt': 'Português',
+    'lang.en': 'English'
+  },
+  en: {
+    'login.char_ph': 'Character name',
+    'login.pwd_ph': 'Password',
+    'login.email_ph': 'Email (optional — password recovery)',
+    'login.status_default': '— enter your name —',
+    'login.enter': 'ENTER',
+    'login.forgot': 'forgot my password',
+    'login.server': 'server',
+    'login.delete_acc': 'delete account',
+    'login.server_ph': 'ws://localhost:8080 or wss://...',
+    'login.server_hint': '↑ Server URL (leave empty for localhost default). Saved in your browser.',
+    'login.server_save': 'save server',
+    'controls.bar': '<kbd>WASD</kbd> move &nbsp; <kbd>SPACE</kbd> engage &nbsp; <kbd>R</kbd> spell &nbsp; <kbd>F</kbd> throw &nbsp; <kbd>E</kbd> eat &nbsp; <kbd>B</kbd> chest &nbsp; <kbd>C</kbd> craft &nbsp; <kbd>M</kbd> altar &nbsp; <kbd>T</kbd> training &nbsp; <kbd>Q</kbd> quests &nbsp; <kbd>I</kbd> stats &nbsp; <kbd>K</kbd> talents &nbsp; <kbd>L</kbd> ranking &nbsp; <kbd>N</kbd> friends &nbsp; <kbd>O</kbd> options &nbsp; <kbd>P</kbd> PvP',
+    'settings.title': '⚙ OPTIONS',
+    'settings.audio': 'AUDIO',
+    'settings.vol_master': 'Master volume',
+    'settings.vol_effects': 'Effects',
+    'settings.vol_ambient': 'Ambient (biome)',
+    'settings.accessibility': 'ACCESSIBILITY',
+    'settings.access_desc': 'Enlarges the whole interface (text, icons, window). Useful if you have trouble seeing.',
+    'settings.zoom_in': '🔍+ Zoom in',
+    'settings.zoom_out': '🔍− Zoom out',
+    'settings.zoom_reset': '↺ Default',
+    'settings.fullscreen': '⛶ Fullscreen (F11)',
+    'settings.access_hint': 'shortcuts: <kbd>Ctrl</kbd>+<kbd>=</kbd> zoom in · <kbd>Ctrl</kbd>+<kbd>−</kbd> zoom out · <kbd>Ctrl</kbd>+<kbd>0</kbd> reset · <kbd>F11</kbd> fullscreen',
+    'settings.system': 'SYSTEM (DESKTOP)',
+    'settings.check_updates': '🔄 Check for updates',
+    'settings.tutorial_head': 'TUTORIAL',
+    'settings.tut_initial': '▶ Watch initial tutorial again',
+    'settings.tut_mobile': '📱 Watch mobile tutorial (touch)',
+    'settings.keys': 'KEYS',
+    'settings.close_hint': '<kbd>O</kbd> or <kbd>ESC</kbd> to close',
+    'settings.language': 'IDIOMA / LANGUAGE',
+    'lang.pt': 'Português',
+    'lang.en': 'English'
+  }
+};
+let LANG = (function(){
+  try {
+    const s = localStorage.getItem('valadares_lang');
+    if (s === 'pt' || s === 'en') return s;
+    return (navigator.language || 'pt').toLowerCase().startsWith('en') ? 'en' : 'pt';
+  } catch(e){ return 'pt'; }
+})();
+function tr(key, params){
+  let s = (I18N[LANG] && I18N[LANG][key]);
+  if (s == null) s = (I18N.pt && I18N.pt[key]);
+  if (s == null) s = key;
+  if (params) for (const k in params) s = s.split('{'+k+'}').join(params[k]);
+  return s;
+}
+function applyI18n(root){
+  const sc = root || document;
+  sc.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
+  sc.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
+  sc.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', tr(el.getAttribute('data-i18n-ph'))); });
+  sc.querySelectorAll('[data-i18n-title]').forEach(el => { el.setAttribute('title', tr(el.getAttribute('data-i18n-title'))); });
+}
+function updateLangButtons(){
+  document.querySelectorAll('[data-lang-btn]').forEach(b => {
+    b.classList.toggle('lang-active', b.getAttribute('data-lang-btn') === LANG);
+  });
+}
+function setLang(l){
+  if (l !== 'pt' && l !== 'en') return;
+  LANG = l;
+  try { localStorage.setItem('valadares_lang', l); } catch(e){}
+  applyI18n();
+  updateLangButtons();
+}
+// Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
+window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLangButtons(); } catch(e){} });
+
 // Bresenham — true se o caminho de (x1,y1) até (x2,y2) está livre de obstáculos.
 // Endpoints não contam (tile do atacante e do alvo são ignorados).
 function hasLineOfSight(x1, y1, x2, y2){
