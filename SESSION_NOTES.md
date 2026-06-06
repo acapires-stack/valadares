@@ -7,15 +7,15 @@
 
 ---
 
-## 🌐 Sessão 06/06 — i18n INGLÊS: Fase 0 (infra) + Fase 1 (UI estática) ✅ FEITO local · ⏳ aguarda revisão+deploy
+## 🌐 Sessão 06/06 — i18n INGLÊS: Fase 0 + Fase 1 (UI estática + títulos dos modais) ✅ DEPLOYADO · expandindo
 
-**Pedido do dono** (saiu pra dormir, autorizou autônomo "com todas as permissões"): ter **opção EN** no jogo + página EN, pro caso de expandir. Plano completo: `docs/i18n-plano-EN.md`.
+**Pedido do dono** (saiu pra dormir, autorizou autônomo "com todas as permissões"): ter **opção EN** no jogo + página EN, pro caso de expandir. De manhã revisou e mandou subir ("manda, deu certo, pode continuar"). Plano completo: `docs/i18n-plano-EN.md`.
 
-**🔒 Decisão de segurança:** CLIENTE-ONLY, **SEM deploy** — o inglês precisa do olho do dono (traduções/voz) antes de ir público; quando aprovar, sobe num Vercel simples (SEM /manutenção, é cliente-only). **2 commits locais NÃO-pushados:** `87a6bd8` (núcleo) + `7e9e96a` (tutoriais).
+**🔒 Cliente-only (zero risco de save):** ✅ **DEPLOYADO 06/06** via `git push` (Vercel rebuilda; **SEM /manutenção** — não toca `server/**`, ninguém online afetado; default segue PT pra quem já joga). **Commits no ar:** `87a6bd8` núcleo + `7e9e96a` tutoriais + `8ae585b` títulos das ~22 janelas/modais. (A regra do /manutenção é só pra push de `server/**`; cliente-only é seguro.)
 
 **Fase 0 — infra (`play.html`, logo após CONSTANTES):** `I18N{pt,en}` + `tr(key,params)` (⚠️ `tr`, NÃO `t` — `t` já é param de tile no código) + `applyI18n()` (atributos: `data-i18n`=textContent / `data-i18n-ph`=placeholder / `data-i18n-title` / `data-i18n-html`=innerHTML p/ texto com `<kbd>`/`<b>`) + `LANG` (detecta navegador `en*`→en senão pt; persiste em localStorage `valadares_lang`) + **fallback lang→pt→chave** (nunca tela em branco) + `setLang()` + `updateLangButtons()` + listener `DOMContentLoaded`→applyI18n. CSS `.lang-btn`/`.lang-active`.
 
-**Fase 1 — fatia ESTÁTICA traduzida (61 marcações data-i18n):** tela de **login** (placeholders/labels/links) + **toggle PT|EN** (no login E no modal de Opções) + modal de **Opções** (nova seção IDIOMA/LANGUAGE + áudio/acessibilidade/sistema/tutorial/teclas/close-hint) + **barra de controles** + **tutorial de boas-vindas** (6 seções, `<kbd>`/`<b>` preservados via data-i18n-html) + **tutorial mobile**.
+**Fase 1 — fatia ESTÁTICA traduzida (83 marcações data-i18n):** tela de **login** (placeholders/labels/links) + **toggle PT|EN** (no login E no modal de Opções) + modal de **Opções** (nova seção IDIOMA/LANGUAGE + áudio/acessibilidade/sistema/tutorial/teclas/close-hint) + **barra de controles** + **tutorial de boas-vindas** (6 seções, `<kbd>`/`<b>` preservados via data-i18n-html) + **tutorial mobile** + **títulos das ~22 janelas/modais** (Mercador/Stats/Quests/Altar/Treino/Talentos/Arena/Loja de Ouro/Casino/Tinturaria/Pets/Leilões/Conquistas/Guild/Ranking/Bancada…). ⚠️ Os **corpos dinâmicos** dos modais seguem PT (Fase 2).
 
 **✅ Testado no preview (:3333, SEM server — login/tutorial não dependem de WS):** flip por **clique real** (Senha→Password, ENTRAR→ENTER, "esqueci minha senha"→"forgot my password"...), **persistência no reload** (reabre em EN), Opções/controles/tutorial 100% EN, fallback OK, **console 0-erro**. Screenshots PT e EN conferidos.
 
