@@ -2731,6 +2731,36 @@ const I18N = {
     'log.quest_accepted': '<span class="log-sys">Quest aceita: <b>{name}</b></span>',
     'log.quest_ready': '<span class="log-up">✓ Quest pronta pra entregar: {name}</span>',
     'log.daily_ready': '<span class="log-up">✓ Diária pronta: {name}</span>',
+    /* ===== i18n Fase 3.1 — quests/chains (prosa + chrome) ===== */
+    'chain.completed_flavor': '"{name} já foi cumprida. Obrigado, herói."',
+    'chain.questline_done': '✓ Linha de quests concluída',
+    'chain.decision': '— DECISÃO —',
+    'chain.prog_killed': '{done}/{total} {mob} mortos',
+    'chain.visited': '✓ Local visitado',
+    'chain.go_to': 'Vá até ({x}, {y})',
+    'chain.btn_accept': 'aceitar quest',
+    'chain.btn_turnin': 'entregar / concluir',
+    'chain.btn_inprogress': 'em progresso',
+    'chain.stage_meta': '📜 {name} · etapa {n}/{total}',
+    'reward.prefix': 'Recompensa: ',
+    'reward.flag': 'algo mudará no mundo…',
+    'reward.permanent': 'permanente',
+    'quest.goal_collect': 'coletar {n}× {name}',
+    'quest.goal_kill': 'matar {n}× {name}',
+    'quest.badge_claimed': '✓ resgatada',
+    'quest.badge_ready': '★ pronta!',
+    'quest.badge_inprogress': 'em progresso',
+    'quest.badge_done': '✓ concluída',
+    'quest.badge_available': 'disponível',
+    'quest.btn_claim': 'resgatar',
+    'quest.btn_accept': 'aceitar',
+    'quest.btn_turnin': 'entregar',
+    'quest.return_attendant': '▸ volte ao Atendente',
+    'quest.reward_prefix': 'recompensa: ',
+    'quest.reset_in': 'reset em {h}h {m}m',
+    'quest.daily_title': '📅 DIÁRIAS',
+    'quest.main_title': '📜 PRINCIPAIS',
+    'quest.no_dailies': 'Sem diárias disponíveis',
     'log.not_enough_gold_price': '<span class="log-sys">Sem ouro suficiente ({price}g).</span>',
     'log.no_conn': '<span class="log-sys">Sem conexão com o servidor.</span>',
     'log.max_level': '<span class="log-sys">Já no nível máximo (+{n}).</span>',
@@ -3142,6 +3172,36 @@ const I18N = {
     'log.quest_accepted': '<span class="log-sys">Quest accepted: <b>{name}</b></span>',
     'log.quest_ready': '<span class="log-up">✓ Quest ready to turn in: {name}</span>',
     'log.daily_ready': '<span class="log-up">✓ Daily ready: {name}</span>',
+    /* ===== i18n Fase 3.1 — quests/chains (prose + chrome) ===== */
+    'chain.completed_flavor': '"{name} has already been fulfilled. Thank you, hero."',
+    'chain.questline_done': '✓ Quest line completed',
+    'chain.decision': '— DECISION —',
+    'chain.prog_killed': '{done}/{total} {mob} killed',
+    'chain.visited': '✓ Place visited',
+    'chain.go_to': 'Go to ({x}, {y})',
+    'chain.btn_accept': 'accept quest',
+    'chain.btn_turnin': 'turn in / complete',
+    'chain.btn_inprogress': 'in progress',
+    'chain.stage_meta': '📜 {name} · stage {n}/{total}',
+    'reward.prefix': 'Reward: ',
+    'reward.flag': 'something will change in the world…',
+    'reward.permanent': 'permanent',
+    'quest.goal_collect': 'collect {n}× {name}',
+    'quest.goal_kill': 'kill {n}× {name}',
+    'quest.badge_claimed': '✓ claimed',
+    'quest.badge_ready': '★ ready!',
+    'quest.badge_inprogress': 'in progress',
+    'quest.badge_done': '✓ completed',
+    'quest.badge_available': 'available',
+    'quest.btn_claim': 'claim',
+    'quest.btn_accept': 'accept',
+    'quest.btn_turnin': 'turn in',
+    'quest.return_attendant': '▸ return to the Attendant',
+    'quest.reward_prefix': 'reward: ',
+    'quest.reset_in': 'reset in {h}h {m}m',
+    'quest.daily_title': '📅 DAILIES',
+    'quest.main_title': '📜 MAIN',
+    'quest.no_dailies': 'No dailies available',
     'log.not_enough_gold_price': '<span class="log-sys">Not enough gold ({price}g).</span>',
     'log.no_conn': '<span class="log-sys">No server connection.</span>',
     'log.max_level': '<span class="log-sys">Already at max level (+{n}).</span>',
@@ -6064,8 +6124,8 @@ function renderChainDialog(npc){
     if (!stage){
         // chain inteira completa
         body.innerHTML = `
-            <div class="dialog-flavor">"${chain.name} já foi cumprida. Obrigado, herói."</div>
-            <div class="dialog-meta">✓ Linha de quests concluída</div>
+            <div class="dialog-flavor">${tr('chain.completed_flavor', {name: chainNameOf(npc.chain, chain)})}</div>
+            <div class="dialog-meta">${tr('chain.questline_done')}</div>
         `;
         return;
     }
@@ -6074,13 +6134,13 @@ function renderChainDialog(npc){
         const choicesHtml = stage.choices.map((c, idx) => {
             const rew = describeReward(c.reward);
             return `<button class="quest-btn" style="display:block;width:100%;margin-top:8px;text-align:left;padding:10px" data-choice="${npc.chain}|${idx}">
-                <b>${c.label}</b><br>
+                <b>${choiceLabelOf(npc.chain, stage, idx)}</b><br>
                 <span style="font-size:9.5px;color:#74d176;font-family:'Consolas',monospace">→ ${rew}</span>
             </button>`;
         }).join('');
         body.innerHTML = `
-            <div class="dialog-flavor">${stage.desc}</div>
-            <div class="dialog-meta">— DECISÃO —</div>
+            <div class="dialog-flavor">${stageDescOf(npc.chain, stage)}</div>
+            <div class="dialog-meta">${tr('chain.decision')}</div>
             ${choicesHtml}
         `;
         return;
@@ -6089,22 +6149,22 @@ function renderChainDialog(npc){
     const started = isStageStarted(npc.chain, stage);
     const ready = stageReadyToTurnIn(npc.chain, stage);
     let progDesc = '';
-    if (stage.kind === 'item')      progDesc = `${stageProgress(npc.chain, stage)}/${stage.count} ${ITEMS[stage.type]?.name || stage.type}`;
+    if (stage.kind === 'item')      progDesc = `${stageProgress(npc.chain, stage)}/${stage.count} ${itmName(stage.type)}`;
     else if (stage.kind === 'multiItem'){
-        const parts = Object.entries(stage.items).map(([k,n]) => `${Math.min(player.inv[k]||0, n)}/${n} ${ITEMS[k]?.name || k}`);
+        const parts = Object.entries(stage.items).map(([k,n]) => `${Math.min(player.inv[k]||0, n)}/${n} ${itmName(k)}`);
         progDesc = parts.join(', ');
     } else if (stage.kind === 'mob'){
-        progDesc = `${stageProgress(npc.chain, stage)}/${stage.count} ${MTYPE[stage.type]?.name || stage.type} mortos`;
+        progDesc = tr('chain.prog_killed', { done: stageProgress(npc.chain, stage), total: stage.count, mob: mobName(stage.type) });
     } else if (stage.kind === 'visit'){
-        progDesc = stageReadyToTurnIn(npc.chain, stage) ? '✓ Local visitado' : `Vá até (${stage.x}, ${stage.y})`;
+        progDesc = stageReadyToTurnIn(npc.chain, stage) ? tr('chain.visited') : tr('chain.go_to', {x: stage.x, y: stage.y});
     }
     let btn;
-    if (!started) btn = `<button class="quest-btn" data-stage-start="${npc.chain}">aceitar quest</button>`;
-    else if (ready) btn = `<button class="quest-btn" data-stage-complete="${npc.chain}">entregar / concluir</button>`;
-    else btn = `<button class="quest-btn" disabled style="opacity:0.5;cursor:not-allowed">em progresso</button>`;
+    if (!started) btn = `<button class="quest-btn" data-stage-start="${npc.chain}">${tr('chain.btn_accept')}</button>`;
+    else if (ready) btn = `<button class="quest-btn" data-stage-complete="${npc.chain}">${tr('chain.btn_turnin')}</button>`;
+    else btn = `<button class="quest-btn" disabled style="opacity:0.5;cursor:not-allowed">${tr('chain.btn_inprogress')}</button>`;
     body.innerHTML = `
-        <div class="dialog-flavor">${stage.desc}</div>
-        <div class="dialog-meta">📜 ${chain.name} · etapa ${chain.stages.findIndex(s=>s.id===stage.id)+1}/${chain.stages.length}</div>
+        <div class="dialog-flavor">${stageDescOf(npc.chain, stage)}</div>
+        <div class="dialog-meta">${tr('chain.stage_meta', {name: chainNameOf(npc.chain, chain), n: chain.stages.findIndex(s=>s.id===stage.id)+1, total: chain.stages.length})}</div>
         <div class="dialog-progress">${progDesc}</div>
         <div class="dialog-reward">${describeReward(stage.reward)}</div>
         ${btn}
@@ -6115,11 +6175,11 @@ function describeReward(reward){
     if (!reward) return '';
     const parts = [];
     if (reward.gold) parts.push(`${reward.gold}g`);
-    if (reward.xp) for (const [s, v] of Object.entries(reward.xp)) parts.push(`${v}xp ${s}`);
-    if (reward.item) for (const [k, n] of Object.entries(reward.item)) parts.push(`${n}× ${ITEMS[k]?.name || k}`);
-    if (reward.permaBuff) for (const [k, v] of Object.entries(reward.permaBuff)) parts.push(`+${(v*100).toFixed(0)}% ${k} (permanente)`);
-    if (reward.flag) parts.push('algo mudará no mundo…');
-    return parts.length ? 'Recompensa: ' + parts.join(' + ') : '';
+    if (reward.xp) for (const [s, v] of Object.entries(reward.xp)) parts.push(`${v}xp ${skillDisp(s)}`);
+    if (reward.item) for (const [k, n] of Object.entries(reward.item)) parts.push(`${n}× ${itmName(k)}`);
+    if (reward.permaBuff) for (const [k, v] of Object.entries(reward.permaBuff)) parts.push(`+${(v*100).toFixed(0)}% ${k} (${tr('reward.permanent')})`);
+    if (reward.flag) parts.push(tr('reward.flag'));
+    return parts.length ? tr('reward.prefix') + parts.join(' + ') : '';
 }
 
 // ─── QUESTS modal (Atendente) ──────────────────────────────────────────────
@@ -6142,23 +6202,23 @@ function renderQuests(){
         const claimed = isDailyClaimed(q.id);
         const ready = !claimed && dailyComplete(q.id);
         let cls, badge, btn = '';
-        if (claimed){ cls = 'done'; badge = '✓ resgatada'; }
+        if (claimed){ cls = 'done'; badge = tr('quest.badge_claimed'); }
         else if (ready){
-            cls = 'ready'; badge = '★ pronta!';
-            btn = `<button class="quest-btn" data-claim="${q.id}">resgatar</button>`;
-        } else { cls = 'active'; badge = 'em progresso'; }
+            cls = 'ready'; badge = tr('quest.badge_ready');
+            btn = `<button class="quest-btn" data-claim="${q.id}">${tr('quest.btn_claim')}</button>`;
+        } else { cls = 'active'; badge = tr('quest.badge_inprogress'); }
         const prog = dailyProgress(q.id);
         const total = q.goal.count;
-        const goalName = q.goal.kind === 'item' ? (ITEMS[q.goal.type]?.name || q.goal.type) : (MTYPE[q.goal.type]?.name || q.goal.type);
-        const goalDesc = q.goal.kind === 'item' ? `coletar ${total}× ${goalName}` : `matar ${total}× ${goalName}`;
+        const goalName = q.goal.kind === 'item' ? itmName(q.goal.type) : mobName(q.goal.type);
+        const goalDesc = q.goal.kind === 'item' ? tr('quest.goal_collect', {n: total, name: goalName}) : tr('quest.goal_kill', {n: total, name: goalName});
         const rewardParts = [];
         if (q.reward.gold) rewardParts.push(`${q.reward.gold}g`);
-        if (q.reward.xp) for (const [s, v] of Object.entries(q.reward.xp)) rewardParts.push(`${v}xp ${s}`);
+        if (q.reward.xp) for (const [s, v] of Object.entries(q.reward.xp)) rewardParts.push(`${v}xp ${skillDisp(s)}`);
         return `<div class="quest-row ${cls}">
-            <div class="quest-title">${q.name} <span class="quest-badge">${badge}</span></div>
-            <div class="quest-desc">${q.desc}</div>
+            <div class="quest-title">${dailyNameOf(q)} <span class="quest-badge">${badge}</span></div>
+            <div class="quest-desc">${dailyDescOf(q)}</div>
             ${!claimed ? `<div class="quest-progress">→ ${goalDesc} &nbsp;|&nbsp; <b>${prog}/${total}</b></div>` : ''}
-            <div class="quest-reward">recompensa: ${rewardParts.join(' + ')}</div>
+            <div class="quest-reward">${tr('quest.reward_prefix')}${rewardParts.join(' + ')}</div>
             ${btn}
         </div>`;
     }).join('');
@@ -6169,31 +6229,31 @@ function renderQuests(){
         const ready = active && questComplete(q.id);
         let cls, badge, btn = '';
         if (done){
-            cls = 'done'; badge = '✓ concluída';
+            cls = 'done'; badge = tr('quest.badge_done');
         } else if (ready){
-            cls = 'ready'; badge = '★ pronta!';
-            btn = near ? `<button class="quest-btn" data-turnin="${q.id}">entregar</button>` : `<span style="font-size:9px;color:#888">▸ volte ao Atendente</span>`;
+            cls = 'ready'; badge = tr('quest.badge_ready');
+            btn = near ? `<button class="quest-btn" data-turnin="${q.id}">${tr('quest.btn_turnin')}</button>` : `<span style="font-size:9px;color:#888">${tr('quest.return_attendant')}</span>`;
         } else if (active){
-            cls = 'active'; badge = 'em progresso';
+            cls = 'active'; badge = tr('quest.badge_inprogress');
         } else {
-            cls = 'available'; badge = 'disponível';
-            btn = near ? `<button class="quest-btn" data-accept="${q.id}">aceitar</button>` : '';
+            cls = 'available'; badge = tr('quest.badge_available');
+            btn = near ? `<button class="quest-btn" data-accept="${q.id}">${tr('quest.btn_accept')}</button>` : '';
         }
         const prog = questProgress(q.id);
         const total = q.goal.count;
         const goalDesc = q.goal.kind === 'item'
-            ? `coletar ${total}× ${ITEMS[q.goal.type].name}`
-            : `matar ${total}× ${MTYPE[q.goal.type]?.name || q.goal.type}`;
+            ? tr('quest.goal_collect', {n: total, name: itmName(q.goal.type)})
+            : tr('quest.goal_kill', {n: total, name: mobName(q.goal.type)});
         const rewardParts = [];
         if (q.reward.gold) rewardParts.push(`${q.reward.gold}g`);
         if (q.reward.xp) {
-            for (const [s, v] of Object.entries(q.reward.xp)) rewardParts.push(`${v}xp ${s}`);
+            for (const [s, v] of Object.entries(q.reward.xp)) rewardParts.push(`${v}xp ${skillDisp(s)}`);
         }
         return `<div class="quest-row ${cls}">
-            <div class="quest-title">${q.name} <span class="quest-badge">${badge}</span></div>
-            <div class="quest-desc">${q.desc}</div>
+            <div class="quest-title">${qName(q)} <span class="quest-badge">${badge}</span></div>
+            <div class="quest-desc">${qDesc(q)}</div>
             ${!done ? `<div class="quest-progress">→ ${goalDesc} &nbsp;|&nbsp; <b>${prog}/${total}</b></div>` : ''}
-            <div class="quest-reward">recompensa: ${rewardParts.join(' + ')}</div>
+            <div class="quest-reward">${tr('quest.reward_prefix')}${rewardParts.join(' + ')}</div>
             ${btn}
         </div>`;
     }).join('');
@@ -6205,12 +6265,12 @@ function renderQuests(){
     const msLeft = nextReset - now;
     const hLeft = Math.floor(msLeft / 3600000);
     const mLeft = Math.floor((msLeft % 3600000) / 60000);
-    const resetTxt = `reset em ${hLeft}h ${mLeft}m`;
+    const resetTxt = tr('quest.reset_in', {h: hLeft, m: mLeft});
 
     el.innerHTML = `
-        <div class="quest-section-title">📅 DIÁRIAS <span style="float:right;color:#888;font-weight:400;font-size:9.5px;letter-spacing:1px">${resetTxt}</span></div>
-        ${dailyRows || '<div class="stats-empty">Sem diárias disponíveis</div>'}
-        <div class="quest-section-title" style="margin-top:14px">📜 PRINCIPAIS</div>
+        <div class="quest-section-title">${tr('quest.daily_title')} <span style="float:right;color:#888;font-weight:400;font-size:9.5px;letter-spacing:1px">${resetTxt}</span></div>
+        ${dailyRows || `<div class="stats-empty">${tr('quest.no_dailies')}</div>`}
+        <div class="quest-section-title" style="margin-top:14px">${tr('quest.main_title')}</div>
         ${rows}
     `;
 }
@@ -9016,6 +9076,102 @@ const QUEST_CHAINS = {
     },
 };
 
+// ─── i18n Fase 3.1 — quests/chains em EN (chave = id). Dados PT acima intactos;
+//     helpers caem no PT por fallback. Conteúdo de prosa/chrome vai no I18N. ──────
+const QUEST_EN = {
+    q_ratos:  { name:'Infestation Hunt', desc:'Rats invaded the yard. Kill 10.' },
+    q_cobras: { name:'Defend the Yard',  desc:'Kill 5 swamp snakes.' },
+    q_seda:   { name:"Spider's Weave",   desc:'Collect 5 silks (from spiders).' },
+    q_orcs:   { name:'Orc Heads',        desc:'Kill 3 Orcs (the Leader does not count).' },
+    q_lider:  { name:'The Leader',       desc:'Finish off the Orc Leader.' },
+};
+const CHAIN_EN = {
+    cripta: {
+        name:'The Dead of the Crypt',
+        stages: {
+            cr1: { name:'Investigate the Crypt', desc:'The Hermit asks you to visit the Crypt of the Dead (18, 18).' },
+            cr2: { name:'Desecrated Remains',    desc:'Bring 8 Bones from the crypt.' },
+            cr3: { name:'Silence the Dead',      desc:'Eliminate 10 Skeletons.' },
+            cr4: { name:'The Lord of the Crypt', desc:'Kill the Minotaur guarding the Lair.' },
+        },
+    },
+    forja: {
+        name:'The Forgotten Forge',
+        stages: {
+            fj1: { name:'Rare Materials', desc:'Bring 5 Golem Stones and 5 Horns.' },
+            fj2: { name:'The Bellows',    desc:'Bring 10 Silks (to feed the bellows).' },
+            fj3: { name:'The Final Forge',desc:'Kill 5 Golems (testing the metal against them).' },
+        },
+    },
+    drake: {
+        name:'The Drake Hunt',
+        stages: {
+            dr1: { name:'Hatchlings', desc:'Kill 5 (younger) Drakes.' },
+            dr2: { name:'Drake Hide', desc:'Bring 8 Drake Scales.' },
+            dr3: { name:'The Elder',  desc:'Slay the Elder Drake once.' },
+        },
+    },
+    mina: {
+        name:'Rescue in the Mine',
+        stages: {
+            mn1: { name:'Supplies',       desc:'Bring 3 Hams and 3 Health Potions.' },
+            mn2: { name:'Cleanup',        desc:'Kill 10 Bats near the Abyss.' },
+            mn3: { name:'The Golem King', desc:'Kill the Golem King to clear the way.' },
+        },
+    },
+    vohrim: {
+        name:"The Ambassador's Plan",
+        stages: {
+            vh1: { name:'Audience at Court',      desc:'Vohrim asks for signs of respect: 5 Silks and 3 Bones to impress the foreign court.' },
+            vh2: { name:'Show of Strength',       desc:'The Ambassador wants proof: kill 5 Spiders (show your efficiency).' },
+            vh3: { name:'Ancient Seal of the Lair', desc:'Vohrim wants a lost seal — search the WEST side of the Minotaur Lair (78, 18) and see what remains.' },
+            vh4: { name:'Final Tribute',          desc:"Vohrim wants 1 Highlander's Heart to \"seal the alliance.\" Something smells wrong about this demand." },
+            vh5: { name:'The Truth',              desc:'On receiving the Heart, Vohrim laughs darkly. "You were always so useful." The choice is yours.',
+                   choices:['Hand it over and accept the dark pact', 'Refuse and expose the betrayal'] },
+        },
+    },
+    crepusculo: {
+        name:'The Mirror of Fate',
+        stages: {
+            cp1: { name:'The Reflections of Dawn', desc:'Madame Twilight asks for basic proof of courage: kill 25 Snakes to open the ritual.' },
+            cp2: { name:'Crystals of Winter',      desc:'Bring 5 Drake Scales and 3 Golem Stones — the ritual demands ancient blood.' },
+            cp3: { name:"The Predator's Eye",      desc:'Prove your sight: kill 3 Drakes (not the Elder).' },
+            cp4: { name:'The Final Vision',        desc:'The mirror awakens. Madame Twilight offers two truths — only one can be accepted.',
+                   choices:["Accept the Vision — Seer's Aura + 5% permanent dodge", "Refuse the Vision — Skeptic's Cape + 3000g"] },
+        },
+    },
+    vendedor: {
+        name:'The Soul Seller',
+        stages: {
+            vd1: { name:'Welcome, mortal', desc:"The Seller demands 2 Highlander's Hearts for the deal." },
+            vd2: { name:'The Decision',    desc:'The Seller reveals: he will use the Hearts to resurrect the Elder Drake as a Lv11 Boss. You decide what to do.',
+                   choices:["Accept the Soul Seller's Crown (legendary item)", 'Kill the Seller (he vanishes, gain +5% permanent XP)'] },
+        },
+    },
+};
+function qName(q){ return (LANG==='en' && QUEST_EN[q.id]?.name) || q.name || q.id; }
+function qDesc(q){ return (LANG==='en' && QUEST_EN[q.id]?.desc) || q.desc || ''; }
+function chainNameOf(chainId, chain){ return (LANG==='en' && CHAIN_EN[chainId]?.name) || (chain && chain.name) || chainId; }
+function stageNameOf(chainId, stage){ return (LANG==='en' && CHAIN_EN[chainId]?.stages?.[stage.id]?.name) || stage.name || stage.id; }
+function stageDescOf(chainId, stage){ return (LANG==='en' && CHAIN_EN[chainId]?.stages?.[stage.id]?.desc) || stage.desc || ''; }
+function choiceLabelOf(chainId, stage, idx){ return (LANG==='en' && CHAIN_EN[chainId]?.stages?.[stage.id]?.choices?.[idx]) || (stage.choices?.[idx]?.label) || ''; }
+// Diárias são geradas por template client-side (rollDailyQuests); aqui re-derivamos
+// o nome/desc em EN a partir do goal (sem tocar no save — PT cai no q.name/q.desc).
+function dailyNameOf(q){
+    if (LANG==='en'){
+        const nm = q.goal.kind==='item' ? itmName(q.goal.type) : mobName(q.goal.type);
+        return `Daily: ${q.goal.kind==='mob'?'⚔':'📦'} ${q.goal.count}× ${nm}`;
+    }
+    return q.name;
+}
+function dailyDescOf(q){
+    if (LANG==='en'){
+        const nm = q.goal.kind==='item' ? itmName(q.goal.type) : mobName(q.goal.type);
+        return `${q.goal.kind==='mob'?'Kill':'Collect'} ${q.goal.count} ${nm}${q.goal.count>1?'s':''} before midnight.`;
+    }
+    return q.desc;
+}
+
 // Helpers de chain
 function currentChainStage(chainId){
     const chain = QUEST_CHAINS[chainId]; if (!chain) return null;
@@ -9062,15 +9218,15 @@ function startStage(chainId, stage){
     player.questFlags = player.questFlags || {};
     player.questFlags[chainId] = player.questFlags[chainId] || {};
     player.questFlags[chainId][stage.id + '_started'] = true;
-    log(tr('log.quest_accepted_stage', {name: stage.name}));
-    if (typeof showServerToast === 'function') showServerToast('event', `✦ ${stage.name}`, null, 4000);
+    log(tr('log.quest_accepted_stage', {name: stageNameOf(chainId, stage)}));
+    if (typeof showServerToast === 'function') showServerToast('event', `✦ ${stageNameOf(chainId, stage)}`, null, 4000);
     saveState();
 }
 function completeStage(chainId, stage){
     // N3 fase 3: online → server valida + aplica reward. Cliente só dispara intent.
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id })); } catch {}
-        log(tr('log.delivering', {name: stage.name}));
+        log(tr('log.delivering', {name: stageNameOf(chainId, stage)}));
         return;
     }
 }
@@ -9087,7 +9243,7 @@ function notifyMobKillForChains(type){
         if (cur < stage.count){
             player.questFlags[chainId][key] = cur + 1;
             if (cur + 1 === stage.count){
-                log(tr('log.return_to_npc', {name: stage.name}));
+                log(tr('log.return_to_npc', {name: stageNameOf(chainId, stage)}));
             }
         }
     }
@@ -9104,7 +9260,7 @@ function notifyVisitForChains(x, y){
             player.questFlags[chainId] = player.questFlags[chainId] || {};
             if (!player.questFlags[chainId][stage.id + '_visited']){
                 player.questFlags[chainId][stage.id + '_visited'] = true;
-                log(tr('log.place_visited', {name: stage.name}));
+                log(tr('log.place_visited', {name: stageNameOf(chainId, stage)}));
             }
         }
     }
@@ -9197,7 +9353,7 @@ function claimDaily(id){
     // N3 fase 3: online → server autoritativo
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'daily', dailyId:id })); } catch {}
-        log(tr('log.receiving_reward', {name: q.name}));
+        log(tr('log.receiving_reward', {name: dailyNameOf(q)}));
         return true;
     }
 }
@@ -9213,7 +9369,7 @@ function questIsDone(id){ return player.quests.completed.includes(id); }
 function acceptQuest(id){
     if (questIsActive(id) || questIsDone(id)) return false;
     player.quests.active[id] = { progress: 0 };
-    log(tr('log.quest_accepted', {name: questById(id).name}));
+    log(tr('log.quest_accepted', {name: qName(questById(id))}));
     return true;
 }
 function turnInQuest(id){
@@ -9222,7 +9378,7 @@ function turnInQuest(id){
     // N3 fase 3: online → server é a autoridade. Cliente só envia intent + espera invUpdate.
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'simple', questId:id })); } catch {}
-        log(tr('log.delivering', {name: q.name}));
+        log(tr('log.delivering', {name: qName(q)}));
         return true;
     }
 }
@@ -9237,7 +9393,7 @@ function notifyMobKilledForQuests(type){
         if (st.progress < q.goal.count){
             st.progress++;
             if (st.progress === q.goal.count){
-                log(tr('log.quest_ready', {name: q.name}));
+                log(tr('log.quest_ready', {name: qName(q)}));
             }
         }
     }
@@ -9250,7 +9406,7 @@ function notifyMobKilledForQuests(type){
         if (isDailyClaimed(q.id)) continue;
         daily.progress[q.id] = (daily.progress[q.id] || 0) + 1;
         if (daily.progress[q.id] === q.goal.count){
-            log(tr('log.daily_ready', {name: q.name}));
+            log(tr('log.daily_ready', {name: dailyNameOf(q)}));
         }
     }
 }
@@ -11598,7 +11754,7 @@ document.addEventListener('click', e => {
             // N3 fase 3: online → server valida + aplica. Cliente só dispara intent.
             if (ws && ws.readyState === 1 && _wsAuthed){
                 try { ws.send(JSON.stringify({ t:'questTurnIn', kind:'chain', chainId, stageId: stage.id, choiceId: idx })); } catch {}
-                log(tr('log.deciding', {label: stage.choices[idx].label}));
+                log(tr('log.deciding', {label: choiceLabelOf(chainId, stage, idx)}));
                 return;
             }
         }
