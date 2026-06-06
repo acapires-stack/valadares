@@ -3813,7 +3813,7 @@ const ITEMS = {
     MEAT:     { name:'Carne de lobo',  color:'#aa5040', heal:45, kind:'food' },
     HAM:      { name:'Presunto',       color:'#d07050', heal:75, kind:'food' },
     POTION:   { name:'Poção de vida',  color:'#ee3040', heal:60, kind:'potion' },
-    POTION_MP:{ name:'Poção de mana',  color:'#4080ff', manaheal:50, kind:'potion' },
+    POTION_MP:{ name:'Poção de mana',  color:'#4080ff', manaheal:80, kind:'potion' },
     BENCAO_FENIX: { name:'Bênção da Fênix', color:'#ffaa30', kind:'blessing', desc:'Salva você da próxima morte. Consumida automaticamente.' },
     BENCAO_FENIX_TEMP: { name:'Bênção da Fênix (24h)', color:'#ff6020', kind:'blessing', desc:'Salva você da próxima morte. Expira em 24h se não for usada.' },
     // Cosméticos — equipáveis num slot único, só visual, sem stats
@@ -4345,7 +4345,6 @@ const player = {
     stun:   null,   // { endAt }
     bleed:  null,   // mesmo shape de poison
     buff:   null,   // { dmg, spd, expiresAt, color, name } — Fúria etc
-    manaBuff: null, // { mpPerSec, life, maxLife } — pot de mana vira regen on-the-fly
     // Quests: ativas com progresso, completas (já entregues), prontas pra entregar
     quests: {
         active: {},      // id -> { progress }
@@ -4771,7 +4770,7 @@ function itemFullDesc(def){
         if (def.moveSpd) lines.push(`Velocidade de movimento +${Math.round(def.moveSpd*100)}%`);
         if (def.hpRegen) lines.push(`Regen de HP +${def.hpRegen}`);
         if (def.heal) lines.push(`Recupera ${def.heal} HP`);
-        if (def.manaheal) lines.push(`Regen de mana: 8 mp/s por 10s (80 total)`);
+        if (def.manaheal) lines.push(`Restaura ${def.manaheal} MP na hora`);
     }
     if (def.desc) lines.push(def.desc);
     return lines.join('\n');
@@ -5734,28 +5733,9 @@ function armorHpRegenBonus(){
     }
     return bonus;
 }
-function tickRegen(dt){
-    // T2: regen autoritativo no server quando online (`serverAuthMobs && _wsAuthed`).
-    // Server broadcasta pstats com hp/mp atualizado — cliente só renderiza.
-    // manaBuff (POTION_MP que dá +80 MP em 10s) ainda é local pra UI snappy
-    // — não é vetor crítico, e o cap em maxMp é validado server-side a cada pstats.
-    // Pot de mana: UI-only countdown. MP é aplicado pelo server (tickPlayerRegen) e chega
-    // via broadcastPstatsAll, então o cliente NÃO soma local pra evitar conflito com lockdown.
-    if (player.manaBuff){
-        // Expira pelo RELÓGIO real (expiresAt), não por dt acumulado: se o game loop
-        // pausar (perda de foco / aba em background no navegador), o countdown não
-        // "congela" — senão a próxima poção de mana ficava travada bem além dos 10s
-        // reais (bug do dono 04/06: "hp cheio e a poção de mana não entrou").
-        player.manaBuff.life = (player.manaBuff.expiresAt || 0) - Date.now();
-        if (player.manaBuff.life <= 0) player.manaBuff = null;
-    }
-}
-
-// Regen de mana ativo? Checado pelo RELÓGIO (não pelo countdown, que congela com o
-// loop pausado) — usado pra não desperdiçar poção de mana empilhada.
-function manaBuffActive(){
-    return !!(player.manaBuff && player.manaBuff.expiresAt && Date.now() < player.manaBuff.expiresAt);
-}
+// Regen de HP/MP é 100% server-autoritativo (tickPlayerRegen) e chega via pstats.
+// A poção de mana restaura na hora (ver handler de invUpdate.consume) — não há mais
+// regen-over-time no cliente.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MULTIPLAYER
@@ -6281,8 +6261,8 @@ function handleMP(msg){
                 }
             }
         }
-        // Consume (food/potion): HP é instant (server aplicou + broadcastPstatsAll); MP é
-        // regen-over-time via manaBuff (server tickPlayerRegen aplica). Aqui só UI snappy.
+        // Consume (food/potion): HP e MP são instant (server aplicou + broadcastPstatsAll).
+        // Aqui só float/log + soma local pra UI snappy (server confirma via pstats).
         if (msg.consume && msg.consume.ok){
             const def = ITEMS[msg.consume.key];
             const name = def ? def.name : msg.consume.key;
@@ -6292,11 +6272,11 @@ function handleMP(msg){
                 addFloat(player.x, player.y, `+${healed}`, '#66cc66', false, 0);
                 log(`<span class="log-xp">Comeu ${name} (+${healed} HP)</span>`);
             }
-            if (msg.consume.manaBuff){
-                const { mpPerSec, lifeMs } = msg.consume.manaBuff;
-                player.manaBuff = { mpPerSec, life: lifeMs, maxLife: lifeMs, expiresAt: Date.now() + lifeMs };
-                addFloat(player.x, player.y, `+${mpPerSec}/s por ${lifeMs/1000}s`, '#5599ff', false, -14);
-                log(`<span class="log-xp">Bebeu ${name} — regen ${mpPerSec} mp/s por ${lifeMs/1000}s</span>`);
+            const manaHealed = msg.consume.manaHealed | 0;
+            if (manaHealed > 0){
+                player.mp = Math.min(player.maxMp, player.mp + manaHealed);
+                addFloat(player.x, player.y, `+${manaHealed} MP`, '#5599ff', false, -14);
+                log(`<span class="log-xp">Bebeu ${name} (+${manaHealed} MP)</span>`);
             }
         }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
@@ -8572,7 +8552,7 @@ function sellToShop(itemKey, qtyStr){
 
 // ─── Status Effects (poison/stun/bleed) ─────────────────────────────────────
 function clearStatusEffects(){
-    player.poison = null; player.stun = null; player.bleed = null; player.buff = null; player.manaBuff = null;
+    player.poison = null; player.stun = null; player.bleed = null; player.buff = null;
 }
 function isStunned(){
     if (!player.stun) return false;
@@ -12203,7 +12183,7 @@ function eatBestFood(){
             sent = true;
         }
     }
-    if (needMp > 0 && !manaBuffActive()){
+    if (needMp > 0){
         const mana = Object.entries(player.inv)
             .filter(([k,q]) => q > 0 && ITEMS[k] && ITEMS[k].manaheal)
             .map(([k,q]) => ({ k, q, mp: ITEMS[k].manaheal }));
@@ -12212,9 +12192,7 @@ function eatBestFood(){
             sent = true;
         }
     }
-    if (manaBuffActive() && needMp > 0){
-        log('<span class="log-sys">Regen de mana ainda ativa — aguarde acabar.</span>');
-    } else if (!sent){
+    if (!sent){
         if (needHp <= 0 && needMp <= 0) log('<span class="log-sys">HP e MP já estão cheios.</span>');
         else log('<span class="log-sys">Sem comida/poção disponível.</span>');
     }
@@ -14337,7 +14315,6 @@ function loop(ts){
     itemPulse += dt*0.005;
 
     handleMovement(dt);
-    tickRegen(dt);
     checkPzLock();
     tickRespawns(dt);
     tickSpellCooldowns(dt);
@@ -14878,7 +14855,6 @@ function loop(ts){
         if (player.stun)   icons.push({ glyph:'⚡', color:'#ffaa20' });
         if (player.bleed)  icons.push({ glyph:'🩸', color:'#cc3030' });
         if (player.buff)   icons.push({ glyph:'★', color: player.buff.color || '#ff6060' });
-        if (player.manaBuff) icons.push({ glyph:'⚗', color:'#5599ff' });
         if (icons.length){
             ctx.font = 'bold 11px monospace';
             ctx.textAlign = 'center';

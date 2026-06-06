@@ -7,6 +7,32 @@
 
 ---
 
+## 🧪 Sessão 05/06 (cont.) — POÇÃO DE MANA volta a curar DIRETO (instant) ✅ FEITO local · ⏳ aguarda deploy
+
+**Pedido do dono:** "voltar o pot de mana para curar direto — entra em conflito com o regen dos ataques."
+
+**Diagnóstico:** a poção era **regen-over-time** (`manaBuff`: 8 mp/s × 10s = 80 MP via `tickPlayerRegen`).
+O gotejamento não acompanhava o gasto de mana em combate (tiro básico 4 / magia 45-60) **e** o cliente
+**travava a re-bebida por 10s** (`eatBestFood`: "Regen de mana ainda ativa — aguarde acabar"). Esse era o atrito.
+Não há "regen no ataque" separado no server — o conflito é gasto-em-combate vs. gotejamento + trava.
+
+**Mudança (server-autoritativa, espelha o HP):** poção restaura **80 MP na hora**.
+- `server.js`: `POTION_MP.manaheal` 50→**80** (o 50 era só flag; o buff entregava 80); o consumo aplica
+  `manaheal` direto em `p.mp` (cap `maxMp`) + `broadcastPstatsAll`; **removido** o tick de `manaBuff` em
+  `tickPlayerRegen`. Payload do consume agora manda `manaHealed`.
+- `play.html`: handler de `invUpdate.consume` aplica `manaHealed` na hora (+float/log "+80 MP"); `eatBestFood`
+  sem a trava de 10s; tooltip "Restaura 80 MP na hora"; **removido o andaime morto** do `manaBuff`
+  (declaração, `tickRegen`+chamada no loop, `manaBuffActive`, ícone ⚗, clear de status). 12 edições / 2 arquivos.
+
+**Verificação:** `node --check` server OK + parse do JS inline do play.html OK + grep **zero** referência
+solta a `manaBuff/tickRegen/manaBuffActive`. **Static só — behavioral é in-game do dono** (toca server).
+
+**⏳ Deploy:** toca `server/**` → exige `/manutenção`. Validar in-game: MP baixo → beber → **sobe na hora**;
+beber 2× seguidas **sem trava**; tooltip "Restaura 80 MP na hora". Balance: o **80** é tunável (1 linha em
+`server.js`:598 + `play.html`:3816; mantido = total que a poção já entregava).
+
+---
+
 ## 🪄 Sessão 05/06/2026 (noite) — REWORK DE MAGOS (Fases 1 + 2a + 2b) ✅ TODO DEPLOYADO
 
 > Estado completo + commits + gotchas na memória `project_valadares.md` (status do topo). Resumo:

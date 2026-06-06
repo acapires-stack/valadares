@@ -595,7 +595,7 @@ const ITEM_META = {
     MEAT:     { kind:'food', heal:45 },
     HAM:      { kind:'food', heal:75 },
     POTION:   { kind:'potion', heal:60 },
-    POTION_MP:{ kind:'potion', manaheal:50 },
+    POTION_MP:{ kind:'potion', manaheal:80 },
     CARNE_LAGARTO: { kind:'food', heal:35 },
     BENCAO_FENIX:  { kind:'blessing' },
     // Bênção temporária — entregue só pela morte do 007. Some 24h depois.
@@ -4351,21 +4351,6 @@ function tickPlayerRegen(){
             p._regenMpAt = now;
             changed = true;
         }
-        // ManaBuff (POTION_MP): 8mp/s autoritativo enquanto ativo.
-        if (p.manaBuff && maxMp > 0){
-            if (now >= p.manaBuff.until){
-                p.manaBuff = null;
-                changed = true;
-            } else if (p.mp < maxMp){
-                const elapsed = now - (p.manaBuff.lastTickAt || now);
-                if (elapsed >= 250){   // tick ~4× por segundo
-                    const gain = Math.max(1, Math.floor(elapsed * p.manaBuff.mpPerSec / 1000));
-                    p.mp = Math.min(maxMp, p.mp + gain);
-                    p.manaBuff.lastTickAt = now;
-                    changed = true;
-                }
-            }
-        }
         if (changed) broadcastPstatsAll(p);
     }
 }
@@ -5883,26 +5868,23 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             incInv(p, key, -1);
-            // HP/food: aplicação instant + autoritativa (lockdown N3 ignora hp do client).
-            // MP/potion: regen-over-time (8mp/s × 10s) autoritativo via p.manaBuff —
-            // tickPlayerRegen aplica o ganho. Não pode empilhar com manaBuff já ativo.
+            // HP/food e MP/potion: aplicação instant + autoritativa (lockdown N3 ignora
+            // hp/mp do client). A poção de mana já foi regen-over-time (manaBuff), mas o
+            // gotejamento (8mp/s) brigava com o gasto de mana em combate e travava a
+            // re-bebida por 10s → revertido pra restauração direta (cura na hora).
             const maxHp = p.maxHp || 100;
             const maxMp = p.maxMp || 0;
-            let healed = 0, manaBuffApplied = false;
+            let healed = 0, manaHealed = 0;
             if (meta.heal && (p.hp ?? 0) < maxHp){
                 healed = Math.min(meta.heal, maxHp - (p.hp ?? 0));
                 p.hp = Math.min(maxHp, (p.hp ?? 0) + meta.heal);
             }
-            if (meta.manaheal && maxMp > 0){
-                const now = Date.now();
-                const active = p.manaBuff && p.manaBuff.until > now;
-                if (!active){
-                    p.manaBuff = { mpPerSec: 8, until: now + 10000, lastTickAt: now };
-                    manaBuffApplied = true;
-                }
+            if (meta.manaheal && maxMp > 0 && (p.mp ?? 0) < maxMp){
+                manaHealed = Math.min(meta.manaheal, maxMp - (p.mp ?? 0));
+                p.mp = Math.min(maxMp, (p.mp ?? 0) + meta.manaheal);
             }
-            sendInvUpdate(p, { consume:{ ok:true, key, heal: meta.heal || 0, manaheal: meta.manaheal || 0, healed, manaBuff: manaBuffApplied ? { mpPerSec:8, lifeMs:10000 } : null } });
-            if (healed > 0) broadcastPstatsAll(p);
+            sendInvUpdate(p, { consume:{ ok:true, key, heal: meta.heal || 0, manaheal: meta.manaheal || 0, healed, manaHealed } });
+            if (healed > 0 || manaHealed > 0) broadcastPstatsAll(p);
             return;
         }
 
