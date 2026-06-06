@@ -184,7 +184,16 @@ diárias re-derivadas do `goal`, sem tocar no save). Render roteado (`renderChai
 `renderQuests`) + 10 logs/toasts com nome traduzido. +29 chaves `chain.*`/`reward.*`/`quest.*` (431/431 pt/en).
 Verificado: vm.Script 0-erro, paridade, render real EN+PT no preview, 0 vazamento. Detalhe no `SESSION_NOTES.md`.
 
-**⏳ FALTA (tail restante):** (2) **tooltips de stat** (itemFullDesc "+4 ataque·2 mãos"; altar statLine) —
-itemFullDesc precisa receber a key; (3) **chrome de UI dos OUTROS modais** (botões "comprar"/"vender"/
-"Estudar Magia" etc — prosa de interface); (4) **server** manda o nome da quest em PT nas mensagens de
-conclusão (`server.js`, exigiria /manutenção).
+### Fase 3 TAIL — tooltips + chrome de TODOS os modais ✅ FEITA (06/06, cliente `11917a3`; server `3f29fb0` SEGURADO)
+Workflow de descoberta (8 agentes, 306 strings) + crítico. **Item 2 (tooltips):** `itemFullDesc(def,key)` +
+`tip.*` + altar `statLine`. **Item 3 (chrome):** loja/baú/bancada/forja/altar/treino/casino/leilão/loja-ouro/
+pets/dye/talentos/arena/trade/amigos/guild/ranking/stats/conquistas/widgets + categorias (`catLabelInv`,
+label-chave intacto) + `KEY_HELP_EN` + HTML estático (heads/abas/botões/subtítulos/hints `data-i18n*`;
+`hint.esc_close` compartilhado) + overlays (reconexão/loading/forgot) + modal de duelo. **Item 4 (server):**
+NO-OP p/ quest names (server manda códigos, cliente traduz); só o reject do `trainAttempt` → 6 chaves
+`srv.train_*` via `trp` — **commit `3f29fb0` SEGURADO (server → /manutenção)**. Pulado jargão EN===PT +
+`toLocaleString`. I18N **681/681**; verificado: sintaxe, paridade, 669 chaves usadas todas definidas, 17
+renders sem erro em EN + 0 vazamento (preview). Detalhe: `SESSION_NOTES.md`.
+
+**✅ Tail FECHADO.** Resíduo (fora do tail): texto vindo do MercadoPago/server (`data.error`/`e.message`),
+lore/flavor que ficar em PT por escolha, e o push do server `3f29fb0` no próximo `/manutenção` do dono.

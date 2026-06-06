@@ -7,6 +7,28 @@
 
 ---
 
+## 🌐 Sessão 06/06 (cont. 3) — i18n Fase 3 TAIL: tooltips + chrome de TODOS os modais ✅ DEPLOYADO (cliente `11917a3`) · server `3f29fb0` SEGURADO
+
+**Pedido do dono:** "tail da fase 3 pode fazer" (Ultracode ligado → exaustivo). Fecha o item 2 (tooltips) e item 3 (chrome dos modais). Item 4 (nomes de quest no server) = **NO-OP** confirmado.
+
+**Descoberta (workflow `wqp8xiwn0`):** 8 agentes paralelos varreram tooltips + ~20 modais + server.js → **306 strings candidatas** + crítico de completude. Crítico cravou: (a) leak real em `renderStats` (lista de kills usava `def.name` cru → `mobName`); (b) overlays conexão/loading/forgot fora das funções de render; (c) categorias do inventário: `label` é CHAVE de colapso → traduzir só no display; (d) **server quest names = NO-OP** (server manda só códigos/números, cliente traduz) — só o reject do `trainAttempt` era leak real; (e) pular jargão EN===PT (PvP kills/online/Rating/atk-def-spd) e `toLocaleString`.
+
+**Item 2 — tooltips (cliente):** `itemFullDesc(def, key)` (assinatura ganhou `key`) → 1ª linha `itmName(key)`, desc `itemDescEn(key)`, e `tip.*` (ataque/defesa/atkspd/alcance/procs veneno/sangra/fogo/heal/etc.) + 3 call sites passam a key. Altar `statLine` (5 ramos) → `altar.stat_*`.
+
+**Item 3 — chrome (cliente, ~tudo via tr()/data-i18n):** loja/baú/bancada(craft+forja+describeUpgradeBonuses+banner)/altar/treino(já era)/casino/leilão(4 renders+confirms)/loja-ouro(MercadoPago)/pets/tinturaria/talentos/arena/trade/amigos/guild/ranking(temporada+listas+labels LANG-aware)/stats(cards+lista+summary)/conquistas/widgets(target/pvp/bosses→mobName/party/daily/players-online) + **categorias do inventário** (`catLabelInv` traduz só display, `data-cat` cru) + **KEY_HELP_EN** (Opções) + **HTML estático** dos modais (heads/abas/botões/subtítulos/hints via `data-i18n`/`-html`/`-ph`; hints "ESC fechar" puros compartilham `hint.esc_close`) + **overlays** (reconexão/loading/forgot-pwd) + **modal de duelo** + fix de um `log('Use WASD...')` hardcoded.
+
+**Item 4 — server (`3f29fb0`, SEGURADO):** só o reject do `trainAttempt` (6 chaves `srv.train_*` no `I18N_SRV` pt/en + `reject()` via `trp(p,key)`). **NÃO PUSHADO — toca `server/**` → exige `/manutenção` + logout do dono.** Quest names confirmados NO-OP (sem ação).
+
+**Mecânica:** `tr()` + dict `I18N{pt,en}` (agora **681/681**, 0 assimetria) + helpers de conteúdo já existentes (itmName/mobName/spellName/etc.). Pulado o jargão EN===PT (falsos-positivos do crítico).
+
+**Verificação:** `vm.Script` 0-erro (cliente) + `node --check` (server); **paridade programática 681/681**; **669 chaves usadas todas definidas nas 2 línguas** (único "missing" = `chave` num comentário); preview :3333 — **17 render funcs sem erro em EN + 0 vazamento PT** no DOM (incl. modais estáticos + duelo após applyI18n); amostras EN conferidas ("Sword · +4 attack · 1-handed", "by X · expires in 2h", "STORE ALL/TAKE ALL", "Materials"…).
+
+**Deploy:** cliente `11917a3` pushado → Vercel confirmado no ar (`/jogar`: catLabelInv/dyeSlotLabel/KEY_HELP_EN/chest.your_bag/duel.challenged_you presentes). **SEM /manutenção** (não tocou `server/**` no push). Server `3f29fb0` aguarda `/manutenção`.
+
+**⏳ Próximo /manutenção do dono:** push do `3f29fb0` (trainAttempt EN) + validar in-game (treinar errado mostra reject em EN). **Tail da Fase 3 FECHADO** — só sobra a camada de tradução do MercadoPago/server-sourced (data.error etc.) e lore/flavor PT por escolha.
+
+---
+
 ## 🌐 Sessão 06/06 (cont. 2) — i18n Fase 3.1: DIÁLOGOS DE NPC + QUESTS ✅ DEPLOYADO (cliente-only, `cd58f70`)
 
 **Pedido do dono:** "pode executar a faze 3.1 em automato" (autônomo, valida in-game depois). Fecha o
