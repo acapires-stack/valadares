@@ -174,4 +174,7 @@ Até lá: **PT-BR é o padrão e está certo.** Este doc é só o roteiro guarda
 - **innerHTML de resultado** (auction listado/cancelado/comprado, dye removida/tingido, pet adotado, arena fila, trade AGUARDANDO, update check) → `tr('res.*')`.
 - **+76 chaves** `toast.*`/`err.*`/`res.*` (dict cliente agora **303/303** pt/en, 0 vazamento). Verificado no preview.
 
-**Fase 3** (pendente) = conteúdo: nomes/descrições de itens, magias, mobs, NPCs, quests (~330). Maior esforço, menor prioridade (lore/flavor pode ficar PT).
+### Fase 3 — conteúdo (PARCIAL, 06/06)
+**✅ FEITO + deployado (nomes + descrições, paridade total, cliente):** mobs(22), itens(87 name+desc), magias(9 name+desc), NPCs(15 nomes), talentos(15), conquistas(20), pets(4), receitas, skills(7). Mecanismo: mapas `*_EN` por chave + helpers (`mobName/itmName/spellName/npcName/talName/achName/petNameOf/skillDisp` + catLabel/tierLabel) com fallback PT; dados originais intactos. Commits `cec8e87`→`9add7ad`.
+
+**⏳ FALTA:** (1) **diálogos de NPC + quests** (QUEST_CHAINS conversas das chains + QUESTS nomes/descrições + estágios — MAIOR pedaço); (2) **tooltips de stat** (itemFullDesc "+4 ataque·2 mãos"; altar statLine) — itemFullDesc precisa receber a key; (3) **chrome de UI dos modais** (botões "comprar"/"vender"/"Estudar Magia" etc — prosa de interface). Detalhe no `SESSION_NOTES.md`.

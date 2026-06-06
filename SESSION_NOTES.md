@@ -29,6 +29,32 @@
 
 ---
 
+## 🌐 Sessão 06/06 (continuação) — i18n Fase 2 + 2.5 + 3 (conteúdo) ✅ DEPLOYADO · 1 pendência grande
+
+**Dono pediu Fase 2 inteira → depois 2.5 → depois Fase 3, autônomo ("pode fazer automato, ai verifico tudo").** Tudo testado no preview (console 0-erro, paridade pt/en, flip EN). Dados PT originais intactos; mecanismo = dict/maps EN + helpers com fallback.
+
+### Fase 2 — mensagens dinâmicas ✅
+- **Cliente (`3b9fed2`):** 247 `log()` + 10 floats de texto → `tr('chave',{params})`. Dict `log.*`/`float.*`/`lbl.*`. `join` manda `lang: LANG`. Admin/[admin] e relays seguem PT.
+- **Server (`00aee74`, Opção B):** `p.lang` no join (fallback PT = zero regressão) + `I18N_SRV{pt,en}` + `trp(p,key,params)` + `broadcastMsgKey()` (traduz por destinatário). ~95 serverMsg player-facing. Admin/maintenance/`5656` "entrou em outro lugar" (cliente detecta por `text.includes`) seguem PT de propósito.
+
+### Fase 2.5 — toasts + dicts de erro ✅ (`e5d194d`, cliente)
+18 `showServerToast` + 7 dicts de erro inline (auth/questResult/dungeon/arena/auction/dye/pet) + innerHTML de resultado → `toast.*`/`err.*`/`res.*`. Dict cliente: **303/303 pt/en, 0 vazamento**.
+
+### Fase 3 — conteúdo (nomes+descrições) ✅ 5 deploys cliente
+`cec8e87` skills · `6e316de` mobs(22) · `e4c94cc` itens(87) · `a01015e` magias(9)+NPCs(15) · `9add7ad` talentos(15)/conquistas(20)/pets(4)/receitas. Mapas `MTYPE_EN/ITEM_EN/SPELL_EN/NPC_EN/TALENT_EN/ACH_EN/PET_EN` + helpers `mobName/itmName/spellName/npcName/talName/achName/petNameOf/skillDisp` (+ catLabel/tierLabel/BUFFLABEL_EN). **Paridade total verificada.** Mob name é baked em `m.name` no snapshot (combate/battle list/logs grátis). Item `itmName` trata `_PLUS_N`. Receitas reusam `itmName(r.out)`.
+
+### ⚠️ GAFE — server pushado SEM /manutenção
+O push do cliente 2.5 **arrastou o commit do server `00aee74`** junto (empilhei 2.5 sobre o server "segurado"; `git push` manda a cadeia). Railway redeployou — **HTTP 200 o tempo todo, sem downtime**, código já verificado; risco mitigado pelas hardenings pós-30/05. **LIÇÃO:** ao segurar commit de `server/**`, NÃO empilhar commit pushável em cima (commitar server por último ou `git stash`). Dono deve conferir personagem no login.
+
+### ⏳ FALTA (Fase 3 tail — retomar AQUI na próxima sessão)
+1. **Diálogos de NPC + quests** (o MAIOR pedaço; o que o dono mais citou): conversas das chains em `QUEST_CHAINS` (~3000 linhas, ~100-200 falas: eremita/ferreiro/cacadora/mineiro/crepusculo/vohrim/vendedor) + `QUESTS` (nomes/descrições) + estágios/escolhas + progresso de quest (item names em 6071 etc). Render: `renderChainDialog`/`renderQuests`. Mecanismo sugerido: mapa `CHAIN_EN`/`QUEST_EN` por id+stage OU campos `*En` inline + rotear os renders.
+2. **Tooltips de stat** (hover): `itemFullDesc` ("+4 ataque · 2 mãos", veneno/sangra…) + altar `statLine` ("dano base · range · cd"). itemFullDesc precisa receber a `key` (hoje só recebe `def`) pra puxar `ITEM_EN[key].desc`.
+3. **Chrome de UI dos modais:** botões/labels PT (loja "comprar"/"vender"/"inventário vazio", talentos "comprar"/"sem pontos"/"Redistribuir", altar "Estudar Magia", summaries, confirm() de pet). É prosa de interface, não-conteúdo.
+
+**Deploy:** cliente tudo no ar (Vercel). Server `00aee74` no ar (deployado pela gafe). `main...origin/main` limpo. Prod: valadares.app.br 200 / ws maintenance:false.
+
+---
+
 ## 🧪 Sessão 05-06/06 — POÇÃO DE MANA volta a curar DIRETO (instant) ✅ DEPLOYADO 06/06 + no ar
 
 **Pedido do dono:** "voltar o pot de mana para curar direto — entra em conflito com o regen dos ataques."
