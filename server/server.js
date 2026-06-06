@@ -1849,6 +1849,12 @@ const I18N_SRV = {
     'srv.near_chest': 'Aproxime-se do baú.',
     'srv.bad_chest_op': 'Operação de baú inválida.',
     'srv.need_wand': 'Precisa de uma wand equipada.',
+    'srv.train_unknown_skill': 'Skill desconhecida.',
+    'srv.train_too_fast': 'Calma — espere entre treinos.',
+    'srv.train_not_at_altar': 'Treine Magia no Altar.',
+    'srv.train_not_at_dummy': 'Aproxime-se do Boneco de treino.',
+    'srv.train_no_gold': 'Gold insuficiente pra treinar.',
+    'srv.train_failed': 'Não foi possível treinar.',
     'srv.no_mana': 'Sem mana suficiente.',
     'srv.no_mana_short': 'Sem mana.',
     'srv.respec_cost': 'Respec custa {g}g — você não tem.',
@@ -1949,6 +1955,12 @@ const I18N_SRV = {
     'srv.near_chest': 'Get closer to the chest.',
     'srv.bad_chest_op': 'Invalid chest operation.',
     'srv.need_wand': 'You need a wand equipped.',
+    'srv.train_unknown_skill': 'Unknown skill.',
+    'srv.train_too_fast': 'Easy — wait between training sessions.',
+    'srv.train_not_at_altar': 'Train Magic at the Altar.',
+    'srv.train_not_at_dummy': 'Get closer to the training Dummy.',
+    'srv.train_no_gold': 'Not enough gold to train.',
+    'srv.train_failed': "Couldn't train.",
     'srv.no_mana': 'Not enough mana.',
     'srv.no_mana_short': 'No mana.',
     'srv.respec_cost': 'Respec costs {g}g — you cannot afford it.',
@@ -6772,11 +6784,9 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'trainAttempt') {
             const reject = (reason) => {
                 // ok:false não era tratado no cliente (falha silenciosa). serverMsg já renderiza.
-                const txt = {
-                    unknown_skill:'Skill desconhecida.', too_fast:'Calma — espere entre treinos.',
-                    not_at_altar:'Treine Magia no Altar.', not_at_dummy:'Aproxime-se do Boneco de treino.',
-                    no_gold:'Gold insuficiente pra treinar.',
-                }[reason] || 'Não foi possível treinar.';
+                // i18n: traduz por p.lang (trp); fallback p/ srv.train_failed em reason desconhecida.
+                const key = 'srv.train_' + reason;
+                const txt = I18N_SRV.pt[key] ? trp(p, key) : trp(p, 'srv.train_failed');
                 sendTo(id, { t:'serverMsg', level:'warn', text: txt });
             };
             const skill = String(msg.skill || '');
