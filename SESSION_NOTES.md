@@ -7,7 +7,25 @@
 
 ---
 
-## 🧪 Sessão 05/06 (cont.) — POÇÃO DE MANA volta a curar DIRETO (instant) ✅ FEITO local · ⏳ aguarda deploy
+## 🌐 Sessão 06/06 — i18n INGLÊS: Fase 0 (infra) + Fase 1 (UI estática) ✅ FEITO local · ⏳ aguarda revisão+deploy
+
+**Pedido do dono** (saiu pra dormir, autorizou autônomo "com todas as permissões"): ter **opção EN** no jogo + página EN, pro caso de expandir. Plano completo: `docs/i18n-plano-EN.md`.
+
+**🔒 Decisão de segurança:** CLIENTE-ONLY, **SEM deploy** — o inglês precisa do olho do dono (traduções/voz) antes de ir público; quando aprovar, sobe num Vercel simples (SEM /manutenção, é cliente-only). **2 commits locais NÃO-pushados:** `87a6bd8` (núcleo) + `7e9e96a` (tutoriais).
+
+**Fase 0 — infra (`play.html`, logo após CONSTANTES):** `I18N{pt,en}` + `tr(key,params)` (⚠️ `tr`, NÃO `t` — `t` já é param de tile no código) + `applyI18n()` (atributos: `data-i18n`=textContent / `data-i18n-ph`=placeholder / `data-i18n-title` / `data-i18n-html`=innerHTML p/ texto com `<kbd>`/`<b>`) + `LANG` (detecta navegador `en*`→en senão pt; persiste em localStorage `valadares_lang`) + **fallback lang→pt→chave** (nunca tela em branco) + `setLang()` + `updateLangButtons()` + listener `DOMContentLoaded`→applyI18n. CSS `.lang-btn`/`.lang-active`.
+
+**Fase 1 — fatia ESTÁTICA traduzida (61 marcações data-i18n):** tela de **login** (placeholders/labels/links) + **toggle PT|EN** (no login E no modal de Opções) + modal de **Opções** (nova seção IDIOMA/LANGUAGE + áudio/acessibilidade/sistema/tutorial/teclas/close-hint) + **barra de controles** + **tutorial de boas-vindas** (6 seções, `<kbd>`/`<b>` preservados via data-i18n-html) + **tutorial mobile**.
+
+**✅ Testado no preview (:3333, SEM server — login/tutorial não dependem de WS):** flip por **clique real** (Senha→Password, ENTRAR→ENTER, "esqueci minha senha"→"forgot my password"...), **persistência no reload** (reabre em EN), Opções/controles/tutorial 100% EN, fallback OK, **console 0-erro**. Screenshots PT e EN conferidos.
+
+**⏳ PRÓXIMAS FATIAS (com o dono — todas em `docs/i18n-plano-EN.md`):** HUD in-game (muito é JS dinâmico, precisa login pra testar) · mensagens dinâmicas (log/serverMsg/floats, ~211 = "Fase 2") · conteúdo (itens/magias/mobs/quests ~330) · demais modais (inventário/loja/craft/quests/ranking/PvP/arena) · mensagens do server (precisa locale no server) · páginas avulsas (index/terms/privacy). **Padrão pronto e mecânico:** marcar `data-i18n*` no elemento + chave no dict pt/en.
+
+**▶ Pra deployar (quando o dono aprovar):** cliente-only → `git push origin main` (Vercel rebuilda; **SEM /manutenção**). Validar in-game: toggle no login + nas Opções; recarregar mantém idioma.
+
+---
+
+## 🧪 Sessão 05-06/06 — POÇÃO DE MANA volta a curar DIRETO (instant) ✅ DEPLOYADO 06/06 + no ar
 
 **Pedido do dono:** "voltar o pot de mana para curar direto — entra em conflito com o regen dos ataques."
 

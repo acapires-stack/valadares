@@ -1,7 +1,7 @@
 # Internacionalização (EN) — Levantamento + Plano de Contingência
 
-> **Status:** PLANEJAMENTO. Nada implementado. Código intocado.
-> **Natureza:** contingência — executar **se/quando o jogo expandir**, não agora.
+> **Status:** EM ANDAMENTO — **Fase 0 (infra) + Fase 1 parcial (UI estática) FEITAS 06/06** (local, cliente-only, NÃO-pushado: commits `87a6bd8`+`7e9e96a`). Ver §8 e SESSION_NOTES.
+> **Natureza:** começou como contingência; o dono pediu pra iniciar. Demais fases = quando o dono aprovar/expandir.
 > **Escopo combinado com o dono:** apenas (a) uma **opção EN dentro do jogo** (toggle PT/EN)
 > e (b) **página(s) escritas em EN** (landing/marketing). **NÃO** inclui dobrar
 > comunidade/suporte/marketing — o jogo fica bilíngue, a **operação segue PT-first**.
@@ -124,8 +124,16 @@ Até lá: **PT-BR é o padrão e está certo.** Este doc é só o roteiro guarda
 
 ---
 
-## 8. Estado atual
+## 8. Estado atual (atualizado 06/06)
 
-- **Nada implementado.** Código 100% intocado por este planejamento.
-- Este doc é **referência/contingência** — não há tarefa em andamento.
-- Quando o dono der o "vai", começar pela **Fase 0** (§4).
+- **Fase 0 (infra) + Fase 1 PARCIAL FEITAS** — `play.html`, cliente-only, **NÃO-pushado**
+  (commits `87a6bd8` núcleo + `7e9e96a` tutoriais). Testado no preview (flip por clique,
+  persistência no reload, console limpo).
+- **Coberto (61 marcações `data-i18n`):** login + toggle PT|EN (login+Opções) + modal de Opções
+  (+seção idioma) + barra de controles + tutorial de boas-vindas + tutorial mobile.
+- **Infra:** `tr(key,params)` (⚠️ `tr`, não `t`) + `applyI18n()` (data-i18n / -ph / -title / -html)
+  + `LANG` (detecta navegador + persiste localStorage) + fallback lang→pt→chave + `setLang()`.
+- **Falta (com o dono):** HUD in-game · mensagens dinâmicas (~211) · conteúdo (~330) · demais modais
+  · mensagens do server (locale no server) · páginas avulsas (index/terms/privacy). Padrão pronto:
+  marcar `data-i18n*` + chave no dict pt/en.
+- **Deploy (quando o dono aprovar):** `git push origin main` — **cliente-only, SEM /manutenção**.
