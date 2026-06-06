@@ -177,4 +177,14 @@ Até lá: **PT-BR é o padrão e está certo.** Este doc é só o roteiro guarda
 ### Fase 3 — conteúdo (PARCIAL, 06/06)
 **✅ FEITO + deployado (nomes + descrições, paridade total, cliente):** mobs(22), itens(87 name+desc), magias(9 name+desc), NPCs(15 nomes), talentos(15), conquistas(20), pets(4), receitas, skills(7). Mecanismo: mapas `*_EN` por chave + helpers (`mobName/itmName/spellName/npcName/talName/achName/petNameOf/skillDisp` + catLabel/tierLabel) com fallback PT; dados originais intactos. Commits `cec8e87`→`9add7ad`.
 
-**⏳ FALTA:** (1) **diálogos de NPC + quests** (QUEST_CHAINS conversas das chains + QUESTS nomes/descrições + estágios — MAIOR pedaço); (2) **tooltips de stat** (itemFullDesc "+4 ataque·2 mãos"; altar statLine) — itemFullDesc precisa receber a key; (3) **chrome de UI dos modais** (botões "comprar"/"vender"/"Estudar Magia" etc — prosa de interface). Detalhe no `SESSION_NOTES.md`.
+### Fase 3.1 — diálogos de NPC + quests ✅ FEITA + deployada (06/06, cliente, `cd58f70`)
+`QUEST_EN`(5) + `CHAIN_EN`(7 chains: name/stages/choices) keyados por id + helpers fallback PT
+(`qName/qDesc`, `chainNameOf/stageNameOf/stageDescOf/choiceLabelOf`, `dailyNameOf/dailyDescOf` —
+diárias re-derivadas do `goal`, sem tocar no save). Render roteado (`renderChainDialog`/`describeReward`/
+`renderQuests`) + 10 logs/toasts com nome traduzido. +29 chaves `chain.*`/`reward.*`/`quest.*` (431/431 pt/en).
+Verificado: vm.Script 0-erro, paridade, render real EN+PT no preview, 0 vazamento. Detalhe no `SESSION_NOTES.md`.
+
+**⏳ FALTA (tail restante):** (2) **tooltips de stat** (itemFullDesc "+4 ataque·2 mãos"; altar statLine) —
+itemFullDesc precisa receber a key; (3) **chrome de UI dos OUTROS modais** (botões "comprar"/"vender"/
+"Estudar Magia" etc — prosa de interface); (4) **server** manda o nome da quest em PT nas mensagens de
+conclusão (`server.js`, exigiria /manutenção).

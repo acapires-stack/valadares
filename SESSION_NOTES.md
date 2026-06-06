@@ -7,6 +7,41 @@
 
 ---
 
+## 🌐 Sessão 06/06 (cont. 2) — i18n Fase 3.1: DIÁLOGOS DE NPC + QUESTS ✅ DEPLOYADO (cliente-only, `cd58f70`)
+
+**Pedido do dono:** "pode executar a faze 3.1 em automato" (autônomo, valida in-game depois). Fecha o
+**maior pedaço** do tail da Fase 3 — as quests/chains que ainda estavam 100% em PT.
+
+**Mecanismo (= o sugerido no handoff):** mapas `QUEST_EN` (5 quests) + `CHAIN_EN` (7 chains: name +
+stages{name,desc} + choices) keyados por id, logo após `QUEST_CHAINS` (play.html). Helpers com **fallback
+PT**: `qName/qDesc`, `chainNameOf/stageNameOf/stageDescOf/choiceLabelOf`, `dailyNameOf/dailyDescOf` —
+as **diárias** são geradas por template client-side, então o nome/desc são **re-derivados em EN a partir
+do `goal`** (mob/itmName + count), **SEM tocar no save** (PT cai no `q.name`/`q.desc` baked). Dados PT
+originais intactos.
+
+**Render roteado:** `renderChainDialog` (flavor de conclusão, escolhas, desc do estágio, progresso
+item/multiItem/mob/visit via itmName/mobName+tr, botões aceitar/entregar/em-progresso, meta da etapa),
+`describeReward` (prefixo/flag/`(permanente)` via tr + itmName + skillDisp nos nomes de skill),
+`renderQuests` (diárias + principais: badges, botões, goal collect/kill, reward, títulos 📅 DAILIES /
+📜 MAIN, reset, "no dailies"). + **10 logs/toasts** passam o nome **traduzido** (stageNameOf/qName/
+dailyNameOf/choiceLabelOf).
+
+**+29 chaves** `chain.*`/`reward.*`/`quest.*` nas 2 seções do I18N (dict agora **431/431** pt/en, 0 assimetria).
+
+**Verificação:** `vm.Script` no JS inline (731k chars, **0 erro**); paridade pt/en programática (431=431,
+todas as 29 novas presentes); preview :3333 — helpers no caminho EN + **render REAL** de quests/diálogo +
+**fallback PT** no DOM, **0 vazamento, console 0-erro**. Amostras: "📜 The Dead of the Crypt · stage 1/4 ·
+Go to (18,18) · Reward: 80g + 50xp Magic · accept quest" / "Daily: ⚔ 15× Bat · Kill 15 Bats before midnight".
+
+**Deploy:** cliente-only (só `play.html`) → `git push origin main`, Vercel rebuilda, **SEM /manutenção**
+(não toca `server/**`; default segue PT para quem já joga). Não havia commit de server segurado (sem gafe-30/05).
+
+**⏳ Tail da Fase 3 restante (NÃO-3.1):** tooltips de stat (`itemFullDesc`/altar `statLine`) + chrome dos
+OUTROS modais (loja comprar/vender, talentos, altar "Estudar Magia"). E o server (`server.js`) ainda manda
+o NOME da quest em PT nas mensagens de conclusão — separado, exigiria `/manutenção`.
+
+---
+
 ## 🌐 Sessão 06/06 — i18n INGLÊS: Fase 0 + Fase 1 (UI estática + títulos dos modais) ✅ DEPLOYADO · expandindo
 
 **Pedido do dono** (saiu pra dormir, autorizou autônomo "com todas as permissões"): ter **opção EN** no jogo + página EN, pro caso de expandir. De manhã revisou e mandou subir ("manda, deu certo, pode continuar"). Plano completo: `docs/i18n-plano-EN.md`.
