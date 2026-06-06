@@ -42,7 +42,17 @@
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
     padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
   }
+  .lang-switch { display: inline-flex; gap: 4px; }
+  .lang-switch button {
+    background: var(--bg-elev); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 4px;
+    font: 700 12px/1 inherit; letter-spacing: 1px; padding: 7px 10px;
+    cursor: pointer; transition: all .15s ease;
+  }
+  .lang-switch button:hover { color: var(--gold); border-color: var(--gold); }
+  .lang-switch button.lang-active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   .nav-brand {
     font-family: "Cinzel", Georgia, serif;
     font-size: 22px; font-weight: 700;
@@ -131,26 +141,77 @@
 </head>
 <body>
 
+<script>
+// i18n da página de ranking (PT padrão · EN auto-detect + toggle, mesma chave 'valadares_lang').
+const I18N_RK = {
+  pt: {
+    'rk.subtitle': `Os melhores caçadores, lutadores e mercadores de Valadares`,
+    'rk.tab_gold': `💰 Ouro`, 'rk.tab_season': `👑 Temporada`,
+    'rk.cta': `Jogar Valadares`,
+    'rk.f_home': `Início`, 'rk.f_play': `Jogar`, 'rk.f_privacy': `Privacidade`, 'rk.f_terms': `Termos`,
+    'rk.credit': `Valadares · feito com ♥ em Paranaguá/PR · 2026`,
+    'rk.loading': `Carregando…`,
+    'rk.empty': `Sem dados ainda — seja o primeiro a aparecer aqui!`,
+    'rk.empty_guilds': `Sem guilds no ranking ainda.`,
+    'rk.season_new': `Temporada nova começando…`,
+    'rk.player': `Jogador`, 'rk.gold': `Ouro`, 'rk.members': `Membros`, 'rk.points': `Pontos`,
+    'rk.champs': `Campeões anteriores`, 'rk.season_col': `Temporada`, 'rk.champion': `Campeão`,
+    'rk.season_label': `Temporada`, 'rk.updated': `Atualizado em`,
+    'rk.error': `Não foi possível carregar o ranking agora. Tente novamente em alguns segundos.`
+  },
+  en: {
+    'rk.subtitle': `The finest hunters, fighters and merchants of Valadares`,
+    'rk.tab_gold': `💰 Gold`, 'rk.tab_season': `👑 Season`,
+    'rk.cta': `Play Valadares`,
+    'rk.f_home': `Home`, 'rk.f_play': `Play`, 'rk.f_privacy': `Privacy`, 'rk.f_terms': `Terms`,
+    'rk.credit': `Valadares · made with ♥ in Paranaguá/PR · 2026`,
+    'rk.loading': `Loading…`,
+    'rk.empty': `No data yet — be the first to show up here!`,
+    'rk.empty_guilds': `No guilds in the ranking yet.`,
+    'rk.season_new': `New season starting…`,
+    'rk.player': `Player`, 'rk.gold': `Gold`, 'rk.members': `Members`, 'rk.points': `Points`,
+    'rk.champs': `Past champions`, 'rk.season_col': `Season`, 'rk.champion': `Champion`,
+    'rk.season_label': `Season`, 'rk.updated': `Updated`,
+    'rk.error': `Couldn't load the ranking right now. Try again in a few seconds.`
+  }
+};
+let LANG = (function(){ try { const s = localStorage.getItem('valadares_lang'); if (s==='pt'||s==='en') return s; return (navigator.language||'pt').toLowerCase().startsWith('en')?'en':'pt'; } catch(e){ return 'pt'; } })();
+function tr(k){ const d=I18N_RK; let s=(d[LANG]&&d[LANG][k]); if(s==null) s=(d.pt&&d.pt[k]); return s==null?k:s; }
+function numLocale(){ return LANG==='en' ? 'en-US' : 'pt-BR'; }
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
+  document.documentElement.lang = (LANG==='en') ? 'en' : 'pt-BR';
+  document.documentElement.setAttribute('data-lang', LANG);
+}
+function updateLangButtons(){ document.querySelectorAll('[data-lang-btn]').forEach(b => b.classList.toggle('lang-active', b.getAttribute('data-lang-btn')===LANG)); }
+function setLang(l){ if(l!=='pt'&&l!=='en') return; LANG=l; try{localStorage.setItem('valadares_lang',l);}catch(e){} applyI18n(); updateLangButtons(); if(typeof load==='function') load(); }
+window.addEventListener('DOMContentLoaded', ()=>{ try{ applyI18n(); updateLangButtons(); }catch(e){} });
+</script>
+
 <nav>
   <a href="/" class="nav-brand">VALADARES</a>
+  <span class="lang-switch">
+    <button type="button" data-lang-btn="pt" onclick="setLang('pt')">PT</button>
+    <button type="button" data-lang-btn="en" onclick="setLang('en')">EN</button>
+  </span>
 </nav>
 
 <main>
   <h1>RANKING</h1>
-  <p class="subtitle">Os melhores caçadores, lutadores e mercadores de Valadares</p>
+  <p class="subtitle" data-i18n="rk.subtitle">Os melhores caçadores, lutadores e mercadores de Valadares</p>
   <p class="updated" id="updatedAt"></p>
 
   <div class="tabs" role="tablist">
     <button class="tab active" data-panel="mobs"   role="tab">⚔ Mobs</button>
     <button class="tab"        data-panel="pvp"    role="tab">☠ PvP</button>
     <button class="tab"        data-panel="bosses" role="tab">★ Bosses</button>
-    <button class="tab"        data-panel="gold"   role="tab">💰 Ouro</button>
+    <button class="tab"        data-panel="gold"   role="tab" data-i18n="rk.tab_gold">💰 Ouro</button>
     <button class="tab"        data-panel="guilds" role="tab">📜 Guilds</button>
-    <button class="tab"        data-panel="season" role="tab">👑 Temporada</button>
+    <button class="tab"        data-panel="season" role="tab" data-i18n="rk.tab_season">👑 Temporada</button>
   </div>
 
   <div id="panels">
-    <div class="panel active" data-panel="mobs"><div class="loading">Carregando…</div></div>
+    <div class="panel active" data-panel="mobs"><div class="loading" data-i18n="rk.loading">Carregando…</div></div>
     <div class="panel"        data-panel="pvp"></div>
     <div class="panel"        data-panel="bosses"></div>
     <div class="panel"        data-panel="gold"></div>
@@ -158,18 +219,18 @@
     <div class="panel"        data-panel="season"></div>
   </div>
 
-  <a class="play-cta" href="/jogar">Jogar Valadares</a>
+  <a class="play-cta" href="/jogar" data-i18n="rk.cta">Jogar Valadares</a>
 </main>
 
 <footer>
   <p>
-    <a href="/">Início</a> ·
-    <a href="/jogar">Jogar</a> ·
-    <a href="/privacy">Privacidade</a> ·
-    <a href="/terms">Termos</a> ·
+    <a href="/" data-i18n="rk.f_home">Início</a> ·
+    <a href="/jogar" data-i18n="rk.f_play">Jogar</a> ·
+    <a href="/privacy" data-i18n="rk.f_privacy">Privacidade</a> ·
+    <a href="/terms" data-i18n="rk.f_terms">Termos</a> ·
     <a href="https://github.com/acapires-stack/valadares" target="_blank">GitHub</a>
   </p>
-  <p style="margin-top: 12px; font-size: 11px;">
+  <p style="margin-top: 12px; font-size: 11px;" data-i18n="rk.credit">
     Valadares · feito com ♥ em Paranaguá/PR · 2026
   </p>
 </footer>
@@ -184,7 +245,7 @@ function escapeHtml(s){
 
 function renderSimple(panel, entries, labelHeader, labelValue, valueFormatter){
   if (!entries || !entries.length){
-    panel.innerHTML = '<div class="empty">Sem dados ainda — seja o primeiro a aparecer aqui! <a href="/jogar">Jogar Valadares</a></div>';
+    panel.innerHTML = '<div class="empty">' + tr('rk.empty') + ' <a href="/jogar">' + tr('rk.cta') + '</a></div>';
     return;
   }
   let rows = '';
@@ -204,7 +265,7 @@ function renderSimple(panel, entries, labelHeader, labelValue, valueFormatter){
 
 function renderGuilds(panel, entries){
   if (!entries || !entries.length){
-    panel.innerHTML = '<div class="empty">Sem guilds no ranking ainda.</div>';
+    panel.innerHTML = '<div class="empty">' + tr('rk.empty_guilds') + '</div>';
     return;
   }
   let rows = '';
@@ -218,14 +279,14 @@ function renderGuilds(panel, entries){
     </tr>`;
   });
   panel.innerHTML = `<table>
-    <thead><tr><th class="rank-num">#</th><th>Guild</th><th class="rank-value">Membros</th><th class="rank-value">Pontos</th></tr></thead>
+    <thead><tr><th class="rank-num">#</th><th>Guild</th><th class="rank-value">${tr('rk.members')}</th><th class="rank-value">${tr('rk.points')}</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
 
 function renderSeason(panel, data){
   if (!data || !data.top || !data.top.length){
-    panel.innerHTML = '<div class="empty">Temporada nova começando…</div>';
+    panel.innerHTML = '<div class="empty">' + tr('rk.season_new') + '</div>';
     return;
   }
   let rows = '';
@@ -239,13 +300,13 @@ function renderSeason(panel, data){
   });
   let archive = '';
   if (data.archive && data.archive.length){
-    archive = '<h3 style="color:var(--gold-bright);margin:24px 0 12px;font-size:16px">Campeões anteriores</h3><table><thead><tr><th>Temporada</th><th>Campeão</th><th class="rank-value">Pontos</th></tr></thead><tbody>'
+    archive = '<h3 style="color:var(--gold-bright);margin:24px 0 12px;font-size:16px">' + tr('rk.champs') + '</h3><table><thead><tr><th>' + tr('rk.season_col') + '</th><th>' + tr('rk.champion') + '</th><th class="rank-value">' + tr('rk.points') + '</th></tr></thead><tbody>'
       + data.archive.map(a => `<tr><td>${escapeHtml(a.id)}</td><td>${escapeHtml(a.champion || '—')}</td><td class="rank-value">${FMT.format(a.score || 0)}</td></tr>`).join('')
       + '</tbody></table>';
   }
-  panel.innerHTML = `<h3 style="color:var(--gold);margin-bottom:12px;font-size:18px">Temporada ${escapeHtml(data.id || '—')}</h3>
+  panel.innerHTML = `<h3 style="color:var(--gold);margin-bottom:12px;font-size:18px">${tr('rk.season_label')} ${escapeHtml(data.id || '—')}</h3>
     <table>
-      <thead><tr><th class="rank-num">#</th><th>Jogador</th><th class="rank-value">Pontos</th></tr></thead>
+      <thead><tr><th class="rank-num">#</th><th>${tr('rk.player')}</th><th class="rank-value">${tr('rk.points')}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${archive}`;
@@ -258,18 +319,18 @@ async function load(){
     const r = await fetch(API_URL, { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
-    renderSimple(panels.mobs,   data.mobs,   'Jogador', 'Mobs',   v => FMT.format(v));
-    renderSimple(panels.pvp,    data.pvp,    'Jogador', 'Kills',  v => FMT.format(v));
-    renderSimple(panels.bosses, data.bosses, 'Jogador', 'Bosses', v => FMT.format(v));
-    renderSimple(panels.gold,   data.gold,   'Jogador', 'Ouro',   v => FMT.format(v) + ' g');
+    renderSimple(panels.mobs,   data.mobs,   tr('rk.player'), 'Mobs',        v => FMT.format(v));
+    renderSimple(panels.pvp,    data.pvp,    tr('rk.player'), 'Kills',       v => FMT.format(v));
+    renderSimple(panels.bosses, data.bosses, tr('rk.player'), 'Bosses',      v => FMT.format(v));
+    renderSimple(panels.gold,   data.gold,   tr('rk.player'), tr('rk.gold'), v => FMT.format(v) + ' g');
     renderGuilds(panels.guilds, data.guilds);
     renderSeason(panels.season, data.season);
     if (data.updatedAt){
-      document.getElementById('updatedAt').textContent = 'Atualizado em ' + new Date(data.updatedAt).toLocaleString('pt-BR');
+      document.getElementById('updatedAt').textContent = tr('rk.updated') + ' ' + new Date(data.updatedAt).toLocaleString(numLocale());
     }
   } catch (err){
     Object.values(panels).forEach(p => {
-      p.innerHTML = '<div class="error">Não foi possível carregar o ranking agora. Tente novamente em alguns segundos.</div>';
+      p.innerHTML = '<div class="error">' + tr('rk.error') + '</div>';
     });
     console.error('[ranking]', err);
   }
