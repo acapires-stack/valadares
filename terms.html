@@ -33,7 +33,17 @@
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
     padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
   }
+  .lang-switch { display: inline-flex; gap: 4px; }
+  .lang-switch button {
+    background: var(--bg-elev); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 4px;
+    font: 700 12px/1 inherit; letter-spacing: 1px; padding: 7px 10px;
+    cursor: pointer; transition: all .15s ease;
+  }
+  .lang-switch button:hover { color: var(--gold); border-color: var(--gold); }
+  .lang-switch button.lang-active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   .nav-brand {
     font-family: "Cinzel", Georgia, serif;
     font-size: 22px; font-weight: 700;
@@ -80,11 +90,35 @@
 </head>
 <body>
 
+<script>
+// i18n dos Termos (PT padrão · EN cortesia). Alterna blocos [data-lang-content].
+const I18N_T = {
+  pt: { 'doc.title': `Termos de Uso — Valadares`, 'f.home': `Início`, 'f.play': `Jogar`, 'f.ranking': `Ranking`, 'f.privacy': `Privacidade`, 'f.credit': `Valadares · feito com ♥ em Paranaguá/PR · 2026` },
+  en: { 'doc.title': `Terms of Use — Valadares`, 'f.home': `Home`, 'f.play': `Play`, 'f.ranking': `Ranking`, 'f.privacy': `Privacy`, 'f.credit': `Valadares · made with ♥ in Paranaguá/PR · 2026` }
+};
+let LANG = (function(){ try { const s = localStorage.getItem('valadares_lang'); if (s==='pt'||s==='en') return s; return (navigator.language||'pt').toLowerCase().startsWith('en')?'en':'pt'; } catch(e){ return 'pt'; } })();
+function tr(k){ const d=I18N_T; let s=(d[LANG]&&d[LANG][k]); if(s==null) s=(d.pt&&d.pt[k]); return s==null?k:s; }
+function applyLang(){
+  document.querySelectorAll('[data-lang-content]').forEach(el => { el.style.display = (el.getAttribute('data-lang-content')===LANG) ? '' : 'none'; });
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
+  document.title = tr('doc.title');
+  document.documentElement.lang = (LANG==='en') ? 'en' : 'pt-BR';
+}
+function updateLangButtons(){ document.querySelectorAll('[data-lang-btn]').forEach(b => b.classList.toggle('lang-active', b.getAttribute('data-lang-btn')===LANG)); }
+function setLang(l){ if(l!=='pt'&&l!=='en') return; LANG=l; try{localStorage.setItem('valadares_lang',l);}catch(e){} applyLang(); updateLangButtons(); }
+window.addEventListener('DOMContentLoaded', ()=>{ try{ applyLang(); updateLangButtons(); }catch(e){} });
+</script>
+
 <nav>
   <a href="/" class="nav-brand">VALADARES</a>
+  <span class="lang-switch">
+    <button type="button" data-lang-btn="pt" onclick="setLang('pt')">PT</button>
+    <button type="button" data-lang-btn="en" onclick="setLang('en')">EN</button>
+  </span>
 </nav>
 
 <main>
+<div data-lang-content="pt">
   <h1>Termos de Uso</h1>
   <p class="updated">Última atualização: 28 de maio de 2026</p>
 
@@ -239,18 +273,178 @@
     Dúvidas, reclamações ou comunicações sobre estes Termos:
     <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a>
   </p>
+</div>
+
+<div data-lang-content="en" style="display:none">
+  <div class="warn">
+    <strong>Courtesy translation.</strong> This English version is provided for convenience only. The official, legally binding text is the <a href="/terms">Portuguese version</a> — in case of any discrepancy, the Portuguese prevails.
+  </div>
+
+  <h1>Terms of Use</h1>
+  <p class="updated">Last updated: May 28, 2026</p>
+
+  <p>
+    Welcome to <strong>Valadares</strong>. These Terms of Use govern the relationship between you ("User")
+    and the Game's developer ("we", "Valadares"), operating in Paranaguá/PR, Brazil. By creating an account
+    or using the Game, you accept these Terms in full.
+  </p>
+
+  <div class="callout">
+    If you do not agree with any of the terms below, do not use the Game. Continued use means acceptance.
+  </div>
+
+  <h2>1. About the Game</h2>
+  <p>
+    Valadares is a free tile-based online RPG, played directly in the browser (PC and mobile) or via a
+    desktop app (Electron). The service is provided "as is", without guarantees of continuous availability
+    or freedom from errors.
+  </p>
+
+  <h2>2. User account</h2>
+
+  <h3>2.1 Creation and responsibility</h3>
+  <ul>
+    <li>You can create an account for free by choosing a player name and password.</li>
+    <li>You are responsible for keeping your password secure. Do not share it with third parties.</li>
+    <li>All activity originating from your account is considered to have been performed by you.</li>
+    <li>Creating accounts in another person's name, using a false identity, or using multiple accounts to bypass rules (abusive multi-accounting) is not allowed.</li>
+  </ul>
+
+  <h3>2.2 Account recovery</h3>
+  <p>
+    If you forget your password and <strong>have not provided a valid email</strong>, we have no way to recover the account —
+    passwords are stored only as an irreversible hash. We strongly recommend registering a recovery email
+    on your first gold purchase or in your account settings.
+  </p>
+
+  <h3>2.3 Account termination</h3>
+  <ul>
+    <li>You may request deletion of your account at any time via <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a>.</li>
+    <li>We may suspend or terminate your account without prior notice in case of a violation of these Terms, abusive behavior, or cheating.</li>
+    <li>In case of termination due to a violation, there is <strong>no refund</strong> of previously acquired gold or virtual items.</li>
+  </ul>
+
+  <h2>3. Prohibited conduct</h2>
+  <p>The following are expressly prohibited:</p>
+  <ul>
+    <li><strong>Cheating:</strong> using bots, automated scripts, client modifications to alter gold/HP/items, bug exploits, or any tool that grants an unfair advantage.</li>
+    <li><strong>Reverse engineering</strong> the server, decompilation, or attempts at unauthorized access to systems.</li>
+    <li><strong>Harassing</strong> other players: insults, hate speech, threats, doxxing, message spam, sexual or illegal content in chat.</li>
+    <li><strong>Trading accounts, gold or items</strong> outside the Game's official channels. Selling gold through third parties (RMT — Real Money Trading) is prohibited and results in a permanent ban.</li>
+    <li>Using the Game for any illegal activity, money laundering, or fraud.</li>
+    <li>Intentionally overloading servers (DDoS, connection spam).</li>
+  </ul>
+
+  <div class="warn">
+    Violating these items may result in: a warning, temporary mute, temporary ban, permanent ban
+    or legal action — at the Game team's discretion, without need for prior notice.
+  </div>
+
+  <h2>4. Purchase of virtual items (Gold)</h2>
+
+  <h3>4.1 Nature of the purchase</h3>
+  <p>
+    Valadares offers packages of <strong>virtual gold</strong> for sale. Gold is an in-Game currency,
+    with no monetary value outside it, used exclusively to acquire items, services and upgrades within
+    the Valadares ecosystem.
+  </p>
+  <p>
+    Buying gold is characterized as the <strong>acquisition of a license to use a digital good</strong> — you
+    are not buying transferable property, but rather the right to use gold within the Game while your
+    account is active.
+  </p>
+
+  <h3>4.2 Processing and delivery</h3>
+  <ul>
+    <li>Payments are processed by <strong>Mercado Pago</strong>, an authorized partner.</li>
+    <li>Accepted methods: PIX and Credit Card.</li>
+    <li>After payment confirmation by Mercado Pago (usually seconds for PIX, a few minutes for card), gold is credited automatically to the account linked to the email provided at checkout.</li>
+    <li>If gold is not credited within 24h after payment confirmation, contact <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a> with the Mercado Pago transaction ID.</li>
+  </ul>
+
+  <h3>4.3 Refund policy</h3>
+  <p>
+    Under art. 49 of the Brazilian Consumer Protection Code (CDC — right of withdrawal in distance purchases), you may request the
+    <strong>cancellation of the purchase within 7 calendar days</strong> of payment confirmation, provided that:
+  </p>
+  <ul>
+    <li>The gold <strong>has not been used</strong> (spent on items, lost in PvP, gambled at the casino, transferred to another player, etc.).</li>
+    <li>The request is sent in writing to <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a> with the Mercado Pago transaction ID.</li>
+  </ul>
+  <p>
+    After 7 days OR after any use (even partial) of the gold, the purchase is considered consummated and <strong>there is no refund</strong>,
+    except in case of a proven technical failure of the Game that prevented gold delivery.
+  </p>
+
+  <h3>4.4 No guarantee of future value</h3>
+  <p>
+    Virtual gold <strong>is not an investment</strong>. Its relative value within the Game may change at any
+    time by team decision (rebalancing item prices, promotional events, economic adjustments). You are not
+    entitled to a refund or compensation for changes in the Game's economic balance.
+  </p>
+
+  <h3>4.5 Service discontinuation</h3>
+  <p>
+    If Valadares is discontinued, we will make a reasonable effort to give at least 30 days' notice
+    and will offer a proportional refund of gold packages purchased in the last 90 days that have not been used.
+  </p>
+
+  <h2>5. Intellectual property</h2>
+  <ul>
+    <li>All Game content (code, art, sounds, mechanics, names, visual identity) is the exclusive property of the Valadares developer.</li>
+    <li>You receive a <strong>non-exclusive, non-transferable and revocable license</strong> to play the Game under these Terms.</li>
+    <li>You have no ownership rights over your account, character, items or gold — only the right to use them while your account is active and these Terms are respected.</li>
+    <li>Messages posted in the Game's public chat may be viewed by other players and recorded in logs for moderation purposes.</li>
+  </ul>
+
+  <h2>6. Limitation of liability</h2>
+  <ul>
+    <li>The Game is provided "as is", with no guarantee of uninterrupted availability, freedom from bugs, or data loss.</li>
+    <li>We are not responsible for: loss of progress due to misuse of the account by the user (leaked password, shared account), problems with your internet connection, failures in user equipment, or third-party actions (hacking, phishing).</li>
+    <li>In case of a serious bug affecting the Game's economy, we may perform a rollback (restoration of a previous state) without prior notice. You agree to this possibility by using the service.</li>
+    <li>Our maximum liability in any dispute related to the Game is limited to the amount you spent on purchases in the last 90 days, subject to the provisions of the CDC.</li>
+  </ul>
+
+  <h2>7. Privacy and personal data</h2>
+  <p>
+    The processing of personal data follows our <a href="/privacy">Privacy Policy</a>, an integral part of these Terms.
+  </p>
+
+  <h2>8. Changes to the terms</h2>
+  <p>
+    We may modify these Terms periodically. Significant changes will be communicated at least
+    7 days in advance via in-Game message or email. Continued use of the Game after the new version takes effect means acceptance.
+  </p>
+  <p>
+    If you do not agree with the changes, you may terminate your account before they take effect —
+    in that case, unused gold purchased in the last 90 days will be refunded proportionally.
+  </p>
+
+  <h2>9. Governing law and jurisdiction</h2>
+  <p>
+    These Terms are governed by the laws of the Federative Republic of Brazil. The courts of the District of
+    <strong>Paranaguá/PR</strong> are elected to settle any disputes, with express waiver of any other,
+    however privileged. For consumer relations (CDC), the jurisdiction of the consumer's domicile prevails.
+  </p>
+
+  <h2>10. Contact</h2>
+  <p>
+    Questions, complaints or communications about these Terms:
+    <a href="mailto:contato@valadares.app.br">contato@valadares.app.br</a>
+  </p>
+</div>
 
 </main>
 
 <footer>
   <p>
-    <a href="/">Início</a> ·
-    <a href="/jogar">Jogar</a> ·
-    <a href="/ranking">Ranking</a> ·
-    <a href="/privacy">Privacidade</a> ·
+    <a href="/" data-i18n="f.home">Início</a> ·
+    <a href="/jogar" data-i18n="f.play">Jogar</a> ·
+    <a href="/ranking" data-i18n="f.ranking">Ranking</a> ·
+    <a href="/privacy" data-i18n="f.privacy">Privacidade</a> ·
     <a href="https://github.com/acapires-stack/valadares" target="_blank">GitHub</a>
   </p>
-  <p style="margin-top: 12px; font-size: 11px;">
+  <p style="margin-top: 12px; font-size: 11px;" data-i18n="f.credit">
     Valadares · feito com ♥ em Paranaguá/PR · 2026
   </p>
 </footer>
