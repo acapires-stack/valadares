@@ -2834,6 +2834,7 @@ const I18N = {
     'lbl.dummy': 'boneco',
     'lbl.upgrading': 'Subindo',
     'lbl.acquiring': 'Adquirindo',
+    'lbl.equipped_tag': 'EQUIPADA',
     'lbl.item': 'item',
     'lbl.items': 'itens',
     /* ===== Fase 2.5: toast.* / err.* / res.* ===== */
@@ -3244,6 +3245,7 @@ const I18N = {
     'lbl.dummy': 'dummy',
     'lbl.upgrading': 'Upgrading',
     'lbl.acquiring': 'Acquiring',
+    'lbl.equipped_tag': 'EQUIPPED',
     'lbl.item': 'item',
     'lbl.items': 'items',
     /* ===== Fase 2.5: toast.* / err.* / res.* ===== */
@@ -3457,6 +3459,14 @@ const NPCS = [
     // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
     { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', sanctuary:true, chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
 ];
+// i18n Fase 3 — nomes de NPC em EN (chave = id). npcName() prefere EN.
+const NPC_EN = {
+    mercador:'Merchant', leiloeiro:'Auctioneer', crupie:'Croupier', banqueiro:'Banker',
+    atendente:'Attendant', tintureira:'Dyer', domador:'Tamer', arena:'Arena Master',
+    eremita:'Hermit', ferreiro:'Old Blacksmith', cacadora:'Drake Huntress', mineiro:'Lost Miner',
+    crepusculo:'Madame Twilight', vohrim:'Ambassador Vohrim', vendedor:'Soul Seller',
+};
+function npcName(npc){ return (LANG === 'en' && npc && NPC_EN[npc.id]) || (npc && npc.name) || ''; }
 
 // ─── M6 PET — defs (espelha PET_DEFS do server). Buff/level são autoritativos
 // no server; aqui guardamos só visual + texto pra UI/render. ───────────────
@@ -6037,7 +6047,7 @@ window.openChainDialog = openChainDialog; window.closeChainDialog = closeChainDi
 
 function renderChainDialog(npc){
     const chain = QUEST_CHAINS[npc.chain]; if (!chain) return;
-    document.getElementById('chainDialogTitle').textContent = `🗣 ${npc.name}`;
+    document.getElementById('chainDialogTitle').textContent = `🗣 ${npcName(npc)}`;
     const body = document.getElementById('chainDialogBody');
     const stage = currentChainStage(npc.chain);
     if (!stage){
@@ -10040,7 +10050,7 @@ function updateSidebar(){
             const manaTxt = player.mp >= sp.manaCost ? '#aaccff' : '#cc5050';
             spEl.innerHTML = `<div style="display:flex;align-items:center;gap:6px">
                 <kbd style="background:#1a1408;border:1px solid #3a2d10;padding:1px 5px;font-size:9px;color:#c8a050">R</kbd>
-                <span style="flex:1;color:${sp.glow}">${sp.name}</span>
+                <span style="flex:1;color:${sp.glow}">${spellName(player.activeSpell)}</span>
                 <span style="color:${manaTxt};font-size:10px">${sp.manaCost}mp</span>
                 <span style="font-size:10px;min-width:36px;text-align:right">${cdTxt}</span>
             </div>
@@ -11959,6 +11969,20 @@ const SPELLS = {
         desc: 'Tempestade elétrica em área (raio 4). Maior dano e alcance entre as AoE; mana e cooldown altos.',
     },
 };
+// i18n Fase 3 — nomes/descrições de magia em EN (chave = id).
+const SPELL_EN = {
+    FIREBALL:{name:'Fireball', desc:'Casts a fireball at the target. Range 8 tiles.'},
+    HEAL:{name:'Heal', desc:'Restores HP. Can be used in the PZ.'},
+    HEAL_GRUPO:{name:'Group Heal', desc:'Heals you and all nearby players within 8 tiles (no party needed). High mana, 6s cooldown.'},
+    RAIO:{name:'Mystic Bolt', desc:'Long-range magic shot (10 tiles). Lower damage than Fireball but cheap and fast.'},
+    EXORI:{name:'Exori', desc:'Area explosion — hits all mobs within 3 tiles around you. No target needed.'},
+    PROVOCACAO:{name:'Taunt', desc:'Forces nearby mobs to focus you (range 5 + Magic). No damage — useful to pull aggro in groups.'},
+    FURIA:{name:'Fury', desc:'Temporary buff: +25% damage and +25% speed. Lasts 12s + Magic. 30s cooldown.'},
+    GLACIAL:{name:'Glacial Nova', desc:'Ice explosion in an area (radius 3) + freeze (slow 3s). Bosses immune to freeze.'},
+    TEMPESTADE:{name:'Storm', desc:'Electric storm in an area (radius 4). Highest damage and range among AoE; high mana and cooldown.'},
+};
+function spellName(key){ return (LANG === 'en' && SPELL_EN[key] && SPELL_EN[key].name) || (SPELLS[key] && SPELLS[key].name) || key; }
+function spellDescEn(key){ return (LANG === 'en' && SPELL_EN[key] && SPELL_EN[key].desc) || (SPELLS[key] && SPELLS[key].desc) || ''; }
 const auraEffects = [];   // { entity, color, life, duration }
 const spellCooldowns = {};   // { FIREBALL: ms restante }
 const projectiles = [];      // { x,y, startX,startY, endX,endY, color, life, duration }
@@ -11991,7 +12015,7 @@ function castSpell(spellKey){
     // Magias ofensivas/AoE/taunt quebram mini-PZ do NPC
     if (sp.damage || sp.aoeRange || sp.tauntRange) player.lastAttackAt = Date.now();
     if ((spellCooldowns[spellKey] || 0) > 0){
-        log(tr('log.spell_cooldown', {name: sp.name})); return;
+        log(tr('log.spell_cooldown', {name: spellName(spellKey)})); return;
     }
     if (player.mp < sp.manaCost){
         log(tr('log.no_mana', {mp: player.mp, cost: sp.manaCost})); return;
@@ -12055,7 +12079,7 @@ function castSpell(spellKey){
                 color: sp.glow, life: 500, maxLife: 500,
             });
         }
-        log(tr('log.spell_hits', {name: sp.name, hits}));
+        log(tr('log.spell_hits', {name: spellName(spellKey), hits}));
         return;
     }
 
@@ -12079,7 +12103,7 @@ function castSpell(spellKey){
         // Visual AoE: anel grande do raio de provocação
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: tauntRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
-        log(tr('log.spell_taunt', {name: sp.name, count}));
+        log(tr('log.spell_taunt', {name: spellName(spellKey), count}));
         gainMagiaXp(spellKey, Math.max(1, count));
         return;
     }
@@ -12096,11 +12120,11 @@ function castSpell(spellKey){
             spd: sp.buff.spd,
             expiresAt: Date.now() + buffDur,
             color: sp.glow,
-            name: sp.name,
+            name: spellName(spellKey),
         };
         if (typeof updateSidebar === 'function') updateSidebar();   // painel reflete +spd na hora (Vel. ataque/Velocidade)
-        addFloat(player.x, player.y, `★ ${sp.name}`, sp.glow, true, -10);
-        log(tr('log.spell_buff', {name: sp.name, dmg: Math.round(sp.buff.dmg*100), spd: Math.round(sp.buff.spd*100), s: Math.round(buffDur/1000)}));
+        addFloat(player.x, player.y, `★ ${spellName(spellKey)}`, sp.glow, true, -10);
+        log(tr('log.spell_buff', {name: spellName(spellKey), dmg: Math.round(sp.buff.dmg*100), spd: Math.round(sp.buff.spd*100), s: Math.round(buffDur/1000)}));
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 700 });
         gainMagiaXp(spellKey, 2);
         return;
@@ -12115,8 +12139,8 @@ function castSpell(spellKey){
         sndSpell();
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.groupRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
-        addFloat(player.x, player.y, `✦ ${sp.name}`, sp.glow, true, -10);
-        log(tr('log.spell_healing_group', {name: sp.name, r: sp.groupRange}));
+        addFloat(player.x, player.y, `✦ ${spellName(spellKey)}`, sp.glow, true, -10);
+        log(tr('log.spell_healing_group', {name: spellName(spellKey), r: sp.groupRange}));
         if (ws && ws.readyState === 1){
             try { ws.send(JSON.stringify({ t:'spellCast', spellKey, hits: 1 })); } catch {}
         }
@@ -12135,7 +12159,7 @@ function castSpell(spellKey){
         sndSpell();
         player.hp += healed;
         addFloat(player.x, player.y, `+${healed}`, sp.glow, true);
-        log(tr('log.spell_heal', {name: sp.name, n: healed}));
+        log(tr('log.spell_heal', {name: spellName(spellKey), n: healed}));
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 500 });
         gainMagiaXp(spellKey, 1);
         return;
@@ -12182,7 +12206,7 @@ function castSpell(spellKey){
         // não causavam dano real online.
         ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false, dots: elementStatusRoll(sp.element) }));
         m.aggro = true;
-        log(tr('log.dmg_spell', {star: crit?'★ ':'', name: sp.name, dmg, mob: m.name}));
+        log(tr('log.dmg_spell', {star: crit?'★ ':'', name: spellName(spellKey), dmg, mob: m.name}));
     }
 }
 
@@ -12606,7 +12630,7 @@ function switchSpell(key){
     }
     player.gold -= sp.switchCost;
     player.activeSpell = key;
-    log(tr('log.learned_spell', {name: sp.name, cost: sp.switchCost}));
+    log(tr('log.learned_spell', {name: spellName(key), cost: sp.switchCost}));
     renderAltar();
     saveState();
 }
@@ -12655,10 +12679,10 @@ function renderAltar(){
         return `<div class="craft-row ${active?'craft-ok':''}">
             <div class="craft-out">
                 <span style="color:${sp.glow}">●</span>
-                <span style="margin-left:6px;color:#e0c060;font-weight:600">${sp.name}</span>
-                ${active ? '<span style="margin-left:6px;color:#74d176;font-size:10px">[EQUIPADA]</span>' : ''}
+                <span style="margin-left:6px;color:#e0c060;font-weight:600">${spellName(k)}</span>
+                ${active ? `<span style="margin-left:6px;color:#74d176;font-size:10px">[${tr('lbl.equipped_tag')}]</span>` : ''}
             </div>
-            <div class="craft-in" style="color:#aaa">${sp.desc}<br>${statLine}</div>
+            <div class="craft-in" style="color:#aaa">${spellDescEn(k)}<br>${statLine}</div>
             <button class="craft-btn" ${active||!canBuy?'disabled':''} onclick="switchSpell('${k}')">${active?'equipada':canBuy?`equipar (${sp.switchCost}g)`:`${sp.switchCost}g`}</button>
         </div>`;
     }).join('');
@@ -15569,7 +15593,7 @@ function loop(ts){
             ctx.globalAlpha = 1;
         }
         // nome (sempre visível) — pill com padding real, borda dourada e sombra
-        const label = npc.name;
+        const label = npcName(npc);
         ctx.font = 'bold 11px "Segoe UI", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
