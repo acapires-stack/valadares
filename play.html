@@ -1823,7 +1823,7 @@
 <!-- Modal "Esqueci a senha" -->
 <div id="forgotPwdModal" style="display:none">
     <div class="chest-box" style="min-width:380px;max-width:440px">
-        <div class="chest-title">RECUPERAR SENHA</div>
+        <div class="chest-title" data-i18n="modal.forgot">RECUPERAR SENHA</div>
         <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
             Digite o email cadastrado na sua conta. Vamos enviar um link pra redefinir.
         </div>
@@ -1991,7 +1991,7 @@
 <!-- MODAL TREINO -->
 <div id="trainingModal" style="display:none">
     <div class="chest-box" style="min-width:540px">
-        <div class="chest-title">🎯 BONECO DE TREINO</div>
+        <div class="chest-title" data-i18n="modal.training">🎯 BONECO DE TREINO</div>
         <div style="display:flex;justify-content:center;gap:4px;margin-top:-10px;margin-bottom:14px;flex-wrap:wrap" id="trainArmaLabel"></div>
         <div style="background:#050405;border:1px solid #1a1408;padding:10px;border-radius:1px;margin-bottom:14px;font-size:11px">
             <div id="trainSkillStat" style="color:#aaa;margin-bottom:6px"></div>
@@ -2006,7 +2006,7 @@
 <!-- MODAL ALTAR -->
 <div id="altarModal" style="display:none">
     <div class="chest-box" style="min-width:620px">
-        <div class="chest-title">✨ ALTAR DE MAGIAS</div>
+        <div class="chest-title" data-i18n="modal.altar">✨ ALTAR DE MAGIAS</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px;letter-spacing:1px;font-weight:600" id="altarGoldLabel">0 g</div>
         <div id="altarList" class="craft-list"></div>
         <div class="chest-hint">você pode equipar 1 magia por vez · pague pra trocar · <kbd>ESC</kbd> fechar</div>
@@ -2018,7 +2018,7 @@
 <!-- MODAL SHOP (Mercador) -->
 <div id="shopModal" style="display:none">
     <div class="chest-box" style="min-width:520px">
-        <div class="chest-title">🛒 MERCADOR</div>
+        <div class="chest-title" data-i18n="modal.merchant">🛒 MERCADOR</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px" id="shopGoldLabel">0 g</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div>
@@ -2038,7 +2038,7 @@
 <!-- MODAL QUESTS (Atendente) -->
 <div id="questsModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:640px">
-        <div class="chest-title">📜 QUADRO DE QUESTS</div>
+        <div class="chest-title" data-i18n="modal.quests">📜 QUADRO DE QUESTS</div>
         <div id="questsBody" style="margin-top:14px"></div>
         <div class="chest-hint"><kbd>Q</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeQuests()">×</button>
@@ -2058,7 +2058,7 @@
 <!-- MODAL ESTATÍSTICAS -->
 <div id="statsModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:620px">
-        <div class="chest-title">📊 ESTATÍSTICAS</div>
+        <div class="chest-title" data-i18n="modal.stats">📊 ESTATÍSTICAS</div>
         <div id="statsBody" style="margin-top:14px"></div>
         <div class="chest-hint"><kbd>I</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeStats()">×</button>
@@ -2067,7 +2067,7 @@
 
 <div id="tradeInviteModal" style="display:none">
     <div class="chest-box" style="min-width:340px;max-width:420px;text-align:center">
-        <div class="chest-title">🤝 CONVITE DE TROCA</div>
+        <div class="chest-title" data-i18n="modal.trade_invite">🤝 CONVITE DE TROCA</div>
         <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
             <span id="tradeInviteName" style="color:#ffd060;font-weight:bold">—</span>
             <br>quer fazer trade com você.
@@ -2082,7 +2082,7 @@
 
 <div id="partyInviteModal" style="display:none">
     <div class="chest-box" style="min-width:340px;max-width:420px;text-align:center">
-        <div class="chest-title">👥 CONVITE PRA PARTY</div>
+        <div class="chest-title" data-i18n="modal.party_invite">👥 CONVITE PRA PARTY</div>
         <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
             <span id="partyInviteName" style="color:#ffd060;font-weight:bold">—</span>
             <br>te convidou pra formar party.
@@ -2098,7 +2098,7 @@
 
 <div id="goldShopModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:600px">
-        <div class="chest-title">💰 LOJA DE OURO</div>
+        <div class="chest-title" data-i18n="modal.gold_shop">💰 LOJA DE OURO</div>
         <div style="text-align:center;color:#c8a050;font-size:11px;margin-bottom:12px">
             <b style="color:#00b1ea">PIX</b> · <b style="color:#9dd07d">Cartão</b> · crédito automático após confirmação
         </div>
@@ -2113,7 +2113,7 @@
 
 <div id="duelInviteModal" style="display:none">
     <div class="chest-box" style="min-width:340px;max-width:420px;text-align:center">
-        <div class="chest-title">⚔ CONVITE DE DUELO</div>
+        <div class="chest-title" data-i18n="modal.duel_invite">⚔ CONVITE DE DUELO</div>
         <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
             <span id="duelInviteName" style="color:#ffd060;font-weight:bold">—</span>
             <br>te desafiou pra um duelo.
@@ -2130,7 +2130,7 @@
 
 <div id="arenaModal" style="display:none">
     <div class="chest-box" style="min-width:360px;max-width:440px;text-align:center">
-        <div class="chest-title">⚔ ARENA PvP — 1v1</div>
+        <div class="chest-title" data-i18n="modal.arena">⚔ ARENA PvP — 1v1</div>
         <div style="padding:6px 10px;color:#c8a050;font-size:12px;line-height:1.6">
             Fila com matchmaking. O servidor casa você com outro desafiante de aposta igual, numa arena isolada.
             <div style="margin-top:10px;display:flex;justify-content:space-around;font-size:12px">
@@ -2163,7 +2163,7 @@
 
 <div id="tradeModal" style="display:none">
     <div class="chest-box" style="min-width:680px;max-width:760px">
-        <div class="chest-title">🤝 NEGOCIAÇÃO</div>
+        <div class="chest-title" data-i18n="modal.trade">🤝 NEGOCIAÇÃO</div>
         <div id="tradeStatus" style="text-align:center;color:#998040;font-size:11px;margin-bottom:10px"></div>
         <div style="display:flex;gap:10px">
             <div style="flex:1;background:#050405;border:1px solid #2a200a;padding:8px;border-radius:1px">
@@ -2197,7 +2197,7 @@
 
 <div id="friendsModal" style="display:none">
     <div class="chest-box" style="min-width:480px;max-width:540px">
-        <div class="chest-title">👥 AMIGOS</div>
+        <div class="chest-title" data-i18n="modal.friends">👥 AMIGOS</div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
             <input type="text" id="friendNameInput" placeholder="nome do amigo" maxlength="14"
                    style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:5px 8px;font-family:Consolas,monospace">
@@ -2213,7 +2213,7 @@
 
 <div id="casinoModal" style="display:none">
     <div class="chest-box" style="min-width:420px;max-width:480px">
-        <div class="chest-title">🎰 CASSINO DO CRUPIÊ</div>
+        <div class="chest-title" data-i18n="modal.casino">🎰 CASSINO DO CRUPIÊ</div>
         <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
             Slot Machine · 3 símbolos · house edge ~7%
         </div>
@@ -2244,7 +2244,7 @@
 
 <div id="dyeModal" style="display:none">
     <div class="chest-box" style="min-width:400px;max-width:480px">
-        <div class="chest-title">🎨 TINTURARIA</div>
+        <div class="chest-title" data-i18n="modal.dye">🎨 TINTURARIA</div>
         <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
             Tinge um slot equipado · <b style="color:#ffd060">5.000g</b> por cor · <b style="color:#8aa050">1.000g</b> pra remover
         </div>
@@ -2259,7 +2259,7 @@
 
 <div id="petModal" style="display:none">
     <div class="chest-box" style="min-width:460px;max-width:560px;max-height:88vh;display:flex;flex-direction:column">
-        <div class="chest-title">🐾 DOMADOR DE PETS</div>
+        <div class="chest-title" data-i18n="modal.pet_tamer">🐾 DOMADOR DE PETS</div>
         <div style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:12px">
             Um pet ativo dá um bônus passivo · sobe de nível matando mobs · <b style="color:#ffd060">1 equipado por vez</b>
         </div>
@@ -2272,7 +2272,7 @@
 
 <div id="auctionModal" style="display:none">
     <div class="chest-box" style="min-width:620px;max-width:760px;max-height:88vh;display:flex;flex-direction:column">
-        <div class="chest-title">⚖ CASA DE LEILÕES</div>
+        <div class="chest-title" data-i18n="modal.auction">⚖ CASA DE LEILÕES</div>
         <div style="text-align:center;color:#c8a050;margin-bottom:12px;font-size:12px">
             Trade assíncrono · 24h por listing · <b style="color:#ffd060">5%</b> de comissão por venda · máx 10 ativos
         </div>
@@ -2292,7 +2292,7 @@
 
 <div id="talentsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
-        <div class="chest-title">⚜ TALENTOS</div>
+        <div class="chest-title" data-i18n="modal.talents">⚜ TALENTOS</div>
         <div id="talentsSummary" style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px"></div>
         <div id="talentsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
         <div class="chest-hint" style="margin-top:10px">
@@ -2305,7 +2305,7 @@
 
 <div id="achievementsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
-        <div class="chest-title">🏆 CONQUISTAS</div>
+        <div class="chest-title" data-i18n="modal.achievements">🏆 CONQUISTAS</div>
         <div id="achievementsSummary" style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:13px"></div>
         <div id="achievementsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
         <div class="chest-hint" style="margin-top:10px">
@@ -2317,7 +2317,7 @@
 
 <div id="guildModal" style="display:none">
     <div class="chest-box" style="min-width:480px;max-width:520px">
-        <div class="chest-title">📜 GUILD</div>
+        <div class="chest-title" data-i18n="modal.guild">📜 GUILD</div>
         <div id="guildModalHeader" style="text-align:center;color:#c8a050;margin-bottom:12px;font-size:14px"></div>
         <div class="chest-head">MEMBROS</div>
         <div id="guildMembersList" style="max-height:340px;overflow-y:auto;padding:4px"></div>
@@ -2328,7 +2328,7 @@
 
 <div id="rankingModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:580px">
-        <div class="chest-title">🏆 RANKING</div>
+        <div class="chest-title" data-i18n="modal.ranking">🏆 RANKING</div>
         <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;flex-wrap:wrap">
             <button class="train-tab active" data-rank-tab="season" onclick="switchRankingTab('season')">🏆 TEMPORADA</button>
             <button class="train-tab" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
@@ -2450,7 +2450,7 @@
 
 <div id="craftModal" style="display:none">
     <div class="chest-box" style="min-width:620px">
-        <div class="chest-title">⚒ BANCADA</div>
+        <div class="chest-title" data-i18n="modal.craft">⚒ BANCADA</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px;letter-spacing:1px;font-weight:600" id="craftGoldLabel">0 g</div>
         <div style="display:flex;gap:4px;justify-content:center;margin-bottom:8px">
             <button class="train-tab active" data-craft-tab="craft" onclick="switchCraftTab('craft')">RECEITAS</button>
@@ -2571,6 +2571,28 @@ const I18N = {
     'tut.tips_p': 'Auto-save constante. Mini-mapa no canto descobre andando. <kbd>I</kbd> abre estatísticas, <kbd>O</kbd> abre opções/volume. Logout só fora de combate PvP.',
     'tut.dont_show': 'Não mostrar de novo',
     'tut.btn': 'ENTENDI ✦',
+    'modal.forgot': 'RECUPERAR SENHA',
+    'modal.training': '🎯 BONECO DE TREINO',
+    'modal.altar': '✨ ALTAR DE MAGIAS',
+    'modal.merchant': '🛒 MERCADOR',
+    'modal.quests': '📜 QUADRO DE QUESTS',
+    'modal.stats': '📊 ESTATÍSTICAS',
+    'modal.trade_invite': '🤝 CONVITE DE TROCA',
+    'modal.party_invite': '👥 CONVITE PRA PARTY',
+    'modal.gold_shop': '💰 LOJA DE OURO',
+    'modal.duel_invite': '⚔ CONVITE DE DUELO',
+    'modal.arena': '⚔ ARENA PvP — 1v1',
+    'modal.trade': '🤝 NEGOCIAÇÃO',
+    'modal.friends': '👥 AMIGOS',
+    'modal.casino': '🎰 CASSINO DO CRUPIÊ',
+    'modal.dye': '🎨 TINTURARIA',
+    'modal.pet_tamer': '🐾 DOMADOR DE PETS',
+    'modal.auction': '⚖ CASA DE LEILÕES',
+    'modal.talents': '⚜ TALENTOS',
+    'modal.achievements': '🏆 CONQUISTAS',
+    'modal.guild': '📜 GUILD',
+    'modal.ranking': '🏆 RANKING',
+    'modal.craft': '⚒ BANCADA',
     'lang.pt': 'Português',
     'lang.en': 'English'
   },
@@ -2635,6 +2657,28 @@ const I18N = {
     'tut.tips_p': 'Constant auto-save. The corner minimap reveals as you walk. <kbd>I</kbd> opens stats, <kbd>O</kbd> opens options/volume. You can only log out when not in PvP combat.',
     'tut.dont_show': "Don't show again",
     'tut.btn': 'GOT IT ✦',
+    'modal.forgot': 'PASSWORD RECOVERY',
+    'modal.training': '🎯 TRAINING DUMMY',
+    'modal.altar': '✨ SPELL ALTAR',
+    'modal.merchant': '🛒 MERCHANT',
+    'modal.quests': '📜 QUEST BOARD',
+    'modal.stats': '📊 STATISTICS',
+    'modal.trade_invite': '🤝 TRADE INVITE',
+    'modal.party_invite': '👥 PARTY INVITE',
+    'modal.gold_shop': '💰 GOLD SHOP',
+    'modal.duel_invite': '⚔ DUEL INVITE',
+    'modal.arena': '⚔ PvP ARENA — 1v1',
+    'modal.trade': '🤝 TRADING',
+    'modal.friends': '👥 FRIENDS',
+    'modal.casino': "🎰 CROUPIER'S CASINO",
+    'modal.dye': '🎨 DYE SHOP',
+    'modal.pet_tamer': '🐾 PET TAMER',
+    'modal.auction': '⚖ AUCTION HOUSE',
+    'modal.talents': '⚜ TALENTS',
+    'modal.achievements': '🏆 ACHIEVEMENTS',
+    'modal.guild': '📜 GUILD',
+    'modal.ranking': '🏆 RANKING',
+    'modal.craft': '⚒ CRAFTING BENCH',
     'lang.pt': 'Português',
     'lang.en': 'English'
   }
