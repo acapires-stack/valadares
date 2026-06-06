@@ -168,6 +168,10 @@ Até lá: **PT-BR é o padrão e está certo.** Este doc é só o roteiro guarda
 1. **Cliente primeiro** (Vercel, sem /manutenção): novo cliente manda `lang`; server velho ignora → PT, sem regressão.
 2. **Server depois** (Railway, watch paths) sob **/manutenção** + 0 players: aí o EN do server passa a fluir.
 
-### Fase 2.5 (pendente — NÃO feito): toasts client-side `showServerToast('event','PT…')` +
-dicts de erro inline (dye/auction/pet/arena-cancel/dungeon) + auth `msgs` + questResult `reasons`.
-São banners/labels separados do log; ficam PT até a 2.5. **Fase 3** segue = conteúdo (itens/magias/mobs ~330).
+### Fase 2.5 — FEITA (06/06, cliente, deploy SEM /manutenção)
+- **18 `showServerToast`** literais → `tr('toast.*')` (blessing, arena, profundezas, duelo, loot de boss, campeão, backup…). Relays `msg.text`/`msg.motd`/`stage.name` ficam (são dados/server-localizados).
+- **7 dicts de erro inline** → valores `tr('err.*')`: auth `msgs`, questResult `reasons`, dungeon, arena-cancel, auction, dye, pet.
+- **innerHTML de resultado** (auction listado/cancelado/comprado, dye removida/tingido, pet adotado, arena fila, trade AGUARDANDO, update check) → `tr('res.*')`.
+- **+76 chaves** `toast.*`/`err.*`/`res.*` (dict cliente agora **303/303** pt/en, 0 vazamento). Verificado no preview.
+
+**Fase 3** (pendente) = conteúdo: nomes/descrições de itens, magias, mobs, NPCs, quests (~330). Maior esforço, menor prioridade (lore/flavor pode ficar PT).
