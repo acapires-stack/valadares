@@ -2911,6 +2911,13 @@ const I18N = {
     'res.trade_waiting': '✓ AGUARDANDO OUTRO',
     'res.update_available': '✓ Atualização disponível: v{v} — baixando…',
     'res.update_latest': '✓ Você já está na última versão.',
+    /* ===== Fase 3 starter: nomes de skill (chaves internas PT) ===== */
+    'skill.Espada': 'Espada', 'skill.Machado': 'Machado', 'skill.Clava': 'Clava',
+    'skill.Distância': 'Distância', 'skill.Punho': 'Punho', 'skill.Escudo': 'Escudo', 'skill.Magia': 'Magia',
+    'train.current': 'Skill atual: <span style="color:#e0c060">{val}</span> (xp {xp}/{next})',
+    'train.cost_line': 'Custo: <span style="color:#ffcc40">{cost}g</span>/sessão · Tempo: 2s/sessão · <span style="color:#74d176">+{xp} XP</span>/sessão',
+    'train.sessions_to_level': '<span style="color:#aacfff">~{n} sessões pro próximo nível</span> ({g}g)',
+    'train.can_afford': 'Você consegue pagar {n} sessões ({gold}g)',
     /*F2PT*/
   },
   en: {
@@ -3314,6 +3321,13 @@ const I18N = {
     'res.trade_waiting': '✓ WAITING FOR OTHER',
     'res.update_available': '✓ Update available: v{v} — downloading…',
     'res.update_latest': '✓ You are on the latest version.',
+    /* ===== Fase 3 starter: skill names ===== */
+    'skill.Espada': 'Sword', 'skill.Machado': 'Axe', 'skill.Clava': 'Club',
+    'skill.Distância': 'Ranged', 'skill.Punho': 'Fist', 'skill.Escudo': 'Shield', 'skill.Magia': 'Magic',
+    'train.current': 'Current skill: <span style="color:#e0c060">{val}</span> (xp {xp}/{next})',
+    'train.cost_line': 'Cost: <span style="color:#ffcc40">{cost}g</span>/session · Time: 2s/session · <span style="color:#74d176">+{xp} XP</span>/session',
+    'train.sessions_to_level': '<span style="color:#aacfff">~{n} sessions to next level</span> ({g}g)',
+    'train.can_afford': 'You can afford {n} sessions ({gold}g)',
     /*F2EN*/
   }
 };
@@ -3331,6 +3345,8 @@ function tr(key, params){
   if (params) for (const k in params) s = s.split('{'+k+'}').join(params[k]);
   return s;
 }
+// Nome de skill traduzido (a chave interna é PT: player.skills['Espada']). Fallback = a própria chave.
+function skillDisp(s){ const v = tr('skill.' + s); return v === ('skill.' + s) ? s : v; }
 function applyI18n(root){
   const sc = root || document;
   sc.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
@@ -6573,7 +6589,7 @@ function doAttack(m){
     dmg = applyAttackMults(dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
     if (crit) sndCrit(); else sndHit();
-    log(tr('log.dmg_hit', {star: crit?'★ ':'', weapon: w.skill, dmg, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
+    log(tr('log.dmg_hit', {star: crit?'★ ':'', weapon: skillDisp(w.skill), dmg, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
     gainSkillXpLocal(w.skill, 1);
     if (player.equipped.offhand && ITEMS[player.equipped.offhand].kind === 'offhand'){
         gainSkillXpLocal('Escudo', 1);
@@ -7834,7 +7850,7 @@ function mobKilledByServer(m, serverLoot, serverDrops){
     // Em modo offline (sem ws), fallback continua aplicando local.
     const wKey = player.equipped.weapon;
     const skill = m.skill || (wKey ? ITEMS[wKey].skill : 'Punho');
-    log(tr('log.mob_killed', {mob: m.name, xp: m.xpReward||0, skill}));
+    log(tr('log.mob_killed', {mob: m.name, xp: m.xpReward||0, skill: skillDisp(skill)}));
     addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
     if (player.target === m.id){ player.target = null; /* mantém autoAttack */ }
     // #3/#6: coleta o loot recém-caído NA HORA da morte. Antes o pickup só rodava ao MOVER
@@ -9880,7 +9896,7 @@ function buildSkillList(){
     const active = activeWeapon().skill;
     el.innerHTML = Object.entries(player.skills).map(([n,s])=>`
         <div class="skill-row">
-            <span class="skill-name">${n}${n===active?' ⚔':''}</span>
+            <span class="skill-name">${skillDisp(n)}${n===active?' ⚔':''}</span>
             <span class="skill-val" id="sk-${n}">${s.val}</span>
         </div>
         <div class="skill-bar"><div class="skill-fill" id="skb-${n}" style="width:${s.xp/s.xpNext*100}%"></div></div>
@@ -12639,15 +12655,15 @@ function renderTraining(){
 
     // Tabs por skill treinável
     document.getElementById('trainArmaLabel').innerHTML = skills.map(s =>
-        `<button class="train-tab ${s===skill?'active':''}" onclick="setTrainingSkill('${s}')">${s}</button>`
+        `<button class="train-tab ${s===skill?'active':''}" onclick="setTrainingSkill('${s}')">${skillDisp(s)}</button>`
     ).join(' ');
 
     document.getElementById('trainSkillStat').innerHTML =
-        `Skill atual: <span style="color:#e0c060">${sk.val}</span> (xp ${sk.xp}/${sk.xpNext})<br>` +
-        `Custo: <span style="color:#ffcc40">${cost}g</span>/sessão · Tempo: 2s/sessão · <span style="color:#74d176">+${xpPerSess} XP</span>/sessão<br>` +
-        `<span style="color:#aacfff">~${sessionsToLevel} sessões pro próximo nível</span> (${sessionsToLevel*cost}g)`;
+        tr('train.current', {val: sk.val, xp: sk.xp, next: sk.xpNext}) + '<br>' +
+        tr('train.cost_line', {cost, xp: xpPerSess}) + '<br>' +
+        tr('train.sessions_to_level', {n: sessionsToLevel, g: sessionsToLevel*cost});
     const maxAfford = Math.floor(player.gold / cost);
-    document.getElementById('trainCanAfford').textContent = `Você consegue pagar ${maxAfford} sessões (${player.gold}g)`;
+    document.getElementById('trainCanAfford').textContent = tr('train.can_afford', {n: maxAfford, gold: player.gold});
     const opts = [10, 50, 100, maxAfford];
     const labels = ['10×', '50×', '100×', `MAX (${maxAfford})`];
     document.getElementById('trainBtns').innerHTML = opts.map((q, i) => {
@@ -12673,7 +12689,7 @@ function startTraining(count, opts){
     };
     closeTraining();
     closeAltar();
-    log(tr('log.training', {skill, n: actual, g: actual*cost}));
+    log(tr('log.training', {skill: skillDisp(skill), n: actual, g: actual*cost}));
 }
 function startMagicTraining(count){
     startTraining(count, { location:'altar', skill:'Magia' });
@@ -12891,7 +12907,7 @@ function tickTraining(dt){
         if (ws && ws.readyState === 1 && _wsAuthed){
             try { ws.send(JSON.stringify({ t:'trainAttempt', skill: training.skill })); } catch {}
         }
-        addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${training.skill}`, '#ffcc40');
+        addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${skillDisp(training.skill)}`, '#ffcc40');
         training.remaining--;
         training.lastTick = now;
         if (training.remaining <= 0) stopTraining('completo');
