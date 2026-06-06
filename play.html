@@ -1824,13 +1824,13 @@
 <div id="forgotPwdModal" style="display:none">
     <div class="chest-box" style="min-width:380px;max-width:440px">
         <div class="chest-title" data-i18n="modal.forgot">RECUPERAR SENHA</div>
-        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
+        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px" data-i18n="forgot.intro">
             Digite o email cadastrado na sua conta. Vamos enviar um link pra redefinir.
         </div>
         <input type="email" id="forgotEmailInput" placeholder="seu@email.com" maxlength="120" style="width:100%;padding:10px;background:#0a0805;border:1px solid #6a5020;color:#e0d8c8;border-radius:2px;font-family:inherit;font-size:14px;margin-bottom:12px">
         <div id="forgotPwdStatus" style="text-align:center;min-height:20px;margin-bottom:10px;font-size:13px;color:#c8a050"></div>
-        <button onclick="submitForgotPwd()" style="width:100%;padding:10px;background:#d4a847;color:#0a0805;border:0;font-weight:600;letter-spacing:1px;cursor:pointer;border-radius:2px">ENVIAR LINK</button>
-        <div class="chest-hint" style="margin-top:10px">
+        <button onclick="submitForgotPwd()" style="width:100%;padding:10px;background:#d4a847;color:#0a0805;border:0;font-weight:600;letter-spacing:1px;cursor:pointer;border-radius:2px" data-i18n="forgot.send">ENVIAR LINK</button>
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="forgot.hint">
             Sem email cadastrado? Não tem como recuperar. <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeForgotPwd()">×</button>
@@ -1860,9 +1860,9 @@
 <div id="reconnectOverlay">
     <div class="reconnect-box">
         <div class="reconnect-spinner">⚙</div>
-        <div class="reconnect-title">ATUALIZANDO</div>
-        <div class="reconnect-desc">Servidor está atualizando — voltamos em segundos.</div>
-        <div class="reconnect-hint">Ataques e movimento bloqueados até voltar</div>
+        <div class="reconnect-title" data-i18n="reconnect.title">ATUALIZANDO</div>
+        <div class="reconnect-desc" data-i18n="reconnect.desc">Servidor está atualizando — voltamos em segundos.</div>
+        <div class="reconnect-hint" data-i18n="reconnect.hint">Ataques e movimento bloqueados até voltar</div>
     </div>
 </div>
 
@@ -1998,7 +1998,7 @@
             <div id="trainCanAfford" style="color:#666;font-size:10px"></div>
         </div>
         <div id="trainBtns" style="display:flex;flex-direction:column;gap:6px"></div>
-        <div class="chest-hint">cada sessão = 1 XP na skill · andar cancela · <kbd>ESC</kbd> fechar/parar</div>
+        <div class="chest-hint" data-i18n-html="training.hint">cada sessão = 1 XP na skill · andar cancela · <kbd>ESC</kbd> fechar/parar</div>
         <button class="chest-close" onclick="closeTraining()">×</button>
     </div>
 </div>
@@ -2009,7 +2009,7 @@
         <div class="chest-title" data-i18n="modal.altar">✨ ALTAR DE MAGIAS</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px;letter-spacing:1px;font-weight:600" id="altarGoldLabel">0 g</div>
         <div id="altarList" class="craft-list"></div>
-        <div class="chest-hint">você pode equipar 1 magia por vez · pague pra trocar · <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="altar.hint">você pode equipar 1 magia por vez · pague pra trocar · <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeAltar()">×</button>
     </div>
 </div>
@@ -2022,15 +2022,15 @@
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px" id="shopGoldLabel">0 g</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div>
-                <div class="chest-head">COMPRAR</div>
+                <div class="chest-head" data-i18n="shop.head_buy">COMPRAR</div>
                 <div id="shopBuyList" class="craft-list" style="max-height:380px"></div>
             </div>
             <div>
-                <div class="chest-head">VENDER (do seu inventário)</div>
+                <div class="chest-head" data-i18n="shop.head_sell">VENDER (do seu inventário)</div>
                 <div id="shopSellList" class="craft-list" style="max-height:380px"></div>
             </div>
         </div>
-        <div class="chest-hint"><kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="hint.esc_close"><kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeShop()">×</button>
     </div>
 </div>
@@ -2040,7 +2040,7 @@
     <div class="chest-box" style="min-width:520px;max-width:640px">
         <div class="chest-title" data-i18n="modal.quests">📜 QUADRO DE QUESTS</div>
         <div id="questsBody" style="margin-top:14px"></div>
-        <div class="chest-hint"><kbd>Q</kbd> ou <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="quests.hint"><kbd>Q</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeQuests()">×</button>
     </div>
 </div>
@@ -2050,7 +2050,7 @@
     <div class="chest-box" style="min-width:480px;max-width:620px">
         <div class="chest-title" id="chainDialogTitle">NPC</div>
         <div id="chainDialogBody" style="margin-top:14px"></div>
-        <div class="chest-hint"><kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="hint.esc_close"><kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeChainDialog()">×</button>
     </div>
 </div>
@@ -2060,7 +2060,7 @@
     <div class="chest-box" style="min-width:520px;max-width:620px">
         <div class="chest-title" data-i18n="modal.stats">📊 ESTATÍSTICAS</div>
         <div id="statsBody" style="margin-top:14px"></div>
-        <div class="chest-hint"><kbd>I</kbd> ou <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="stats.hint"><kbd>I</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeStats()">×</button>
     </div>
 </div>
@@ -2099,12 +2099,12 @@
 <div id="goldShopModal" style="display:none">
     <div class="chest-box" style="min-width:520px;max-width:600px">
         <div class="chest-title" data-i18n="modal.gold_shop">💰 LOJA DE OURO</div>
-        <div style="text-align:center;color:#c8a050;font-size:11px;margin-bottom:12px">
+        <div style="text-align:center;color:#c8a050;font-size:11px;margin-bottom:12px" data-i18n-html="goldshop.subtitle">
             <b style="color:#00b1ea">PIX</b> · <b style="color:#9dd07d">Cartão</b> · crédito automático após confirmação
         </div>
         <div id="goldShopList" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
         <div id="goldShopCheckout" style="display:none;margin-top:14px;padding:14px;background:#0a0805;border:1px solid #3a2d10;border-radius:3px;text-align:center"></div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="goldshop.hint">
             preço em R$ · após pagamento, o ouro cai automaticamente no boneco · <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeGoldShop()">×</button>
@@ -2116,14 +2116,14 @@
         <div class="chest-title" data-i18n="modal.duel_invite">⚔ CONVITE DE DUELO</div>
         <div style="padding:18px 8px;color:#c8a050;font-size:13px;line-height:1.6">
             <span id="duelInviteName" style="color:#ffd060;font-weight:bold">—</span>
-            <br>te desafiou pra um duelo.
-            <div style="margin-top:10px;color:#ffcc40;font-size:14px">💰 Aposta: <b id="duelInviteAmount">0g</b></div>
-            <div style="margin-top:4px;font-size:10px;color:#888">vencedor leva o dobro · 3 min máx</div>
+            <br><span data-i18n="duel.challenged_you">te desafiou pra um duelo.</span>
+            <div style="margin-top:10px;color:#ffcc40;font-size:14px"><span data-i18n="duel.wager_label">💰 Aposta:</span> <b id="duelInviteAmount">0g</b></div>
+            <div style="margin-top:4px;font-size:10px;color:#888" data-i18n="duel.terms">vencedor leva o dobro · 3 min máx</div>
             <div id="duelInviteCountdown" style="margin-top:10px;color:#888;font-size:11px">expira em 30s</div>
         </div>
         <div style="display:flex;gap:10px;justify-content:center;padding:8px 14px 14px">
-            <button class="craft-btn" id="duelInviteAccept" style="background:#3a2818;border-color:#7a5a20;color:#ffcc40" onclick="acceptDuelInvite()">⚔ ACEITAR</button>
-            <button class="craft-btn" id="duelInviteReject" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d" onclick="rejectDuelInvite()">✗ RECUSAR</button>
+            <button class="craft-btn" id="duelInviteAccept" style="background:#3a2818;border-color:#7a5a20;color:#ffcc40" onclick="acceptDuelInvite()" data-i18n="duel.accept">⚔ ACEITAR</button>
+            <button class="craft-btn" id="duelInviteReject" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d" onclick="rejectDuelInvite()" data-i18n="duel.reject">✗ RECUSAR</button>
         </div>
     </div>
 </div>
@@ -2132,23 +2132,23 @@
     <div class="chest-box" style="min-width:360px;max-width:440px;text-align:center">
         <div class="chest-title" data-i18n="modal.arena">⚔ ARENA PvP — 1v1</div>
         <div style="padding:6px 10px;color:#c8a050;font-size:12px;line-height:1.6">
-            Fila com matchmaking. O servidor casa você com outro desafiante de aposta igual, numa arena isolada.
+            <span data-i18n="arena.intro">Fila com matchmaking. O servidor casa você com outro desafiante de aposta igual, numa arena isolada.</span>
             <div style="margin-top:10px;display:flex;justify-content:space-around;font-size:12px">
                 <div>Rating<br><b id="arenaRating" style="color:#ffd060;font-size:18px">—</b></div>
-                <div>Vitórias<br><b id="arenaWins" style="color:#74d176;font-size:18px">0</b></div>
-                <div>Derrotas<br><b id="arenaLosses" style="color:#d07d7d;font-size:18px">0</b></div>
+                <div><span data-i18n="arena.wins">Vitórias</span><br><b id="arenaWins" style="color:#74d176;font-size:18px">0</b></div>
+                <div><span data-i18n="arena.losses">Derrotas</span><br><b id="arenaLosses" style="color:#d07d7d;font-size:18px">0</b></div>
             </div>
             <div style="margin-top:14px">
-                💰 Aposta (gold):
+                <span data-i18n="arena.wager_label">💰 Aposta (gold):</span>
                 <input id="arenaWagerInput" type="number" min="0" step="50" value="0"
                     style="width:90px;background:#0a0805;border:1px solid #3a2d10;color:#ffcc40;padding:4px;text-align:center;font-family:inherit">
-                <div style="font-size:10px;color:#888;margin-top:3px">0 = só rating · mín 50g se apostar · vencedor leva o dobro</div>
+                <div style="font-size:10px;color:#888;margin-top:3px" data-i18n="arena.wager_hint">0 = só rating · mín 50g se apostar · vencedor leva o dobro</div>
             </div>
             <div id="arenaStatus" style="margin-top:12px;font-size:12px;color:#9ab0c0;min-height:18px"></div>
         </div>
         <div style="display:flex;gap:10px;justify-content:center;padding:6px 14px 14px">
-            <button class="craft-btn" id="arenaJoinBtn" style="background:#3a2818;border-color:#7a5a20;color:#ffcc40" onclick="arenaJoinQueue()">⚔ ENTRAR NA FILA</button>
-            <button class="craft-btn" id="arenaLeaveBtn" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d;display:none" onclick="arenaLeaveQueue()">✗ SAIR DA FILA</button>
+            <button class="craft-btn" id="arenaJoinBtn" style="background:#3a2818;border-color:#7a5a20;color:#ffcc40" onclick="arenaJoinQueue()" data-i18n="arena.btn_join">⚔ ENTRAR NA FILA</button>
+            <button class="craft-btn" id="arenaLeaveBtn" style="background:#3a1818;border-color:#6a2a2a;color:#d07d7d;display:none" onclick="arenaLeaveQueue()" data-i18n="arena.btn_leave">✗ SAIR DA FILA</button>
         </div>
         <button class="chest-close" onclick="closeArenaModal()">×</button>
     </div>
@@ -2167,19 +2167,19 @@
         <div id="tradeStatus" style="text-align:center;color:#998040;font-size:11px;margin-bottom:10px"></div>
         <div style="display:flex;gap:10px">
             <div style="flex:1;background:#050405;border:1px solid #2a200a;padding:8px;border-radius:1px">
-                <div class="chest-head">SUA OFERTA — <span id="tradeMyName">você</span></div>
+                <div class="chest-head"><span data-i18n="trade.your_offer">SUA OFERTA —</span> <span id="tradeMyName">você</span></div>
                 <div id="tradeMyOffer" style="min-height:120px;font-size:11px"></div>
                 <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:6px;border-top:1px solid #1a1408">
                     <span style="color:#c8a050;font-size:11px">Gold:</span>
                     <input id="tradeMyGoldInput" type="number" min="0" value="0"
                            style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#ffcc40;padding:3px 6px;font-family:Consolas,monospace">
-                    <button class="chest-qty-btn" onclick="updateTradeGold()">aplicar</button>
+                    <button class="chest-qty-btn" onclick="updateTradeGold()" data-i18n="trade.btn_apply">aplicar</button>
                 </div>
-                <div style="color:#666;font-size:9px;margin-top:6px;text-align:center">Clique em item do inv abaixo p/ adicionar</div>
+                <div style="color:#666;font-size:9px;margin-top:6px;text-align:center" data-i18n="trade.add_hint">Clique em item do inv abaixo p/ adicionar</div>
                 <div id="tradeMyInv" style="margin-top:8px;max-height:200px;overflow-y:auto;font-size:11px"></div>
             </div>
             <div style="flex:1;background:#050405;border:1px solid #2a200a;padding:8px;border-radius:1px">
-                <div class="chest-head">OFERTA DE <span id="tradeOtherName">?</span></div>
+                <div class="chest-head"><span data-i18n="trade.offer_from">OFERTA DE</span> <span id="tradeOtherName">?</span></div>
                 <div id="tradeOtherOffer" style="min-height:120px;font-size:11px"></div>
                 <div style="margin-top:8px;padding-top:6px;border-top:1px solid #1a1408;color:#ffcc40;font-size:11px">
                     Gold: <span id="tradeOtherGold">0</span>
@@ -2187,10 +2187,10 @@
             </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px">
-            <button class="chest-btn chest-btn-primary" id="tradeConfirmBtn" onclick="confirmTradeOffer()">CONFIRMAR</button>
-            <button class="chest-btn" onclick="cancelTradeOffer()">cancelar</button>
+            <button class="chest-btn chest-btn-primary" id="tradeConfirmBtn" onclick="confirmTradeOffer()" data-i18n="trade.confirm">CONFIRMAR</button>
+            <button class="chest-btn" onclick="cancelTradeOffer()" data-i18n="trade.cancel">cancelar</button>
         </div>
-        <div class="chest-hint">os 2 lados precisam confirmar &nbsp;|&nbsp; <kbd>ESC</kbd> cancela</div>
+        <div class="chest-hint" data-i18n-html="trade.hint">os 2 lados precisam confirmar &nbsp;|&nbsp; <kbd>ESC</kbd> cancela</div>
         <button class="chest-close" onclick="cancelTradeOffer()">×</button>
     </div>
 </div>
@@ -2199,12 +2199,12 @@
     <div class="chest-box" style="min-width:480px;max-width:540px">
         <div class="chest-title" data-i18n="modal.friends">👥 AMIGOS</div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
-            <input type="text" id="friendNameInput" placeholder="nome do amigo" maxlength="14"
+            <input type="text" id="friendNameInput" placeholder="nome do amigo" data-i18n-ph="friends.input_ph" maxlength="14"
                    style="flex:1;background:#0a0805;border:1px solid #3a2d10;color:#e0c060;padding:5px 8px;font-family:Consolas,monospace">
-            <button class="chest-btn" style="margin:0;width:auto;padding:5px 12px" onclick="addFriendFromInput()">adicionar</button>
+            <button class="chest-btn" style="margin:0;width:auto;padding:5px 12px" onclick="addFriendFromInput()" data-i18n="friends.btn_add">adicionar</button>
         </div>
         <div id="friendsList" style="max-height:50vh;overflow-y:auto"></div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="friends.hint">
             chat: <kbd>/msg nome</kbd> <span style="color:#888">texto</span> &nbsp;|&nbsp; <kbd>N</kbd> ou <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeFriends()">×</button>
@@ -2214,7 +2214,7 @@
 <div id="casinoModal" style="display:none">
     <div class="chest-box" style="min-width:420px;max-width:480px">
         <div class="chest-title" data-i18n="modal.casino">🎰 CASSINO DO CRUPIÊ</div>
-        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
+        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px" data-i18n="casino.subtitle">
             Slot Machine · 3 símbolos · house edge ~7%
         </div>
         <div id="casinoReels" style="display:flex;justify-content:center;gap:14px;margin:18px 0">
@@ -2231,11 +2231,11 @@
             <button class="qty-btn" onclick="casinoSpin(10000)">10.000g</button>
         </div>
         <div style="font-size:11px;color:#8a7050;line-height:1.6">
-            <div style="font-weight:600;color:#c8a050;margin-bottom:4px">PAGAMENTOS (sobre a aposta):</div>
+            <div style="font-weight:600;color:#c8a050;margin-bottom:4px" data-i18n="casino.payouts_header">PAGAMENTOS (sobre a aposta):</div>
             <div>3× 💎 = <b style="color:#aacfff">100×</b> · 3× 7️⃣ = <b style="color:#ffaa20">20×</b> · 3× 🍇 = <b style="color:#cc60aa">10×</b></div>
-            <div>3× 🍋 = <b style="color:#ffcc40">5×</b> · 3× 🍒 = <b style="color:#cc3030">3×</b> · 2 iguais = <b>1×</b> (volta aposta)</div>
+            <div data-i18n-html="casino.payout_line2">3× 🍋 = <b style="color:#ffcc40">5×</b> · 3× 🍒 = <b style="color:#cc3030">3×</b> · 2 iguais = <b>1×</b> (volta aposta)</div>
         </div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="hint.esc_close">
             <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeCasino()">×</button>
@@ -2245,12 +2245,12 @@
 <div id="dyeModal" style="display:none">
     <div class="chest-box" style="min-width:400px;max-width:480px">
         <div class="chest-title" data-i18n="modal.dye">🎨 TINTURARIA</div>
-        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px">
+        <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px" data-i18n-html="dye.subtitle">
             Tinge um slot equipado · <b style="color:#ffd060">5.000g</b> por cor · <b style="color:#8aa050">1.000g</b> pra remover
         </div>
         <div id="dyeBody"></div>
         <div id="dyeResult" style="text-align:center;min-height:18px;margin-top:10px;font-size:12px;color:#c8a050"></div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="hint.esc_close">
             <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeDye()">×</button>
@@ -2260,12 +2260,12 @@
 <div id="petModal" style="display:none">
     <div class="chest-box" style="min-width:460px;max-width:560px;max-height:88vh;display:flex;flex-direction:column">
         <div class="chest-title" data-i18n="modal.pet_tamer">🐾 DOMADOR DE PETS</div>
-        <div style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:12px">
+        <div style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:12px" data-i18n-html="pet.subtitle">
             Um pet ativo dá um bônus passivo · sobe de nível matando mobs · <b style="color:#ffd060">1 equipado por vez</b>
         </div>
         <div id="petBody" style="flex:1;overflow-y:auto;min-height:200px;max-height:60vh"></div>
         <div id="petResult" style="text-align:center;min-height:18px;margin-top:10px;font-size:12px;color:#c8a050"></div>
-        <div class="chest-hint" style="margin-top:10px"><kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="hint.esc_close"><kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closePetShop()">×</button>
     </div>
 </div>
@@ -2273,17 +2273,17 @@
 <div id="auctionModal" style="display:none">
     <div class="chest-box" style="min-width:620px;max-width:760px;max-height:88vh;display:flex;flex-direction:column">
         <div class="chest-title" data-i18n="modal.auction">⚖ CASA DE LEILÕES</div>
-        <div style="text-align:center;color:#c8a050;margin-bottom:12px;font-size:12px">
+        <div style="text-align:center;color:#c8a050;margin-bottom:12px;font-size:12px" data-i18n-html="auction.subtitle">
             Trade assíncrono · 24h por listing · <b style="color:#ffd060">5%</b> de comissão por venda · máx 10 ativos
         </div>
         <div class="chat-tabs" style="border-bottom:1px solid #3a2d10;margin-bottom:12px">
             <span class="chat-tab active" data-atab="browse" onclick="selectAuctionTab('browse')">BROWSE</span>
-            <span class="chat-tab" data-atab="mine" onclick="selectAuctionTab('mine')">MINHAS</span>
-            <span class="chat-tab" data-atab="sell" onclick="selectAuctionTab('sell')">VENDER</span>
+            <span class="chat-tab" data-atab="mine" onclick="selectAuctionTab('mine')" data-i18n="auction.tab_mine">MINHAS</span>
+            <span class="chat-tab" data-atab="sell" onclick="selectAuctionTab('sell')" data-i18n="auction.tab_sell">VENDER</span>
         </div>
         <div id="auctionBody" style="flex:1;overflow-y:auto;min-height:260px;max-height:55vh"></div>
         <div id="auctionResult" style="text-align:center;min-height:18px;margin-top:10px;font-size:12px;color:#c8a050"></div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="hint.esc_close">
             <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeAuction()">×</button>
@@ -2295,7 +2295,7 @@
         <div class="chest-title" data-i18n="modal.talents">⚜ TALENTOS</div>
         <div id="talentsSummary" style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px"></div>
         <div id="talentsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="talents.hint">
             1 ponto a cada 10 níveis totais de skill &nbsp;|&nbsp; talentos são permanentes &nbsp;|&nbsp; <kbd>K</kbd> ou <kbd>ESC</kbd> fechar
         </div>
         <div style="text-align:center;font-size:9px;color:#5a5240;margin-top:4px">ícones: <a href="https://game-icons.net" target="_blank" rel="noopener" style="color:#7a6a40">game-icons.net</a> · CC BY 3.0</div>
@@ -2308,7 +2308,7 @@
         <div class="chest-title" data-i18n="modal.achievements">🏆 CONQUISTAS</div>
         <div id="achievementsSummary" style="text-align:center;color:#c8a050;margin-bottom:10px;font-size:13px"></div>
         <div id="achievementsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
-        <div class="chest-hint" style="margin-top:10px">
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="ach.hint">
             clique no badge equipado pra trocar (2 slots) &nbsp;|&nbsp; <kbd>J</kbd> ou <kbd>ESC</kbd> fechar
         </div>
         <button class="chest-close" onclick="closeAchievements()">×</button>
@@ -2319,9 +2319,9 @@
     <div class="chest-box" style="min-width:480px;max-width:520px">
         <div class="chest-title" data-i18n="modal.guild">📜 GUILD</div>
         <div id="guildModalHeader" style="text-align:center;color:#c8a050;margin-bottom:12px;font-size:14px"></div>
-        <div class="chest-head">MEMBROS</div>
+        <div class="chest-head" data-i18n="guild.members_head">MEMBROS</div>
         <div id="guildMembersList" style="max-height:340px;overflow-y:auto;padding:4px"></div>
-        <div class="chest-hint" style="margin-top:10px">verde = online · 👑 = líder · <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" style="margin-top:10px" data-i18n-html="guild.hint">verde = online · 👑 = líder · <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeGuildModal()">×</button>
     </div>
 </div>
@@ -2330,7 +2330,7 @@
     <div class="chest-box" style="min-width:520px;max-width:580px">
         <div class="chest-title" data-i18n="modal.ranking">🏆 RANKING</div>
         <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;flex-wrap:wrap">
-            <button class="train-tab active" data-rank-tab="season" onclick="switchRankingTab('season')">🏆 TEMPORADA</button>
+            <button class="train-tab active" data-rank-tab="season" onclick="switchRankingTab('season')" data-i18n="ranking.tab_season">🏆 TEMPORADA</button>
             <button class="train-tab" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
             <button class="train-tab" data-rank-tab="pvp" onclick="switchRankingTab('pvp')">PvP</button>
             <button class="train-tab" data-rank-tab="bosses" onclick="switchRankingTab('bosses')">BOSSES</button>
@@ -2338,7 +2338,7 @@
             <button class="train-tab" data-rank-tab="guilds" onclick="switchRankingTab('guilds')">GUILDS</button>
         </div>
         <div id="rankingBody" style="min-height:300px"></div>
-        <div class="chest-hint"><kbd>L</kbd> ou <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="ranking.hint"><kbd>L</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeRanking()">×</button>
     </div>
 </div>
@@ -2453,12 +2453,12 @@
         <div class="chest-title" data-i18n="modal.craft">⚒ BANCADA</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px;letter-spacing:1px;font-weight:600" id="craftGoldLabel">0 g</div>
         <div style="display:flex;gap:4px;justify-content:center;margin-bottom:8px">
-            <button class="train-tab active" data-craft-tab="craft" onclick="switchCraftTab('craft')">RECEITAS</button>
-            <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')">🔥 FORJA</button>
+            <button class="train-tab active" data-craft-tab="craft" onclick="switchCraftTab('craft')" data-i18n="craft.tab_recipes">RECEITAS</button>
+            <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')" data-i18n="craft.tab_forge">🔥 FORJA</button>
         </div>
         <div id="craftList" class="craft-list"></div>
         <div id="forjaPanel" class="craft-list" style="display:none"></div>
-        <div class="chest-hint" id="craftHint">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" id="craftHint" data-i18n-html="craft.hint_recipes">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeCraft()">×</button>
     </div>
 </div>
@@ -2470,19 +2470,19 @@
         <div style="text-align:center;color:#666;font-size:9px;margin-top:-12px;margin-bottom:12px;letter-spacing:1px" id="chestTotalGold"></div>
         <div class="chest-cols">
             <div class="chest-col">
-                <div class="chest-head">SUA SACOLA <span id="chestPlayerGold" style="float:right;color:#ffcc40">0 g</span></div>
+                <div class="chest-head"><span data-i18n="chest.your_bag">SUA SACOLA</span> <span id="chestPlayerGold" style="float:right;color:#ffcc40">0 g</span></div>
                 <div id="chestInvList" class="chest-list"></div>
-                <button class="chest-btn chest-btn-primary" onclick="depositAll()">▶ GUARDAR TUDO</button>
-                <button class="chest-btn" onclick="depositAllGold()">depositar todo ouro →</button>
+                <button class="chest-btn chest-btn-primary" onclick="depositAll()" data-i18n="chest.deposit_all">▶ GUARDAR TUDO</button>
+                <button class="chest-btn" onclick="depositAllGold()" data-i18n="chest.deposit_gold">depositar todo ouro →</button>
             </div>
             <div class="chest-col">
-                <div class="chest-head">ESTE BAÚ <span id="chestChestGold" style="float:right;color:#ffcc40">0 g</span></div>
+                <div class="chest-head"><span data-i18n="chest.this_chest">ESTE BAÚ</span> <span id="chestChestGold" style="float:right;color:#ffcc40">0 g</span></div>
                 <div id="chestChestList" class="chest-list"></div>
-                <button class="chest-btn chest-btn-primary" onclick="withdrawAll()">◀ PEGAR TUDO</button>
-                <button class="chest-btn" onclick="withdrawAllGold()">← retirar todo ouro</button>
+                <button class="chest-btn chest-btn-primary" onclick="withdrawAll()" data-i18n="chest.withdraw_all">◀ PEGAR TUDO</button>
+                <button class="chest-btn" onclick="withdrawAllGold()" data-i18n="chest.withdraw_gold">← retirar todo ouro</button>
             </div>
         </div>
-        <div class="chest-hint">cada baú é independente — escolha o seu &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
+        <div class="chest-hint" data-i18n-html="chest.hint">cada baú é independente — escolha o seu &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeChest()">×</button>
     </div>
 </div>
@@ -2761,6 +2761,239 @@ const I18N = {
     'quest.daily_title': '📅 DIÁRIAS',
     'quest.main_title': '📜 PRINCIPAIS',
     'quest.no_dailies': 'Sem diárias disponíveis',
+    /* ===== i18n Fase 3 tail — tooltips de item / inventário / altar ===== */
+    'tip.twohand': '2 mãos',
+    'tip.onehand': '1 mão',
+    'tip.attack_hand': '+{n} ataque · {hand}',
+    'tip.defense': '+{n} defesa',
+    'tip.atk_speed': 'Velocidade de ataque +{pct}%',
+    'tip.melee_range': 'Alcance corpo a corpo: {n} tiles',
+    'tip.range_arrows': 'Alcance: {n} tiles (consome flechas)',
+    'tip.range_wand': 'Alcance: {n} tiles · tiro básico: {cost} mana',
+    'tip.proc_poison': '☠ {pct}% chance de veneno ({dmg} dano × {ticks} ticks)',
+    'tip.proc_bleed': '🩸 {pct}% chance de sangra ({dmg} × {ticks})',
+    'tip.proc_burn': '🔥 {pct}% chance de fogo ({dmg} × {ticks})',
+    'tip.speed': '+{n} velocidade',
+    'tip.move_speed': 'Velocidade de movimento +{pct}%',
+    'tip.hp_regen': 'Regen de HP +{n}',
+    'tip.heal_hp': 'Recupera {n} HP',
+    'tip.heal_mp': 'Restaura {n} MP na hora',
+    'tip.unequip_hint': 'Click p/ desequipar',
+    'tip.equip_hint': 'Click p/ equipar',
+    'tip.blocked_2h': 'Bloqueado por arma 2H',
+    'tip.slot_empty': '{slot} — vazio',
+    'common.empty': 'vazio',
+    'inv.arrows': '▶ {n} flechas',
+    'inv.mana_per_shot': '✦ {n} mana/tiro',
+    'altar.gold_available': '{g} g disponíveis',
+    'altar.study_magic': 'Estudar Magia',
+    'altar.per_session': '/sessão',
+    'altar.sessions_to_next': '~{n} sessões pro próximo',
+    'altar.stat_heal': '<span style="color:#74d176">+{n} HP base</span> · {mp}mp · cd {cd}s',
+    'altar.stat_aoe': '<span style="color:#ff8030">{dmg} dano base</span> · AoE raio {r} · {mp}mp · cd {cd}s',
+    'altar.stat_taunt': '<span style="color:#ff8080">taunt</span> · raio {r} · {mp}mp · cd {cd}s',
+    'altar.stat_buff': '<span style="color:#ff6060">+{d}% dmg / +{s}% spd</span> · {dur}s · {mp}mp · cd {cd}s',
+    'altar.stat_dmg': '<span style="color:#ff8030">{dmg} dano base</span> · range {r} · {mp}mp · cd {cd}s',
+    'altar.equipped': 'equipada',
+    'altar.equip_cost': 'equipar ({g}g)',
+    /* shop / chest / craft / forge */
+    'common.all': 'tudo',
+    'shop.buy': 'comprar',
+    'shop.inv_empty': 'inventário vazio',
+    'shop.sell_one': 'vender 1 = {price}g',
+    'shop.sell_n': 'vender {n} = {price}g',
+    'chest.total_storage': '(total no DP: {g} g)',
+    'craft.btn_make': 'fabricar',
+    'craft.need_mats_gold': 'faltam mat + ouro',
+    'craft.need_mats': 'faltam materiais',
+    'craft.need_gold': 'falta ouro',
+    'craft.hint_recipes': 'click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
+    'craft.hint_forge': '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói 1 dos 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
+    'forge.no_candidates_html': 'Sem candidatos.<br><br>Precisa de <b>3× items equipáveis iguais</b> (arma, armadura, escudo, elmo, botas ou colar) com mesmo nível.',
+    'forge.header_legend': '3× consumidos por tentativa &nbsp;·&nbsp; <span style="color:#ff8060">falha destrói todos</span> &nbsp;·&nbsp; sucesso retorna 1× upgraded',
+    'forge.available': '{n}× disponíveis',
+    'forge.fail_pct': '{pct}% falha',
+    'forge.btn': 'forjar +{n}',
+    'forge.bonus_poison': '☠ veneno {pct}%',
+    'forge.bonus_bleed': '🩸 sangra {pct}%',
+    'forge.bonus_burn': '🔥 fogo {pct}%',
+    'forge.banner_ok': '✨ Sucesso! {item} +{n}',
+    'forge.banner_fail': '💥 Falhou! 1× {item} destruído (−{cost}g)',
+    /* casino / auction / gold shop / party */
+    'common.no_connection': 'Sem conexão',
+    'common.loading': 'Carregando…',
+    'casino.not_enough_gold': 'Sem ouro suficiente ({amount}g)',
+    'casino.spinning': '🎲 Girando...',
+    'casino.refund': '{payout}g de volta ({kind})',
+    'casino.lose': '−{bet}g · sem combo',
+    'auction.browse_empty_html': 'Nenhuma listagem ativa no momento.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar a primeira.',
+    'auction.mine_empty_html': 'Você não tem listagens ativas.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar uma.',
+    'auction.by': 'por',
+    'auction.expires_in': 'expira em {t}',
+    'auction.buy': 'Comprar',
+    'auction.cancel': 'Cancelar',
+    'auction.inv_empty': 'Seu inventário está vazio.',
+    'auction.sell_prompt': 'Selecione um item do inventário pra listar:',
+    'auction.qty_in_inv': '({n} no inv)',
+    'auction.qty_title': 'Quantidade',
+    'auction.price_ph': 'preço',
+    'auction.price_title': 'Preço total em gold',
+    'auction.list': 'Listar',
+    'auction.invalid_price': 'Defina um preço válido',
+    'auction.confirm_buy': 'Comprar "{item}{qty}" por {price}g de {seller}?\n\nOuro atual: {gold}g',
+    'auction.confirm_cancel': 'Cancelar a listagem de "{item}{qty}"?\n\nO item volta pro seu inventário sem custo.',
+    'auction.confirm_list': 'Listar {qty}× "{item}" por {price}g?\n\nDuração: 24h\nSe vender, você recebe {net}g (95%, casa fica com 5%)\nSe não vender, item volta pro inv quando expirar.',
+    'goldshop.email_label': 'Email pro recibo do Mercado Pago:',
+    'goldshop.pay_methods': 'PIX · Cartão',
+    'goldshop.email_invalid': 'Digite um email válido pro recibo (ex: voce@gmail.com)',
+    'goldshop.generating': 'Gerando cobrança…',
+    'goldshop.error_prefix': 'Erro: ',
+    'goldshop.no_link': 'Sem link de pagamento.',
+    'goldshop.opened_mp': '📲 Abrimos a página de pagamento do Mercado Pago.',
+    'goldshop.choose_method': 'Escolha <b>PIX</b> ou <b>Cartão</b> na aba que abriu.',
+    'goldshop.open_again': 'abrir novamente',
+    'goldshop.auto_credit': 'o ouro cai automaticamente após confirmação do MP. Pode fechar este modal.',
+    'goldshop.conn_fail': 'Falha na conexão: ',
+    'party.leave': 'Sair da party',
+    /* pets / dye / talents */
+    'pet.max': 'máx',
+    'pet.adopt': 'adotar',
+    'pet.unequip': 'desequipar',
+    'pet.equip': 'equipar',
+    'pet.no_gold': 'Sem ouro ({cost}g)',
+    'pet.confirm_buy': 'Adotar {name} por {price}g?\n\nOuro atual: {gold}g',
+    'dye.empty_slot': '— vazio —',
+    'dye.tip_dye': 'Tingir 5.000g',
+    'dye.remove': 'Remover',
+    'dye.tip_remove': 'Remover 1.000g',
+    'dye.equip_first': 'Equipe um item neste slot pra tingir.',
+    'dye.same_color': 'Esse slot já está nessa cor.',
+    'dye.confirm_remove': 'Remover a tinta de {slot}?\n\nCusto: 1.000g\nOuro atual: {gold}g',
+    'dye.confirm_dye': 'Tingir {slot} desta cor?\n\nCusto: 5.000g\nOuro atual: {gold}g',
+    'talents.breakdown': '{used}/{earned} usados · {total} níveis totais (próximo ponto em {n} levels)',
+    'talents.respec_btn': 'Redistribuir tudo (5000g)',
+    'talents.maxed': '✓ MÁX ({max}/{max})',
+    'talents.rank_up': 'subir rank',
+    'talents.buy': 'comprar',
+    'talents.no_points': 'sem pontos',
+    'talents.sc_recharge': '⏳ recarrega em {n} min',
+    'talents.sc_ready': '✓ pronto pra reviver',
+    'talents.confirm_respec': 'Redistribuir TODOS os talentos? Devolve os pontos e custa 5000g.',
+    /* trade / friends / guild / ranking */
+    'common.you': '(você)',
+    'trade.negotiating': 'Negociando com {name}',
+    'trade.confirm': 'CONFIRMAR',
+    'trade.tip_remove': 'click p/ remover 1',
+    'trade.tip_offer': 'click p/ ofertar 1',
+    'trade.tip_all_offered': 'já tudo ofertado',
+    'trade.you': 'Você',
+    'trade.confirmed': '✓ confirmou',
+    'trade.waiting': 'aguardando',
+    'friends.empty': 'Sem amigos ainda. Adicione pelo nome acima.',
+    'guild.header_meta': 'criada {date} · {n} membro{s}',
+    'guild.leader': 'Líder',
+    'ranking.offline_only': 'Ranking só disponível online.',
+    'ranking.loading': 'carregando…',
+    'ranking.champion': '🏆 Campeão de {id}: <b style="color:#ffd060">{name}</b>',
+    'ranking.season_header': '🏆 TEMPORADA {id} · termina em {n} dia{s}',
+    'ranking.season_formula': 'pontos = mobs + pvp×5 + bosses×20 · #1 ganha Coroa',
+    'ranking.season_empty': 'Ainda ninguém pontuou esta temporada. Bora caçar!',
+    'ranking.list_empty': 'Ninguém com {label} ainda.',
+    'ranking.guilds_header': 'TOP {n} GUILDS · pontos = mobs + pvp×5 + bosses×20',
+    'ranking.member_count': '{n} membros',
+    'ranking.yours': '(sua)',
+    'backup.admin_only': 'Só admin pode restaurar backup. Fale com o gestor.',
+    'backup.confirm': 'Restaurar do backup? O save atual será sobrescrito.',
+    /* stats / achievements / widgets / categorias */
+    'stats.mobs_killed': 'Mobs mortos',
+    'stats.unique_bosses': 'Bosses únicos',
+    'stats.deaths_mob': 'Mortes (mob)',
+    'stats.deaths_pvp': 'Mortes (PvP)',
+    'stats.empty_kills': 'Ainda não matou nada. Vai lá! ⚔',
+    'stats.last_death_title': 'Última morte — últimos {s}s',
+    'stats.kills_by_mob': 'Mortes por mob',
+    'stats.summary': 'tempo de jogo: <b>{playtime}</b> &nbsp;·&nbsp; K/D PvP: <b>{kd}</b>',
+    'ach.summary': '{got}/{total} conquistas · {eq}/2 badges equipadas',
+    'ach.badge_equipped': '★ equipada',
+    'ach.badge_equip': 'equipar',
+    'widget.safe_zone': '🛡 ZONA SEGURA',
+    'widget.no_enemies': 'Nenhum inimigo à vista',
+    'widget.only_you': 'só você por aqui',
+    'widget.ghost_tip': 'Corpo desconectado',
+    'widget.pvp_tip': 'PvP ativo',
+    'widget.row_tip': 'Right-click no boneco pra Trade/Whisper',
+    'widget.expires_in': 'expira em {s}s',
+    'widget.daily_ends_in': 'termina em <b style="color:#e0c060">{time}</b>',
+    'pvp.state_on': 'PvP ATIVO',
+    'pvp.hunt_active': '⚔ CAÇADA ATIVA',
+    'pvp.hunt_in': 'Caçada em {s}s',
+    'boss.alive': '● vivo',
+    'boss.returning': '● voltando',
+    /* HTML estático dos modais / overlays */
+    'hint.esc_close': '<kbd>ESC</kbd> fechar',
+    'forgot.intro': 'Digite o email cadastrado na sua conta. Vamos enviar um link pra redefinir.',
+    'forgot.send': 'ENVIAR LINK',
+    'forgot.hint': 'Sem email cadastrado? Não tem como recuperar. <kbd>ESC</kbd> fechar',
+    'reconnect.title': 'ATUALIZANDO',
+    'reconnect.desc': 'Servidor está atualizando — voltamos em segundos.',
+    'reconnect.hint': 'Ataques e movimento bloqueados até voltar',
+    'loading.title': 'CARREGANDO MUNDO',
+    'loading.desc': 'Aguardando snapshot do servidor…',
+    'log.controls_hint': 'Use WASD para mover, ESPAÇO para atacar.',
+    'update.new_version': 'Nova versão do jogo detectada…',
+    'update.saving': 'Salvando progresso · combate pausado',
+    'duel.challenged_you': 'te desafiou pra um duelo.',
+    'duel.wager_label': '💰 Aposta:',
+    'duel.terms': 'vencedor leva o dobro · 3 min máx',
+    'duel.accept': '⚔ ACEITAR',
+    'duel.reject': '✗ RECUSAR',
+    'shop.head_buy': 'COMPRAR',
+    'shop.head_sell': 'VENDER (do seu inventário)',
+    'goldshop.subtitle': '<b style="color:#00b1ea">PIX</b> · <b style="color:#9dd07d">Cartão</b> · crédito automático após confirmação',
+    'goldshop.hint': 'preço em R$ · após pagamento, o ouro cai automaticamente no boneco · <kbd>ESC</kbd> fechar',
+    'arena.intro': 'Fila com matchmaking. O servidor casa você com outro desafiante de aposta igual, numa arena isolada.',
+    'arena.wins': 'Vitórias',
+    'arena.losses': 'Derrotas',
+    'arena.wager_label': '💰 Aposta (gold):',
+    'arena.wager_hint': '0 = só rating · mín 50g se apostar · vencedor leva o dobro',
+    'arena.btn_join': '⚔ ENTRAR NA FILA',
+    'arena.btn_leave': '✗ SAIR DA FILA',
+    'trade.your_offer': 'SUA OFERTA —',
+    'trade.btn_apply': 'aplicar',
+    'trade.add_hint': 'Clique em item do inv abaixo p/ adicionar',
+    'trade.offer_from': 'OFERTA DE',
+    'trade.cancel': 'cancelar',
+    'trade.hint': 'os 2 lados precisam confirmar &nbsp;|&nbsp; <kbd>ESC</kbd> cancela',
+    'friends.input_ph': 'nome do amigo',
+    'friends.btn_add': 'adicionar',
+    'friends.hint': 'chat: <kbd>/msg nome</kbd> <span style="color:#888">texto</span> &nbsp;|&nbsp; <kbd>N</kbd> ou <kbd>ESC</kbd> fechar',
+    'casino.subtitle': 'Slot Machine · 3 símbolos · house edge ~7%',
+    'casino.payouts_header': 'PAGAMENTOS (sobre a aposta):',
+    'casino.payout_line2': '3× 🍋 = <b style="color:#ffcc40">5×</b> · 3× 🍒 = <b style="color:#cc3030">3×</b> · 2 iguais = <b>1×</b> (volta aposta)',
+    'dye.subtitle': 'Tinge um slot equipado · <b style="color:#ffd060">5.000g</b> por cor · <b style="color:#8aa050">1.000g</b> pra remover',
+    'pet.subtitle': 'Um pet ativo dá um bônus passivo · sobe de nível matando mobs · <b style="color:#ffd060">1 equipado por vez</b>',
+    'auction.subtitle': 'Trade assíncrono · 24h por listing · <b style="color:#ffd060">5%</b> de comissão por venda · máx 10 ativos',
+    'auction.tab_mine': 'MINHAS',
+    'auction.tab_sell': 'VENDER',
+    'talents.hint': '1 ponto a cada 10 níveis totais de skill &nbsp;|&nbsp; talentos são permanentes &nbsp;|&nbsp; <kbd>K</kbd> ou <kbd>ESC</kbd> fechar',
+    'ach.hint': 'clique no badge equipado pra trocar (2 slots) &nbsp;|&nbsp; <kbd>J</kbd> ou <kbd>ESC</kbd> fechar',
+    'guild.members_head': 'MEMBROS',
+    'guild.hint': 'verde = online · 👑 = líder · <kbd>ESC</kbd> fechar',
+    'ranking.tab_season': '🏆 TEMPORADA',
+    'ranking.hint': '<kbd>L</kbd> ou <kbd>ESC</kbd> fechar',
+    'craft.tab_recipes': 'RECEITAS',
+    'craft.tab_forge': '🔥 FORJA',
+    'chest.your_bag': 'SUA SACOLA',
+    'chest.deposit_all': '▶ GUARDAR TUDO',
+    'chest.deposit_gold': 'depositar todo ouro →',
+    'chest.this_chest': 'ESTE BAÚ',
+    'chest.withdraw_all': '◀ PEGAR TUDO',
+    'chest.withdraw_gold': '← retirar todo ouro',
+    'chest.hint': 'cada baú é independente — escolha o seu &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
+    'training.hint': 'cada sessão = 1 XP na skill · andar cancela · <kbd>ESC</kbd> fechar/parar',
+    'altar.hint': 'você pode equipar 1 magia por vez · pague pra trocar · <kbd>ESC</kbd> fechar',
+    'quests.hint': '<kbd>Q</kbd> ou <kbd>ESC</kbd> fechar',
+    'stats.hint': '<kbd>I</kbd> ou <kbd>ESC</kbd> fechar',
     'log.not_enough_gold_price': '<span class="log-sys">Sem ouro suficiente ({price}g).</span>',
     'log.no_conn': '<span class="log-sys">Sem conexão com o servidor.</span>',
     'log.max_level': '<span class="log-sys">Já no nível máximo (+{n}).</span>',
@@ -3202,6 +3435,239 @@ const I18N = {
     'quest.daily_title': '📅 DAILIES',
     'quest.main_title': '📜 MAIN',
     'quest.no_dailies': 'No dailies available',
+    /* ===== i18n Fase 3 tail — item tooltips / inventory / altar ===== */
+    'tip.twohand': '2-handed',
+    'tip.onehand': '1-handed',
+    'tip.attack_hand': '+{n} attack · {hand}',
+    'tip.defense': '+{n} defense',
+    'tip.atk_speed': 'Attack speed +{pct}%',
+    'tip.melee_range': 'Melee range: {n} tiles',
+    'tip.range_arrows': 'Range: {n} tiles (uses arrows)',
+    'tip.range_wand': 'Range: {n} tiles · basic shot: {cost} mana',
+    'tip.proc_poison': '☠ {pct}% poison chance ({dmg} dmg × {ticks} ticks)',
+    'tip.proc_bleed': '🩸 {pct}% bleed chance ({dmg} × {ticks})',
+    'tip.proc_burn': '🔥 {pct}% burn chance ({dmg} × {ticks})',
+    'tip.speed': '+{n} speed',
+    'tip.move_speed': 'Movement speed +{pct}%',
+    'tip.hp_regen': 'HP regen +{n}',
+    'tip.heal_hp': 'Restores {n} HP',
+    'tip.heal_mp': 'Restores {n} MP instantly',
+    'tip.unequip_hint': 'Click to unequip',
+    'tip.equip_hint': 'Click to equip',
+    'tip.blocked_2h': 'Blocked by 2H weapon',
+    'tip.slot_empty': '{slot} — empty',
+    'common.empty': 'empty',
+    'inv.arrows': '▶ {n} arrows',
+    'inv.mana_per_shot': '✦ {n} mana/shot',
+    'altar.gold_available': '{g} g available',
+    'altar.study_magic': 'Study Magic',
+    'altar.per_session': '/session',
+    'altar.sessions_to_next': '~{n} sessions to next',
+    'altar.stat_heal': '<span style="color:#74d176">+{n} base HP</span> · {mp}mp · cd {cd}s',
+    'altar.stat_aoe': '<span style="color:#ff8030">{dmg} base dmg</span> · AoE radius {r} · {mp}mp · cd {cd}s',
+    'altar.stat_taunt': '<span style="color:#ff8080">taunt</span> · radius {r} · {mp}mp · cd {cd}s',
+    'altar.stat_buff': '<span style="color:#ff6060">+{d}% dmg / +{s}% spd</span> · {dur}s · {mp}mp · cd {cd}s',
+    'altar.stat_dmg': '<span style="color:#ff8030">{dmg} base dmg</span> · range {r} · {mp}mp · cd {cd}s',
+    'altar.equipped': 'equipped',
+    'altar.equip_cost': 'equip ({g}g)',
+    /* shop / chest / craft / forge */
+    'common.all': 'all',
+    'shop.buy': 'buy',
+    'shop.inv_empty': 'inventory empty',
+    'shop.sell_one': 'sell 1 = {price}g',
+    'shop.sell_n': 'sell {n} = {price}g',
+    'chest.total_storage': '(total in chests: {g} g)',
+    'craft.btn_make': 'craft',
+    'craft.need_mats_gold': 'need mats + gold',
+    'craft.need_mats': 'need materials',
+    'craft.need_gold': 'need gold',
+    'craft.hint_recipes': 'click <b>craft</b> &nbsp;|&nbsp; gold costs scale with item power &nbsp;|&nbsp; <kbd>ESC</kbd> close',
+    'craft.hint_forge': '3 identical items + gold try to raise the level &nbsp;|&nbsp; <b style="color:#ff8060">failure destroys 1 of the 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> close',
+    'forge.no_candidates_html': 'No candidates.<br><br>You need <b>3× identical equippable items</b> (weapon, armor, shield, helmet, boots or amulet) at the same level.',
+    'forge.header_legend': '3× consumed per attempt &nbsp;·&nbsp; <span style="color:#ff8060">failure destroys all</span> &nbsp;·&nbsp; success returns 1× upgraded',
+    'forge.available': '{n}× available',
+    'forge.fail_pct': '{pct}% fail',
+    'forge.btn': 'forge +{n}',
+    'forge.bonus_poison': '☠ poison {pct}%',
+    'forge.bonus_bleed': '🩸 bleed {pct}%',
+    'forge.bonus_burn': '🔥 burn {pct}%',
+    'forge.banner_ok': '✨ Success! {item} +{n}',
+    'forge.banner_fail': '💥 Failed! 1× {item} destroyed (−{cost}g)',
+    /* casino / auction / gold shop / party */
+    'common.no_connection': 'No connection',
+    'common.loading': 'Loading…',
+    'casino.not_enough_gold': 'Not enough gold ({amount}g)',
+    'casino.spinning': '🎲 Spinning...',
+    'casino.refund': '{payout}g back ({kind})',
+    'casino.lose': '−{bet}g · no combo',
+    'auction.browse_empty_html': 'No active listings right now.<br><br>Go to the <b style="color:#c8a050">SELL</b> tab to create the first one.',
+    'auction.mine_empty_html': 'You have no active listings.<br><br>Go to the <b style="color:#c8a050">SELL</b> tab to create one.',
+    'auction.by': 'by',
+    'auction.expires_in': 'expires in {t}',
+    'auction.buy': 'Buy',
+    'auction.cancel': 'Cancel',
+    'auction.inv_empty': 'Your inventory is empty.',
+    'auction.sell_prompt': 'Select an inventory item to list:',
+    'auction.qty_in_inv': '({n} in inv)',
+    'auction.qty_title': 'Quantity',
+    'auction.price_ph': 'price',
+    'auction.price_title': 'Total price in gold',
+    'auction.list': 'List',
+    'auction.invalid_price': 'Set a valid price',
+    'auction.confirm_buy': 'Buy "{item}{qty}" for {price}g from {seller}?\n\nCurrent gold: {gold}g',
+    'auction.confirm_cancel': 'Cancel the listing of "{item}{qty}"?\n\nThe item returns to your inventory at no cost.',
+    'auction.confirm_list': 'List {qty}× "{item}" for {price}g?\n\nDuration: 24h\nIf it sells, you receive {net}g (95%, house keeps 5%)\nIf it doesn\'t sell, the item returns to your inventory when it expires.',
+    'goldshop.email_label': 'Email for the Mercado Pago receipt:',
+    'goldshop.pay_methods': 'PIX · Card',
+    'goldshop.email_invalid': 'Enter a valid email for the receipt (e.g. you@gmail.com)',
+    'goldshop.generating': 'Generating charge…',
+    'goldshop.error_prefix': 'Error: ',
+    'goldshop.no_link': 'No payment link.',
+    'goldshop.opened_mp': '📲 We opened the Mercado Pago payment page.',
+    'goldshop.choose_method': 'Choose <b>PIX</b> or <b>Card</b> in the tab that opened.',
+    'goldshop.open_again': 'open again',
+    'goldshop.auto_credit': 'the gold is credited automatically after MP confirms. You can close this modal.',
+    'goldshop.conn_fail': 'Connection failure: ',
+    'party.leave': 'Leave party',
+    /* pets / dye / talents */
+    'pet.max': 'max',
+    'pet.adopt': 'adopt',
+    'pet.unequip': 'unequip',
+    'pet.equip': 'equip',
+    'pet.no_gold': 'Not enough gold ({cost}g)',
+    'pet.confirm_buy': 'Adopt {name} for {price}g?\n\nCurrent gold: {gold}g',
+    'dye.empty_slot': '— empty —',
+    'dye.tip_dye': 'Dye 5,000g',
+    'dye.remove': 'Remove',
+    'dye.tip_remove': 'Remove 1,000g',
+    'dye.equip_first': 'Equip an item in this slot to dye it.',
+    'dye.same_color': 'This slot is already that color.',
+    'dye.confirm_remove': 'Remove the dye from {slot}?\n\nCost: 1,000g\nCurrent gold: {gold}g',
+    'dye.confirm_dye': 'Dye {slot} with this color?\n\nCost: 5,000g\nCurrent gold: {gold}g',
+    'talents.breakdown': '{used}/{earned} used · {total} total levels (next point in {n} levels)',
+    'talents.respec_btn': 'Respec all (5000g)',
+    'talents.maxed': '✓ MAX ({max}/{max})',
+    'talents.rank_up': 'rank up',
+    'talents.buy': 'buy',
+    'talents.no_points': 'no points',
+    'talents.sc_recharge': '⏳ recharges in {n} min',
+    'talents.sc_ready': '✓ ready to revive',
+    'talents.confirm_respec': 'Respec ALL talents? Refunds your points and costs 5000g.',
+    /* trade / friends / guild / ranking */
+    'common.you': '(you)',
+    'trade.negotiating': 'Trading with {name}',
+    'trade.confirm': 'CONFIRM',
+    'trade.tip_remove': 'click to remove 1',
+    'trade.tip_offer': 'click to offer 1',
+    'trade.tip_all_offered': 'all offered already',
+    'trade.you': 'You',
+    'trade.confirmed': '✓ confirmed',
+    'trade.waiting': 'waiting',
+    'friends.empty': 'No friends yet. Add one by name above.',
+    'guild.header_meta': 'created {date} · {n} member{s}',
+    'guild.leader': 'Leader',
+    'ranking.offline_only': 'Ranking only available online.',
+    'ranking.loading': 'loading…',
+    'ranking.champion': '🏆 Champion of {id}: <b style="color:#ffd060">{name}</b>',
+    'ranking.season_header': '🏆 SEASON {id} · ends in {n} day{s}',
+    'ranking.season_formula': 'points = mobs + pvp×5 + bosses×20 · #1 wins the Crown',
+    'ranking.season_empty': 'Nobody has scored this season yet. Go hunt!',
+    'ranking.list_empty': 'Nobody with {label} yet.',
+    'ranking.guilds_header': 'TOP {n} GUILDS · points = mobs + pvp×5 + bosses×20',
+    'ranking.member_count': '{n} members',
+    'ranking.yours': '(yours)',
+    'backup.admin_only': 'Only an admin can restore a backup. Talk to the manager.',
+    'backup.confirm': 'Restore from backup? Your current save will be overwritten.',
+    /* stats / achievements / widgets / categories */
+    'stats.mobs_killed': 'Mobs killed',
+    'stats.unique_bosses': 'Unique bosses',
+    'stats.deaths_mob': 'Deaths (mob)',
+    'stats.deaths_pvp': 'Deaths (PvP)',
+    'stats.empty_kills': "Haven't killed anything yet. Get out there! ⚔",
+    'stats.last_death_title': 'Last death — final {s}s',
+    'stats.kills_by_mob': 'Kills by mob',
+    'stats.summary': 'playtime: <b>{playtime}</b> &nbsp;·&nbsp; PvP K/D: <b>{kd}</b>',
+    'ach.summary': '{got}/{total} achievements · {eq}/2 badges equipped',
+    'ach.badge_equipped': '★ equipped',
+    'ach.badge_equip': 'equip',
+    'widget.safe_zone': '🛡 SAFE ZONE',
+    'widget.no_enemies': 'No enemies in sight',
+    'widget.only_you': 'just you here',
+    'widget.ghost_tip': 'Disconnected body',
+    'widget.pvp_tip': 'PvP on',
+    'widget.row_tip': 'Right-click the avatar to Trade/Whisper',
+    'widget.expires_in': 'expires in {s}s',
+    'widget.daily_ends_in': 'ends in <b style="color:#e0c060">{time}</b>',
+    'pvp.state_on': 'PvP ON',
+    'pvp.hunt_active': '⚔ HUNT ACTIVE',
+    'pvp.hunt_in': 'Hunt in {s}s',
+    'boss.alive': '● alive',
+    'boss.returning': '● returning',
+    /* static modal HTML / overlays */
+    'hint.esc_close': '<kbd>ESC</kbd> close',
+    'forgot.intro': "Enter the email registered to your account. We'll send a reset link.",
+    'forgot.send': 'SEND LINK',
+    'forgot.hint': 'No email registered? No way to recover. <kbd>ESC</kbd> close',
+    'reconnect.title': 'UPDATING',
+    'reconnect.desc': 'The server is updating — back in a few seconds.',
+    'reconnect.hint': 'Attacks and movement blocked until it returns',
+    'loading.title': 'LOADING WORLD',
+    'loading.desc': 'Waiting for the server snapshot…',
+    'log.controls_hint': 'Use WASD to move, SPACE to attack.',
+    'update.new_version': 'New game version detected…',
+    'update.saving': 'Saving progress · combat paused',
+    'duel.challenged_you': 'challenged you to a duel.',
+    'duel.wager_label': '💰 Wager:',
+    'duel.terms': 'winner takes double · 3 min max',
+    'duel.accept': '⚔ ACCEPT',
+    'duel.reject': '✗ DECLINE',
+    'shop.head_buy': 'BUY',
+    'shop.head_sell': 'SELL (from your inventory)',
+    'goldshop.subtitle': '<b style="color:#00b1ea">PIX</b> · <b style="color:#9dd07d">Card</b> · auto-credit after confirmation',
+    'goldshop.hint': 'price in R$ · after payment, gold is credited automatically to your character · <kbd>ESC</kbd> close',
+    'arena.intro': 'Matchmaking queue. The server pairs you with another challenger at the same wager, in an isolated arena.',
+    'arena.wins': 'Wins',
+    'arena.losses': 'Losses',
+    'arena.wager_label': '💰 Wager (gold):',
+    'arena.wager_hint': '0 = rating only · min 50g if wagering · winner takes double',
+    'arena.btn_join': '⚔ JOIN QUEUE',
+    'arena.btn_leave': '✗ LEAVE QUEUE',
+    'trade.your_offer': 'YOUR OFFER —',
+    'trade.btn_apply': 'apply',
+    'trade.add_hint': 'Click an item below to add it',
+    'trade.offer_from': 'OFFER FROM',
+    'trade.cancel': 'cancel',
+    'trade.hint': 'both sides must confirm &nbsp;|&nbsp; <kbd>ESC</kbd> cancels',
+    'friends.input_ph': "friend's name",
+    'friends.btn_add': 'add',
+    'friends.hint': 'chat: <kbd>/msg name</kbd> <span style="color:#888">text</span> &nbsp;|&nbsp; <kbd>N</kbd> or <kbd>ESC</kbd> to close',
+    'casino.subtitle': 'Slot Machine · 3 symbols · house edge ~7%',
+    'casino.payouts_header': 'PAYOUTS (per bet):',
+    'casino.payout_line2': '3× 🍋 = <b style="color:#ffcc40">5×</b> · 3× 🍒 = <b style="color:#cc3030">3×</b> · 2 matching = <b>1×</b> (bet back)',
+    'dye.subtitle': 'Dye an equipped slot · <b style="color:#ffd060">5,000g</b> per color · <b style="color:#8aa050">1,000g</b> to remove',
+    'pet.subtitle': 'An active pet gives a passive bonus · levels up by killing mobs · <b style="color:#ffd060">1 equipped at a time</b>',
+    'auction.subtitle': 'Async trade · 24h per listing · <b style="color:#ffd060">5%</b> sale commission · max 10 active',
+    'auction.tab_mine': 'MINE',
+    'auction.tab_sell': 'SELL',
+    'talents.hint': '1 point every 10 total skill levels &nbsp;|&nbsp; talents are permanent &nbsp;|&nbsp; <kbd>K</kbd> or <kbd>ESC</kbd> to close',
+    'ach.hint': 'click the equipped badge to swap (2 slots) &nbsp;|&nbsp; <kbd>J</kbd> or <kbd>ESC</kbd> to close',
+    'guild.members_head': 'MEMBERS',
+    'guild.hint': 'green = online · 👑 = leader · <kbd>ESC</kbd> to close',
+    'ranking.tab_season': '🏆 SEASON',
+    'ranking.hint': '<kbd>L</kbd> or <kbd>ESC</kbd> to close',
+    'craft.tab_recipes': 'RECIPES',
+    'craft.tab_forge': '🔥 FORGE',
+    'chest.your_bag': 'YOUR BAG',
+    'chest.deposit_all': '▶ STORE ALL',
+    'chest.deposit_gold': 'deposit all gold →',
+    'chest.this_chest': 'THIS CHEST',
+    'chest.withdraw_all': '◀ TAKE ALL',
+    'chest.withdraw_gold': '← withdraw all gold',
+    'chest.hint': 'each chest is independent — pick yours &nbsp;|&nbsp; <kbd>ESC</kbd> close',
+    'training.hint': 'each session = 1 skill XP · walking cancels · <kbd>ESC</kbd> close/stop',
+    'altar.hint': 'you can equip 1 spell at a time · pay to switch · <kbd>ESC</kbd> close',
+    'quests.hint': '<kbd>Q</kbd> or <kbd>ESC</kbd> to close',
+    'stats.hint': '<kbd>I</kbd> or <kbd>ESC</kbd> to close',
     'log.not_enough_gold_price': '<span class="log-sys">Not enough gold ({price}g).</span>',
     'log.no_conn': '<span class="log-sys">No server connection.</span>',
     'log.max_level': '<span class="log-sys">Already at max level (+{n}).</span>',
@@ -5776,29 +6242,30 @@ function itemDisplayMeta(key){
 }
 
 // Descrição completa em texto puro (pra tooltip via title=)
-function itemFullDesc(def){
+function itemFullDesc(def, key){
     if (!def) return '';
-    const lines = [def.name];
+    const lines = [key ? itmName(key) : def.name];
     if (def.base){
-        const hand = def.hand === '2h' ? '2 mãos' : '1 mão';
-        lines.push(`+${def.base} ataque · ${hand}`);
-        if (def.def) lines.push(`+${def.def} defesa`);
-        if (def.atkSpd) lines.push(`Velocidade de ataque +${Math.round(def.atkSpd*100)}%`);
-        if (def.meleeRange && def.meleeRange > 1) lines.push(`Alcance corpo a corpo: ${def.meleeRange} tiles`);
-        if (def.ranged && def.kind !== 'wand') lines.push(`Alcance: ${def.ranged} tiles (consome flechas)`);
-        if (def.kind === 'wand') lines.push(`Alcance: ${def.ranged} tiles · tiro básico: ${WAND_MANA_COST} mana`);
-        if (def.poison) lines.push(`☠ ${Math.round(def.poison.chance*100)}% chance de veneno (${def.poison.dmg} dano × ${def.poison.ticks} ticks)`);
-        if (def.bleed)  lines.push(`🩸 ${Math.round(def.bleed.chance*100)}% chance de sangra (${def.bleed.dmg} × ${def.bleed.ticks})`);
-        if (def.burn)   lines.push(`🔥 ${Math.round(def.burn.chance*100)}% chance de fogo (${def.burn.dmg} × ${def.burn.ticks})`);
+        const hand = def.hand === '2h' ? tr('tip.twohand') : tr('tip.onehand');
+        lines.push(tr('tip.attack_hand', {n: def.base, hand}));
+        if (def.def) lines.push(tr('tip.defense', {n: def.def}));
+        if (def.atkSpd) lines.push(tr('tip.atk_speed', {pct: Math.round(def.atkSpd*100)}));
+        if (def.meleeRange && def.meleeRange > 1) lines.push(tr('tip.melee_range', {n: def.meleeRange}));
+        if (def.ranged && def.kind !== 'wand') lines.push(tr('tip.range_arrows', {n: def.ranged}));
+        if (def.kind === 'wand') lines.push(tr('tip.range_wand', {n: def.ranged, cost: WAND_MANA_COST}));
+        if (def.poison) lines.push(tr('tip.proc_poison', {pct: Math.round(def.poison.chance*100), dmg: def.poison.dmg, ticks: def.poison.ticks}));
+        if (def.bleed)  lines.push(tr('tip.proc_bleed', {pct: Math.round(def.bleed.chance*100), dmg: def.bleed.dmg, ticks: def.bleed.ticks}));
+        if (def.burn)   lines.push(tr('tip.proc_burn', {pct: Math.round(def.burn.chance*100), dmg: def.burn.dmg, ticks: def.burn.ticks}));
     } else {
-        if (def.def) lines.push(`+${def.def} defesa`);
-        if (def.speed) lines.push(`+${def.speed} velocidade`);
-        if (def.moveSpd) lines.push(`Velocidade de movimento +${Math.round(def.moveSpd*100)}%`);
-        if (def.hpRegen) lines.push(`Regen de HP +${def.hpRegen}`);
-        if (def.heal) lines.push(`Recupera ${def.heal} HP`);
-        if (def.manaheal) lines.push(`Restaura ${def.manaheal} MP na hora`);
+        if (def.def) lines.push(tr('tip.defense', {n: def.def}));
+        if (def.speed) lines.push(tr('tip.speed', {n: def.speed}));
+        if (def.moveSpd) lines.push(tr('tip.move_speed', {pct: Math.round(def.moveSpd*100)}));
+        if (def.hpRegen) lines.push(tr('tip.hp_regen', {n: def.hpRegen}));
+        if (def.heal) lines.push(tr('tip.heal_hp', {n: def.heal}));
+        if (def.manaheal) lines.push(tr('tip.heal_mp', {n: def.manaheal}));
     }
-    if (def.desc) lines.push(def.desc);
+    const d = key ? itemDescEn(key) : def.desc;
+    if (d) lines.push(d);
     return lines.join('\n');
 }
 
@@ -6000,11 +6467,11 @@ function renderChest(){
         if (qty >= 5) opts.push(5);
         if (qty >= 10) opts.push(10);
         const btns = opts.map(n => `<button class="chest-qty-btn" data-key="${key}" data-side="${side}" data-qty="${n}">${n}</button>`).join('');
-        const allBtn = `<button class="chest-qty-btn" data-key="${key}" data-side="${side}" data-qty="all" title="tudo">all</button>`;
+        const allBtn = `<button class="chest-qty-btn" data-key="${key}" data-side="${side}" data-qty="all" title="${tr('common.all')}">all</button>`;
         const meta = itemDisplayMeta(key);
         const extra = itemStatsCompact(def);
         const forgeTag = meta.plus > 0 ? `<span class="forge-tag">+${meta.plus}</span>` : '';
-        return `<div class="chest-row" data-key="${key}" title="${escapeHtml(itemFullDesc(def))}">
+        return `<div class="chest-row" data-key="${key}" title="${escapeHtml(itemFullDesc(def, key))}">
             <div class="chest-row1">
                 <span style="color:${def.color};flex-shrink:0">●</span>
                 <span class="chest-name ${meta.rarCls}">${escapeHtml(meta.name)}</span>${forgeTag}
@@ -6018,7 +6485,7 @@ function renderChest(){
     const chEl  = document.getElementById('chestChestList');
     const renderGroups = (entries, side) => {
         const groups = categorizeItems(entries);
-        if (!groups.length) return '<div class="chest-empty">vazio</div>';
+        if (!groups.length) return `<div class="chest-empty">${tr('common.empty')}</div>`;
         return groups
             .map(c => renderCatGroup(c.label, c.items.map(([k,q]) => fmt(k,q,side)).join(''), c.items.length))
             .join('');
@@ -6030,7 +6497,7 @@ function renderChest(){
     const totalGold = Object.values(player.chests).reduce((s,c) => s + (c._GOLD||0), 0);
     document.getElementById('chestChestGold').textContent = (bag._GOLD || 0) + ' g';
     const tg = document.getElementById('chestTotalGold');
-    if (tg) tg.textContent = totalGold ? `(total no DP: ${totalGold} g)` : '';
+    if (tg) tg.textContent = totalGold ? tr('chest.total_storage', {g: totalGold}) : '';
 }
 window.openChest = openChest;
 window.closeChest = closeChest;
@@ -6077,13 +6544,13 @@ function renderShop(){
                 <span class="shop-name">${escapeHtml(label)}</span>
             </div>
             <span class="shop-price">${o.price}g</span>
-            <button class="shop-btn" data-buy="${i}" ${canBuy?'':'disabled'}>comprar</button>
+            <button class="shop-btn" data-buy="${i}" ${canBuy?'':'disabled'}>${tr('shop.buy')}</button>
         </div>`;
     }).join('');
     const sellEl = document.getElementById('shopSellList');
     const items = Object.entries(player.inv).filter(([k,q]) => q > 0);
     if (!items.length){
-        sellEl.innerHTML = '<div style="color:#555;font-style:italic;text-align:center;padding:12px;font-size:11px">inventário vazio</div>';
+        sellEl.innerHTML = `<div style="color:#555;font-style:italic;text-align:center;padding:12px;font-size:11px">${tr('shop.inv_empty')}</div>`;
     } else {
         sellEl.innerHTML = items.map(([k,q]) => {
             const def = ITEMS[k];
@@ -6097,9 +6564,9 @@ function renderShop(){
                 </div>
                 <span class="shop-qty">${q}× · ${unit}g</span>
                 <div class="shop-sell-btns">
-                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="1" title="vender 1 = ${unit}g">1</button>
-                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="10" ${q<2?'disabled':''} title="vender ${Math.min(10,q)} = ${tenPrice}g">10</button>
-                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="all" title="vender ${q} = ${allPrice}g">tudo</button>
+                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="1" title="${tr('shop.sell_one', {price: unit})}">1</button>
+                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="10" ${q<2?'disabled':''} title="${tr('shop.sell_n', {n: Math.min(10,q), price: tenPrice})}">10</button>
+                    <button class="shop-btn shop-btn-sm" data-sell="${k}" data-qty="all" title="${tr('shop.sell_n', {n: q, price: allPrice})}">${tr('common.all')}</button>
                 </div>
             </div>`;
         }).join('');
@@ -6297,13 +6764,13 @@ function renderStats(){
     // Top cards
     let cards = `
         <div class="stats-grid">
-            <div class="stats-card"><div class="stats-label">Mobs mortos</div><div class="stats-value">${totalMobKills}</div></div>
-            <div class="stats-card boss"><div class="stats-label">Bosses únicos</div><div class="stats-value">${s.bossKills||0}</div></div>
+            <div class="stats-card"><div class="stats-label">${tr('stats.mobs_killed')}</div><div class="stats-value">${totalMobKills}</div></div>
+            <div class="stats-card boss"><div class="stats-label">${tr('stats.unique_bosses')}</div><div class="stats-value">${s.bossKills||0}</div></div>
             <div class="stats-card pk"><div class="stats-label">PvP kills</div><div class="stats-value">${s.pkKills||0}</div></div>
         </div>
         <div class="stats-grid" style="grid-template-columns:1fr 1fr">
-            <div class="stats-card death"><div class="stats-label">Mortes (mob)</div><div class="stats-value">${s.mobDeaths||0}</div></div>
-            <div class="stats-card death"><div class="stats-label">Mortes (PvP)</div><div class="stats-value">${s.pkDeaths||0}</div></div>
+            <div class="stats-card death"><div class="stats-label">${tr('stats.deaths_mob')}</div><div class="stats-value">${s.mobDeaths||0}</div></div>
+            <div class="stats-card death"><div class="stats-label">${tr('stats.deaths_pvp')}</div><div class="stats-value">${s.pkDeaths||0}</div></div>
         </div>
     `;
 
@@ -6313,11 +6780,11 @@ function renderStats(){
         .sort((a,b) => b[1] - a[1]);
     let mobList;
     if (sortedMobs.length === 0){
-        mobList = `<div class="stats-empty">Ainda não matou nada. Vai lá! ⚔</div>`;
+        mobList = `<div class="stats-empty">${tr('stats.empty_kills')}</div>`;
     } else {
         mobList = `<div class="stats-mob-list">` + sortedMobs.map(([type, count]) => {
             const def = MTYPE[type];
-            const name = def ? def.name : type;
+            const name = mobName(type);
             const color = def ? def.color : '#888';
             const isBoss = def && def.unique;
             return `<div class="stats-mob-row ${isBoss?'boss':''}">
@@ -6337,7 +6804,7 @@ function renderStats(){
     if (Array.isArray(rp) && rp.length){
         const t0 = rp[0].t;
         const tEnd = rp[rp.length - 1].t;
-        replayHtml = `<div class="stats-section-title">Última morte — últimos ${((tEnd - t0)/1000).toFixed(1)}s</div>
+        replayHtml = `<div class="stats-section-title">${tr('stats.last_death_title', {s: ((tEnd - t0)/1000).toFixed(1)})}</div>
             <div style="background:#0a0805;border:1px solid #3a2d10;padding:6px 8px;max-height:160px;overflow-y:auto;font-size:11px;font-family:Consolas,monospace">
             ${rp.map(e => {
                 const dt = ((e.t - t0)/1000).toFixed(1);
@@ -6350,9 +6817,9 @@ function renderStats(){
             </div>`;
     }
     el.innerHTML = cards +
-        `<div class="stats-section-title">Mortes por mob</div>` + mobList +
+        `<div class="stats-section-title">${tr('stats.kills_by_mob')}</div>` + mobList +
         replayHtml +
-        `<div class="stats-summary">tempo de jogo: <b>${playtime}</b> &nbsp;·&nbsp; K/D PvP: <b>${pkRatio}</b></div>`;
+        `<div class="stats-summary">${tr('stats.summary', {playtime, kd: pkRatio})}</div>`;
 }
 
 function canCraft(r){
@@ -6379,7 +6846,7 @@ window.doCraft = doCraft;
 function renderCraft(){
     const el = document.getElementById('craftList');
     const goldEl = document.getElementById('craftGoldLabel');
-    if (goldEl) goldEl.textContent = `${player.gold} g disponíveis`;
+    if (goldEl) goldEl.textContent = tr('altar.gold_available', {g: player.gold});
     el.innerHTML = RECIPES.map((r, i) => {
         const out = ITEMS[r.out];
         const ok  = canCraft(r);
@@ -6390,13 +6857,13 @@ function renderCraft(){
             const have = player.inv[k] || 0;
             const itm = ITEMS[k];
             const colOk = have >= q ? '#74d176' : '#cc5050';
-            return `<span style="color:${colOk};margin-right:8px">${have}/${q} <span style="color:${itm.color}">●</span> ${itm.name}</span>`;
+            return `<span style="color:${colOk};margin-right:8px">${have}/${q} <span style="color:${itm.color}">●</span> ${itmName(k)}</span>`;
         }).join('');
         const goldColor = goldOk ? '#ffcc40' : '#cc5050';
-        let reason = 'fabricar';
-        if (!matsOk && !goldOk) reason = 'faltam mat + ouro';
-        else if (!matsOk) reason = 'faltam materiais';
-        else if (!goldOk) reason = 'falta ouro';
+        let reason = tr('craft.btn_make');
+        if (!matsOk && !goldOk) reason = tr('craft.need_mats_gold');
+        else if (!matsOk) reason = tr('craft.need_mats');
+        else if (!goldOk) reason = tr('craft.need_gold');
         return `<div class="craft-row ${ok?'craft-ok':'craft-no'}">
             <div class="craft-out">
                 <span style="color:${out.color}">●</span>
@@ -7324,8 +7791,8 @@ function handleMP(msg){
                 addFloat(player.x, player.y, tr('float.fail'), '#ff3030', true, -10);
             }
             _forgeResult = msg.forge.ok
-                ? { ok:true,  text:`✨ Sucesso! ${ITEMS[msg.forge.newKey]?.name || msg.forge.newKey} +${msg.forge.plus}`, at: Date.now() }
-                : { ok:false, text:`💥 Falhou! 1× ${ITEMS[msg.forge.itemKey]?.name || msg.forge.itemKey} destruído (−${msg.forge.cost}g)`, at: Date.now() };
+                ? { ok:true,  text: tr('forge.banner_ok', {item: itmName(msg.forge.newKey), n: msg.forge.plus}), at: Date.now() }
+                : { ok:false, text: tr('forge.banner_fail', {item: itmName(msg.forge.itemKey), cost: msg.forge.cost}), at: Date.now() };
             if (typeof renderForja === 'function') renderForja();
         }
         // Craft: feedback
@@ -7656,10 +8123,10 @@ function handleMP(msg){
         if (msg.payout > 0){
             const net = msg.payout - msg.bet;
             const color = net > 0 ? '#74d176' : '#c8a050';
-            const label = net > 0 ? `+${net}g (${msg.mult}× — ${msg.kind})` : `${msg.payout}g de volta (${msg.kind})`;
+            const label = net > 0 ? `+${net}g (${msg.mult}× — ${msg.kind})` : tr('casino.refund', {payout: msg.payout, kind: msg.kind});
             out.innerHTML = `<span style="color:${color};font-weight:600">${label}</span>`;
         } else {
-            out.innerHTML = `<span style="color:#cc3030">−${msg.bet}g · sem combo</span>`;
+            out.innerHTML = `<span style="color:#cc3030">${tr('casino.lose', {bet: msg.bet})}</span>`;
         }
     } else if (msg.t === 'playerDot'){
         // Fase 5: server iniciou DoT no player local — UI espelha pra renderizar
@@ -8198,7 +8665,7 @@ function renderDailyEventWidget(){
     const mm = Math.floor(left / 60000);
     const ss = Math.floor((left % 60000) / 1000).toString().padStart(2, '0');
     el.innerHTML = `<div style="font-size:11px;color:#ffcc40;font-weight:bold">${_dailyEvent.emoji} ${_dailyEvent.name}</div>
-        <div style="font-size:9px;color:#a08868;margin-top:2px">termina em <b style="color:#e0c060">${mm}:${ss}</b></div>`;
+        <div style="font-size:9px;color:#a08868;margin-top:2px">${tr('widget.daily_ends_in', {time: `${mm}:${ss}`})}</div>`;
 }
 setInterval(() => { if (_dailyEvent) renderDailyEventWidget(); }, 1000);
 
@@ -8214,14 +8681,14 @@ function showDuelInvite(msg){
     m.style.display = 'flex';
     let left = 30;
     const cd = document.getElementById('duelInviteCountdown');
-    if (cd) cd.textContent = `expira em ${left}s`;
+    if (cd) cd.textContent = tr('widget.expires_in', {s: left});
     if (_duelInviteTimerId) clearInterval(_duelInviteTimerId);
     _duelInviteTimerId = setInterval(() => {
         left--;
         if (left <= 0){
             rejectDuelInvite(true);
         } else if (cd) {
-            cd.textContent = `expira em ${left}s`;
+            cd.textContent = tr('widget.expires_in', {s: left});
         }
     }, 1000);
     if (typeof sndLevelUp === 'function') sndLevelUp();
@@ -8375,11 +8842,11 @@ function openCasino(){
 function closeCasino(){ document.getElementById('casinoModal').style.display = 'none'; }
 function casinoSpin(amount){
     if (!ws || ws.readyState !== 1 || !_wsAuthed){
-        document.getElementById('casinoResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        document.getElementById('casinoResult').innerHTML = `<span style="color:#cc3030">${tr('common.no_connection')}</span>`;
         return;
     }
     if ((player.gold|0) < amount){
-        document.getElementById('casinoResult').innerHTML = `<span style="color:#cc3030">Sem ouro suficiente (${amount}g)</span>`;
+        document.getElementById('casinoResult').innerHTML = `<span style="color:#cc3030">${tr('casino.not_enough_gold', {amount})}</span>`;
         return;
     }
     // Animação de spin: roda reels com símbolos aleatórios por 600ms
@@ -8390,7 +8857,7 @@ function casinoSpin(amount){
             r.textContent = CASINO_SYMBOLS[allKeys[Math.floor(Math.random() * allKeys.length)]];
         });
     }, 80);
-    document.getElementById('casinoResult').innerHTML = '<span style="color:#c8a050">🎲 Girando...</span>';
+    document.getElementById('casinoResult').innerHTML = `<span style="color:#c8a050">${tr('casino.spinning')}</span>`;
     setTimeout(() => clearInterval(spinInterval), 600);
     try {
         ws.send(JSON.stringify({ t:'casinoSpin', amount }));
@@ -8414,6 +8881,8 @@ const DYE_SLOT_LABELS = {
     feet:     { label:'Botas',            icon:'👢' },
     cosmetic: { label:'Capa (cosmético)', icon:'✦' },
 };
+const DYE_SLOT_EN = { armor:'Armor', head:'Helmet', feet:'Boots', cosmetic:'Cape (cosmetic)' };
+function dyeSlotLabel(slot){ return (LANG === 'en' && DYE_SLOT_EN[slot]) || (DYE_SLOT_LABELS[slot] && DYE_SLOT_LABELS[slot].label) || slot; }
 // ─── M6 PET — Domador (loja + equipar + barra de nível) ────────────────────
 function openPetShop(){
     closeAllModals();
@@ -8439,9 +8908,9 @@ function renderPetShop(){
         html += `<div style="margin-bottom:10px;padding:10px;background:#0a0805;border:${border};border-radius:5px;display:flex;align-items:center;gap:10px">`;
         html += `<div style="font-size:26px;line-height:1">${def.emoji}</div>`;
         html += `<div style="flex:1;min-width:0">`;
-        html += `<div style="color:#e0c060;font-weight:600;font-size:14px">${petNameOf(key)}${isOwned ? ` <span style="color:#8aa050;font-size:11px">Lv ${lvl}${lvl >= def.maxLvl ? ' · máx' : ''}</span>` : ''}</div>`;
+        html += `<div style="color:#e0c060;font-weight:600;font-size:14px">${petNameOf(key)}${isOwned ? ` <span style="color:#8aa050;font-size:11px">Lv ${lvl}${lvl >= def.maxLvl ? ' · ' + tr('pet.max') : ''}</span>` : ''}</div>`;
         html += `<div style="color:#9a8a6a;font-size:11px;margin:2px 0">${petDescOf(key)}</div>`;
-        html += `<div style="color:#74d176;font-size:12px;font-weight:600">${petBuffText(def, lvl)}${isOwned && lvl < def.maxLvl ? ` <span style="color:#5a7a40">→ máx ${petBuffText(def, def.maxLvl)}</span>` : ''}</div>`;
+        html += `<div style="color:#74d176;font-size:12px;font-weight:600">${petBuffText(def, lvl)}${isOwned && lvl < def.maxLvl ? ` <span style="color:#5a7a40">→ ${tr('pet.max')} ${petBuffText(def, def.maxLvl)}</span>` : ''}</div>`;
         if (isOwned && lvl < def.maxLvl){
             const next = petXpNextClient(lvl);
             const pct = Math.max(0, Math.min(100, Math.round((rec.xp || 0) / next * 100)));
@@ -8453,11 +8922,11 @@ function renderPetShop(){
         if (!isOwned){
             const canBuy = (player.gold | 0) >= def.price;
             html += `<div style="color:#ffd060;font-size:12px;font-weight:600">${def.price.toLocaleString('pt-BR')}g</div>`;
-            html += `<button onclick="petBuyClick('${key}')" ${canBuy ? '' : 'disabled'} style="padding:5px 12px;border-radius:4px;font-size:12px;${canBuy ? 'background:#2a4a2a;color:#aef0ae;border:1px solid #3a6a3a;cursor:pointer' : 'background:#1a1410;color:#5a5040;border:1px solid #2a2418;cursor:not-allowed'}">adotar</button>`;
+            html += `<button onclick="petBuyClick('${key}')" ${canBuy ? '' : 'disabled'} style="padding:5px 12px;border-radius:4px;font-size:12px;${canBuy ? 'background:#2a4a2a;color:#aef0ae;border:1px solid #3a6a3a;cursor:pointer' : 'background:#1a1410;color:#5a5040;border:1px solid #2a2418;cursor:not-allowed'}">${tr('pet.adopt')}</button>`;
         } else if (isEq){
-            html += `<button onclick="petEquipClick(null)" style="padding:5px 12px;border-radius:4px;font-size:12px;background:#3a2a1a;color:#e0b080;border:1px solid #5a4020;cursor:pointer">desequipar</button>`;
+            html += `<button onclick="petEquipClick(null)" style="padding:5px 12px;border-radius:4px;font-size:12px;background:#3a2a1a;color:#e0b080;border:1px solid #5a4020;cursor:pointer">${tr('pet.unequip')}</button>`;
         } else {
-            html += `<button onclick="petEquipClick('${key}')" style="padding:5px 12px;border-radius:4px;font-size:12px;background:#2a3a4a;color:#a0d0f0;border:1px solid #3a5a7a;cursor:pointer">equipar</button>`;
+            html += `<button onclick="petEquipClick('${key}')" style="padding:5px 12px;border-radius:4px;font-size:12px;background:#2a3a4a;color:#a0d0f0;border:1px solid #3a5a7a;cursor:pointer">${tr('pet.equip')}</button>`;
         }
         html += `</div></div>`;
     }
@@ -8466,9 +8935,9 @@ function renderPetShop(){
 function petBuyClick(key){
     const def = PET_DEFS[key]; if (!def) return;
     const out = document.getElementById('petResult');
-    if (!ws || ws.readyState !== 1 || !_wsAuthed){ if (out) out.innerHTML = '<span style="color:#cc3030">Sem conexão</span>'; return; }
-    if ((player.gold | 0) < def.price){ if (out) out.innerHTML = `<span style="color:#cc3030">Sem ouro (${def.price.toLocaleString('pt-BR')}g)</span>`; return; }
-    if (!confirm(`Adotar ${def.name} por ${def.price.toLocaleString('pt-BR')}g?\n\nOuro atual: ${(player.gold | 0).toLocaleString('pt-BR')}g`)) return;
+    if (!ws || ws.readyState !== 1 || !_wsAuthed){ if (out) out.innerHTML = `<span style="color:#cc3030">${tr('common.no_connection')}</span>`; return; }
+    if ((player.gold | 0) < def.price){ if (out) out.innerHTML = `<span style="color:#cc3030">${tr('pet.no_gold', {cost: def.price.toLocaleString('pt-BR')})}</span>`; return; }
+    if (!confirm(tr('pet.confirm_buy', {name: petNameOf(key), price: def.price.toLocaleString('pt-BR'), gold: (player.gold | 0).toLocaleString('pt-BR')}))) return;
     try { ws.send(JSON.stringify({ t:'petBuy', pet:key })); } catch {}
 }
 function petEquipClick(key){
@@ -8495,10 +8964,10 @@ function renderDye(){
         const cfg = DYE_SLOT_LABELS[slot];
         const itemKey = eq[slot];
         const current = dyes[slot] || null;
-        const itemName = itemKey ? itmName(itemKey) : '— vazio —';
+        const itemName = itemKey ? itmName(itemKey) : tr('dye.empty_slot');
         html += `<div style="margin-bottom:10px;padding:10px;background:#0a0805;border:1px solid #3a2d20;border-radius:4px">`;
         html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
-        html += `<div style="color:#c8a050;font-weight:600;font-size:13px">${cfg.icon} ${cfg.label}</div>`;
+        html += `<div style="color:#c8a050;font-weight:600;font-size:13px">${cfg.icon} ${dyeSlotLabel(slot)}</div>`;
         html += `<div style="color:#8a7050;font-size:11px">${itemName}</div>`;
         html += `</div>`;
         if (itemKey){
@@ -8507,15 +8976,15 @@ function renderDye(){
                 const isSel = current === c;
                 const border = isSel ? '2px solid #ffd060' : '1px solid #3a2d20';
                 const box = isSel ? '0 0 6px rgba(255,208,96,0.6)' : 'none';
-                html += `<button onclick="applyDye('${slot}','${c}')" title="Tingir 5.000g" style="width:26px;height:26px;background:${c};border:${border};border-radius:3px;cursor:pointer;box-shadow:${box};padding:0"></button>`;
+                html += `<button onclick="applyDye('${slot}','${c}')" title="${tr('dye.tip_dye')}" style="width:26px;height:26px;background:${c};border:${border};border-radius:3px;cursor:pointer;box-shadow:${box};padding:0"></button>`;
             }
             const removeStyle = current
                 ? 'background:#3a1a1a;color:#e08080;border:1px solid #5a2020;cursor:pointer'
                 : 'background:#1a1410;color:#5a5040;border:1px solid #2a2418;cursor:not-allowed';
-            html += `<button onclick="applyDye('${slot}',null)" ${current ? '' : 'disabled'} title="Remover 1.000g" style="margin-left:6px;padding:4px 10px;border-radius:3px;font-size:11px;${removeStyle}">Remover</button>`;
+            html += `<button onclick="applyDye('${slot}',null)" ${current ? '' : 'disabled'} title="${tr('dye.tip_remove')}" style="margin-left:6px;padding:4px 10px;border-radius:3px;font-size:11px;${removeStyle}">${tr('dye.remove')}</button>`;
             html += `</div>`;
         } else {
-            html += `<div style="color:#5a5040;font-size:11px;font-style:italic">Equipe um item neste slot pra tingir.</div>`;
+            html += `<div style="color:#5a5040;font-size:11px;font-style:italic">${tr('dye.equip_first')}</div>`;
         }
         html += `</div>`;
     }
@@ -8523,25 +8992,25 @@ function renderDye(){
 }
 function applyDye(slot, color){
     if (!ws || ws.readyState !== 1 || !_wsAuthed){
-        document.getElementById('dyeResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        document.getElementById('dyeResult').innerHTML = `<span style="color:#cc3030">${tr('common.no_connection')}</span>`;
         return;
     }
     const cost = (color === null) ? 1000 : 5000;
     if ((player.gold|0) < cost){
-        document.getElementById('dyeResult').innerHTML = `<span style="color:#cc3030">Sem ouro suficiente (${cost.toLocaleString('pt-BR')}g)</span>`;
+        document.getElementById('dyeResult').innerHTML = `<span style="color:#cc3030">${tr('casino.not_enough_gold', {amount: cost.toLocaleString('pt-BR')})}</span>`;
         return;
     }
     // Não desperdiça gold se o slot já está com essa cor
     const cur = (player.dyes && player.dyes[slot]) || null;
     if (cur === color){
-        document.getElementById('dyeResult').innerHTML = '<span style="color:#c8a050">Esse slot já está nessa cor.</span>';
+        document.getElementById('dyeResult').innerHTML = `<span style="color:#c8a050">${tr('dye.same_color')}</span>`;
         return;
     }
     // Confirmação antes de gastar — evita clique acidental
-    const slotName = (DYE_SLOT_LABELS[slot] && DYE_SLOT_LABELS[slot].label) || slot;
+    const slotName = dyeSlotLabel(slot);
     const msg = (color === null)
-        ? `Remover a tinta de ${slotName}?\n\nCusto: 1.000g\nOuro atual: ${(player.gold|0).toLocaleString('pt-BR')}g`
-        : `Tingir ${slotName} desta cor?\n\nCusto: 5.000g\nOuro atual: ${(player.gold|0).toLocaleString('pt-BR')}g`;
+        ? tr('dye.confirm_remove', {slot: slotName, gold: (player.gold|0).toLocaleString('pt-BR')})
+        : tr('dye.confirm_dye', {slot: slotName, gold: (player.gold|0).toLocaleString('pt-BR')});
     if (!confirm(msg)) return;
     try {
         ws.send(JSON.stringify({ t:'dyeItem', slot, color }));
@@ -8600,7 +9069,7 @@ function renderAuctionBrowse(body){
     const items = _auctionData.browse || [];
     const now = _auctionData.serverNow || Date.now();
     if (items.length === 0){
-        body.innerHTML = '<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">Nenhuma listagem ativa no momento.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar a primeira.</div>';
+        body.innerHTML = `<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">${tr('auction.browse_empty_html')}</div>`;
         return;
     }
     let html = '<div style="display:flex;flex-direction:column;gap:6px">';
@@ -8613,10 +9082,10 @@ function renderAuctionBrowse(body){
         html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0a0805;border:1px solid #2a200a;border-radius:3px">`;
         html += `<div style="flex:1;min-width:0">`;
         html += `<div style="color:#e0c060;font-weight:600">${escapeHtml(itemDisplayName(a.itemKey))}${a.qty > 1 ? ` <span style="color:#8a7050">×${a.qty}</span>` : ''}</div>`;
-        html += `<div style="color:#8a7050;font-size:10px;margin-top:2px">por <b style="color:#c8a050">${escapeHtml(a.sellerName)}</b> · expira em ${fmtRemaining(a.expiresAt, now)}</div>`;
+        html += `<div style="color:#8a7050;font-size:10px;margin-top:2px">${tr('auction.by')} <b style="color:#c8a050">${escapeHtml(a.sellerName)}</b> · ${tr('auction.expires_in', {t: fmtRemaining(a.expiresAt, now)})}</div>`;
         html += `</div>`;
         html += `<div style="color:#ffd060;font-weight:600;text-align:right;min-width:90px">${fmtGold(a.price)}g</div>`;
-        html += `<button onclick="auctionBuyClick(${a.id})" ${canBuy ? '' : 'disabled'} style="padding:6px 14px;border-radius:3px;font-size:11px;font-weight:600;${btnStyle}">Comprar</button>`;
+        html += `<button onclick="auctionBuyClick(${a.id})" ${canBuy ? '' : 'disabled'} style="padding:6px 14px;border-radius:3px;font-size:11px;font-weight:600;${btnStyle}">${tr('auction.buy')}</button>`;
         html += `</div>`;
     }
     html += '</div>';
@@ -8626,7 +9095,7 @@ function renderAuctionMine(body){
     const items = _auctionData.mine || [];
     const now = _auctionData.serverNow || Date.now();
     if (items.length === 0){
-        body.innerHTML = '<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">Você não tem listagens ativas.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar uma.</div>';
+        body.innerHTML = `<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">${tr('auction.mine_empty_html')}</div>`;
         return;
     }
     let html = '<div style="display:flex;flex-direction:column;gap:6px">';
@@ -8634,10 +9103,10 @@ function renderAuctionMine(body){
         html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0a0805;border:1px solid #2a200a;border-radius:3px">`;
         html += `<div style="flex:1;min-width:0">`;
         html += `<div style="color:#e0c060;font-weight:600">${escapeHtml(itemDisplayName(a.itemKey))}${a.qty > 1 ? ` <span style="color:#8a7050">×${a.qty}</span>` : ''}</div>`;
-        html += `<div style="color:#8a7050;font-size:10px;margin-top:2px">expira em ${fmtRemaining(a.expiresAt, now)}</div>`;
+        html += `<div style="color:#8a7050;font-size:10px;margin-top:2px">${tr('auction.expires_in', {t: fmtRemaining(a.expiresAt, now)})}</div>`;
         html += `</div>`;
         html += `<div style="color:#ffd060;font-weight:600;text-align:right;min-width:90px">${fmtGold(a.price)}g</div>`;
-        html += `<button onclick="auctionCancelClick(${a.id})" style="padding:6px 14px;border-radius:3px;font-size:11px;background:#3a1a1a;color:#e08080;border:1px solid #5a2020;cursor:pointer">Cancelar</button>`;
+        html += `<button onclick="auctionCancelClick(${a.id})" style="padding:6px 14px;border-radius:3px;font-size:11px;background:#3a1a1a;color:#e08080;border:1px solid #5a2020;cursor:pointer">${tr('auction.cancel')}</button>`;
         html += `</div>`;
     }
     html += '</div>';
@@ -8648,21 +9117,21 @@ function renderAuctionSell(body){
     const inv = player.inv || {};
     const keys = Object.keys(inv).filter(k => (inv[k]|0) > 0);
     if (keys.length === 0){
-        body.innerHTML = '<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">Seu inventário está vazio.</div>';
+        body.innerHTML = `<div style="text-align:center;color:#5a5040;padding:40px 20px;font-style:italic">${tr('auction.inv_empty')}</div>`;
         return;
     }
     keys.sort((a, b) => itemDisplayName(a).localeCompare(itemDisplayName(b), 'pt-BR'));
-    let html = '<div style="margin-bottom:12px;color:#8a7050;font-size:11px">Selecione um item do inventário pra listar:</div>';
+    let html = `<div style="margin-bottom:12px;color:#8a7050;font-size:11px">${tr('auction.sell_prompt')}</div>`;
     html += '<div style="display:flex;flex-direction:column;gap:6px">';
     for (const k of keys){
         const qty = inv[k] | 0;
         html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0a0805;border:1px solid #2a200a;border-radius:3px">`;
         html += `<div style="flex:1;min-width:0">`;
-        html += `<div style="color:#e0c060">${escapeHtml(itemDisplayName(k))} <span style="color:#8a7050">(${qty} no inv)</span></div>`;
+        html += `<div style="color:#e0c060">${escapeHtml(itemDisplayName(k))} <span style="color:#8a7050">${tr('auction.qty_in_inv', {n: qty})}</span></div>`;
         html += `</div>`;
-        html += `<input type="number" min="1" max="${qty}" value="1" style="width:55px;background:#050405;border:1px solid #3a2d10;color:#c8a050;padding:3px 6px;font-size:11px;border-radius:2px" id="aqty_${k}" title="Quantidade">`;
-        html += `<input type="number" min="1" placeholder="preço" style="width:80px;background:#050405;border:1px solid #3a2d10;color:#c8a050;padding:3px 6px;font-size:11px;border-radius:2px" id="aprice_${k}" title="Preço total em gold">`;
-        html += `<button onclick="auctionListClick('${k.replace(/'/g, "\\'")}')" style="padding:5px 12px;border-radius:3px;font-size:11px;background:#3a5018;color:#c8e090;border:1px solid #5a7028;cursor:pointer;font-weight:600">Listar</button>`;
+        html += `<input type="number" min="1" max="${qty}" value="1" style="width:55px;background:#050405;border:1px solid #3a2d10;color:#c8a050;padding:3px 6px;font-size:11px;border-radius:2px" id="aqty_${k}" title="${tr('auction.qty_title')}">`;
+        html += `<input type="number" min="1" placeholder="${tr('auction.price_ph')}" style="width:80px;background:#050405;border:1px solid #3a2d10;color:#c8a050;padding:3px 6px;font-size:11px;border-radius:2px" id="aprice_${k}" title="${tr('auction.price_title')}">`;
+        html += `<button onclick="auctionListClick('${k.replace(/'/g, "\\'")}')" style="padding:5px 12px;border-radius:3px;font-size:11px;background:#3a5018;color:#c8e090;border:1px solid #5a7028;cursor:pointer;font-weight:600">${tr('auction.list')}</button>`;
         html += `</div>`;
     }
     html += '</div>';
@@ -8670,12 +9139,12 @@ function renderAuctionSell(body){
 }
 function auctionBuyClick(id){
     if (!ws || ws.readyState !== 1 || !_wsAuthed){
-        document.getElementById('auctionResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        document.getElementById('auctionResult').innerHTML = `<span style="color:#cc3030">${tr('common.no_connection')}</span>`;
         return;
     }
     const a = (_auctionData.browse || []).find(x => x.id === id);
     if (!a) return;
-    const msg = `Comprar "${itemDisplayName(a.itemKey)}${a.qty > 1 ? ` x${a.qty}` : ''}" por ${fmtGold(a.price)}g de ${a.sellerName}?\n\nOuro atual: ${fmtGold(player.gold)}g`;
+    const msg = tr('auction.confirm_buy', {item: itemDisplayName(a.itemKey), qty: a.qty > 1 ? ` x${a.qty}` : '', price: fmtGold(a.price), seller: a.sellerName, gold: fmtGold(player.gold)});
     if (!confirm(msg)) return;
     try { ws.send(JSON.stringify({ t:'auctionBuy', id })); } catch {}
 }
@@ -8683,13 +9152,13 @@ function auctionCancelClick(id){
     if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
     const a = (_auctionData.mine || []).find(x => x.id === id);
     if (!a) return;
-    const msg = `Cancelar a listagem de "${itemDisplayName(a.itemKey)}${a.qty > 1 ? ` x${a.qty}` : ''}"?\n\nO item volta pro seu inventário sem custo.`;
+    const msg = tr('auction.confirm_cancel', {item: itemDisplayName(a.itemKey), qty: a.qty > 1 ? ` x${a.qty}` : ''});
     if (!confirm(msg)) return;
     try { ws.send(JSON.stringify({ t:'auctionCancel', id })); } catch {}
 }
 function auctionListClick(itemKey){
     if (!ws || ws.readyState !== 1 || !_wsAuthed){
-        document.getElementById('auctionResult').innerHTML = '<span style="color:#cc3030">Sem conexão</span>';
+        document.getElementById('auctionResult').innerHTML = `<span style="color:#cc3030">${tr('common.no_connection')}</span>`;
         return;
     }
     const qtyEl = document.getElementById('aqty_' + itemKey);
@@ -8697,10 +9166,10 @@ function auctionListClick(itemKey){
     const qty = qtyEl ? Math.max(1, qtyEl.value|0) : 1;
     const price = priceEl ? (priceEl.value|0) : 0;
     if (price < 1){
-        document.getElementById('auctionResult').innerHTML = '<span style="color:#cc3030">Defina um preço válido</span>';
+        document.getElementById('auctionResult').innerHTML = `<span style="color:#cc3030">${tr('auction.invalid_price')}</span>`;
         return;
     }
-    const msg = `Listar ${qty}× "${itemDisplayName(itemKey)}" por ${fmtGold(price)}g?\n\nDuração: 24h\nSe vender, você recebe ${fmtGold(Math.floor(price * 0.95))}g (95%, casa fica com 5%)\nSe não vender, item volta pro inv quando expirar.`;
+    const msg = tr('auction.confirm_list', {qty, item: itemDisplayName(itemKey), price: fmtGold(price), net: fmtGold(Math.floor(price * 0.95))});
     if (!confirm(msg)) return;
     try { ws.send(JSON.stringify({ t:'auctionList', itemKey, qty, price })); } catch {}
 }
@@ -8713,11 +9182,11 @@ window.auctionListClick = auctionListClick;
 
 function renderGoldShop(){
     const el = document.getElementById('goldShopList');
-    if (!_goldPackages){ el.innerHTML = '<div>Carregando…</div>'; return; }
+    if (!_goldPackages){ el.innerHTML = `<div>${tr('common.loading')}</div>`; return; }
     const savedEmail = String(player.email || '').replace(/"/g, '&quot;');
     const emailRow = `
         <div style="grid-column:1/-1;margin-bottom:8px">
-            <label style="display:block;color:#c8a050;font-size:11px;margin-bottom:4px">Email pro recibo do Mercado Pago:</label>
+            <label style="display:block;color:#c8a050;font-size:11px;margin-bottom:4px">${tr('goldshop.email_label')}</label>
             <input id="goldShopEmail" type="email" value="${savedEmail}" placeholder="seu@email.com"
                 style="width:100%;padding:8px 10px;background:#0a0805;border:1px solid #3a2d10;color:#e8d8a0;font-family:inherit;font-size:13px;border-radius:3px;box-sizing:border-box">
             <div id="goldShopEmailErr" style="color:#ff7050;font-size:10px;margin-top:3px;min-height:12px"></div>
@@ -8726,8 +9195,8 @@ function renderGoldShop(){
         <div style="background:#1a1208;border:1px solid #3a2d10;padding:12px;text-align:center;border-radius:3px">
             <div style="font-size:18px;color:#ffcc40;font-weight:bold">${pkg.title}</div>
             <div style="font-size:22px;color:#74d176;margin:6px 0">R$ ${(pkg.priceCents/100).toFixed(2)}</div>
-            <button class="chest-btn" style="width:100%;margin:0" onclick="buyGoldPackage('${id}')">comprar</button>
-            <div style="font-size:9px;color:#888;margin-top:4px">PIX · Cartão</div>
+            <button class="chest-btn" style="width:100%;margin:0" onclick="buyGoldPackage('${id}')">${tr('shop.buy')}</button>
+            <div style="font-size:9px;color:#888;margin-top:4px">${tr('goldshop.pay_methods')}</div>
         </div>
     `).join('');
 }
@@ -8745,7 +9214,7 @@ async function buyGoldPackage(packageId){
     const emailErr   = document.getElementById('goldShopEmailErr');
     const email = String(emailInput?.value || '').trim();
     if (!_validEmail(email)){
-        if (emailErr) emailErr.textContent = 'Digite um email válido pro recibo (ex: voce@gmail.com)';
+        if (emailErr) emailErr.textContent = tr('goldshop.email_invalid');
         emailInput?.focus();
         return;
     }
@@ -8753,7 +9222,7 @@ async function buyGoldPackage(packageId){
     player.email = email;
     if (typeof saveState === 'function') saveState();
     checkout.style.display = '';
-    checkout.innerHTML = `<div style="color:#c8a050">Gerando cobrança…</div>`;
+    checkout.innerHTML = `<div style="color:#c8a050">${tr('goldshop.generating')}</div>`;
     try {
         const res = await fetch(SERVER_HTTP_BASE + '/api/pix/create', {
             method: 'POST',
@@ -8762,26 +9231,26 @@ async function buyGoldPackage(packageId){
         });
         const data = await res.json();
         if (data.error){
-            checkout.innerHTML = `<div style="color:#ff5050">Erro: ${escapeHtml(data.error)}${data.detail ? '<br><span style="font-size:10px">'+escapeHtml(data.detail)+'</span>' : ''}</div>`;
+            checkout.innerHTML = `<div style="color:#ff5050">${tr('goldshop.error_prefix')}${escapeHtml(data.error)}${data.detail ? '<br><span style="font-size:10px">'+escapeHtml(data.detail)+'</span>' : ''}</div>`;
             return;
         }
         // Checkout Pro: abre página de pagamento do MP numa nova aba
         // Prioriza initPoint (produção). sandbox só como fallback se PROD não vier.
         const url = data.initPoint || data.sandboxInitPoint;
         if (!url){
-            checkout.innerHTML = `<div style="color:#ff5050">Sem link de pagamento.</div>`;
+            checkout.innerHTML = `<div style="color:#ff5050">${tr('goldshop.no_link')}</div>`;
             return;
         }
         window.open(url, '_blank', 'noopener,noreferrer');
         checkout.innerHTML = `
-            <div style="font-size:14px;color:#ffcc40;margin-bottom:8px">📲 Abrimos a página de pagamento do Mercado Pago.</div>
-            <div style="color:#a8e0ff;margin-bottom:10px">Escolha <b>PIX</b> ou <b>Cartão</b> na aba que abriu.</div>
-            <button class="chest-btn" style="margin:0;width:auto;padding:6px 16px" onclick="window.open('${escapeAttr(url)}', '_blank')">abrir novamente</button>
+            <div style="font-size:14px;color:#ffcc40;margin-bottom:8px">${tr('goldshop.opened_mp')}</div>
+            <div style="color:#a8e0ff;margin-bottom:10px">${tr('goldshop.choose_method')}</div>
+            <button class="chest-btn" style="margin:0;width:auto;padding:6px 16px" onclick="window.open('${escapeAttr(url)}', '_blank')">${tr('goldshop.open_again')}</button>
             <div style="margin-top:10px;font-size:10px;color:#888">preferenceId: ${data.preferenceId}</div>
-            <div style="margin-top:8px;color:#a8e0ff">o ouro cai automaticamente após confirmação do MP. Pode fechar este modal.</div>
+            <div style="margin-top:8px;color:#a8e0ff">${tr('goldshop.auto_credit')}</div>
         `;
     } catch (e){
-        checkout.innerHTML = `<div style="color:#ff5050">Falha na conexão: ${escapeHtml(e.message)}</div>`;
+        checkout.innerHTML = `<div style="color:#ff5050">${tr('goldshop.conn_fail')}${escapeHtml(e.message)}</div>`;
     }
 }
 window.buyGoldPackage = buyGoldPackage;
@@ -8831,7 +9300,7 @@ function renderPartyWidget(){
         const nameCol = isMe ? '#ffd060' : '#a8e0ff';
         return `<div style="font-size:11px;color:${nameCol};display:flex;justify-content:space-between"><span>${tag}${n}</span><span style="color:#9dd07d;font-size:10px">${hpStr}</span></div>`;
     }).join('');
-    el.innerHTML = lines + `<button onclick="partyLeave()" style="margin-top:6px;width:100%;background:#3a1818;border:1px solid #6a2a2a;color:#d07d7d;font-family:'Consolas',monospace;font-size:10px;padding:3px 0;cursor:pointer">Sair da party</button>`;
+    el.innerHTML = lines + `<button onclick="partyLeave()" style="margin-top:6px;width:100%;background:#3a1818;border:1px solid #6a2a2a;color:#d07d7d;font-family:'Consolas',monospace;font-size:10px;padding:3px 0;cursor:pointer">${tr('party.leave')}</button>`;
 }
 window.renderPartyWidget = renderPartyWidget;
 setInterval(() => { if (player._party) renderPartyWidget(); }, 1500);
@@ -8873,7 +9342,7 @@ function renderAchievements(){
     const total = ACHIEVEMENTS.length;
     const eq = player.equippedBadges || [];
     if (summary){
-        summary.innerHTML = `${got}/${total} conquistas · ${eq.length}/2 badges equipadas`;
+        summary.innerHTML = tr('ach.summary', {got, total, eq: eq.length});
     }
     list.innerHTML = ACHIEVEMENTS.map(a => {
         const have = (player.achievements || []).includes(a.id);
@@ -8882,7 +9351,7 @@ function renderAchievements(){
         const col = tierColor(a.tier);
         const eqIdx = eq.indexOf(a.id);
         const btn = have
-            ? `<button class="chest-btn" style="margin:0;width:auto;padding:3px 10px;background:${eqIdx>=0?'#3a2d10':'#1a1208'};border-color:${col};color:${col}" onclick="toggleBadge('${a.id}')">${eqIdx>=0?'★ equipada':'equipar'}</button>`
+            ? `<button class="chest-btn" style="margin:0;width:auto;padding:3px 10px;background:${eqIdx>=0?'#3a2d10':'#1a1208'};border-color:${col};color:${col}" onclick="toggleBadge('${a.id}')">${eqIdx>=0?tr('ach.badge_equipped'):tr('ach.badge_equip')}</button>`
             : `<span style="font-size:11px;color:#888">${cur}/${max} (${pct}%)</span>`;
         return `<div class="ach-row" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid ${have?col:'#2a1f0a'};background:${have?'rgba(60,40,15,0.5)':'rgba(15,10,5,0.4)'};margin-bottom:6px;border-radius:3px">
             <div style="font-size:20px;width:28px;text-align:center;color:${have?col:'#555'};text-shadow:${have?`0 0 8px ${col}`:'none'}">${a.icon}</div>
@@ -9572,12 +10041,12 @@ function switchCraftTab(which){
     if (which === 'craft'){
         listEl.style.display = '';
         forjaEl.style.display = 'none';
-        hint.innerHTML = 'click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar';
+        hint.innerHTML = tr('craft.hint_recipes');
         renderCraft();
     } else {
         listEl.style.display = 'none';
         forjaEl.style.display = '';
-        hint.innerHTML = '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói 1 dos 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar';
+        hint.innerHTML = tr('craft.hint_forge');
         renderForja();
     }
 }
@@ -9609,13 +10078,13 @@ function describeUpgradeBonuses(itemKey, target){
         parts.push(`<span style="color:#74d176">+${up.hpRegen} HP regen</span>`);
     }
     if (up.poison){
-        parts.push(`<span style="color:#74d176">☠ veneno ${Math.round(up.poison.chance*100)}%</span>`);
+        parts.push(`<span style="color:#74d176">${tr('forge.bonus_poison', {pct: Math.round(up.poison.chance*100)})}</span>`);
     }
     if (up.bleed){
-        parts.push(`<span style="color:#cc3030">🩸 sangra ${Math.round(up.bleed.chance*100)}%</span>`);
+        parts.push(`<span style="color:#cc3030">${tr('forge.bonus_bleed', {pct: Math.round(up.bleed.chance*100)})}</span>`);
     }
     if (up.burn){
-        parts.push(`<span style="color:#ff8030">🔥 fogo ${Math.round(up.burn.chance*100)}%</span>`);
+        parts.push(`<span style="color:#ff8030">${tr('forge.bonus_burn', {pct: Math.round(up.burn.chance*100)})}</span>`);
     }
     return parts.join(' &nbsp; ');
 }
@@ -9637,10 +10106,10 @@ function renderForja(){
         .filter(([k]) => getUpgradeTier(k).plus < UPGRADE_MAX)
         .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
     if (!candidates.length){
-        el.innerHTML = rb + '<div class="chest-empty" style="padding:24px;text-align:center;font-style:italic;color:#666">Sem candidatos.<br><br>Precisa de <b>3× items equipáveis iguais</b> (arma, armadura, escudo, elmo, botas ou colar) com mesmo nível.</div>';
+        el.innerHTML = rb + `<div class="chest-empty" style="padding:24px;text-align:center;font-style:italic;color:#666">${tr('forge.no_candidates_html')}</div>`;
         return;
     }
-    el.innerHTML = rb + '<div style="color:#998040;font-size:10px;padding:0 6px 10px 6px;letter-spacing:0.3px;text-align:center">3× consumidos por tentativa &nbsp;·&nbsp; <span style="color:#ff8060">falha destrói todos</span> &nbsp;·&nbsp; sucesso retorna 1× upgraded</div>' +
+    el.innerHTML = rb + `<div style="color:#998040;font-size:10px;padding:0 6px 10px 6px;letter-spacing:0.3px;text-align:center">${tr('forge.header_legend')}</div>` +
         candidates.map(([k,q]) => {
             const def = ITEMS[k];
             const tier = getUpgradeTier(k);
@@ -9653,14 +10122,14 @@ function renderForja(){
                 <div class="craft-out">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
                     <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(itmName(k))}</span>
-                    <span style="margin-left:6px;color:#888;font-size:10px">${q}× disponíveis</span>
+                    <span style="margin-left:6px;color:#888;font-size:10px">${tr('forge.available', {n: q})}</span>
                 </div>
                 <div class="craft-in" style="color:#aaa;font-size:10.5px;line-height:1.5">
                     ${bonusLine}<br>
                     <span style="color:#ffcc40">${cost}g</span> &nbsp;·&nbsp;
-                    <span style="color:#ff8060">${fail}% falha</span>
+                    <span style="color:#ff8060">${tr('forge.fail_pct', {pct: fail})}</span>
                 </div>
-                <button class="craft-btn" ${canPay ? '' : 'disabled'} onclick="attemptForge('${k}')">forjar +${target}</button>
+                <button class="craft-btn" ${canPay ? '' : 'disabled'} onclick="attemptForge('${k}')">${tr('forge.btn', {n: target})}</button>
             </div>`;
         }).join('');
 }
@@ -10047,7 +10516,7 @@ function renderPlayersOnline(){
     if (remotes.length === 0){
         el.innerHTML = `
             <div class="po-header">${headerTxt}</div>
-            <div style="padding:8px 6px;color:#666;font-size:10px;text-align:center;font-style:italic">só você por aqui</div>
+            <div style="padding:8px 6px;color:#666;font-size:10px;text-align:center;font-style:italic">${tr('widget.only_you')}</div>
         `;
         return;
     }
@@ -10059,9 +10528,9 @@ function renderPlayersOnline(){
 
 function renderPlayerRow(p){
     let badge = '';
-    if (p.ghost) badge = '<span class="po-badge ghost" title="Corpo desconectado">💤</span>';
+    if (p.ghost) badge = `<span class="po-badge ghost" title="${tr('widget.ghost_tip')}">💤</span>`;
     else if (p.highlander) badge = '<span class="po-badge hl" title="Highlander">👑</span>';
-    else if (p.pvp) badge = '<span class="po-badge pvp" title="PvP ativo">☠</span>';
+    else if (p.pvp) badge = `<span class="po-badge pvp" title="${tr('widget.pvp_tip')}">☠</span>`;
     let distTag = '';
     if (!p.isMe){
         const d = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
@@ -10073,9 +10542,9 @@ function renderPlayerRow(p){
     const meClass = p.isMe ? ' me' : '';
     const ghostClass = p.ghost ? ' ghost' : '';
     const safeName = escapeHtml(p.name || '?');
-    return `<div class="po-row${meClass}${ghostClass}" title="${p.isMe?'':'Right-click no boneco pra Trade/Whisper'}">
+    return `<div class="po-row${meClass}${ghostClass}" title="${p.isMe?'':tr('widget.row_tip')}">
         <div class="po-line1">
-            <span class="po-name">${safeName}${p.isMe?' <span style="color:#888;font-weight:400">(você)</span>':''}</span>
+            <span class="po-name">${safeName}${p.isMe?` <span style="color:#888;font-weight:400">${tr('common.you')}</span>`:''}</span>
             ${badge}${distTag}
         </div>
     </div>`;
@@ -10135,10 +10604,10 @@ function showPartyInvite(fromName, expiresMs){
     document.getElementById('partyInviteModal').style.display = 'flex';
     let remaining = totalSec;
     const cd = document.getElementById('partyInviteCountdown');
-    cd.textContent = `expira em ${remaining}s`;
+    cd.textContent = tr('widget.expires_in', {s: remaining});
     _partyInviteCountdownId = setInterval(() => {
         remaining--;
-        if (remaining > 0) cd.textContent = `expira em ${remaining}s`;
+        if (remaining > 0) cd.textContent = tr('widget.expires_in', {s: remaining});
         else closePartyInvite();
     }, 1000);
     _partyInviteTimer = setTimeout(closePartyInvite, totalSec * 1000 + 500);
@@ -10385,13 +10854,13 @@ function renderTargetWidget(){
     if (!el) return;
     if (playerInSafeZone()){
         el.className = '';
-        el.innerHTML = '<div style="text-align:center;color:#6fb8e8;padding:6px 0;font-size:11px;font-weight:600;letter-spacing:1px">🛡 ZONA SEGURA</div>';
+        el.innerHTML = `<div style="text-align:center;color:#6fb8e8;padding:6px 0;font-size:11px;font-weight:600;letter-spacing:1px">${tr('widget.safe_zone')}</div>`;
         return;
     }
     const list = getBattleList();
     if (!list.length){
         el.className = 'target-empty';
-        el.innerHTML = 'Nenhum inimigo à vista';
+        el.innerHTML = tr('widget.no_enemies');
         return;
     }
     el.className = 'battle-list';
@@ -10421,7 +10890,7 @@ function renderPvpWidget(){
     }
     let stateHtml;
     if (player.highlander) stateHtml = '<div class="pvp-state hl">👑 HIGHLANDER</div>';
-    else if (player.pvp)   stateHtml = '<div class="pvp-state on">PvP ATIVO</div>';
+    else if (player.pvp)   stateHtml = `<div class="pvp-state on">${tr('pvp.state_on')}</div>`;
     else                   stateHtml = '<div class="pvp-state off">PvP off</div>';
     let pzLock = '';
     if (Date.now() < player.pzLockUntil){
@@ -10431,13 +10900,13 @@ function renderPvpWidget(){
     let huntBlock = '';
     if (player.highlander){
         if (typeof hlHuntActive !== 'undefined' && hlHuntActive){
-            huntBlock = `<div class="hunt-label hunt-active">⚔ CAÇADA ATIVA</div>`;
+            huntBlock = `<div class="hunt-label hunt-active">${tr('pvp.hunt_active')}</div>`;
         } else if (typeof hlHuntTimer !== 'undefined' && hlHuntTimer > 0 && hlHuntTimer < HL_HUNT_DELAY_MS){
             const remaining = HL_HUNT_DELAY_MS - hlHuntTimer;
             const pct = (hlHuntTimer / HL_HUNT_DELAY_MS) * 100;
             huntBlock = `
                 <div class="hunt-bar"><div class="hunt-bar-fill" style="width:${pct}%"></div></div>
-                <div class="hunt-label">Caçada em ${Math.ceil(remaining/1000)}s</div>`;
+                <div class="hunt-label">${tr('pvp.hunt_in', {s: Math.ceil(remaining/1000)})}</div>`;
         }
     }
     el.innerHTML = `<div class="pvp-skulls">${skulls}</div>${stateHtml}${pzLock}${huntBlock}`;
@@ -10457,7 +10926,7 @@ function renderBossesWidget(){
         let status, cls;
         if (aliveMob){
             const lvlTag = lvl > 1 ? ` <span style="color:#ffcc40">★Lv${lvl}</span>` : '';
-            status = `<span class="boss-status-alive">● vivo${lvlTag}</span>`;
+            status = `<span class="boss-status-alive">${tr('boss.alive')}${lvlTag}</span>`;
             cls = 'alive';
         } else if (b.deathT){
             const remaining = b.respawn - (Date.now() - b.deathT);
@@ -10467,14 +10936,14 @@ function renderBossesWidget(){
                 status = `<span class="boss-status-down">⌛ ${mm}:${ss.toString().padStart(2,'0')}</span>`;
                 cls = 'respawn';
             } else {
-                status = '<span class="boss-status-alive">● voltando</span>';
+                status = `<span class="boss-status-alive">${tr('boss.returning')}</span>`;
                 cls = 'alive';
             }
         } else {
             status = '<span class="boss-status-none">—</span>';
             cls = '';
         }
-        return `<div class="boss-row ${cls}"><span class="boss-name">${b.name}</span>${status}</div>`;
+        return `<div class="boss-row ${cls}"><span class="boss-name">${mobName(b.type)}</span>${status}</div>`;
     }).join('');
 }
 
@@ -11353,6 +11822,10 @@ const ITEM_CATEGORIES = [
     { label: 'Materiais',    kinds: ['mat'] },
 ];
 const ITEM_CATEGORY_KNOWN_KINDS = new Set(ITEM_CATEGORIES.flatMap(c => c.kinds));
+// i18n: o label é a CHAVE de colapso (data-cat/localStorage) — NÃO traduzir o label;
+// traduz só no DISPLAY via catLabelInv() em renderCatGroup.
+const ITEM_CAT_EN = { 'Armas':'Weapons', 'Equipamento':'Equipment', 'Cosméticos':'Cosmetics', 'Bênçãos':'Blessings', 'Consumíveis':'Consumables', 'Munição':'Ammo', 'Materiais':'Materials', 'Outros':'Other' };
+function catLabelInv(label){ return (LANG === 'en' && ITEM_CAT_EN[label]) || label; }
 // showEmpty=true mantém todas as 7 categorias padrão visíveis (mesmo vazias) —
 // usado no inv principal pro player saber sempre onde cada coisa fica
 // (consistência com o baú). showEmpty=false (default) filtra vazias — usado
@@ -11394,7 +11867,7 @@ function renderCatGroup(label, bodyHtml, count){
     const collapsed = isCatCollapsed(label);
     return `<div class="inv-cat-group ${collapsed?'collapsed':''}" data-cat="${escapeAttr(label)}">
         <div class="inv-cat-head" data-cat-toggle="${escapeAttr(label)}">
-            <span><span class="inv-cat-arrow">▼</span>${label}</span>
+            <span><span class="inv-cat-arrow">▼</span>${catLabelInv(label)}</span>
             <span class="inv-cat-count">${count}</span>
         </div>
         <div class="inv-cat-body">${bodyHtml}</div>
@@ -11423,7 +11896,9 @@ function renderInventoryIfChanged(){
     //  WPN  ARMOR  OFF
     //   .   NECK    .
     //   .   FEET    .
-    const slotLabels = { weapon:'ARMA', offhand:'OFF', armor:'CORPO', head:'CABEÇA', feet:'PÉS', neck:'PESCOÇO', cosmetic:'COSM' };
+    const slotLabels = (LANG === 'en')
+        ? { weapon:'WPN', offhand:'OFF', armor:'BODY', head:'HEAD', feet:'FEET', neck:'NECK', cosmetic:'COSM' }
+        : { weapon:'ARMA', offhand:'OFF', armor:'CORPO', head:'CABEÇA', feet:'PÉS', neck:'PESCOÇO', cosmetic:'COSM' };
     const slotGrid   = { head:'1/2', neck:'1/3', weapon:'2/1', armor:'2/2', offhand:'2/3', feet:'3/2', cosmetic:'3/3' };
     const eqEl = document.getElementById('equipment');
     let hasRanged = false;
@@ -11436,7 +11911,7 @@ function renderInventoryIfChanged(){
             const def = ITEMS[k];
             if (def.ranged && def.kind !== 'wand') hasRanged = true;
             if (def.kind === 'wand') hasWand = true;
-            const tip = itemFullDesc(def) + '\n\nClick p/ desequipar';
+            const tip = itemFullDesc(def, k) + '\n\n' + tr('tip.unequip_hint');
             return `<div class="paper-slot filled" data-slot="${slot}" style="grid-area:${area}" title="${escapeHtml(tip)}">
                 <span class="paper-slot-label">${slotLabels[slot]}</span>
                 <div class="paper-icon" style="background-image:url(${getItemIconURL(k, 26)})"></div>
@@ -11444,7 +11919,7 @@ function renderInventoryIfChanged(){
         }
         const blocked = slot === 'offhand' && player.equipped.weapon && ITEMS[player.equipped.weapon].hand === '2h';
         const cls = blocked ? 'blocked' : 'empty';
-        const tip = blocked ? 'Bloqueado por arma 2H' : `${slotLabels[slot]} — vazio`;
+        const tip = blocked ? tr('tip.blocked_2h') : tr('tip.slot_empty', {slot: slotLabels[slot]});
         return `<div class="paper-slot ${cls}" data-slot="${slot}" style="grid-area:${area}" title="${tip}">
             <span class="paper-slot-label">${slotLabels[slot]}</span>
         </div>`;
@@ -11453,9 +11928,9 @@ function renderInventoryIfChanged(){
     let ammoLine = '';
     if (hasRanged){
         const fl = (player.inv.FLECHA || 0) + (player.inv.FLECHA_PERF || 0);
-        ammoLine = `<div class="paper-ammo ${fl>0?'':'low'}">▶ ${fl} flechas</div>`;
+        ammoLine = `<div class="paper-ammo ${fl>0?'':'low'}">${tr('inv.arrows', {n: fl})}</div>`;
     } else if (hasWand){
-        ammoLine = `<div class="paper-ammo ${player.mp < WAND_MANA_COST ? 'low':''}">✦ ${WAND_MANA_COST} mana/tiro</div>`;
+        ammoLine = `<div class="paper-ammo ${player.mp < WAND_MANA_COST ? 'low':''}">${tr('inv.mana_per_shot', {n: WAND_MANA_COST})}</div>`;
     }
     eqEl.innerHTML = `<div class="paper-doll">${slotHtml}</div>${ammoLine}`;
 
@@ -11466,13 +11941,13 @@ function renderInventoryIfChanged(){
     const groups = categorizeItems(Object.entries(player.inv), true);
     const hasAny = groups.some(g => g.items.length > 0);
     if (!hasAny){
-        invEl.innerHTML = '<span style="color:#666">vazio</span>';
+        invEl.innerHTML = `<span style="color:#666">${tr('common.empty')}</span>`;
     } else {
         const renderItem = ([k,q]) => {
             const def = ITEMS[k];
             const equippable = ['weapon','wand','offhand','armor','head','feet','neck','cosmetic'].includes(def.kind);
             const extra = itemStatsCompact(def);
-            const tip = itemFullDesc(def) + (equippable ? '\n\nClick p/ equipar' : '');
+            const tip = itemFullDesc(def, k) + (equippable ? '\n\n' + tr('tip.equip_hint') : '');
             // Raridade vira COR do nome e forja vira badge no ícone (helper compartilhado
             // com o baú) — libera a 1ª linha pro nome e a 2ª (.inv-stats) pros modificadores.
             const meta = itemDisplayMeta(k);
@@ -12830,7 +13305,7 @@ function switchSpell(key){
 }
 function renderAltar(){
     const el = document.getElementById('altarList');
-    document.getElementById('altarGoldLabel').textContent = `${player.gold} g disponíveis`;
+    document.getElementById('altarGoldLabel').textContent = tr('altar.gold_available', {g: player.gold});
     // Painel de estudo de Magia
     const sk = player.skills.Magia;
     const cost = trainingCostPerSession('Magia');
@@ -12842,11 +13317,11 @@ function renderAltar(){
     const studyHtml = `<div class="craft-row" style="margin-bottom:14px;background:#08080d;border-color:#3a3050">
         <div class="craft-out">
             <span style="color:#aaffaa">✨</span>
-            <span style="margin-left:6px;color:#e0c060;font-weight:600">Estudar Magia</span>
+            <span style="margin-left:6px;color:#e0c060;font-weight:600">${tr('altar.study_magic')}</span>
             <span style="margin-left:6px;color:#aaa;font-size:10px">skill ${sk.val} (xp ${sk.xp}/${sk.xpNext})</span>
         </div>
         <div class="craft-in" style="color:#aaa">
-            <span style="color:#ffcc40">${cost}g</span>/sessão · 2s · <span style="color:#74d176">+${xpPerSess} XP</span> · ~${toLvl} sessões pro próximo
+            <span style="color:#ffcc40">${cost}g</span>${tr('altar.per_session')} · 2s · <span style="color:#74d176">+${xpPerSess} XP</span> · ${tr('altar.sessions_to_next', {n: toLvl})}
         </div>
         <div style="grid-column:1/-1;display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
             ${opts.map((q,i) => {
@@ -12859,16 +13334,17 @@ function renderAltar(){
         const active = k === player.activeSpell;
         const canBuy = player.gold >= sp.switchCost;
         let statLine;
+        const _cd1 = (sp.cooldown/1000).toFixed(1);
         if (sp.heal){
-            statLine = `<span style="color:#74d176">+${sp.heal} HP base</span> · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+            statLine = tr('altar.stat_heal', {n: sp.heal, mp: sp.manaCost, cd: _cd1});
         } else if (sp.aoeRange){
-            statLine = `<span style="color:#ff8030">${sp.damage} dano base</span> · AoE raio ${sp.aoeRange} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+            statLine = tr('altar.stat_aoe', {dmg: sp.damage, r: sp.aoeRange, mp: sp.manaCost, cd: _cd1});
         } else if (sp.tauntRange){
-            statLine = `<span style="color:#ff8080">taunt</span> · raio ${sp.tauntRange} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+            statLine = tr('altar.stat_taunt', {r: sp.tauntRange, mp: sp.manaCost, cd: _cd1});
         } else if (sp.buff){
-            statLine = `<span style="color:#ff6060">+${Math.round(sp.buff.dmg*100)}% dmg / +${Math.round(sp.buff.spd*100)}% spd</span> · ${(sp.buff.duration/1000).toFixed(0)}s · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(0)}s`;
+            statLine = tr('altar.stat_buff', {d: Math.round(sp.buff.dmg*100), s: Math.round(sp.buff.spd*100), dur: (sp.buff.duration/1000).toFixed(0), mp: sp.manaCost, cd: (sp.cooldown/1000).toFixed(0)});
         } else {
-            statLine = `<span style="color:#ff8030">${sp.damage} dano base</span> · range ${sp.range} · ${sp.manaCost}mp · cd ${(sp.cooldown/1000).toFixed(1)}s`;
+            statLine = tr('altar.stat_dmg', {dmg: sp.damage, r: sp.range, mp: sp.manaCost, cd: _cd1});
         }
         return `<div class="craft-row ${active?'craft-ok':''}">
             <div class="craft-out">
@@ -12877,7 +13353,7 @@ function renderAltar(){
                 ${active ? `<span style="margin-left:6px;color:#74d176;font-size:10px">[${tr('lbl.equipped_tag')}]</span>` : ''}
             </div>
             <div class="craft-in" style="color:#aaa">${spellDescEn(k)}<br>${statLine}</div>
-            <button class="craft-btn" ${active||!canBuy?'disabled':''} onclick="switchSpell('${k}')">${active?'equipada':canBuy?`equipar (${sp.switchCost}g)`:`${sp.switchCost}g`}</button>
+            <button class="craft-btn" ${active||!canBuy?'disabled':''} onclick="switchSpell('${k}')">${active?tr('altar.equipped'):canBuy?tr('altar.equip_cost', {g: sp.switchCost}):`${sp.switchCost}g`}</button>
         </div>`;
     }).join('');
 }
@@ -13798,6 +14274,7 @@ const KEY_HELP = [
     ['Q','quests'], ['I','stats'], ['L','ranking'], ['N','amigos'], ['O','opções'], ['P','PvP'],
     ['ESC','fechar/cancelar'],
 ];
+const KEY_HELP_EN = { 'mover':'move', 'engajar/falar':'engage/talk', 'trocar alvo':'switch target', 'magia':'spell', 'arremessar lança':'throw spear', 'comer':'eat', 'baú':'chest', 'craft':'craft', 'altar':'altar', 'treino':'training', 'quests':'quests', 'stats':'stats', 'ranking':'ranking', 'amigos':'friends', 'opções':'options', 'PvP':'PvP', 'fechar/cancelar':'close/cancel' };
 function openSettings(){
     closeAllModals();
     document.getElementById('settingsModal').style.display = 'flex';
@@ -13811,7 +14288,7 @@ function openSettings(){
     // Lista de teclas
     const grid = document.getElementById('keyGrid');
     grid.innerHTML = KEY_HELP.map(([k, desc]) =>
-        `<div class="key-row"><kbd>${k}</kbd><span>${desc}</span></div>`
+        `<div class="key-row"><kbd>${k}</kbd><span>${(LANG === 'en' && KEY_HELP_EN[desc]) || desc}</span></div>`
     ).join('');
     // Painel admin (só se player.isAdmin)
     const adminSec = document.getElementById('adminSection');
@@ -13847,10 +14324,10 @@ function showTradeInvite(fromName, fromId){
     if (typeof sndPickup === 'function') sndPickup();
     let secondsLeft = 20;
     const cd = document.getElementById('tradeInviteCountdown');
-    cd.textContent = `expira em ${secondsLeft}s`;
+    cd.textContent = tr('widget.expires_in', {s: secondsLeft});
     _tradeInviteCountdownId = setInterval(() => {
         secondsLeft--;
-        if (cd) cd.textContent = `expira em ${secondsLeft}s`;
+        if (cd) cd.textContent = tr('widget.expires_in', {s: secondsLeft});
         if (secondsLeft <= 0){
             // auto-rejeita
             ws.send(JSON.stringify({ t:'tradeReject', fromId }));
@@ -13874,8 +14351,8 @@ function openTradeModal(otherName){
     document.getElementById('tradeModal').style.display = 'flex';
     document.getElementById('tradeMyName').textContent = player.name;
     document.getElementById('tradeOtherName').textContent = otherName;
-    document.getElementById('tradeStatus').textContent = `Negociando com ${otherName}`;
-    document.getElementById('tradeConfirmBtn').textContent = 'CONFIRMAR';
+    document.getElementById('tradeStatus').textContent = tr('trade.negotiating', {name: otherName});
+    document.getElementById('tradeConfirmBtn').textContent = tr('trade.confirm');
     document.getElementById('tradeConfirmBtn').style.background = '';
     renderTradeUI();
 }
@@ -13888,13 +14365,13 @@ function renderTradeUI(){
     myEl.innerHTML = myItems.length
         ? myItems.map(([k,q]) => {
             const def = ITEMS[k]; if (!def) return '';
-            return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid #1a1408;cursor:pointer" onclick="removeFromMyOffer('${k}')" title="click p/ remover 1">
+            return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid #1a1408;cursor:pointer" onclick="removeFromMyOffer('${k}')" title="${tr('trade.tip_remove')}">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 16)});width:16px;height:16px"></span>
                 <span style="flex:1;color:#c8a050">${escapeHtml(itmName(k))}</span>
                 <span style="color:#e0c060">${q}×</span>
             </div>`;
           }).join('')
-        : '<div style="color:#555;text-align:center;padding:14px;font-style:italic">vazio</div>';
+        : `<div style="color:#555;text-align:center;padding:14px;font-style:italic">${tr('common.empty')}</div>`;
     otherEl.innerHTML = otherItems.length
         ? otherItems.map(([k,q]) => {
             const def = ITEMS[k] || { name: k, color: '#aaa' };
@@ -13904,20 +14381,20 @@ function renderTradeUI(){
                 <span style="color:#e0c060">${q}×</span>
             </div>`;
           }).join('')
-        : '<div style="color:#555;text-align:center;padding:14px;font-style:italic">vazio</div>';
+        : `<div style="color:#555;text-align:center;padding:14px;font-style:italic">${tr('common.empty')}</div>`;
     document.getElementById('tradeOtherGold').textContent = (_trade.otherOffer.gold || 0) + ' g';
     document.getElementById('tradeMyGoldInput').value = _trade.myOffer.gold || 0;
     // Inventário disponível pra adicionar
     const invEl = document.getElementById('tradeMyInv');
     const invItems = Object.entries(player.inv).filter(([k,q]) => q > 0 && ITEMS[k]);
     if (!invItems.length){
-        invEl.innerHTML = '<div style="color:#555;text-align:center;font-style:italic;padding:8px">inventário vazio</div>';
+        invEl.innerHTML = `<div style="color:#555;text-align:center;font-style:italic;padding:8px">${tr('shop.inv_empty')}</div>`;
     } else {
         invEl.innerHTML = invItems.map(([k,q]) => {
             const def = ITEMS[k];
             const offered = _trade.myOffer.items[k] || 0;
             const avail = q - offered;
-            return `<div style="display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:${avail>0?'pointer':'not-allowed'};opacity:${avail>0?1:0.4}" onclick="${avail>0?`addToMyOffer('${k}')`:''}" title="${avail>0?'click p/ ofertar 1':'já tudo ofertado'}">
+            return `<div style="display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:${avail>0?'pointer':'not-allowed'};opacity:${avail>0?1:0.4}" onclick="${avail>0?`addToMyOffer('${k}')`:''}" title="${avail>0?tr('trade.tip_offer'):tr('trade.tip_all_offered')}">
                 <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 14)});width:14px;height:14px"></span>
                 <span style="flex:1;color:#aaa">${escapeHtml(itmName(k))}</span>
                 <span style="color:#888;font-size:10px">${avail}/${q}</span>
@@ -13925,7 +14402,8 @@ function renderTradeUI(){
         }).join('');
     }
     // Status confirm
-    const status = `Você: ${_trade.confirmedMe?'<span style="color:#74d176">✓ confirmou</span>':'aguardando'} · ${escapeHtml(_trade.otherName)}: ${_trade.confirmedOther?'<span style="color:#74d176">✓ confirmou</span>':'aguardando'}`;
+    const _cf = `<span style="color:#74d176">${tr('trade.confirmed')}</span>`;
+    const status = `${tr('trade.you')}: ${_trade.confirmedMe?_cf:tr('trade.waiting')} · ${escapeHtml(_trade.otherName)}: ${_trade.confirmedOther?_cf:tr('trade.waiting')}`;
     document.getElementById('tradeStatus').innerHTML = status;
 }
 function addToMyOffer(itemKey){
@@ -14027,7 +14505,7 @@ function renderFriendsList(){
     if (!el) return;
     const friends = loadFriends();
     if (!friends.length){
-        el.innerHTML = '<div style="color:#666;text-align:center;padding:24px;font-style:italic">Sem amigos ainda. Adicione pelo nome acima.</div>';
+        el.innerHTML = `<div style="color:#666;text-align:center;padding:24px;font-style:italic">${tr('friends.empty')}</div>`;
         return;
     }
     // Online = está no remotePlayers
@@ -14078,7 +14556,7 @@ function openRanking(){
         ws.send(JSON.stringify({ t:'getRanking', limit: 10 }));
     } else {
         document.getElementById('rankingBody').innerHTML =
-            '<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ranking só disponível online.</div>';
+            `<div style="color:#666;text-align:center;padding:40px;font-style:italic">${tr('ranking.offline_only')}</div>`;
     }
 }
 function closeRanking(){
@@ -14165,10 +14643,13 @@ function renderTalents(){
     const used = talentPointsUsed();
     const avail = earned - used;
     const totalLv = totalLevelsAbove10();
+    const availLabel = LANG === 'en'
+        ? `${avail} point${avail===1?'':'s'} available`
+        : `${avail} ponto${avail===1?'':'s'} disponíve${avail===1?'l':'is'}`;
     summary.innerHTML = `
-        <div style="font-size:18px;color:#ffd060;font-weight:bold">${avail} ponto${avail===1?'':'s'} disponíve${avail===1?'l':'is'}</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">${used}/${earned} usados · ${totalLv} níveis totais (próximo ponto em ${10 - (totalLv % 10)} levels)</div>
-        ${used > 0 ? `<button class="chest-btn" style="margin-top:8px;padding:4px 12px;font-size:11px;background:#2a1810;border-color:#5a3a1a" onclick="respecTalents()">↺ Redistribuir tudo (5000g)</button>` : ''}`;
+        <div style="font-size:18px;color:#ffd060;font-weight:bold">${availLabel}</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">${tr('talents.breakdown', {used, earned, total: totalLv, n: 10 - (totalLv % 10)})}</div>
+        ${used > 0 ? `<button class="chest-btn" style="margin-top:8px;padding:4px 12px;font-size:11px;background:#2a1810;border-color:#5a3a1a" onclick="respecTalents()">↺ ${tr('talents.respec_btn')}</button>` : ''}`;
     const byCat = { Ofensivo:[], Defensivo:[], Utilidade:[] };
     for (const [id, def] of Object.entries(TALENT_DEFS_CLIENT)){
         byCat[def.cat].push({ id, def });
@@ -14187,16 +14668,16 @@ function renderTalents(){
             // botão em largura de conteúdo (width:auto + flex-shrink:0), min-width só pra alinhar.
             const btnStyle = 'margin:0;padding:5px 12px;font-size:12px;width:auto;flex-shrink:0;white-space:nowrap;min-width:120px;text-align:center';
             const btn = maxed
-                ? `<span style="color:#74d176;font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap;text-align:center;min-width:120px">✓ MÁX (${max}/${max})</span>`
+                ? `<span style="color:#74d176;font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap;text-align:center;min-width:120px">${tr('talents.maxed', {max})}</span>`
                 : canBuy
-                    ? `<button class="chest-btn" style="${btnStyle}" onclick="buyTalent('${id}')">${rank>0?'subir rank':'comprar'} (1 pt)</button>`
-                    : `<button class="chest-btn" style="${btnStyle};opacity:0.4;cursor:not-allowed" disabled>sem pontos</button>`;
+                    ? `<button class="chest-btn" style="${btnStyle}" onclick="buyTalent('${id}')">${rank>0?tr('talents.rank_up'):tr('talents.buy')} (1 pt)</button>`
+                    : `<button class="chest-btn" style="${btnStyle};opacity:0.4;cursor:not-allowed" disabled>${tr('talents.no_points')}</button>`;
             // 🕯️ Segunda Chance é o único talento com ESTADO (cooldown). Mostra pronto/recarga.
             // (Estático: atualiza ao reabrir o modal ou quando chega pstats/secondChance.)
             const scInfo = (id === 't_secondchance' && rank > 0)
                 ? ((player.scReadyAt || 0) > Date.now()
-                    ? `<div style="color:#c89050;font-size:10px;margin-top:2px">⏳ recarrega em ${Math.ceil(((player.scReadyAt||0) - Date.now())/60000)} min</div>`
-                    : `<div style="color:#74d176;font-size:10px;margin-top:2px">✓ pronto pra reviver</div>`)
+                    ? `<div style="color:#c89050;font-size:10px;margin-top:2px">${tr('talents.sc_recharge', {n: Math.ceil(((player.scReadyAt||0) - Date.now())/60000)})}</div>`
+                    : `<div style="color:#74d176;font-size:10px;margin-top:2px">${tr('talents.sc_ready')}</div>`)
                 : '';
             return `
                 <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-bottom:1px solid #1a1408;${rank>0 ? 'background:#0a1a0a' : ''}">
@@ -14224,7 +14705,7 @@ function buyTalent(id){
 function respecTalents(){
     if (talentPointsUsed() < 1) return;
     if ((player.gold || 0) < 5000){ log(tr('log.respec_cost')); return; }
-    if (!confirm('Redistribuir TODOS os talentos? Devolve os pontos e custa 5000g.')) return;
+    if (!confirm(tr('talents.confirm_respec'))) return;
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'talentRespec' })); } catch {}
         log(tr('log.respec_doing'));
@@ -14243,7 +14724,7 @@ function openGuildModal(info){
     const created = info.createdAt ? new Date(info.createdAt).toLocaleDateString('pt-BR') : '?';
     document.getElementById('guildModalHeader').innerHTML =
         `<div style="font-size:18px;color:#ffd060">${escapeHtml(info.name)}</div>` +
-        `<div style="font-size:11px;color:#888;margin-top:4px">criada ${escapeHtml(created)} · ${info.members.length} membro${info.members.length!==1?'s':''}</div>`;
+        `<div style="font-size:11px;color:#888;margin-top:4px">${tr('guild.header_meta', {date: escapeHtml(created), n: info.members.length, s: info.members.length!==1?'s':''})}</div>`;
     const list = document.getElementById('guildMembersList');
     // Líder primeiro, online antes de offline, depois alfabético
     const sorted = info.members.slice().sort((a, b) => {
@@ -14253,7 +14734,7 @@ function openGuildModal(info){
     });
     list.innerHTML = sorted.map(m => {
         const color = m.online ? '#74d176' : '#888';
-        const crown = m.isLeader ? '<span style="color:#ffd060;margin-right:4px" title="Líder">👑</span>' : '';
+        const crown = m.isLeader ? `<span style="color:#ffd060;margin-right:4px" title="${tr('guild.leader')}">👑</span>` : '';
         const status = m.online
             ? '<span style="color:#74d176;font-size:10px">● online</span>'
             : '<span style="color:#666;font-size:10px">offline</span>';
@@ -14278,7 +14759,7 @@ function renderRankingBody(){
     const el = document.getElementById('rankingBody');
     if (!el) return;
     if (!_rankingCache){
-        el.innerHTML = '<div style="color:#666;text-align:center;padding:40px">carregando…</div>';
+        el.innerHTML = `<div style="color:#666;text-align:center;padding:40px">${tr('ranking.loading')}</div>`;
         return;
     }
     const colorMedal = i => i === 0 ? '#ffd040' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#5a4818';
@@ -14292,22 +14773,22 @@ function renderRankingBody(){
         const daysLeft = Math.max(0, Math.ceil((nextRoll - Date.now()) / 86400000));
         const champion = season.archive && season.archive[0];
         const champLine = champion
-            ? `<div style="text-align:center;padding:6px 8px;font-size:11px;color:#a8e0ff;background:#0a1418;border-bottom:1px solid #1a2840">🏆 Campeão de ${escapeHtml(champion.id)}: <b style="color:#ffd060">${escapeHtml(champion.champion || '?')}</b></div>`
+            ? `<div style="text-align:center;padding:6px 8px;font-size:11px;color:#a8e0ff;background:#0a1418;border-bottom:1px solid #1a2840">${tr('ranking.champion', {id: escapeHtml(champion.id), name: escapeHtml(champion.champion || '?')})}</div>`
             : '';
         const header = `
             <div style="color:#ffd060;font-size:12px;letter-spacing:1.5px;padding:8px;text-align:center;background:#1a1408;border-bottom:1px solid #3a2d10">
-                🏆 TEMPORADA ${escapeHtml(season.id)} · termina em ${daysLeft} dia${daysLeft===1?'':'s'}
-                <div style="font-size:9px;color:#888;letter-spacing:1px;margin-top:2px">pontos = mobs + pvp×5 + bosses×20 · #1 ganha Coroa</div>
+                ${tr('ranking.season_header', {id: escapeHtml(season.id), n: daysLeft, s: daysLeft===1?'':'s'})}
+                <div style="font-size:9px;color:#888;letter-spacing:1px;margin-top:2px">${tr('ranking.season_formula')}</div>
             </div>${champLine}`;
         if (!top.length){
-            el.innerHTML = header + `<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ainda ninguém pontuou esta temporada. Bora caçar!</div>`;
+            el.innerHTML = header + `<div style="color:#666;text-align:center;padding:40px;font-style:italic">${tr('ranking.season_empty')}</div>`;
             return;
         }
         el.innerHTML = header + top.map((e, i) => `
             <div style="padding:6px 10px;border-bottom:1px solid #1a1408;${e.name === player.name ? 'background:#1a1a08' : ''}">
                 <div style="display:flex;align-items:center;gap:10px">
                     <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
-                    <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ' <span style="color:#888;font-size:10px">(você)</span>' : ''}</span>
+                    <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ` <span style="color:#888;font-size:10px">${tr('common.you')}</span>` : ''}</span>
                     <span style="color:#ffcc40;font-family:Consolas,monospace;min-width:60px;text-align:right;font-weight:700">${e.total}</span>
                 </div>
                 <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:#7a6520;margin-left:34px">
@@ -14317,23 +14798,25 @@ function renderRankingBody(){
         return;
     }
     const list = _rankingCache[_rankingTab] || [];
-    const labels = { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds' };
+    const labels = LANG === 'en'
+        ? { mobs:'Mobs killed', pvp:'PvP kills', bosses:'Unique bosses', gold:'Gold', guilds:'Guilds' }
+        : { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds' };
     if (!list.length){
-        el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">Ninguém com ${labels[_rankingTab]} ainda.</div>`;
+        el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">${tr('ranking.list_empty', {label: labels[_rankingTab]})}</div>`;
         return;
     }
     // Aba GUILDS tem layout diferente — mostra total agregado + breakdown
     if (_rankingTab === 'guilds'){
         el.innerHTML = `
-            <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">TOP ${list.length} GUILDS · pontos = mobs + pvp×5 + bosses×20</div>
+            <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">${tr('ranking.guilds_header', {n: list.length})}</div>
             ${list.map((e, i) => {
                 const isMine = e.name === player.guild;
                 return `
                 <div style="padding:6px 10px;border-bottom:1px solid #1a1408;${isMine ? 'background:#1a1a08' : ''}">
                     <div style="display:flex;align-items:center;gap:10px">
                         <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
-                        <span style="flex:1;color:${isMine ? '#e0c060' : '#9ab8e8'};font-weight:${isMine ? 600 : 500}">${escapeHtml(e.name)}${isMine ? ' <span style="color:#888;font-size:10px">(sua)</span>' : ''}</span>
-                        <span style="color:#888;font-size:10px">${e.members} membros</span>
+                        <span style="flex:1;color:${isMine ? '#e0c060' : '#9ab8e8'};font-weight:${isMine ? 600 : 500}">${escapeHtml(e.name)}${isMine ? ` <span style="color:#888;font-size:10px">${tr('ranking.yours')}</span>` : ''}</span>
+                        <span style="color:#888;font-size:10px">${tr('ranking.member_count', {n: e.members})}</span>
                         <span style="color:#ffcc40;font-family:Consolas,monospace;min-width:50px;text-align:right">${e.total}</span>
                     </div>
                     <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:#7a6520;margin-left:34px">
@@ -14350,7 +14833,7 @@ function renderRankingBody(){
         ${list.map((e, i) => `
             <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #1a1408;${e.name === player.name ? 'background:#1a1a08' : ''}">
                 <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
-                <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ' <span style="color:#888;font-size:10px">(você)</span>' : ''}</span>
+                <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ` <span style="color:#888;font-size:10px">${tr('common.you')}</span>` : ''}</span>
                 <span style="color:#ffcc40;font-family:Consolas,monospace">${e.value}</span>
             </div>
         `).join('')}`;
@@ -14360,8 +14843,8 @@ window.closeRanking = closeRanking;
 window.switchRankingTab = switchRankingTab;
 
 function tryRestoreBackup(){
-    if (!player.isAdmin){ log('<span class="log-sys">Só admin pode restaurar backup. Fale com o gestor.</span>'); return; }
-    if (!confirm('Restaurar do backup? O save atual será sobrescrito.')) return;
+    if (!player.isAdmin){ log(`<span class="log-sys">${tr('backup.admin_only')}</span>`); return; }
+    if (!confirm(tr('backup.confirm'))) return;
     if (typeof restoreFromBackup === 'function') restoreFromBackup();
 }
 window.tryRestoreBackup = tryRestoreBackup;
@@ -15116,7 +15599,7 @@ function startGame(multiplayer, name){
     }, 8000);
     log(tr('log.welcome', {name: player.name}));
     if (restored) log(tr('log.progress_restored'));
-    log('Use WASD para mover, ESPAÇO para atacar.');
+    log(tr('log.controls_hint'));
     started = true;
     // Tutorial só na primeira vez por usuário (flag em localStorage).
     // No mobile (body.touch) abre versão específica que explica controles touch,
@@ -15167,8 +15650,8 @@ function showLoadingOverlay(show, title, desc, hint){
     const t = document.getElementById('loadingTitle');
     const d = document.getElementById('loadingDesc');
     const h = document.getElementById('loadingHint');
-    if (t) t.textContent = title || LOADING_DEFAULTS.title;
-    if (d) d.textContent = desc  || LOADING_DEFAULTS.desc;
+    if (t) t.textContent = title || tr('loading.title');
+    if (d) d.textContent = desc  || tr('loading.desc');
     if (h){
         const hintTxt = hint || LOADING_DEFAULTS.hint;
         h.textContent = hintTxt;
@@ -15237,7 +15720,7 @@ async function checkClientUpdate(){
         }
         _isUpdating = true;
         // Overlay unificado — fase 1: atualizando
-        showLoadingOverlay(true, 'ATUALIZANDO', 'Nova versão do jogo detectada…', 'Salvando progresso · combate pausado');
+        showLoadingOverlay(true, tr('reconnect.title'), tr('update.new_version'), tr('update.saving'));
         // Fecha WS imediato pra parar mobHit (servidor para de mandar dano)
         if (ws){ try { ws.close(); } catch{} ws = null; }
         // Cancela targets/auto-attack que poderiam roubar mais um tick
