@@ -1757,6 +1757,232 @@ function broadcast(except, msg, floor){
     }
 }
 
+// ── i18n (Fase 2, Opção B): o server traduz a serverMsg pro idioma do player ──
+// (p.lang, capturado no join). Fallback sempre PT, então cliente legado/sem lang
+// vê exatamente o que via antes (zero regressão). Per-player usa trp(p,...);
+// broadcast usa broadcastMsgKey() que traduz POR destinatário (cada um no seu idioma).
+const I18N_SRV = {
+  pt: {
+    'srv.guild_already': 'Você já está numa guild.',
+    'srv.guild_bad_name': 'Nome inválido. 3-16 chars, letras/números/_/-.',
+    'srv.guild_exists': 'Já existe guild com esse nome.',
+    'srv.guild_created': '✦ Guild "{name}" criada! Você é o líder.',
+    'srv.no_guild': 'Você não tem guild.',
+    'srv.leader_only_invite': 'Só o líder convida.',
+    'srv.guild_usage_invite': 'Uso: /guild invite NOME',
+    'srv.bad_name': 'Nome inválido.',
+    'srv.guild_full': 'Guild cheia (máx {max}).',
+    'srv.guild_invited': '👥 {name} convidou você pra guild "{guild}". Use /guild join',
+    'srv.invite_sent_60': 'Convite enviado pra {name} (60s).',
+    'srv.no_invites': 'Sem convites pendentes.',
+    'srv.guild_gone': 'Guild não existe mais.',
+    'srv.guild_joined': '✦ Você entrou na guild "{guild}"!',
+    'srv.guild_member_joined': '👥 {name} entrou na guild.',
+    'srv.guild_left': 'Você saiu da guild "{guild}".',
+    'srv.guild_member_left': '👥 {name} saiu da guild.',
+    'srv.guild_none_help': 'Sem guild. Use /guild create NOME ou /guild join (após convite).',
+    'srv.guild_none_yet': 'Nenhuma guild ainda.',
+    'srv.guild_list': 'Guilds: {list}',
+    'srv.guild_subcmds': 'Subcomandos: create NOME, invite NOME, join, leave, info, list',
+    'srv.season_end': '🏆 Temporada {id} encerrada! Campeão: {champion}',
+    'srv.season_end_nochamp': '🏆 Temporada {id} encerrada (sem campeão).',
+    'srv.admin_reset_pos': 'Admin resetou sua posição. Recarregando…',
+    'srv.account_removed': 'Sua conta foi removida pelo admin.',
+    'srv.duel_invite_expired': 'Convite de duelo a {name} expirou.',
+    'srv.duel_self': 'Não dá pra duelar consigo mesmo.',
+    'srv.duel_already': 'Você já está em duelo.',
+    'srv.duel_wager_high': 'Aposta acima do seu ouro ({g}g).',
+    'srv.not_online': '"{name}" não está online.',
+    'srv.target_dueling': '{name} já está em duelo.',
+    'srv.target_cant_cover': '{name} não tem {g}g pra cobrir.',
+    'srv.duel_invite_sent': '⚔ Convite enviado a {name} ({g}g).',
+    'srv.no_duel_invite': 'Nenhum convite de duelo pendente.',
+    'srv.challenger_left': 'O desafiante saiu.',
+    'srv.someone_dueling': 'Um dos jogadores já está em duelo.',
+    'srv.someone_no_gold': 'Um dos jogadores não tem ouro suficiente.',
+    'srv.duel_cancelled_gold': 'Duelo cancelado: gold insuficiente.',
+    'srv.duel_declined_by': '{name} recusou o duelo.',
+    'srv.duel_declined': 'Duelo recusado.',
+    'srv.party_usage_invite': 'Uso: /party invite NOME',
+    'srv.party_self': 'Não dá pra convidar a si mesmo.',
+    'srv.target_in_party': '{name} já está em outra party.',
+    'srv.party_full': 'Party cheia (max {max}).',
+    'srv.party_invited': '👥 {name} te convidou pra party. Use /party accept',
+    'srv.no_party_invite': 'Sem convites de party pendentes.',
+    'srv.party_gone': 'A party não existe mais.',
+    'srv.party_already': 'Você já está numa party. /party leave primeiro.',
+    'srv.party_member_joined': '✦ {name} entrou na party!',
+    'srv.no_party': 'Você não está em party.',
+    'srv.party_left': 'Você saiu da party.',
+    'srv.party_member_left': '👥 {name} saiu da party.',
+    'srv.no_party_short': 'Sem party.',
+    'srv.leader_only_kick': 'Só o líder dá kick.',
+    'srv.party_usage_kick': 'Uso: /party kick NOME',
+    'srv.party_use_leave': 'Use /party leave pra sair.',
+    'srv.not_in_party': '"{name}" não está na party.',
+    'srv.party_kicked': '👥 {name} removeu {target} da party.',
+    'srv.no_party_help': 'Sem party. /party invite NOME pra criar.',
+    'srv.party_info': 'Party ({n}/{max}): {members}',
+    'srv.party_subcmds': 'Subcomandos: invite NOME, accept, leave, kick NOME, info',
+    'srv.party_invite_expired': 'Convite de party expirou.',
+    'srv.party_member_dc': '👥 {name} desconectou da party.',
+    'srv.save_too_big': 'Save muito grande ({kb}KB) — não foi gravado.',
+    'srv.restore_not_allowed': 'Restauração não liberada. Peça ao admin: /allowrestore SEU_NOME',
+    'srv.restore_only_empty': 'Restauração só em conta zerada (a sua não está vazia).',
+    'srv.backup_invalid': 'Backup inválido/ausente.',
+    'srv.backup_too_big': 'Backup grande demais.',
+    'srv.backup_also_empty': 'O backup também está vazio — nada a restaurar.',
+    'srv.backup_saved': '✦ Backup gravado no servidor ({gold}g)! Saia e entre de novo (SAIR → entrar) pra carregar tudo.',
+    'srv.not_consumable': 'Item não consumível.',
+    'srv.near_merchant': 'Aproxime-se do Mercador.',
+    'srv.bad_offer': 'Oferta inválida.',
+    'srv.no_gold_g': 'Sem ouro ({g}g).',
+    'srv.bad_item': 'Item inválido.',
+    'srv.bad_recipe': 'Receita inválida.',
+    'srv.near_bench': 'Aproxime-se da bancada.',
+    'srv.no_material': 'Sem material: {k} ({q}×)',
+    'srv.bad_item_forge': 'Item inválido pra forja.',
+    'srv.max_level': 'Já no nível máximo (+{n}).',
+    'srv.need_3x_forge': 'Precisa de 3× pra forjar.',
+    'srv.not_equipable': 'Item não-equipável.',
+    'srv.bad_chest': 'Baú inválido.',
+    'srv.near_chest': 'Aproxime-se do baú.',
+    'srv.bad_chest_op': 'Operação de baú inválida.',
+    'srv.need_wand': 'Precisa de uma wand equipada.',
+    'srv.no_mana': 'Sem mana suficiente.',
+    'srv.no_mana_short': 'Sem mana.',
+    'srv.respec_cost': 'Respec custa {g}g — você não tem.',
+    'srv.bad_trade': 'Trade inválido.',
+    'srv.trade_pz_only': 'Trade só pode ser feito na Zona Segura (PZ central).',
+    'srv.trade_too_far': 'Aproxime-se mais (max 3 tiles).',
+    'srv.someone_trading': 'Um dos dois já está em trade.',
+    'srv.trade_declined_by': '{name} recusou o trade.',
+    'srv.chat_slow': 'Devagar com o chat.',
+    'srv.nothing_respec': 'Nada pra redistribuir.',
+    'srv.entered_world': '✦ {name} entrou em Valadares',
+    /*SRVPT*/
+  },
+  en: {
+    'srv.guild_already': 'You are already in a guild.',
+    'srv.guild_bad_name': 'Invalid name. 3-16 chars, letters/numbers/_/-.',
+    'srv.guild_exists': 'A guild with that name already exists.',
+    'srv.guild_created': '✦ Guild "{name}" created! You are the leader.',
+    'srv.no_guild': 'You have no guild.',
+    'srv.leader_only_invite': 'Only the leader can invite.',
+    'srv.guild_usage_invite': 'Usage: /guild invite NAME',
+    'srv.bad_name': 'Invalid name.',
+    'srv.guild_full': 'Guild full (max {max}).',
+    'srv.guild_invited': '👥 {name} invited you to the guild "{guild}". Use /guild join',
+    'srv.invite_sent_60': 'Invite sent to {name} (60s).',
+    'srv.no_invites': 'No pending invites.',
+    'srv.guild_gone': 'Guild no longer exists.',
+    'srv.guild_joined': '✦ You joined the guild "{guild}"!',
+    'srv.guild_member_joined': '👥 {name} joined the guild.',
+    'srv.guild_left': 'You left the guild "{guild}".',
+    'srv.guild_member_left': '👥 {name} left the guild.',
+    'srv.guild_none_help': 'No guild. Use /guild create NAME or /guild join (after an invite).',
+    'srv.guild_none_yet': 'No guilds yet.',
+    'srv.guild_list': 'Guilds: {list}',
+    'srv.guild_subcmds': 'Subcommands: create NAME, invite NAME, join, leave, info, list',
+    'srv.season_end': '🏆 Season {id} ended! Champion: {champion}',
+    'srv.season_end_nochamp': '🏆 Season {id} ended (no champion).',
+    'srv.admin_reset_pos': 'Admin reset your position. Reloading…',
+    'srv.account_removed': 'Your account was removed by the admin.',
+    'srv.duel_invite_expired': 'Duel invite to {name} expired.',
+    'srv.duel_self': 'You cannot duel yourself.',
+    'srv.duel_already': 'You are already in a duel.',
+    'srv.duel_wager_high': 'Wager above your gold ({g}g).',
+    'srv.not_online': '"{name}" is not online.',
+    'srv.target_dueling': '{name} is already in a duel.',
+    'srv.target_cant_cover': '{name} does not have {g}g to cover it.',
+    'srv.duel_invite_sent': '⚔ Invite sent to {name} ({g}g).',
+    'srv.no_duel_invite': 'No pending duel invite.',
+    'srv.challenger_left': 'The challenger left.',
+    'srv.someone_dueling': 'One of the players is already in a duel.',
+    'srv.someone_no_gold': 'One of the players does not have enough gold.',
+    'srv.duel_cancelled_gold': 'Duel cancelled: not enough gold.',
+    'srv.duel_declined_by': '{name} declined the duel.',
+    'srv.duel_declined': 'Duel declined.',
+    'srv.party_usage_invite': 'Usage: /party invite NAME',
+    'srv.party_self': 'You cannot invite yourself.',
+    'srv.target_in_party': '{name} is already in another party.',
+    'srv.party_full': 'Party full (max {max}).',
+    'srv.party_invited': '👥 {name} invited you to a party. Use /party accept',
+    'srv.no_party_invite': 'No pending party invite.',
+    'srv.party_gone': 'The party no longer exists.',
+    'srv.party_already': 'You are already in a party. /party leave first.',
+    'srv.party_member_joined': '✦ {name} joined the party!',
+    'srv.no_party': 'You are not in a party.',
+    'srv.party_left': 'You left the party.',
+    'srv.party_member_left': '👥 {name} left the party.',
+    'srv.no_party_short': 'No party.',
+    'srv.leader_only_kick': 'Only the leader can kick.',
+    'srv.party_usage_kick': 'Usage: /party kick NAME',
+    'srv.party_use_leave': 'Use /party leave to exit.',
+    'srv.not_in_party': '"{name}" is not in the party.',
+    'srv.party_kicked': '👥 {name} removed {target} from the party.',
+    'srv.no_party_help': 'No party. /party invite NAME to create one.',
+    'srv.party_info': 'Party ({n}/{max}): {members}',
+    'srv.party_subcmds': 'Subcommands: invite NAME, accept, leave, kick NAME, info',
+    'srv.party_invite_expired': 'Party invite expired.',
+    'srv.party_member_dc': '👥 {name} disconnected from the party.',
+    'srv.save_too_big': 'Save too large ({kb}KB) — it was not saved.',
+    'srv.restore_not_allowed': 'Restore not allowed. Ask the admin: /allowrestore YOUR_NAME',
+    'srv.restore_only_empty': 'Restore only on an empty account (yours is not empty).',
+    'srv.backup_invalid': 'Backup invalid/missing.',
+    'srv.backup_too_big': 'Backup too large.',
+    'srv.backup_also_empty': 'The backup is also empty — nothing to restore.',
+    'srv.backup_saved': '✦ Backup saved on the server ({gold}g)! Log out and back in (EXIT → enter) to load everything.',
+    'srv.not_consumable': 'Item not consumable.',
+    'srv.near_merchant': 'Get closer to the Merchant.',
+    'srv.bad_offer': 'Invalid offer.',
+    'srv.no_gold_g': 'Not enough gold ({g}g).',
+    'srv.bad_item': 'Invalid item.',
+    'srv.bad_recipe': 'Invalid recipe.',
+    'srv.near_bench': 'Get closer to the bench.',
+    'srv.no_material': 'Missing material: {k} ({q}×)',
+    'srv.bad_item_forge': 'Invalid item for forging.',
+    'srv.max_level': 'Already at max level (+{n}).',
+    'srv.need_3x_forge': 'Need 3× to forge.',
+    'srv.not_equipable': 'Item not equippable.',
+    'srv.bad_chest': 'Invalid chest.',
+    'srv.near_chest': 'Get closer to the chest.',
+    'srv.bad_chest_op': 'Invalid chest operation.',
+    'srv.need_wand': 'You need a wand equipped.',
+    'srv.no_mana': 'Not enough mana.',
+    'srv.no_mana_short': 'No mana.',
+    'srv.respec_cost': 'Respec costs {g}g — you cannot afford it.',
+    'srv.bad_trade': 'Invalid trade.',
+    'srv.trade_pz_only': 'Trade can only be done in the Safe Zone (central PZ).',
+    'srv.trade_too_far': 'Get closer (max 3 tiles).',
+    'srv.someone_trading': 'One of you is already trading.',
+    'srv.trade_declined_by': '{name} declined the trade.',
+    'srv.chat_slow': 'Slow down with the chat.',
+    'srv.nothing_respec': 'Nothing to redistribute.',
+    'srv.entered_world': '✦ {name} entered Valadares',
+    /*SRVEN*/
+  }
+};
+function trp(p, key, params){
+  const lang = (p && p.lang === 'en') ? 'en' : 'pt';
+  let s = (I18N_SRV[lang] && I18N_SRV[lang][key]);
+  if (s == null) s = (I18N_SRV.pt && I18N_SRV.pt[key]);
+  if (s == null) s = key;
+  if (params) for (const k in params) s = s.split('{'+k+'}').join(params[k]);
+  return s;
+}
+// Broadcast traduzido por destinatário — cada player recebe no seu próprio idioma.
+function broadcastMsgKey(level, key, params, fromName, except){
+  for (const p of players.values()){
+    if (except !== undefined && p.id === except) continue;
+    if (!p.ws || p.ws.readyState !== 1) continue;
+    const out = { t:'serverMsg', level, text: String(trp(p, key, params)).substring(0, 280) };
+    if (fromName) out.from = fromName;
+    p.ws.send(JSON.stringify(out));
+  }
+  console.log(`[msg ${level}]${fromName?' '+fromName+':':''} ${key}`);
+}
+
 // Mensagens do servidor pra todos — levels: 'info' | 'warn' | 'event' | 'admin'
 function broadcastMsg(level, text, fromName){
     const out = { t:'serverMsg', level, text: String(text).substring(0, 280) };
@@ -2455,24 +2681,24 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
     const arg = parts.slice(2).join(' ').trim();
     const myGuild = findGuildOfPlayer(p.name);
     if (sub === 'create'){
-        if (myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você já está numa guild.' }); return; }
+        if (myGuild){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_already') }); return; }
         const name = arg.substring(0, 16);
         if (!/^[A-Za-z0-9_-]{3,16}$/.test(name)){
-            sendToFn({ t:'serverMsg', level:'warn', text:'Nome inválido. 3-16 chars, letras/números/_/-.' });
+            sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_bad_name') });
             return;
         }
-        if (guilds.has(name)){ sendToFn({ t:'serverMsg', level:'warn', text:'Já existe guild com esse nome.' }); return; }
+        if (guilds.has(name)){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_exists') }); return; }
         guilds.set(name, { name, leader: p.name, members: [p.name], createdAt: Date.now() });
-        sendToFn({ t:'serverMsg', level:'event', text:`✦ Guild "${name}" criada! Você é o líder.` });
+        sendToFn({ t:'serverMsg', level:'event', text: trp(p, 'srv.guild_created', {name}) });
         broadcastFn(null, { t:'guildUpdate', name, members:[p.name], leader: p.name });
         return;
     }
     if (sub === 'invite'){
-        if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
-        if (myGuild.leader !== p.name){ sendToFn({ t:'serverMsg', level:'warn', text:'Só o líder convida.' }); return; }
-        if (!arg){ sendToFn({ t:'serverMsg', level:'warn', text:'Uso: /guild invite NOME' }); return; }
-        if (!validAccountName(arg)){ sendToFn({ t:'serverMsg', level:'warn', text:'Nome inválido.' }); return; }
-        if (myGuild.members.length >= GUILD_MAX_MEMBERS){ sendToFn({ t:'serverMsg', level:'warn', text:`Guild cheia (máx ${GUILD_MAX_MEMBERS}).` }); return; }
+        if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.no_guild') }); return; }
+        if (myGuild.leader !== p.name){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.leader_only_invite') }); return; }
+        if (!arg){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_usage_invite') }); return; }
+        if (!validAccountName(arg)){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_name') }); return; }
+        if (myGuild.members.length >= GUILD_MAX_MEMBERS){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_full', {max: GUILD_MAX_MEMBERS}) }); return; }
         // Evict convites expirados antes de inserir (chave crua antes crescia o Map sem limite)
         const _tnow = Date.now();
         for (const [k, v] of guildInvites) if (v.expiresAt < _tnow) guildInvites.delete(k);
@@ -2480,38 +2706,38 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
         // Avisa o alvo se online
         for (const pp of players.values()){
             if (!pp.disconnected && pp.name.toLowerCase() === arg.toLowerCase() && pp.ws.readyState === 1){
-                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'event', text:`👥 ${p.name} convidou você pra guild "${myGuild.name}". Use /guild join` }));
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'event', text: trp(pp, 'srv.guild_invited', {name: p.name, guild: myGuild.name}) }));
                 break;
             }
         }
-        sendToFn({ t:'serverMsg', level:'info', text:`Convite enviado pra ${arg} (60s).` });
+        sendToFn({ t:'serverMsg', level:'info', text: trp(p, 'srv.invite_sent_60', {name: arg}) });
         return;
     }
     if (sub === 'join'){
-        if (myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você já está numa guild.' }); return; }
+        if (myGuild){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_already') }); return; }
         const inv = guildInvites.get(p.name);
         if (!inv || inv.expiresAt < Date.now()){
-            sendToFn({ t:'serverMsg', level:'warn', text:'Sem convites pendentes.' });
+            sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.no_invites') });
             return;
         }
         const g = guilds.get(inv.guildName);
-        if (!g){ sendToFn({ t:'serverMsg', level:'warn', text:'Guild não existe mais.' }); guildInvites.delete(p.name); return; }
+        if (!g){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_gone') }); guildInvites.delete(p.name); return; }
         if (g.members.includes(p.name)){ guildInvites.delete(p.name); return; }   // dedup: já é membro
-        if (g.members.length >= GUILD_MAX_MEMBERS){ sendToFn({ t:'serverMsg', level:'warn', text:`Guild cheia (máx ${GUILD_MAX_MEMBERS}).` }); return; }
+        if (g.members.length >= GUILD_MAX_MEMBERS){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_full', {max: GUILD_MAX_MEMBERS}) }); return; }
         g.members.push(p.name);
         guildInvites.delete(p.name);
-        sendToFn({ t:'serverMsg', level:'event', text:`✦ Você entrou na guild "${g.name}"!` });
+        sendToFn({ t:'serverMsg', level:'event', text: trp(p, 'srv.guild_joined', {guild: g.name}) });
         // Notifica membros online
         for (const pp of players.values()){
             if (pp.ws.readyState === 1 && g.members.includes(pp.name) && pp.name !== p.name){
-                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} entrou na guild.` }));
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.guild_member_joined', {name: p.name}) }));
             }
         }
         broadcastFn(null, { t:'guildUpdate', name: g.name, members: g.members, leader: g.leader });
         return;
     }
     if (sub === 'leave'){
-        if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
+        if (!myGuild){ sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.no_guild') }); return; }
         myGuild.members = myGuild.members.filter(n => n !== p.name);
         // Se era líder e ainda tem membros: passa pra próximo
         if (myGuild.leader === p.name){
@@ -2522,11 +2748,11 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
                 myGuild.leader = myGuild.members[0];
             }
         }
-        sendToFn({ t:'serverMsg', level:'info', text:`Você saiu da guild "${myGuild.name}".` });
+        sendToFn({ t:'serverMsg', level:'info', text: trp(p, 'srv.guild_left', {guild: myGuild.name}) });
         // Avisa restantes online
         for (const pp of players.values()){
             if (pp.ws.readyState === 1 && myGuild.members.includes(pp.name)){
-                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} saiu da guild.` }));
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.guild_member_left', {name: p.name}) }));
             }
         }
         if (guilds.has(myGuild.name)){
@@ -2535,7 +2761,7 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
         return;
     }
     if (sub === 'info' || sub === ''){
-        if (!myGuild){ sendToFn({ t:'serverMsg', level:'info', text:'Sem guild. Use /guild create NOME ou /guild join (após convite).' }); return; }
+        if (!myGuild){ sendToFn({ t:'serverMsg', level:'info', text: trp(p, 'srv.guild_none_help') }); return; }
         // Calcula online status por membro
         const onlineNames = new Set();
         for (const pp of players.values()){
@@ -2550,12 +2776,12 @@ function handleGuildCommand(p, text, sendToFn, broadcastFn){
         return;
     }
     if (sub === 'list'){
-        if (!guilds.size){ sendToFn({ t:'serverMsg', level:'info', text:'Nenhuma guild ainda.' }); return; }
+        if (!guilds.size){ sendToFn({ t:'serverMsg', level:'info', text: trp(p, 'srv.guild_none_yet') }); return; }
         const lines = Array.from(guilds.values()).map(g => `${g.name} (${g.members.length})`);
-        sendToFn({ t:'serverMsg', level:'info', text:'Guilds: ' + lines.join(', ') });
+        sendToFn({ t:'serverMsg', level:'info', text: trp(p, 'srv.guild_list', {list: lines.join(', ')}) });
         return;
     }
-    sendToFn({ t:'serverMsg', level:'warn', text:'Subcomandos: create NOME, invite NOME, join, leave, info, list' });
+    sendToFn({ t:'serverMsg', level:'warn', text: trp(p, 'srv.guild_subcmds') });
 }
 
 // ─── Trade ativo entre 2 players ───────────────────────────────────────────
@@ -2800,9 +3026,9 @@ function checkSeasonRollover(){
                 }
             } catch(e){ console.warn('[season] erro ao creditar offline:', e.message); }
         }
-        broadcast(null, { t:'serverMsg', level:'event', text:`🏆 Temporada ${closedId} encerrada! Campeão: ${champion}` });
+        broadcastMsgKey('event', 'srv.season_end', {id: closedId, champion});
     } else {
-        broadcast(null, { t:'serverMsg', level:'info', text:`🏆 Temporada ${closedId} encerrada (sem campeão).` });
+        broadcastMsgKey('info', 'srv.season_end_nochamp', {id: closedId});
     }
     // Reset
     seasonState.id = newId;
@@ -3374,7 +3600,7 @@ function adminResetUser(rawName){
             pp.mp = mxM; pp.maxMp = mxM;
             online = true;
             if (pp.ws.readyState === 1){
-                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:'Admin resetou sua posição. Recarregando…' }));
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.admin_reset_pos') }));
                 broadcastPstatsAll(pp);
                 // Força o client teleportar (server manda pstats + cliente recarrega)
                 pp.ws.send(JSON.stringify({ t:'forceTeleport', x:50, y:50 }));
@@ -3401,7 +3627,7 @@ function deleteUserAccount(rawName){
         if (pp.name && pp.name.toLowerCase() === nameLower){
             try {
                 if (pp.ws && pp.ws.readyState === 1){
-                    pp.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:'Sua conta foi removida pelo admin.' }));
+                    pp.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text: trp(pp, 'srv.account_removed') }));
                     pp.ws.close(4001, 'account_deleted');
                 }
             } catch {}
@@ -4713,7 +4939,7 @@ function tickDuels(){
         if (inv.expiresAt <= now){
             duelInvites.delete(toId);
             const from = players.get(inv.fromId);
-            if (from) sendTo(from.id, { t:'serverMsg', level:'warn', text:`Convite de duelo a ${inv.toName || '?'} expirou.` });
+            if (from) sendTo(from.id, { t:'serverMsg', level:'warn', text: trp(from, 'srv.duel_invite_expired', {name: inv.toName || '?'}) });
         }
     }
     // Empata duels que duraram demais
@@ -5005,15 +5231,15 @@ function handlePartyCommand(p, text){
     const myParty = findPartyOfPlayer(p.name);
     const id = p.id;
     if (sub === 'invite'){
-        if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /party invite NOME' }); return; }
-        if (arg.toLowerCase() === p.name.toLowerCase()){ sendTo(id, { t:'serverMsg', level:'warn', text:'Não dá pra convidar a si mesmo.' }); return; }
+        if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_usage_invite') }); return; }
+        if (arg.toLowerCase() === p.name.toLowerCase()){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_self') }); return; }
         let target = null;
         for (const pp of players.values()){
             if (!pp.disconnected && pp.name.toLowerCase() === arg.toLowerCase()){ target = pp; break; }
         }
-        if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`"${arg}" não está online.` }); return; }
+        if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_online', {name: arg}) }); return; }
         const targetParty = findPartyOfPlayer(target.name);
-        if (targetParty){ sendTo(id, { t:'serverMsg', level:'warn', text:`${target.name} já está em outra party.` }); return; }
+        if (targetParty){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.target_in_party', {name: target.name}) }); return; }
         let party = myParty;
         if (!party){
             // Cria party com o convidante como líder
@@ -5021,65 +5247,65 @@ function handlePartyCommand(p, text){
             parties.set(party.id, party);
             broadcastPartyUpdate(party);
         } else if (party.leader !== p.name){
-            sendTo(id, { t:'serverMsg', level:'warn', text:'Só o líder convida.' });
+            sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.leader_only_invite') });
             return;
         }
         if (party.members.length >= PARTY_MAX){
-            sendTo(id, { t:'serverMsg', level:'warn', text:`Party cheia (max ${PARTY_MAX}).` });
+            sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_full', {max: PARTY_MAX}) });
             return;
         }
         partyInvites.set(target.name.toLowerCase(), { partyId: party.id, fromId: id, fromName: p.name, expiresAt: Date.now() + PARTY_INVITE_TIMEOUT_MS });
-        sendTo(target.id, { t:'serverMsg', level:'event', text:`👥 ${p.name} te convidou pra party. Use /party accept` });
+        sendTo(target.id, { t:'serverMsg', level:'event', text: trp(target, 'srv.party_invited', {name: p.name}) });
         sendTo(target.id, { t:'partyInvite', fromName: p.name, expiresIn: PARTY_INVITE_TIMEOUT_MS });
-        sendTo(id, { t:'serverMsg', level:'info', text:`Convite enviado pra ${target.name} (60s).` });
+        sendTo(id, { t:'serverMsg', level:'info', text: trp(p, 'srv.invite_sent_60', {name: target.name}) });
         return;
     }
     if (sub === 'accept'){
         const inv = partyInvites.get(p.name.toLowerCase());
         if (!inv || inv.expiresAt < Date.now()){
             partyInvites.delete(p.name.toLowerCase());
-            sendTo(id, { t:'serverMsg', level:'warn', text:'Sem convites de party pendentes.' });
+            sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_party_invite') });
             return;
         }
         const party = parties.get(inv.partyId);
-        if (!party){ partyInvites.delete(p.name.toLowerCase()); sendTo(id, { t:'serverMsg', level:'warn', text:'A party não existe mais.' }); return; }
-        if (myParty){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você já está numa party. /party leave primeiro.' }); return; }
-        if (party.members.length >= PARTY_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text:`Party cheia (max ${PARTY_MAX}).` }); return; }
+        if (!party){ partyInvites.delete(p.name.toLowerCase()); sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_gone') }); return; }
+        if (myParty){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_already') }); return; }
+        if (party.members.length >= PARTY_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_full', {max: PARTY_MAX}) }); return; }
         party.members.push(p.name);
         partyInvites.delete(p.name.toLowerCase());
         // Notifica todos os membros
         for (const pp of partyMembersOnline(party)){
             if (pp.ws.readyState === 1){
-                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'event', text:`✦ ${p.name} entrou na party!` }));
+                pp.ws.send(JSON.stringify({ t:'serverMsg', level:'event', text: trp(pp, 'srv.party_member_joined', {name: p.name}) }));
             }
         }
         broadcastPartyUpdate(party);
         return;
     }
     if (sub === 'leave'){
-        if (!myParty){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você não está em party.' }); return; }
+        if (!myParty){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_party') }); return; }
         const wasLeader = myParty.leader === p.name;
         myParty.members = myParty.members.filter(n => n !== p.name);
         sendTo(id, { t:'partyUpdate', deleted: true });
-        sendTo(id, { t:'serverMsg', level:'info', text:'Você saiu da party.' });
+        sendTo(id, { t:'serverMsg', level:'info', text: trp(p, 'srv.party_left') });
         if (myParty.members.length === 0){
             parties.delete(myParty.id);
             return;
         }
         if (wasLeader) myParty.leader = myParty.members[0];
         for (const pp of partyMembersOnline(myParty)){
-            if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} saiu da party.` }));
+            if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.party_member_left', {name: p.name}) }));
         }
         broadcastPartyUpdate(myParty);
         return;
     }
     if (sub === 'kick'){
-        if (!myParty){ sendTo(id, { t:'serverMsg', level:'warn', text:'Sem party.' }); return; }
-        if (myParty.leader !== p.name){ sendTo(id, { t:'serverMsg', level:'warn', text:'Só o líder dá kick.' }); return; }
-        if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /party kick NOME' }); return; }
-        if (arg.toLowerCase() === p.name.toLowerCase()){ sendTo(id, { t:'serverMsg', level:'warn', text:'Use /party leave pra sair.' }); return; }
+        if (!myParty){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_party_short') }); return; }
+        if (myParty.leader !== p.name){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.leader_only_kick') }); return; }
+        if (!arg){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_usage_kick') }); return; }
+        if (arg.toLowerCase() === p.name.toLowerCase()){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_use_leave') }); return; }
         if (!myParty.members.find(n => n.toLowerCase() === arg.toLowerCase())){
-            sendTo(id, { t:'serverMsg', level:'warn', text:`"${arg}" não está na party.` });
+            sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_in_party', {name: arg}) });
             return;
         }
         myParty.members = myParty.members.filter(n => n.toLowerCase() !== arg.toLowerCase());
@@ -5088,19 +5314,19 @@ function handlePartyCommand(p, text){
             parties.delete(myParty.id);
         } else {
             for (const pp of partyMembersOnline(myParty)){
-                if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} removeu ${arg} da party.` }));
+                if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.party_kicked', {name: p.name, target: arg}) }));
             }
             broadcastPartyUpdate(myParty);
         }
         return;
     }
     if (sub === 'info' || sub === ''){
-        if (!myParty){ sendTo(id, { t:'serverMsg', level:'info', text:'Sem party. /party invite NOME pra criar.' }); return; }
+        if (!myParty){ sendTo(id, { t:'serverMsg', level:'info', text: trp(p, 'srv.no_party_help') }); return; }
         const memberLine = myParty.members.map(n => n === myParty.leader ? `👑 ${n}` : n).join(', ');
-        sendTo(id, { t:'serverMsg', level:'info', text:`Party (${myParty.members.length}/${PARTY_MAX}): ${memberLine}` });
+        sendTo(id, { t:'serverMsg', level:'info', text: trp(p, 'srv.party_info', {n: myParty.members.length, max: PARTY_MAX, members: memberLine}) });
         return;
     }
-    sendTo(id, { t:'serverMsg', level:'warn', text:'Subcomandos: invite NOME, accept, leave, kick NOME, info' });
+    sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.party_subcmds') });
 }
 
 function sharePartyKill(killer, mob){
@@ -5127,7 +5353,7 @@ function tickPartyInvites(){
             partyInvites.delete(key);
             const from = players.get(inv.fromId);
             if (from && from.ws.readyState === 1){
-                from.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:`Convite de party expirou.` }));
+                from.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text: trp(from, 'srv.party_invite_expired') }));
             }
         }
     }
@@ -5483,7 +5709,7 @@ wss.on('connection', (ws, request) => {
             try {
                 const sz = JSON.stringify(data).length;
                 if (sz > SAVE_MAX_BYTES){
-                    sendTo(id, { t:'serverMsg', level:'warn', text:`Save muito grande (${(sz/1024).toFixed(1)}KB) — não foi gravado.` });
+                    sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.save_too_big', {kb: (sz/1024).toFixed(1)}) });
                     return;
                 }
             } catch { return; }
@@ -5596,26 +5822,26 @@ wss.on('connection', (ws, request) => {
             if (!p.authed || !p.authedName) return;
             const acc = getAccount(p.authedName);
             if (!acc || !(acc._restoreUntil > Date.now())){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Restauração não liberada. Peça ao admin: /allowrestore SEU_NOME' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.restore_not_allowed') });
                 return;
             }
             // Só restaura SOBRE conta zerada — impede forjar por cima de save cheio.
             if (!isEmptyDefaultSaveServer(acc.save)){
                 acc._restoreUntil = 0;
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Restauração só em conta zerada (a sua não está vazia).' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.restore_only_empty') });
                 return;
             }
             const data = msg.data;
-            if (!data || typeof data !== 'object'){ sendTo(id, { t:'serverMsg', level:'warn', text:'Backup inválido/ausente.' }); return; }
-            try { if (JSON.stringify(data).length > SAVE_MAX_BYTES){ sendTo(id, { t:'serverMsg', level:'warn', text:'Backup grande demais.' }); return; } } catch { return; }
-            if (isEmptyDefaultSaveServer(data)){ sendTo(id, { t:'serverMsg', level:'warn', text:'O backup também está vazio — nada a restaurar.' }); return; }
+            if (!data || typeof data !== 'object'){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.backup_invalid') }); return; }
+            try { if (JSON.stringify(data).length > SAVE_MAX_BYTES){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.backup_too_big') }); return; } } catch { return; }
+            if (isEmptyDefaultSaveServer(data)){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.backup_also_empty') }); return; }
             sanitizeSave(data, p.authedName);   // clampa gold/skills
             acc.save = data;
             acc.savedAt = Date.now();
             acc._restoreUntil = 0;
             queueSaveAccounts();
             console.log(`[restore] ${p.authedName}: acc.save gravado do backup (gold=${data.gold || 0})`);
-            sendTo(id, { t:'serverMsg', level:'event', text:`✦ Backup gravado no servidor (${data.gold||0}g)! Saia e entre de novo (SAIR → entrar) pra carregar tudo.` });
+            sendTo(id, { t:'serverMsg', level:'event', text: trp(p, 'srv.backup_saved', {gold: data.gold||0}) });
             return;
         }
 
@@ -5624,6 +5850,7 @@ wss.on('connection', (ws, request) => {
             // Nunca confiar em msg.name: era o vetor de impersonate e de admin sem
             // senha (join com name='alcione'). (audit 2026-06-03)
             p.name = p.authedName;
+            p.lang = (msg.lang === 'en') ? 'en' : 'pt';   // i18n Opção B: idioma do player p/ serverMsg (fallback PT)
             // Posição AUTORITATIVA (audit 2026-06-03): ignora msg.x/msg.y (era teleporte p/
             // qualquer tile do overworld + fuga de PvP por reconexão). Default = spawn seguro;
             // o bloco do save abaixo sobrescreve pela ÚLTIMA posição PERSISTIDA no server,
@@ -5765,7 +5992,7 @@ wss.on('connection', (ws, request) => {
             }
             broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
             // Anuncia entrada (só pros outros)
-            broadcast(id, { t:'serverMsg', level:'info', text:`✦ ${p.name} entrou em Valadares` });
+            broadcastMsgKey('info', 'srv.entered_world', {name: p.name}, null, id);
             return;
         }
 
@@ -5860,7 +6087,7 @@ wss.on('connection', (ws, request) => {
             const key = typeof msg.key === 'string' ? msg.key.slice(0, 64) : null;
             const meta = key && ITEM_META[key];
             if (!meta || (meta.kind !== 'food' && meta.kind !== 'potion')){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Item não consumível.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_consumable') });
                 return;
             }
             if (!hasInv(p, key, 1)){
@@ -5904,12 +6131,12 @@ wss.on('connection', (ws, request) => {
             const op = msg.op;
             // Mercador em (47,47) — sync com NPCS.mercador em play.html.
             if (Math.max(Math.abs(p.x - 47), Math.abs(p.y - 47)) > 1){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se do Mercador.' }); return;
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.near_merchant') }); return;
             }
             if (op === 'buy'){
                 const offer = SHOP_BUY[msg.idx | 0];
-                if (!offer){ sendTo(id, { t:'serverMsg', level:'warn', text:'Oferta inválida.' }); return; }
-                if ((p.gold || 0) < offer.price){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem ouro (${offer.price}g).` }); return; }
+                if (!offer){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_offer') }); return; }
+                if ((p.gold || 0) < offer.price){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_gold_g', {g: offer.price}) }); return; }
                 p.gold -= offer.price;
                 incInv(p, offer.item, offer.qty || 1);
                 sendInvUpdate(p, { shop:{ op:'buy', item: offer.item, qty: offer.qty || 1, price: offer.price } });
@@ -5920,7 +6147,7 @@ wss.on('connection', (ws, request) => {
                 if (!itemKey) return;
                 // Permite vender items upgrade _PLUS_N — preço base do tier base
                 const tier = getUpgradeTier(itemKey);
-                if (!ITEM_META[tier.base]){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item inválido.' }); return; }
+                if (!ITEM_META[tier.base]){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item') }); return; }
                 const have = (p.inv && p.inv[itemKey]) || 0;
                 if (have <= 0) return;
                 let qty = 1;
@@ -5940,16 +6167,16 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'invCraft') {
             const idx = msg.idx | 0;
             const r = RECIPES[idx];
-            if (!r){ sendTo(id, { t:'serverMsg', level:'warn', text:'Receita inválida.' }); return; }
+            if (!r){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_recipe') }); return; }
             // Tem que estar perto da bancada (51,52) — chebyshev ≤ 1
             if (Math.max(Math.abs(p.x - 51), Math.abs(p.y - 52)) > 1){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se da bancada.' }); return;
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.near_bench') }); return;
             }
             for (const [k, q] of Object.entries(r.in)){
-                if (!hasInv(p, k, q)){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem material: ${k} (${q}×)` }); return; }
+                if (!hasInv(p, k, q)){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_material', {k, q}) }); return; }
             }
             const cost = itemGoldCost(r.out);
-            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem ouro (${cost}g).` }); return; }
+            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_gold_g', {g: cost}) }); return; }
             for (const [k, q] of Object.entries(r.in)) incInv(p, k, -q);
             p.gold -= cost;
             incInv(p, r.out, r.qtyOut || 1);
@@ -5963,13 +6190,13 @@ wss.on('connection', (ws, request) => {
             if (!itemKey) return;
             const tier = getUpgradeTier(itemKey);
             const baseMeta = ITEM_META[tier.base];
-            if (!baseMeta){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item inválido pra forja.' }); return; }
+            if (!baseMeta){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item_forge') }); return; }
             const targetPlus = tier.plus + 1;
-            if (targetPlus > UPGRADE_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text:'Já no nível máximo (+' + UPGRADE_MAX + ').' }); return; }
+            if (targetPlus > UPGRADE_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.max_level', {n: UPGRADE_MAX}) }); return; }
             const have = (p.inv && p.inv[itemKey]) || 0;
-            if (have < 3){ sendTo(id, { t:'serverMsg', level:'warn', text:'Precisa de 3× pra forjar.' }); return; }
+            if (have < 3){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.need_3x_forge') }); return; }
             const cost = forgeCostFor(tier.base, targetPlus);
-            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text:`Sem ouro (${cost}g).` }); return; }
+            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_gold_g', {g: cost}) }); return; }
             // Desconta 3× material + ouro ANTES do roll
             incInv(p, itemKey, -3);
             p.gold = (p.gold || 0) - cost;
@@ -5995,9 +6222,9 @@ wss.on('connection', (ws, request) => {
             // Item upgrade _PLUS_N usa o base pra slot lookup
             const tier = getUpgradeTier(itemKey);
             const def = ITEM_META[tier.base];
-            if (!def){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item inválido.' }); return; }
+            if (!def){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item') }); return; }
             const slot = SLOT_OF_KIND[def.kind];
-            if (!slot){ sendTo(id, { t:'serverMsg', level:'warn', text:'Item não-equipável.' }); return; }
+            if (!slot){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_equipable') }); return; }
             if (!hasInv(p, itemKey, 1)){
                 sendInvUpdate(p, { equipOp:{ ok:false, reason:'no_item' } });
                 return;
@@ -6081,13 +6308,13 @@ wss.on('connection', (ws, request) => {
             const cid = typeof msg.chestId === 'string' ? msg.chestId : null;
             const op  = typeof msg.op === 'string' ? msg.op : null;
             if (!cid || !CHEST_POS[cid]){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Baú inválido.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_chest') });
                 return;
             }
             // Adjacência ao baú (chebyshev ≤ 1)
             const pos = CHEST_POS[cid];
             if (Math.max(Math.abs(p.x - pos.x), Math.abs(p.y - pos.y)) > 1){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se do baú.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.near_chest') });
                 return;
             }
             if (!p.chests[cid]) p.chests[cid] = {};
@@ -6181,7 +6408,7 @@ wss.on('connection', (ws, request) => {
                 replyChests({ withdrawAll:{ moved, gold } });
                 return;
             }
-            sendTo(id, { t:'serverMsg', level:'warn', text:'Operação de baú inválida.' });
+            sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_chest_op') });
             return;
         }
 
@@ -6609,7 +6836,7 @@ wss.on('connection', (ws, request) => {
             if (!sp) return;
             // Fase Magos: magia de ATAQUE exige wand equipada (o cliente também gateia p/ UX).
             if (sp.range && sp.damage && wandBaseServer(p) === 0){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Precisa de uma wand equipada.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.need_wand') });
                 return;
             }
             const now = Date.now();
@@ -6618,7 +6845,7 @@ wss.on('connection', (ws, request) => {
             p._lastSpellAt = now;
             // Mana check + aplicar custo
             if ((p.mp ?? 0) < sp.manaCost){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Sem mana suficiente.' });   // antes: spellResult ok:false (silencioso)
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_mana') });   // antes: spellResult ok:false (silencioso)
                 return;
             }
             p.mp = Math.max(0, (p.mp ?? 0) - sp.manaCost);
@@ -6715,9 +6942,9 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'talentRespec') {
             p.talents = p.talents || {};
             const owned = Object.keys(p.talents).filter(t => TALENT_DEFS[t] && Math.floor(Number(p.talents[t]) || 0) > 0);
-            if (!owned.length){ sendTo(id, { t:'serverMsg', level:'warn', text:'Nada pra redistribuir.' }); return; }
+            if (!owned.length){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.nothing_respec') }); return; }
             const COST = 5000;
-            if ((p.gold || 0) < COST){ sendTo(id, { t:'serverMsg', level:'warn', text:`Respec custa ${COST}g — você não tem.` }); return; }
+            if ((p.gold || 0) < COST){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.respec_cost', {g: COST}) }); return; }
             // RECALCULA o permaBuffs do ZERO (NÃO subtrai — a subtração deixava resíduo quando o
             // permaBuffs vinha INFLADO pelo bug do rank-colapso). Zera os talentos e reconstrói o
             // permaBuffs SÓ com as auras de QUEST (não-talento), re-derivadas das fontes:
@@ -7138,7 +7365,7 @@ wss.on('connection', (ws, request) => {
                 // sem janela de magia + arma é wand → desconta. Magias pagam no spellCast.
                 if (wandBaseServer(p) > 0){
                     if ((p.mp || 0) < WAND_MANA_COST){
-                        sendTo(id, { t:'serverMsg', level:'warn', text:'Sem mana.' });
+                        sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_mana_short') });
                         return;
                     }
                     p.mp -= WAND_MANA_COST;
@@ -7358,45 +7585,45 @@ wss.on('connection', (ws, request) => {
             const amount = Math.max(50, Math.min(1_000_000, msg.amount | 0));
             if (!toName) return;
             if (toName.toLowerCase() === p.name.toLowerCase()){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Não dá pra duelar consigo mesmo.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.duel_self') });
                 return;
             }
-            if (p.duel){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você já está em duelo.' }); return; }
-            if ((p.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text:`Aposta acima do seu ouro (${p.gold || 0}g).` }); return; }
+            if (p.duel){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.duel_already') }); return; }
+            if ((p.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.duel_wager_high', {g: p.gold || 0}) }); return; }
             let target = null;
             for (const pp of players.values()){
                 if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
             }
-            if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`"${toName}" não está online.` }); return; }
-            if (target.duel){ sendTo(id, { t:'serverMsg', level:'warn', text:`${target.name} já está em duelo.` }); return; }
-            if ((target.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text:`${target.name} não tem ${amount}g pra cobrir.` }); return; }
+            if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_online', {name: toName}) }); return; }
+            if (target.duel){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.target_dueling', {name: target.name}) }); return; }
+            if ((target.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.target_cant_cover', {name: target.name, g: amount}) }); return; }
             duelInvites.set(target.id, { fromId: id, fromName: p.name, amount, expiresAt: Date.now() + 30_000 });
             sendTo(target.id, { t:'duelInvite', fromId: id, fromName: p.name, amount });
-            sendTo(id, { t:'serverMsg', level:'info', text:`⚔ Convite enviado a ${target.name} (${amount}g).` });
+            sendTo(id, { t:'serverMsg', level:'info', text: trp(p, 'srv.duel_invite_sent', {name: target.name, g: amount}) });
             return;
         }
         if (msg.t === 'duelAccept') {
             const inv = duelInvites.get(id);
             if (!inv || inv.expiresAt < Date.now()){
                 duelInvites.delete(id);
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Nenhum convite de duelo pendente.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_duel_invite') });
                 return;
             }
             const from = players.get(inv.fromId);
             if (!from || from.disconnected){
                 duelInvites.delete(id);
-                sendTo(id, { t:'serverMsg', level:'warn', text:'O desafiante saiu.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.challenger_left') });
                 return;
             }
             if (from.duel || p.duel){
                 duelInvites.delete(id);
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Um dos jogadores já está em duelo.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.someone_dueling') });
                 return;
             }
             if ((from.gold || 0) < inv.amount || (p.gold || 0) < inv.amount){
                 duelInvites.delete(id);
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Um dos jogadores não tem ouro suficiente.' });
-                sendTo(from.id, { t:'serverMsg', level:'warn', text:'Duelo cancelado: gold insuficiente.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.someone_no_gold') });
+                sendTo(from.id, { t:'serverMsg', level:'warn', text: trp(from, 'srv.duel_cancelled_gold') });
                 return;
             }
             duelInvites.delete(id);
@@ -7409,9 +7636,9 @@ wss.on('connection', (ws, request) => {
             duelInvites.delete(id);
             const from = players.get(inv.fromId);
             if (from && from.ws.readyState === 1){
-                sendTo(from.id, { t:'serverMsg', level:'warn', text:`${p.name} recusou o duelo.` });
+                sendTo(from.id, { t:'serverMsg', level:'warn', text: trp(from, 'srv.duel_declined_by', {name: p.name}) });
             }
-            sendTo(id, { t:'serverMsg', level:'info', text:'Duelo recusado.' });
+            sendTo(id, { t:'serverMsg', level:'info', text: trp(p, 'srv.duel_declined') });
             return;
         }
 
@@ -7503,26 +7730,26 @@ wss.on('connection', (ws, request) => {
             p._lastTradeReqAt = now;
             const toName = String(msg.toName || '').trim().substring(0, 14);
             if (!toName || toName.toLowerCase() === p.name.toLowerCase()){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Trade inválido.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_trade') });
                 return;
             }
             let target = null;
             for (const pp of players.values()){
                 if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
             }
-            if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text:`${toName} não está online.` }); return; }
+            if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_online', {name: toName}) }); return; }
             // Trade só na PZ central (zona segura) — anti-griefing. Na masmorra
             // (floor ≥ 1) não há PZ, então trade não rola lá.
             if (!playerInSafe(p) || !playerInSafe(target)){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Trade só pode ser feito na Zona Segura (PZ central).' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.trade_pz_only') });
                 return;
             }
             if (chebyshev(p.x, p.y, target.x, target.y) > 3){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Aproxime-se mais (max 3 tiles).' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.trade_too_far') });
                 return;
             }
             if (p.tradeId || target.tradeId){
-                sendTo(id, { t:'serverMsg', level:'warn', text:'Um dos dois já está em trade.' });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.someone_trading') });
                 return;
             }
             // Manda oferta pro target. Responde com tradeAccept/tradeReject.
@@ -7554,7 +7781,7 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'tradeReject') {
             const initiator = players.get(msg.fromId);
             if (initiator && initiator.ws.readyState === 1){
-                initiator.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text:`${p.name} recusou o trade.` }));
+                initiator.ws.send(JSON.stringify({ t:'serverMsg', level:'warn', text: trp(initiator, 'srv.trade_declined_by', {name: p.name}) }));
             }
             return;
         }
@@ -7647,7 +7874,7 @@ wss.on('connection', (ws, request) => {
                 p.lastChatAt = p.lastChatAt || 0;
                 if (now - p.lastChatAt < 500){
                     if (now - (p.lastChatRateWarn || 0) > 2000){
-                        sendTo(id, { t:'serverMsg', level:'warn', text:'Devagar com o chat.' });
+                        sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.chat_slow') });
                         p.lastChatRateWarn = now;
                     }
                     return;
@@ -7660,7 +7887,7 @@ wss.on('connection', (ws, request) => {
                 if (!pp.disconnected && pp.name.toLowerCase() === toName.toLowerCase()){ target = pp; break; }
             }
             if (!target){
-                sendTo(id, { t:'serverMsg', level:'warn', text:`"${toName}" não está online.` });
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_online', {name: toName}) });
                 return;
             }
             if (target.ws.readyState === 1){
@@ -7679,7 +7906,7 @@ wss.on('connection', (ws, request) => {
                 if (now - p.lastChatAt < 500){
                     // Avisa só na primeira recusa dentro de uma janela de 2s pra não floodar de volta
                     if (now - (p.lastChatRateWarn || 0) > 2000){
-                        sendTo(id, { t:'serverMsg', level:'warn', text:'Devagar com o chat.' });
+                        sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.chat_slow') });
                         p.lastChatRateWarn = now;
                     }
                     return;
@@ -7701,7 +7928,7 @@ wss.on('connection', (ws, request) => {
                 const body = text.substring(3).trim();
                 if (!body) return;
                 const myGuild = findGuildOfPlayer(p.name);
-                if (!myGuild){ sendTo(id, { t:'serverMsg', level:'warn', text:'Você não tem guild.' }); return; }
+                if (!myGuild){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_guild') }); return; }
                 for (const pp of players.values()){
                     if (pp.ws.readyState !== 1) continue;
                     if (!myGuild.members.includes(pp.name)) continue;
@@ -8032,7 +8259,7 @@ wss.on('connection', (ws, request) => {
                 } else {
                     if (party.leader === p.name) party.leader = party.members[0];
                     for (const pp of partyMembersOnline(party)){
-                        if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text:`👥 ${p.name} desconectou da party.` }));
+                        if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.party_member_dc', {name: p.name}) }));
                     }
                     broadcastPartyUpdate(party);
                 }
