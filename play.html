@@ -1871,14 +1871,14 @@
     <!-- SIDEBAR ESQUERDA -->
     <div class="sidebar" id="leftSidebar">
         <div class="s-section minimap-section">
-            <div class="s-label">Mapa <span id="posMini" style="float:right;color:#888;font-weight:400">—</span></div>
+            <div class="s-label"><span data-i18n="hud.map">Mapa</span> <span id="posMini" style="float:right;color:#888;font-weight:400">—</span></div>
             <canvas id="minimap" width="140" height="140"></canvas>
             <div style="margin-top:4px;font-family:monospace;font-size:10px;color:#aaa;text-align:center" id="gameClock">—</div>
         </div>
 
         <div class="s-section">
-            <div class="s-label">Personagem <a href="#" onclick="event.preventDefault();logout()" style="float:right;font-size:9px;color:#5a4818;text-decoration:none;letter-spacing:1px">sair ⏏</a></div>
-            <div class="s-value" id="charName">Aventureiro</div>
+            <div class="s-label"><span data-i18n="hud.character">Personagem</span> <a href="#" onclick="event.preventDefault();logout()" style="float:right;font-size:9px;color:#5a4818;text-decoration:none;letter-spacing:1px" data-i18n="hud.logout">sair ⏏</a></div>
+            <div class="s-value" id="charName" data-i18n="hud.adventurer">Aventureiro</div>
         </div>
 
         <div class="s-section">
@@ -1895,19 +1895,19 @@
         </div>
 
         <div class="s-section">
-            <div class="s-label">Magias</div>
+            <div class="s-label" data-i18n="hud.spells">Magias</div>
             <div id="spellList" style="font-size:11px"></div>
         </div>
 
         <div class="s-section">
-            <div class="s-label">Ataque <span style="float:right;color:#e0a040" id="atkVal">0</span></div>
-            <div class="s-label" style="margin-top:4px">Defesa <span style="float:right;color:#6fa8e8" id="defVal">0</span></div>
-            <div class="s-label" style="margin-top:4px">Crítico <span style="float:right;color:#ffaa20" id="critVal">1.5%</span></div>
-            <div class="s-label" style="margin-top:4px">Esquiva <span style="float:right;color:#aaffaa" id="dodgeVal">1.5%</span></div>
-            <div class="s-label" style="margin-top:4px">Velocidade <span style="float:right;color:#8acdef" id="spdVal">—</span></div>
-            <div class="s-label" style="margin-top:4px">Vel. ataque <span style="float:right;color:#a0c8ff" id="atkSpdVal">—</span></div>
+            <div class="s-label"><span data-i18n="hud.attack">Ataque</span> <span style="float:right;color:#e0a040" id="atkVal">0</span></div>
+            <div class="s-label" style="margin-top:4px"><span data-i18n="hud.defense">Defesa</span> <span style="float:right;color:#6fa8e8" id="defVal">0</span></div>
+            <div class="s-label" style="margin-top:4px"><span data-i18n="hud.crit">Crítico</span> <span style="float:right;color:#ffaa20" id="critVal">1.5%</span></div>
+            <div class="s-label" style="margin-top:4px"><span data-i18n="hud.dodge">Esquiva</span> <span style="float:right;color:#aaffaa" id="dodgeVal">1.5%</span></div>
+            <div class="s-label" style="margin-top:4px"><span data-i18n="hud.speed">Velocidade</span> <span style="float:right;color:#8acdef" id="spdVal">—</span></div>
+            <div class="s-label" style="margin-top:4px"><span data-i18n="hud.atkspeed">Vel. ataque</span> <span style="float:right;color:#a0c8ff" id="atkSpdVal">—</span></div>
             <div class="s-label" id="procsRow" style="margin-top:4px;display:none">Procs <span style="float:right" id="procsVal">—</span></div>
-            <div class="s-label" style="margin-top:6px">Posição</div>
+            <div class="s-label" style="margin-top:6px" data-i18n="hud.position">Posição</div>
             <div class="s-value" id="posVal" style="font-size:11px">—</div>
         </div>
     </div>
@@ -1915,25 +1915,25 @@
     <!-- GAME -->
     <div id="gameContainer">
         <canvas id="canvas"></canvas>
-        <button id="recBtn" title="Gravar um clipe do gameplay (só a tela do jogo, sem HUD)" onclick="toggleRecording()">● REC</button>
+        <button id="recBtn" title="Gravar um clipe do gameplay (só a tela do jogo, sem HUD)" data-i18n-title="hud.rec_title" onclick="toggleRecording()">● REC</button>
 
         <!-- LOG / CHAT — abaixo do canvas -->
         <div id="chatPanel">
             <div class="chat-tabs">
                 <span class="chat-tab active" data-tab="chat">CHAT</span>
-                <span class="chat-tab" data-tab="log">COMBATE</span>
+                <span class="chat-tab" data-tab="log" data-i18n="hud.combat_tab">COMBATE</span>
                 <div class="log-filters" id="logFilters" style="display:none">
-                    <span class="log-filter active" data-cat="all"  onclick="setLogFilter('all')">tudo</span>
-                    <span class="log-filter"        data-cat="dmg"  onclick="setLogFilter('dmg')">dano</span>
-                    <span class="log-filter"        data-cat="kill" onclick="setLogFilter('kill')">mortes</span>
+                    <span class="log-filter active" data-cat="all"  onclick="setLogFilter('all')" data-i18n="hud.f_all">tudo</span>
+                    <span class="log-filter"        data-cat="dmg"  onclick="setLogFilter('dmg')" data-i18n="hud.f_dmg">dano</span>
+                    <span class="log-filter"        data-cat="kill" onclick="setLogFilter('kill')" data-i18n="hud.f_kill">mortes</span>
                     <span class="log-filter"        data-cat="loot" onclick="setLogFilter('loot')">loot</span>
-                    <span class="log-filter"        data-cat="sys"  onclick="setLogFilter('sys')">sistema</span>
+                    <span class="log-filter"        data-cat="sys"  onclick="setLogFilter('sys')" data-i18n="hud.f_sys">sistema</span>
                 </div>
             </div>
             <div id="log" style="display:none"></div>
             <div id="chatMessages"></div>
             <div id="chatInputRow">
-                <input type="text" id="chatInput" placeholder="Diga algo... (Enter envia, Esc cancela, máx 240 chars)" maxlength="240">
+                <input type="text" id="chatInput" placeholder="Diga algo... (Enter envia, Esc cancela, máx 240 chars)" data-i18n-ph="hud.chat_ph" maxlength="240">
             </div>
         </div>
     </div>
@@ -1941,12 +1941,12 @@
     <!-- SIDEBAR DIREITA -->
     <div class="sidebar" id="rightSidebar">
         <div class="s-section">
-            <div class="s-label">Status PvP</div>
+            <div class="s-label" data-i18n="hud.pvp_status">Status PvP</div>
             <div id="pvpWidget"></div>
         </div>
 
         <div class="s-section">
-            <div class="s-label">Equipamento</div>
+            <div class="s-label" data-i18n="hud.equipment">Equipamento</div>
             <div id="equipment" style="font-size:10px"></div>
         </div>
 
@@ -1956,7 +1956,7 @@
         </div>
 
         <div class="s-section" id="dailyEventSection" style="display:none">
-            <div class="s-label">Evento Diário</div>
+            <div class="s-label" data-i18n="hud.daily_event">Evento Diário</div>
             <div id="dailyEventWidget"></div>
         </div>
 
@@ -1967,23 +1967,23 @@
 
         <!-- Combate (battle list) + Online dividem o espaço restante -->
         <div class="s-section split-half">
-            <div class="s-label">Combate</div>
-            <div id="targetWidget" class="target-empty">Nenhum alvo</div>
+            <div class="s-label" data-i18n="hud.combat">Combate</div>
+            <div id="targetWidget" class="target-empty" data-i18n="hud.no_target">Nenhum alvo</div>
         </div>
 
         <div class="s-section split-half">
             <div class="s-label">Online</div>
-            <div id="players-online">Conectando...</div>
+            <div id="players-online" data-i18n="hud.connecting">Conectando...</div>
         </div>
     </div>
 
     <!-- INVENTÁRIO (coluna própria, cresce sozinho) -->
     <div class="sidebar" id="invSidebar">
         <div class="s-section" style="margin-bottom:6px">
-            <div class="s-label">Inventário <span style="float:right;color:#ffcc40" id="goldVal">0 g</span></div>
-            <div style="font-size:9px;color:#555">click p/ equipar</div>
+            <div class="s-label"><span data-i18n="hud.inventory">Inventário</span> <span style="float:right;color:#ffcc40" id="goldVal">0 g</span></div>
+            <div style="font-size:9px;color:#555" data-i18n="hud.click_equip">click p/ equipar</div>
         </div>
-        <div id="inventory" style="font-size:11px;color:#aaa">vazio</div>
+        <div id="inventory" style="font-size:11px;color:#aaa" data-i18n="hud.empty">vazio</div>
     </div>
 </div>
 
@@ -2593,6 +2593,15 @@ const I18N = {
     'modal.guild': '📜 GUILD',
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ BANCADA',
+    'hud.map': 'Mapa', 'hud.character': 'Personagem', 'hud.logout': 'sair ⏏', 'hud.adventurer': 'Aventureiro',
+    'hud.spells': 'Magias', 'hud.attack': 'Ataque', 'hud.defense': 'Defesa', 'hud.crit': 'Crítico',
+    'hud.dodge': 'Esquiva', 'hud.speed': 'Velocidade', 'hud.atkspeed': 'Vel. ataque', 'hud.position': 'Posição',
+    'hud.combat_tab': 'COMBATE', 'hud.f_all': 'tudo', 'hud.f_dmg': 'dano', 'hud.f_kill': 'mortes', 'hud.f_sys': 'sistema',
+    'hud.chat_ph': 'Diga algo... (Enter envia, Esc cancela, máx 240 chars)',
+    'hud.rec_title': 'Gravar um clipe do gameplay (só a tela do jogo, sem HUD)',
+    'hud.pvp_status': 'Status PvP', 'hud.equipment': 'Equipamento', 'hud.daily_event': 'Evento Diário',
+    'hud.combat': 'Combate', 'hud.no_target': 'Nenhum alvo', 'hud.connecting': 'Conectando...',
+    'hud.inventory': 'Inventário', 'hud.click_equip': 'click p/ equipar', 'hud.empty': 'vazio',
     'lang.pt': 'Português',
     'lang.en': 'English'
   },
@@ -2679,6 +2688,15 @@ const I18N = {
     'modal.guild': '📜 GUILD',
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ CRAFTING BENCH',
+    'hud.map': 'Map', 'hud.character': 'Character', 'hud.logout': 'log out ⏏', 'hud.adventurer': 'Adventurer',
+    'hud.spells': 'Spells', 'hud.attack': 'Attack', 'hud.defense': 'Defense', 'hud.crit': 'Critical',
+    'hud.dodge': 'Dodge', 'hud.speed': 'Speed', 'hud.atkspeed': 'Atk. speed', 'hud.position': 'Position',
+    'hud.combat_tab': 'COMBAT', 'hud.f_all': 'all', 'hud.f_dmg': 'damage', 'hud.f_kill': 'deaths', 'hud.f_sys': 'system',
+    'hud.chat_ph': 'Say something... (Enter sends, Esc cancels, max 240 chars)',
+    'hud.rec_title': 'Record a gameplay clip (game screen only, no HUD)',
+    'hud.pvp_status': 'PvP Status', 'hud.equipment': 'Equipment', 'hud.daily_event': 'Daily Event',
+    'hud.combat': 'Combat', 'hud.no_target': 'No target', 'hud.connecting': 'Connecting...',
+    'hud.inventory': 'Inventory', 'hud.click_equip': 'click to equip', 'hud.empty': 'empty',
     'lang.pt': 'Português',
     'lang.en': 'English'
   }
