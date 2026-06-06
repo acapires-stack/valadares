@@ -1778,16 +1778,16 @@
 <!-- Onboarding mobile — primeiro login no celular vê isso 1 vez -->
 <div id="mobileTutOverlay">
     <div class="mt-card">
-        <div class="mt-card-title">👋 BEM-VINDO AO VALADARES</div>
-        <div class="mt-card-sub">Aqui é como você joga no celular:</div>
+        <div class="mt-card-title" data-i18n="mt.title">👋 BEM-VINDO AO VALADARES</div>
+        <div class="mt-card-sub" data-i18n="mt.sub">Aqui é como você joga no celular:</div>
         <div class="mt-card-list">
-            <div class="mt-item"><span class="mt-zone">⬆ TOPO</span><span class="mt-desc">Seu HP, MP e gold sempre visíveis</span></div>
-            <div class="mt-item"><span class="mt-zone">⬅ ESQUERDA</span><span class="mt-desc">Joystick — arrasta o círculo dourado pra andar</span></div>
-            <div class="mt-item"><span class="mt-zone">⬇ EMBAIXO</span><span class="mt-desc">Hotbar com 5 slots — 1 toque usa poção HP/MP, comida, magia, lança</span></div>
-            <div class="mt-item"><span class="mt-zone">➡ DIREITA</span><span class="mt-desc">Botão ATACAR — encosta num inimigo e toca</span></div>
-            <div class="mt-item"><span class="mt-zone">≡ MENU</span><span class="mt-desc">Abre inventário, baú, chat e ranking</span></div>
+            <div class="mt-item"><span class="mt-zone" data-i18n="mt.top_zone">⬆ TOPO</span><span class="mt-desc" data-i18n="mt.top_desc">Seu HP, MP e gold sempre visíveis</span></div>
+            <div class="mt-item"><span class="mt-zone" data-i18n="mt.left_zone">⬅ ESQUERDA</span><span class="mt-desc" data-i18n="mt.left_desc">Joystick — arrasta o círculo dourado pra andar</span></div>
+            <div class="mt-item"><span class="mt-zone" data-i18n="mt.down_zone">⬇ EMBAIXO</span><span class="mt-desc" data-i18n="mt.down_desc">Hotbar com 5 slots — 1 toque usa poção HP/MP, comida, magia, lança</span></div>
+            <div class="mt-item"><span class="mt-zone" data-i18n="mt.right_zone">➡ DIREITA</span><span class="mt-desc" data-i18n="mt.right_desc">Botão ATACAR — encosta num inimigo e toca</span></div>
+            <div class="mt-item"><span class="mt-zone" data-i18n="mt.menu_zone">≡ MENU</span><span class="mt-desc" data-i18n="mt.menu_desc">Abre inventário, baú, chat e ranking</span></div>
         </div>
-        <button class="mt-card-btn" onclick="closeMobileTut()">ENTENDI ✦ JOGAR</button>
+        <button class="mt-card-btn" onclick="closeMobileTut()" data-i18n="mt.btn">ENTENDI ✦ JOGAR</button>
     </div>
 </div>
 
@@ -2406,44 +2406,44 @@
 
 <div id="tutorialModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
-        <div class="chest-title">📜 BEM-VINDO A VALADARES</div>
+        <div class="chest-title" data-i18n="tut.title">📜 BEM-VINDO A VALADARES</div>
 
         <div class="tutorial-section">
-            <h4>🗺 O Mundo</h4>
-            <p>Você começa numa <b style="color:#c8a050">Zona Segura (PZ)</b> ao redor do spawn — sem combate. Saia pelos quatro lados pra encontrar mobs. Cada anel é mais difícil. Há <b style="color:#c8a050">5 cavernas</b>, biomas de <b style="color:#a8c8e8">neve</b> e <b style="color:#e8c878">deserto</b> com mobs exclusivos.</p>
+            <h4 data-i18n="tut.world_h">🗺 O Mundo</h4>
+            <p data-i18n-html="tut.world_p">Você começa numa <b style="color:#c8a050">Zona Segura (PZ)</b> ao redor do spawn — sem combate. Saia pelos quatro lados pra encontrar mobs. Cada anel é mais difícil. Há <b style="color:#c8a050">5 cavernas</b>, biomas de <b style="color:#a8c8e8">neve</b> e <b style="color:#e8c878">deserto</b> com mobs exclusivos.</p>
         </div>
 
         <div class="tutorial-section">
-            <h4>⚔ Combate</h4>
-            <p><kbd>WASD</kbd> move (diagonais ok), <kbd>ESPAÇO</kbd> ataca/engaja, <kbd>TAB</kbd> troca de alvo, <kbd>R</kbd> lança magia, <kbd>F</kbd> arremessa lança. Equipe armas/armaduras clicando no inventário.</p>
+            <h4 data-i18n="tut.combat_h">⚔ Combate</h4>
+            <p data-i18n-html="tut.combat_p"><kbd>WASD</kbd> move (diagonais ok), <kbd>ESPAÇO</kbd> ataca/engaja, <kbd>TAB</kbd> troca de alvo, <kbd>R</kbd> lança magia, <kbd>F</kbd> arremessa lança. Equipe armas/armaduras clicando no inventário.</p>
         </div>
 
         <div class="tutorial-section">
-            <h4>🏠 Base Operacional (PZ)</h4>
-            <p><kbd>B</kbd> abre baú (4 independentes), <kbd>C</kbd> bancada de craft, <kbd>M</kbd> altar de magias, <kbd>T</kbd> boneco de treino, <kbd>Q</kbd> quests (fale com a Atendente). Mercador adjacente compra/vende.</p>
+            <h4 data-i18n="tut.base_h">🏠 Base Operacional (PZ)</h4>
+            <p data-i18n-html="tut.base_p"><kbd>B</kbd> abre baú (4 independentes), <kbd>C</kbd> bancada de craft, <kbd>M</kbd> altar de magias, <kbd>T</kbd> boneco de treino, <kbd>Q</kbd> quests (fale com a Atendente). Mercador adjacente compra/vende.</p>
         </div>
 
         <div class="tutorial-section">
-            <h4>📈 Progressão</h4>
-            <p>Sem nível de personagem — tudo deriva de <b style="color:#c8a050">skills</b>. Cada arma treina sua skill (Espada/Machado/Clava/Distância/Punho). HP, MP, defesa e velocidade saem das skills. Treine no boneco da PZ ou matando mobs.</p>
+            <h4 data-i18n="tut.prog_h">📈 Progressão</h4>
+            <p data-i18n-html="tut.prog_p">Sem nível de personagem — tudo deriva de <b style="color:#c8a050">skills</b>. Cada arma treina sua skill (Espada/Machado/Clava/Distância/Punho). HP, MP, defesa e velocidade saem das skills. Treine no boneco da PZ ou matando mobs.</p>
         </div>
 
         <div class="tutorial-section">
-            <h4>☠ PvP (cuidado!)</h4>
-            <p><kbd>P</kbd> liga PvP (custa 5000g). Cada kill = <b style="color:#ff6060">selo de sangue</b>. 5 selos + kill final = vira <b style="color:#ffcc40">Highlander</b>. Aí 3 Caçadores vêm te perseguir pelo mapa inteiro.</p>
+            <h4 data-i18n="tut.pvp_h">☠ PvP (cuidado!)</h4>
+            <p data-i18n-html="tut.pvp_p"><kbd>P</kbd> liga PvP (custa 5000g). Cada kill = <b style="color:#ff6060">selo de sangue</b>. 5 selos + kill final = vira <b style="color:#ffcc40">Highlander</b>. Aí 3 Caçadores vêm te perseguir pelo mapa inteiro.</p>
         </div>
 
         <div class="tutorial-section">
-            <h4>💡 Dicas</h4>
-            <p>Auto-save constante. Mini-mapa no canto descobre andando. <kbd>I</kbd> abre estatísticas, <kbd>O</kbd> abre opções/volume. Logout só fora de combate PvP.</p>
+            <h4 data-i18n="tut.tips_h">💡 Dicas</h4>
+            <p data-i18n-html="tut.tips_p">Auto-save constante. Mini-mapa no canto descobre andando. <kbd>I</kbd> abre estatísticas, <kbd>O</kbd> abre opções/volume. Logout só fora de combate PvP.</p>
         </div>
 
         <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center">
             <label style="color:#998040;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer">
-                <input type="checkbox" id="tutDontShow" checked style="cursor:pointer"> Não mostrar de novo
+                <input type="checkbox" id="tutDontShow" checked style="cursor:pointer"> <span data-i18n="tut.dont_show">Não mostrar de novo</span>
             </label>
         </div>
-        <button class="chest-btn chest-btn-primary" onclick="closeTutorial()" style="margin-top:8px">ENTENDI ✦</button>
+        <button class="chest-btn chest-btn-primary" onclick="closeTutorial()" style="margin-top:8px" data-i18n="tut.btn">ENTENDI ✦</button>
         <button class="chest-close" onclick="closeTutorial()">×</button>
     </div>
 </div>
@@ -2543,6 +2543,34 @@ const I18N = {
     'settings.keys': 'TECLAS',
     'settings.close_hint': '<kbd>O</kbd> ou <kbd>ESC</kbd> fechar',
     'settings.language': 'IDIOMA / LANGUAGE',
+    'mt.title': '👋 BEM-VINDO AO VALADARES',
+    'mt.sub': 'Aqui é como você joga no celular:',
+    'mt.top_zone': '⬆ TOPO',
+    'mt.top_desc': 'Seu HP, MP e gold sempre visíveis',
+    'mt.left_zone': '⬅ ESQUERDA',
+    'mt.left_desc': 'Joystick — arrasta o círculo dourado pra andar',
+    'mt.down_zone': '⬇ EMBAIXO',
+    'mt.down_desc': 'Hotbar com 5 slots — 1 toque usa poção HP/MP, comida, magia, lança',
+    'mt.right_zone': '➡ DIREITA',
+    'mt.right_desc': 'Botão ATACAR — encosta num inimigo e toca',
+    'mt.menu_zone': '≡ MENU',
+    'mt.menu_desc': 'Abre inventário, baú, chat e ranking',
+    'mt.btn': 'ENTENDI ✦ JOGAR',
+    'tut.title': '📜 BEM-VINDO A VALADARES',
+    'tut.world_h': '🗺 O Mundo',
+    'tut.world_p': 'Você começa numa <b style="color:#c8a050">Zona Segura (PZ)</b> ao redor do spawn — sem combate. Saia pelos quatro lados pra encontrar mobs. Cada anel é mais difícil. Há <b style="color:#c8a050">5 cavernas</b>, biomas de <b style="color:#a8c8e8">neve</b> e <b style="color:#e8c878">deserto</b> com mobs exclusivos.',
+    'tut.combat_h': '⚔ Combate',
+    'tut.combat_p': '<kbd>WASD</kbd> move (diagonais ok), <kbd>ESPAÇO</kbd> ataca/engaja, <kbd>TAB</kbd> troca de alvo, <kbd>R</kbd> lança magia, <kbd>F</kbd> arremessa lança. Equipe armas/armaduras clicando no inventário.',
+    'tut.base_h': '🏠 Base Operacional (PZ)',
+    'tut.base_p': '<kbd>B</kbd> abre baú (4 independentes), <kbd>C</kbd> bancada de craft, <kbd>M</kbd> altar de magias, <kbd>T</kbd> boneco de treino, <kbd>Q</kbd> quests (fale com a Atendente). Mercador adjacente compra/vende.',
+    'tut.prog_h': '📈 Progressão',
+    'tut.prog_p': 'Sem nível de personagem — tudo deriva de <b style="color:#c8a050">skills</b>. Cada arma treina sua skill (Espada/Machado/Clava/Distância/Punho). HP, MP, defesa e velocidade saem das skills. Treine no boneco da PZ ou matando mobs.',
+    'tut.pvp_h': '☠ PvP (cuidado!)',
+    'tut.pvp_p': '<kbd>P</kbd> liga PvP (custa 5000g). Cada kill = <b style="color:#ff6060">selo de sangue</b>. 5 selos + kill final = vira <b style="color:#ffcc40">Highlander</b>. Aí 3 Caçadores vêm te perseguir pelo mapa inteiro.',
+    'tut.tips_h': '💡 Dicas',
+    'tut.tips_p': 'Auto-save constante. Mini-mapa no canto descobre andando. <kbd>I</kbd> abre estatísticas, <kbd>O</kbd> abre opções/volume. Logout só fora de combate PvP.',
+    'tut.dont_show': 'Não mostrar de novo',
+    'tut.btn': 'ENTENDI ✦',
     'lang.pt': 'Português',
     'lang.en': 'English'
   },
@@ -2579,6 +2607,34 @@ const I18N = {
     'settings.keys': 'KEYS',
     'settings.close_hint': '<kbd>O</kbd> or <kbd>ESC</kbd> to close',
     'settings.language': 'IDIOMA / LANGUAGE',
+    'mt.title': '👋 WELCOME TO VALADARES',
+    'mt.sub': "Here's how you play on mobile:",
+    'mt.top_zone': '⬆ TOP',
+    'mt.top_desc': 'Your HP, MP and gold always visible',
+    'mt.left_zone': '⬅ LEFT',
+    'mt.left_desc': 'Joystick — drag the golden circle to move',
+    'mt.down_zone': '⬇ BOTTOM',
+    'mt.down_desc': '5-slot hotbar — 1 tap uses HP/MP potion, food, spell, spear',
+    'mt.right_zone': '➡ RIGHT',
+    'mt.right_desc': 'ATTACK button — get next to an enemy and tap',
+    'mt.menu_zone': '≡ MENU',
+    'mt.menu_desc': 'Opens inventory, chest, chat and ranking',
+    'mt.btn': 'GOT IT ✦ PLAY',
+    'tut.title': '📜 WELCOME TO VALADARES',
+    'tut.world_h': '🗺 The World',
+    'tut.world_p': 'You start in a <b style="color:#c8a050">Safe Zone (PZ)</b> around the spawn — no combat. Head out in any of the four directions to find mobs. Each ring is harder. There are <b style="color:#c8a050">5 caves</b>, plus <b style="color:#a8c8e8">snow</b> and <b style="color:#e8c878">desert</b> biomes with exclusive mobs.',
+    'tut.combat_h': '⚔ Combat',
+    'tut.combat_p': '<kbd>WASD</kbd> move (diagonals ok), <kbd>SPACE</kbd> attack/engage, <kbd>TAB</kbd> switch target, <kbd>R</kbd> cast spell, <kbd>F</kbd> throw spear. Equip weapons/armor by clicking them in your inventory.',
+    'tut.base_h': '🏠 Home Base (PZ)',
+    'tut.base_p': '<kbd>B</kbd> opens chest (4 independent ones), <kbd>C</kbd> crafting bench, <kbd>M</kbd> spell altar, <kbd>T</kbd> training dummy, <kbd>Q</kbd> quests (talk to the Attendant). The nearby Merchant buys/sells.',
+    'tut.prog_h': '📈 Progression',
+    'tut.prog_p': 'No character level — everything derives from <b style="color:#c8a050">skills</b>. Each weapon trains its skill (Sword/Axe/Club/Ranged/Fist). HP, MP, defense and speed all come from skills. Train on the PZ dummy or by killing mobs.',
+    'tut.pvp_h': '☠ PvP (careful!)',
+    'tut.pvp_p': '<kbd>P</kbd> toggles PvP (costs 5000g). Each kill = a <b style="color:#ff6060">blood seal</b>. 5 seals + a final kill = you become a <b style="color:#ffcc40">Highlander</b>. Then 3 Hunters chase you across the whole map.',
+    'tut.tips_h': '💡 Tips',
+    'tut.tips_p': 'Constant auto-save. The corner minimap reveals as you walk. <kbd>I</kbd> opens stats, <kbd>O</kbd> opens options/volume. You can only log out when not in PvP combat.',
+    'tut.dont_show': "Don't show again",
+    'tut.btn': 'GOT IT ✦',
     'lang.pt': 'Português',
     'lang.en': 'English'
   }
