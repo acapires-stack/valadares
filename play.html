@@ -2594,6 +2594,7 @@ const I18N = {
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ BANCADA',
     'hud.map': 'Mapa', 'hud.character': 'Personagem', 'hud.logout': 'sair ⏏', 'hud.adventurer': 'Aventureiro',
+    'hud.floor': 'Andar {floor}/{max}',
     'hud.spells': 'Magias', 'hud.attack': 'Ataque', 'hud.defense': 'Defesa', 'hud.crit': 'Crítico',
     'hud.dodge': 'Esquiva', 'hud.speed': 'Velocidade', 'hud.atkspeed': 'Vel. ataque', 'hud.position': 'Posição',
     'hud.combat_tab': 'COMBATE', 'hud.f_all': 'tudo', 'hud.f_dmg': 'dano', 'hud.f_kill': 'mortes', 'hud.f_sys': 'sistema',
@@ -3268,6 +3269,7 @@ const I18N = {
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ CRAFTING BENCH',
     'hud.map': 'Map', 'hud.character': 'Character', 'hud.logout': 'log out ⏏', 'hud.adventurer': 'Adventurer',
+    'hud.floor': 'Floor {floor}/{max}',
     'hud.spells': 'Spells', 'hud.attack': 'Attack', 'hud.defense': 'Defense', 'hud.crit': 'Critical',
     'hud.dodge': 'Dodge', 'hud.speed': 'Speed', 'hud.atkspeed': 'Atk. speed', 'hud.position': 'Position',
     'hud.combat_tab': 'COMBAT', 'hud.f_all': 'all', 'hud.f_dmg': 'damage', 'hud.f_kill': 'deaths', 'hud.f_sys': 'system',
@@ -10373,6 +10375,21 @@ function drawMinimap(){
         else icon = '🌆';
         gc.textContent = `${icon} ${fmtGameHour(d.hour)}`;
     }
+    // M4 3b: indicador de andar — visível só na masmorra (floor>=1), acento por profundidade
+    const fb = document.getElementById('floorBadge');
+    if (fb){
+        const f = player.floor || 0;
+        if (f >= 1){
+            const txt = document.getElementById('floorBadgeText');
+            if (txt) txt.textContent = tr('hud.floor', { floor: f, max: DUNGEON_MAX_FLOOR_C });
+            const t = Math.min(1, (f - 1) / Math.max(1, DUNGEON_MAX_FLOOR_C - 1));
+            fb.style.borderColor = `rgb(${Math.round(110 + 90*t)},${Math.round(58 - 28*t)},${Math.round(130 - 20*t)})`;
+            fb.style.boxShadow = `0 2px 12px rgba(${Math.round(110 + 90*t)},20,90,0.45)`;
+            if (fb.style.display === 'none') fb.style.display = '';
+        } else if (fb.style.display !== 'none'){
+            fb.style.display = 'none';
+        }
+    }
 }
 
 async function pkDeathBy(killerId, killerName){
@@ -12930,6 +12947,18 @@ function tickProjectiles(dt){
 
 // ===== Iluminação dinâmica + tint do ciclo dia/noite =====
 function drawDayNightTint(day){
+    // M4 3b polish: na masmorra, banho de cor (roxo→vermelho) que cresce com o andar
+    // — ignora o ciclo dia/noite (a masmorra não vê o céu).
+    const dFloor = (player && player.floor) || 0;
+    if (dFloor >= 1){
+        const t = Math.min(1, (dFloor - 1) / Math.max(1, DUNGEON_MAX_FLOOR_C - 1));
+        const a = 0.05 + 0.09 * t;
+        ctx.save();
+        ctx.fillStyle = `rgba(${Math.round(70 + 70*t)},14,${Math.round(54 + 8*t)},${a})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        return;
+    }
     if (day.tintA < 0.02) return;
     ctx.save();
     ctx.fillStyle = `rgba(${day.tintR},${day.tintG},${day.tintB},${day.tintA})`;
@@ -12948,10 +12977,23 @@ function drawLighting(cam, day){
     if (!player || player.renderX == null) return;  // guard: só pinta com player carregado
     const px0 = Math.floor(player.x), py0 = Math.floor(player.y);
     const playerInCave = inCave(px0, py0);
-    // caverna: sempre escura; fora dela, segue ciclo dia/noite
+    const dFloor = player.floor || 0;
+    const caveLike = playerInCave || dFloor >= 1;
+    // masmorra: escurece e esquenta por profundidade; caverna: sempre escura;
+    // fora delas, segue o ciclo dia/noite.
     let darkness = day.darkness;
     let baseR = 8, baseG = 10, baseB = 30;
-    if (playerInCave){
+    let lightScale = 1;
+    if (dFloor >= 1){
+        // M4 3b polish: tonalidade por profundidade — andar 1 leve → andar 5
+        // escuro e ameaçador (avermelha/arroxeia); a luz do player encolhe = claustrofobia.
+        const t = Math.min(1, (dFloor - 1) / Math.max(1, DUNGEON_MAX_FLOOR_C - 1));
+        darkness = 0.66 + 0.20 * t;
+        baseR = Math.round(14 + 28 * t);
+        baseG = 8;
+        baseB = Math.round(22 + 10 * t);
+        lightScale = 1 - 0.14 * t;
+    } else if (playerInCave){
         darkness = Math.max(0.78, day.darkness);
         baseR = 10; baseG = 8; baseB = 18;
     } else if (darkness < 0.10){
@@ -12968,7 +13010,7 @@ function drawLighting(cam, day){
     // luz do player
     const ppx = (player.renderX - cam.x) * TS + TS/2;
     const ppy = (player.renderY - cam.y) * TS + TS/2;
-    const pr = playerInCave ? 4.5*TS : 6*TS;
+    const pr = (dFloor >= 1 ? 5.2 * lightScale : (playerInCave ? 4.5 : 6)) * TS;
     _carve(ppx, ppy, pr, 1);
     // tochas (PZ na cidade / próprias na masmorra) — acesas com flicker
     for (const t of activeTorches()){
@@ -12992,7 +13034,7 @@ function drawLighting(cam, day){
         const ry = (rp.renderY != null ? rp.renderY : rp.y);
         const x = (rx - cam.x) * TS + TS/2;
         const y = (ry - cam.y) * TS + TS/2;
-        _carve(x, y, playerInCave ? 3.5*TS : 5*TS, 0.95);
+        _carve(x, y, (caveLike ? 3.5 : 5)*TS, 0.95);
     }
     lightCtx.globalCompositeOperation = 'source-over';
     ctx.drawImage(lightCanvas, 0, 0);
@@ -16753,5 +16795,8 @@ function loop(ts){
     }
 })();
 </script>
+<!-- M4 3b: indicador de andar da masmorra — filho DIRETO do body (NÃO do #gameWrapper,
+     que é flex-row e esticaria a altura do fixed). Visível só em floor>=1; acento por profundidade. -->
+<div id="floorBadge" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,8,22,0.85);border:1px solid #5a2a6a;color:#e6c8f5;font-family:monospace;font-weight:700;font-size:13px;letter-spacing:1px;padding:4px 14px;border-radius:7px;box-shadow:0 2px 12px rgba(80,20,90,0.4);text-shadow:0 1px 2px #000;display:none">🕳️ <span id="floorBadgeText">—</span></div>
 </body>
 </html>

@@ -40,7 +40,7 @@ em 4 commits ([58c1d72](https://github.com/acapires-stack/valadares/commit/58c1d
 
 ### 🟢 P0.6 — Pendentes da auditoria FECHADOS (30/05, commit d5aec67)
 
-> **✅ 30/05 deployado:** re-claim daily (server-autoritativo + cap 3/dia), hash scrypt (salt por conta + rehash transparente), rate-limits (pos 40ms/pix 3s), `_errorRateMap` leak (IP real XFF + TTL), float/guild caps, isAdmin por flag/env, castSpell guard (FIREBALL/RAIO online), train/spell/talent → toast. **✅ FECHADO depois:** offline removido INTEIRO (~826 linhas, 01/06 `3456f36`+`1d924ca`; resíduo morto `damagePlayer` + log/comentários defasados 03/06 `8a2d592`) + protocolo morto (01/06 `55cf611`). **Deferido restante:** M4 3b (implementado em PR #1, aguardando merge). Detalhes no `SESSION_NOTES.md`. O bloco abaixo é o histórico 29/05.
+> **✅ 30/05 deployado:** re-claim daily (server-autoritativo + cap 3/dia), hash scrypt (salt por conta + rehash transparente), rate-limits (pos 40ms/pix 3s), `_errorRateMap` leak (IP real XFF + TTL), float/guild caps, isAdmin por flag/env, castSpell guard (FIREBALL/RAIO online), train/spell/talent → toast. **✅ FECHADO depois:** offline removido INTEIRO (~826 linhas, 01/06 `3456f36`+`1d924ca`; resíduo morto `damagePlayer` + log/comentários defasados 03/06 `8a2d592`) + protocolo morto (01/06 `55cf611`). **Deferido restante:** ~~M4 3b~~ ✅ FEITO inline 31/05 (`0f4b188`+`8fc5fec`); o PR #1 foi FECHADO sem merge — a feature foi reimplementada direto no `main`, sem o `dungeon-gen.js` separado. Só sobra o polish visual (ver P1 → M4). Detalhes no `SESSION_NOTES.md`. O bloco abaixo é o histórico 29/05.
 
 > **🔬 AUDITORIA COMPLETA DO JOGO (29/05) — relatório priorizado em [`docs/AUDITORIA_2026-05-29.md`](docs/AUDITORIA_2026-05-29.md).** Aplicado+deployado: 🔴 **lockdown do save** (`saveUpload` gravava gold/inv/skills do cliente as-is → forja PERSISTENTE; furava o lockdown N3 + a venda de gold) + 🟠 **maxPayload** (DoS). Pra revisar JUNTOS (com teste in-game): re-claim de daily, hash de senha fraco, rate-limits pos/pix, ~500 linhas de código offline, protocolo morto (trainResult/spellResult sem feedback), `RECIPES` dup index-sensitive, dead code. O `_errorRateMap leak` abaixo está coberto no relatório.
 
@@ -69,7 +69,7 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] 🎯 EM ANDAMENTO (3a descida + 3c boss ✅; falta 3b procedural)
+**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] ✅ 3a/3b/3c FEITOS (procedural no ar desde 31/05; só falta polish visual do 3b)
 > Decisão de design (29/05): NÃO instanciada. Insight do dono: instância
 > fechada = farm seguro = pay-to-win fácil num jogo PvP. Em vez disso,
 > masmorra aberta e mortal estilo Tibia — melhor loot, maior perigo (mobs
@@ -107,10 +107,19 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 4. ✅ **3c — Boss do andar 5** (RESOLVIDO 29/05, cae70b8): **O Senhor das
    Profundezas** (5000hp/110dmg, intel 3, spawn 50,42), loot top-tier por dano,
    respawna Lv1 fresco a cada delve (isolado do leveling dos bosses do mundo).
-5. 🎯 **3b — Geração procedural por andar** (PRÓXIMA SESSÃO): cada andar com
-   layout/sala diferente. Server precisa do **grid real** (hoje usa bounding box
-   fixo 40-60) pra spawn/colisão. Resolve as "escadas em linha" (posições por
-   andar). Polish: tonalidade por profundidade + indicador de andar.
+5. ✅ **3b — Geração procedural por andar** (RESOLVIDO 31/05, `0f4b188` Fase 1 +
+   `8fc5fec` Fase 2): cada andar é caverna procedural (cellular automata +
+   flood-fill + BFS), gerada no **server = dono do grid** (`genDungeonGrid`/
+   `dungeonFloors`), transmitida no `dungeonEnter` (`grid:{region,rows}` +
+   `stairs`) e desenhada pelo cliente (`applyDungeonGrid`). `mobTileOk`/
+   `playerTileWalkable` usam o grid real (não mais a box 40-60). Escadas
+   (chegada/subida/descida/boss) procedurais por andar — matou a "escada em
+   linha". **NÃO veio do PR #1** (fechado 30/05); foi reimplementado inline.
+   - 🎨 **Polish pendente** (client-only): indicador de andar fixo no HUD (hoje
+     só toast passageiro `toast.depths_down`) + tonalidade por profundidade
+     (caverna escurece andar 1→5; reaproveitar o tint dia/noite).
+   - 🤖 **Deferido** (server-side): IA greedy dos mobs emperra em caverna torta
+     (sem pathfinding real).
 
 **✅ M6 Tinturaria — gold sink cosmético** (RESOLVIDO sessão 29/05)
 - NPC Tintureira em (53,53) na PZ, 4 slots tingíveis com 12 cores
