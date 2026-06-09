@@ -22,7 +22,9 @@
 
 **Verificação:** `node --check` server ✅ + parse do `<script>` inline do cliente ✅. Design doc `design-magos.md` decisão #1 marcada como REVERTIDA.
 
-**Deploy:** toca `server/**` → via `/manutenção` (dono colocou 3min). Push do lote (server+cliente+docs) quando `maintenance:true`. Validar in-game: castar Fireball/Glacial segurando uma espada.
+**Deploy:** ✅ FEITO + VALIDADO in-game (dono: "deu tudo certo, estamos intactos e sem mensagem"). Commit `5f42dbf` (server+cliente+design-doc+SESSION_NOTES), push `e66a0a6..5f42dbf`. Magia agora casta com espada/qualquer arma, sem o aviso "Precisa de wand equipada".
+
+**⚠️ GOTCHA DE DEPLOY (lição):** o build do Docker no Railway demorou **~12min**, MAIS que o **lock de manutenção de 5min** (`LOCK_MS` em server.js:2029, auto-expira). Sequência do erro: (1) dono pôs manut 3min → lock 5min + deslogou todo mundo; (2) push no início da janela ✅; (3) build demorou >5min → lock EXPIROU → dono **voltou a logar no server VELHO** (gate antigo ainda disparou `srv.need_wand`, mesmo com cliente novo já no Vercel); (4) build terminou (imagem `17:25:35Z`) e o container novo **trocou com o dono online**. O `maintenance:false` que vi aos 206s era o **lock velho expirando**, NÃO o deploy novo — declarei "no ar" cedo demais. **Save sobreviveu** (dedup/lockdown das auditorias + estado salvo 6s antes do reboot), mas foi sorte. **Correção de processo p/ próxima:** NÃO confiar no flag `maintenance` (auto-expira) como sinal de "deploy pronto" — monitorar a conclusão REAL do Railway (`railway logs --build` / timestamp da imagem / boot do container novo). Railway linkado nesta pasta: projeto `humorous-acceptance` / serviço `valadares` / env `production`. Detalhe em `reference_valadares_deploy_monitor`.
 
 ---
 
