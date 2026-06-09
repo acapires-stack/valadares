@@ -7586,7 +7586,10 @@ function handleMP(msg){
         snapRender(player);
         player.moveTimer = 0;
     } else if (msg.t === 'pvp'){
-        if (remotePlayers[msg.id]) remotePlayers[msg.id].pvp = msg.pvp;
+        if (remotePlayers[msg.id]){
+            remotePlayers[msg.id].pvp = msg.pvp;
+            if (typeof msg.highlander === 'boolean') remotePlayers[msg.id].highlander = msg.highlander;
+        }
     } else if (msg.t === 'ranking'){
         _rankingCache = msg;
         if (document.getElementById('rankingModal')?.style.display === 'flex') renderRankingBody();
@@ -10480,8 +10483,22 @@ function pkKilledSomeone(msg){
         // Não-vingança: registra que eu posso ser vingado por essa vítima
         player.vengeance[msg.victimId] = Date.now() + PVP_VENGEANCE_MS;
     }
-    // Ganha selo
-    gainSelo(msg.victimHadSelos);
+    // Selos/Highlander são SERVER-AUTORITATIVOS: o server credita o selo e decide a
+    // ascensão (em processPkDeathServerSide) e manda o estado novo aqui no pkKill.
+    // O cliente só ESPELHA (não soma mais sozinho — antes mandava selos/highlander de
+    // volta e o server confiava = forjável).
+    if (typeof msg.selos === 'number'){
+        if (msg.selos > (player.selos || 0)) log(tr('log.seal_earned', {n: msg.selos}));
+        player.selos = msg.selos;
+    }
+    if (msg.ascended && !player.highlander){
+        if (!player.flags) player.flags = {};
+        player.flags.everHighlander = true;
+        hlHuntActive = false; hlHuntTimer = 0;
+        log(tr('log.became_highlander'));
+        log(tr('log.hunters_incoming'));
+    }
+    if (typeof msg.highlander === 'boolean') player.highlander = msg.highlander;
     // Aplica PZ lock se 3+ selos
     if (player.selos >= 3){
         player.pzLockUntil = Date.now() + PVP_PZ_LOCK_MS;
@@ -13557,37 +13574,11 @@ function checkPzLock(){
     player._lastInSafe = inSafe;
 }
 
-// Concede +1 selo ao matador (chamado quando alguém é morto em PvP)
-function gainSelo(victimHadSelos){
-    if (player.selos >= 5){
-        // já cap — se vítima tinha selo e ainda não é Highlander, ascende
-        tryAscendHighlander(victimHadSelos);
-        return;
-    }
-    player.selos++;
-    const m = pvpMults();
-    log(tr('log.seal_earned', {n: player.selos}));
-    // tenta ascender ao Highlander se chegou no 5 e vítima tinha selo
-    if (player.selos === 5) tryAscendHighlander(victimHadSelos);
-    // notifica servidor
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pvp', pvp:player.pvp, selos:player.selos, highlander:player.highlander}));
-}
-
-function tryAscendHighlander(victimHadSelos){
-    if (player.highlander) return;
-    if (player.selos < 5 || !victimHadSelos) return;
-    player.highlander = true;
-    if (!player.flags) player.flags = {};
-    player.flags.everHighlander = true;
-    hlHuntActive = false; hlHuntTimer = 0;
-    log(tr('log.became_highlander'));
-    log(tr('log.hunters_incoming'));
-    if (ws && ws.readyState === 1){
-        ws.send(JSON.stringify({t:'pvp', pvp:player.pvp, selos:player.selos, highlander:true}));
-        ws.send(JSON.stringify({t:'announce', text:`⚔ ${player.name} ascendeu ao Highlander!`}));
-    }
-    checkAchievements();
-}
+// Selos de Sangue + ascensão ao Highlander são SERVER-AUTORITATIVOS: o crédito do selo,
+// a regra do "5º kill em quem tem selo" e a ascensão acontecem em processPkDeathServerSide
+// (server.js); o cliente só espelha o estado recebido no pkKill (ver pkKilledSomeone).
+// As antigas gainSelo()/tryAscendHighlander() (cliente decidia e o server confiava) foram
+// removidas porque eram forjáveis via F12.
 
 function applyPvpPenalty(double){
     const pct = double ? 0.60 : 0.30;

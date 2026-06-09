@@ -2046,7 +2046,7 @@ function snapshotPlayers(floor){
     return Array.from(players.values())
       .filter(p => floor === undefined || (p.floor || 0) === floor)
       .map(p => ({
-        id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:!!p.pvp,
+        id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:!!p.pvp, highlander:!!p.highlander,
         hp:p.hp ?? 100, maxHp:p.maxHp ?? 100,
         mp:p.mp ?? 0, maxMp:p.maxMp ?? 0,
         cosmetic: p.cosmetic || null,
@@ -2276,6 +2276,12 @@ function respawnPlayerServer(p, id){
     p.dots = [];                                   // clean slate: sem DoT herdado da morte (não sangra pós-respawn)
     p.hp = p.maxHp;
     p.mp = p.maxMp;
+    // Morte (PvE) reseta Selos de Sangue + Highlander — server-autoritativo (design: dura "até morrer").
+    if ((p.selos || 0) !== 0 || p.highlander){
+        p.selos = 0;
+        p.highlander = false;
+        broadcastPvpState(p);                      // remotes tiram a coroa/skull
+    }
     if ((p.floor || 0) > 0) returnPlayerToTown(p, id);   // masmorra → cidade (zera floor + manda dungeonExit pro cliente)
     broadcastPstatsAll(p);                         // servidor e cliente concordam (hp cheio) → o loop não se forma
 }
@@ -4388,11 +4394,19 @@ function totalDefenseServer(p){
     }
     return total;
 }
+// Propaga o estado PvP (pvp on/off + Highlander) de um player pros outros clientes.
+// Selos não vão no snapshot dos remotos (só o dono precisa do número exato); a coroa
+// (highlander) sim, pra renderizar nos outros. id próprio é ignorado no cliente (não
+// está em remotePlayers), então é seguro mandar pra todos.
+function broadcastPvpState(p){
+    broadcast(null, { t:'pvp', id:p.id, pvp:!!p.pvp, highlander:!!p.highlander });
+}
 // Processa morte PvP server-side — chamado quando pvpAttack zera hp do alvo.
 // Antes: cliente vítima mandava msg.pkDeath {killerId, goldGain, dropHighlander}
 // e server confiava → cúmplice podia farmar kills no ranking forjando msgs.
 // Agora: server transfere gold (10% do que vítima tinha) + CORACAO_HL se tinha
-// + 1 selo pro killer + ranking. Tudo autoritativo.
+// + 1 selo pro killer + ascensão a Highlander + ranking. Tudo autoritativo
+// (antes os selos/Highlander vinham de msg.selos/msg.highlander do cliente = forjável).
 function processPkDeathServerSide(killer, victim){
     if (!killer || !victim) return;
     // Morte PvP: o cliente respawna no spawn local (bloco "Respawn no spawn") e pode
@@ -4428,19 +4442,47 @@ function processPkDeathServerSide(killer, victim){
         sendInvUpdate(victim, { pvpLoss:{ amount: goldDrop, dropHighlander } });
         sendInvUpdate(killer, { pvpGain:{ amount: goldDrop, dropHighlander } });
     }
-    // pkKill pro killer (UI float + log + selos de sangue)
+    // ── Selos de Sangue + Highlander (server-autoritativo) ──────────────────
+    // Snapshot ANTES de mexer na vítima: ascensão exige que o 5º kill seja em
+    // alguém com ≥1 selo (não vale farmar noob). Design: docs/design-pvp.md §2/§4.
+    const victimHadSelos = (victim.selos || 0) >= 1;
+    // Vítima: morte zera selos; se era o Highlander, o trono fica vago + anúncio global.
+    if (victim.highlander){
+        victim.highlander = false;
+        broadcastMsg('event', `⚔ ${killer.name} derrotou o Highlander ${victim.name}!`);
+    }
+    victim.selos = 0;
+    broadcastPvpState(victim);
+    // Matador: +1 selo (cap 5).
+    killer.selos = Math.min(5, (killer.selos || 0) + 1);
+    // Ascensão ao Highlander: 5 selos + o 5º kill foi em alguém que tinha selo.
+    let ascended = false;
+    if (killer.selos >= 5 && victimHadSelos && !killer.highlander){
+        killer.highlander = true;
+        killer.flags = killer.flags || {};
+        killer.flags.everHighlander = true;
+        ascended = true;
+        broadcastMsg('event', `⚔ ${killer.name} ascendeu ao Highlander!`);
+    }
+    broadcastPvpState(killer);
+
+    // pkKill pro killer (UI float + log) — selos/highlander/ascended autoritativos; o
+    // cliente só espelha (não soma mais sozinho). victimHadSelos fica por compat/log.
     if (killer.ws.readyState === 1){
         killer.ws.send(JSON.stringify({
             t: 'pkKill',
             victimId: victim.id, victimName: victim.name,
-            victimHadSelos: (victim.selos || 0) >= 1,
+            victimHadSelos,
+            selos: killer.selos,
+            highlander: killer.highlander,
+            ascended,
             goldGain: goldDrop,
             dropHighlander,
         }));
     }
     broadcastMsg('warn', `⚔ ${killer.name} matou ${victim.name}` + (dropHighlander ? ' (Highlander caiu!)' : ''));
     bumpPkKill(killer.name);
-    console.log(`[pk] ${killer.name} → ${victim.name} (autoritativo) gold=${goldDrop} hl=${dropHighlander}`);
+    console.log(`[pk] ${killer.name} → ${victim.name} (autoritativo) gold=${goldDrop} selos=${killer.selos} hl=${killer.highlander}`);
 }
 
 // Cap de dano PvP server-side. Cliente envia `amount` no pvpAttack — sem cap,
@@ -6052,21 +6094,17 @@ wss.on('connection', (ws, request) => {
 
         if (msg.t === 'pvp') {
             p.pvp = !!msg.pvp;
-            // T2: cliente também sinaliza selos + highlander pra server calcular
-            // regen autoritativo (pvpMultsServer). Clamp via sanitizeSave já cuida.
-            if (typeof msg.selos === 'number' && isFinite(msg.selos)){
-                p.selos = Math.max(0, Math.min(5, msg.selos | 0));
-            }
-            if (typeof msg.highlander === 'boolean'){
-                p.highlander = msg.highlander;
-            }
+            // Selos/Highlander são SERVER-AUTORITATIVOS (ganhos por kill em
+            // processPkDeathServerSide, resetados na morte). NÃO confiamos mais em
+            // msg.selos/msg.highlander — antes um cliente forjado mandava {selos:5,
+            // highlander:true} e ganhava regen 2× + coroa/Highlander Hunt de graça.
             // Throttle do BROADCAST (audit 2026-06-03): toggle de PvP é humano/raro e este era
             // o pior fan-out (global por mensagem). O ESTADO já foi atualizado acima; aqui só
             // limitamos o re-broadcast a ~3/s. Eventual consistência via playerSync/snapshot.
             const nowPvp = Date.now();
             if (p._lastPvpBcastAt && nowPvp - p._lastPvpBcastAt < 300) return;
             p._lastPvpBcastAt = nowPvp;
-            broadcast(null, { t:'pvp', id, pvp:p.pvp });
+            broadcast(null, { t:'pvp', id, pvp:p.pvp, highlander:!!p.highlander });
             return;
         }
 
