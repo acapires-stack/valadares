@@ -138,6 +138,10 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
   IN-GAME 04/06** (`1efd23a` + 2 hotfixes pegos no teste ao vivo: `5516b76` mob-de-masmorra-spawnando-na-arena +
   `3afd7ba` "PvP na PZ" travava ataque na arena). Dono venceu o bot — caminho morte-por-combate confirmado.
   Detalhes no `SESSION_NOTES.md`.
+- ✅ **Arena pública (09/06)** — o Elo da Arena (`arenaRating`/wins/losses, já server-auth) agora aparece no
+  **ranking público**: aba `⚔ ARENA` no modal in-game (play.html) + `🏟 Arena` na página `ranking.html` +
+  campo `arena` no `/api/ranking` e no WS `getRanking` (helper `topArenaRanking`). Era o item "Arena pública"
+  do backlog de endgame (½ sessão, maior ROI). Deploy `bb15140` (server vazio, push direto).
 - 🎯 **Fase 2 (próxima)** — bracket **3v3** (times via party) + **recompensa cosmética semanal** (ladder de
   `arenaRating` premiada no rollover de temporada).
 

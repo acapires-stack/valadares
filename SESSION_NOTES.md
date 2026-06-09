@@ -7,6 +7,25 @@
 
 ---
 
+## 🏟️ Sessão 09/06 (cont.) — ARENA PÚBLICA: Elo da Arena PvP no ranking ✅ DEPLOYADO (server vazio, push direto)
+
+**Pedido do dono:** item #1 do backlog de endgame ("Arena pública", ½ sessão / maior ROI). "pode fazer automato, se não tiver gente no servidor pode subir já". Modo autônomo + deploy autorizado se servidor vazio.
+
+**O que era:** a Arena 1v1 já tinha Elo real server-autoritativo (`arenaRating`/`arenaWins`/`arenaLosses` via `arenaEloUpdate` em server.js:5097, persistido no `state.json` dentro da entry de `rankings`), mas ficava **fora do ranking público** — só visível no modal `arenaStats` do NPC. Esta sessão expõe esse Elo no ranking.
+
+**Mudança (server + 2 clientes, cirúrgica):**
+- **server.js:** novo helper `topArenaRanking(limit)` (logo após `topRanking`) — filtra só quem disputou (`arenaRating != null || wins+losses > 0`; o `!= null` garante incluir jogador que só empatou, pois empate mexe no rating mas não em wins/losses), mapeia `{name, rating, wins, losses}`, ordena por rating desc. Campo `arena:` adicionado nos **2 emit sites**: HTTP `/api/ranking` (:188) e WS `getRanking` (:7757). **Sem mudança de persistência** (arena já vivia na entry de rankings).
+- **play.html:** aba `⚔ ARENA` no modal (entre PvP e BOSSES) + branch de render em `renderRankingBody` (rating grande + ✔V/✘D + winrate%, destaque "(você)", cores de medalha — espelha o layout de season/guilds) + `arena` no `labels` (empty state) + i18n `ranking.tab_arena`/`arena_header`/`arena_winrate` (pt+en).
+- **ranking.html:** aba `🏟 Arena` + painel + `renderArena()` (tabela #/Jogador/Rating/V–D(winrate%)) + chamada no `load()` + i18n `rk.tab_arena`/`rating`/`record`/`empty_arena` (pt+en).
+
+**Verificação (preview :3333, sem login):** `node --check` server ✅ + parse inline dos 2 HTMLs 0-erro; teste lógico do `topArenaRanking` **5/5 asserts** (exclui quem nunca lutou · inclui só-empate · ordena por rating · winrate correto). Render exercitado direto via `preview_eval` injetando mock: ranking.html tabela PT(#/Jogador/Rating/V–D) + EN(#/Player/Rating/W–L) + empty state pt/en, **console 0-erro**, screenshot; play.html modal `⚔ ARENA` com "(você)" destacado + winrate 74%/56%/0% + empty "Ninguém com Arena ainda.", **console 0-erro**, screenshot.
+
+**Deploy:** **servidor VAZIO confirmado** via `/api/admin/state` (token do Railway, sem criar sessão-fantasma de WS) → **ONLINE: 0**, uptime 1831s. Push direto `2533495..bb15140` (autorizado p/ server vazio; sem `/manutencao` pois não há ninguém pra deslogar — o gotcha do build>lock de 09/06 não se aplica sem players). **Vercel já no ar** (cliente novo serve a aba em `/ranking` e `/jogar`). **Railway em build (~12min)** — monitor em background polando `/api/ranking` até o campo `arena` aparecer (sinal definitivo do container novo, não o flag `maintenance` que auto-expira).
+
+**Pendência:** confirmar boot do container novo (monitor) + olhada in-game do dono (1ª vez que a aba aparece com dados reais quando alguém jogar arena). Risco baixo — server-auth intacto, só leitura/exposição de dado já existente.
+
+---
+
 ## 🪄 Sessão 09/06 — Magia LIBERADA pra qualquer arma (remove gate da wand) · masmorra 3b confirmada in-game
 
 **Dono:** "masmorra ficou ótima" (✅ valida o tint/badge do M4-3b in-game — pendência fechada) + "vamos liberar as magias para qualquer arma".
