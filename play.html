@@ -12707,13 +12707,13 @@ function castSpell(spellKey){
         log(tr('log.no_mana', {mp: player.mp, cost: sp.manaCost})); return;
     }
     const sk = player.skills['Magia'];
-    // WAND obrigatória pra magia de ATAQUE (dano/AoE). Cura/buff/taunt seguem livres.
+    // Magia LIBERADA pra qualquer arma (09/06). A wand não é mais obrigatória: ela só
+    // ADICIONA a base dela (wandBase) + afinidade elemental (+20% no elemento dela). Sem
+    // wand, casta com base 0 (dano da magia + Magia/3 + crit + talentos). O tiro BÁSICO
+    // spammável segue wand-only (é o auto-ataque do cajado). Cura/buff/taunt sempre livres.
     const wEq = ITEMS[player.equipped.weapon];
     const isWand = wEq && wEq.kind === 'wand';
     const wandBase = isWand ? wEq.base : 0;
-    if ((sp.damage || sp.aoeRange) && !isWand){
-        log(tr('log.need_wand')); return;
-    }
 
     // ─── AOE (Exori) ────────────────────────────────────────────
     if (sp.aoeRange){

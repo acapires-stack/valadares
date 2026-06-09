@@ -7,6 +7,25 @@
 
 ---
 
+## 🪄 Sessão 09/06 — Magia LIBERADA pra qualquer arma (remove gate da wand) · masmorra 3b confirmada in-game
+
+**Dono:** "masmorra ficou ótima" (✅ valida o tint/badge do M4-3b in-game — pendência fechada) + "vamos liberar as magias para qualquer arma".
+
+**Contexto:** a Fase 1 do rework de magos travou **wand obrigatória** pra castar magia de ataque (identidade de classe). O dono reverteu: quer castar magia segurando qualquer arma.
+
+**Mudança (cirúrgica — 2 gates):**
+- Cliente `castSpell` (play.html ~12714): removido o `if ((sp.damage||sp.aoeRange) && !isWand) → log(need_wand); return`.
+- Server `spellCast` (server.js ~6847): removido o reject `wandBaseServer(p)===0`.
+- A pipeline de dano JÁ funcionava com `wandBase=0` (sempre foi o caminho sem-wand) → nada mais a mexer.
+
+**Design resultante:** wand não é mais obrigatória, mas segue sendo a melhor escolha — **soma a base dela** ao dano + **afinidade elemental +20%** + tem o **tiro básico spammável** (auto-ataque do cajado, mana 4). Sem wand a magia sai com base 0 (dano da magia + Magia/3 + crit + talentos); crit e fraqueza do mob valem pros dois. Cura/buff/taunt sempre foram livres. Strings `log.need_wand`/`srv.need_wand` ficaram órfãs (mantidas pra não quebrar paridade i18n 681/681).
+
+**Verificação:** `node --check` server ✅ + parse do `<script>` inline do cliente ✅. Design doc `design-magos.md` decisão #1 marcada como REVERTIDA.
+
+**Deploy:** toca `server/**` → via `/manutenção` (dono colocou 3min). Push do lote (server+cliente+docs) quando `maintenance:true`. Validar in-game: castar Fireball/Glacial segurando uma espada.
+
+---
+
 ## 🌐 Sessão 06/06 (cont. 3) — i18n Fase 3 TAIL: tooltips + chrome de TODOS os modais ✅ DEPLOYADO (cliente `11917a3`) · server `3f29fb0` SEGURADO
 
 **Pedido do dono:** "tail da fase 3 pode fazer" (Ultracode ligado → exaustivo). Fecha o item 2 (tooltips) e item 3 (chrome dos modais). Item 4 (nomes de quest no server) = **NO-OP** confirmado.

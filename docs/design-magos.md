@@ -32,7 +32,13 @@ As três fontes de dano usam a MESMA progressão por skill: `+1 a cada 3 pontos`
 
 ## 2. Decisões de design (travadas com o dono)
 
-1. **Wand obrigatória** pra castar ataque mágico (identidade de classe forte).
+1. ~~**Wand obrigatória** pra castar ataque mágico (identidade de classe forte).~~
+   **REVERTIDO 09/06:** magia de ataque LIBERADA pra qualquer arma (gate removido no
+   cliente `castSpell` + no server `spellCast`). A wand deixou de ser obrigatória; ela
+   segue dando vantagem (soma a `base` dela ao dano + afinidade elemental +20%) e ainda
+   é a única com o tiro básico spammável — mas não bloqueia mais o cast. Sem wand a
+   magia sai com base 0 (só `dano da magia + Magia/3 + crit + talentos`). Strings
+   `log.need_wand`/`srv.need_wand` ficaram órfãs (mantidas pra não quebrar a paridade i18n).
 2. **Tiro básico da wand**: ataque normal com wand equipada = projétil mágico
    spammável, escala, **mana 0** (igual auto-ataque de wand no Tibia). É o que
    sustenta o upar. As magias de cooldown são burst/AoE por cima.

@@ -6844,11 +6844,10 @@ wss.on('connection', (ws, request) => {
             const spellKey = String(msg.spellKey || '');
             const sp = SPELLS_META[spellKey];
             if (!sp) return;
-            // Fase Magos: magia de ATAQUE exige wand equipada (o cliente também gateia p/ UX).
-            if (sp.range && sp.damage && wandBaseServer(p) === 0){
-                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.need_wand') });
-                return;
-            }
+            // Magia de ataque LIBERADA pra qualquer arma (09/06 — gate da wand removido).
+            // A wand não é mais obrigatória pra castar; ela só ADICIONA a base dela ao
+            // _spellWindow (vide wandBaseServer abaixo) + afinidade elemental no cliente.
+            // O tiro BÁSICO da wand (attackMob sem janela) segue wand-only por natureza.
             const now = Date.now();
             p._lastSpellAt = p._lastSpellAt || 0;
             if (now - p._lastSpellAt < 600) return;
