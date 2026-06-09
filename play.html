@@ -2333,6 +2333,7 @@
             <button class="train-tab active" data-rank-tab="season" onclick="switchRankingTab('season')" data-i18n="ranking.tab_season">🏆 TEMPORADA</button>
             <button class="train-tab" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
             <button class="train-tab" data-rank-tab="pvp" onclick="switchRankingTab('pvp')">PvP</button>
+            <button class="train-tab" data-rank-tab="arena" onclick="switchRankingTab('arena')" data-i18n="ranking.tab_arena">⚔ ARENA</button>
             <button class="train-tab" data-rank-tab="bosses" onclick="switchRankingTab('bosses')">BOSSES</button>
             <button class="train-tab" data-rank-tab="gold" onclick="switchRankingTab('gold')">GOLD</button>
             <button class="train-tab" data-rank-tab="guilds" onclick="switchRankingTab('guilds')">GUILDS</button>
@@ -2901,6 +2902,9 @@ const I18N = {
     'ranking.season_empty': 'Ainda ninguém pontuou esta temporada. Bora caçar!',
     'ranking.list_empty': 'Ninguém com {label} ainda.',
     'ranking.guilds_header': 'TOP {n} GUILDS · pontos = mobs + pvp×5 + bosses×20',
+    'ranking.tab_arena': '⚔ ARENA',
+    'ranking.arena_header': 'TOP {n} · RATING DA ARENA (Elo · PvP 1v1)',
+    'ranking.arena_winrate': '{n}% vitórias',
     'ranking.member_count': '{n} membros',
     'ranking.yours': '(sua)',
     'backup.admin_only': 'Só admin pode restaurar backup. Fale com o gestor.',
@@ -3576,6 +3580,9 @@ const I18N = {
     'ranking.season_empty': 'Nobody has scored this season yet. Go hunt!',
     'ranking.list_empty': 'Nobody with {label} yet.',
     'ranking.guilds_header': 'TOP {n} GUILDS · points = mobs + pvp×5 + bosses×20',
+    'ranking.tab_arena': '⚔ ARENA',
+    'ranking.arena_header': 'TOP {n} · ARENA RATING (Elo · 1v1 PvP)',
+    'ranking.arena_winrate': '{n}% winrate',
     'ranking.member_count': '{n} members',
     'ranking.yours': '(yours)',
     'backup.admin_only': 'Only an admin can restore a backup. Talk to the manager.',
@@ -14832,8 +14839,8 @@ function renderRankingBody(){
     }
     const list = _rankingCache[_rankingTab] || [];
     const labels = LANG === 'en'
-        ? { mobs:'Mobs killed', pvp:'PvP kills', bosses:'Unique bosses', gold:'Gold', guilds:'Guilds' }
-        : { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds' };
+        ? { mobs:'Mobs killed', pvp:'PvP kills', bosses:'Unique bosses', gold:'Gold', guilds:'Guilds', arena:'Arena' }
+        : { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds', arena:'Arena' };
     if (!list.length){
         el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">${tr('ranking.list_empty', {label: labels[_rankingTab]})}</div>`;
         return;
@@ -14856,6 +14863,27 @@ function renderRankingBody(){
                         <span>🐺 ${e.mobs}</span>
                         <span>☠ ${e.pvp}</span>
                         <span>👑 ${e.bosses}</span>
+                    </div>
+                </div>`;
+            }).join('')}`;
+        return;
+    }
+    // Aba ARENA — rating Elo (PvP 1v1) + recorde V/D + winrate
+    if (_rankingTab === 'arena'){
+        el.innerHTML = `
+            <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">${tr('ranking.arena_header', {n: list.length})}</div>
+            ${list.map((e, i) => {
+                const total = (e.wins || 0) + (e.losses || 0);
+                const wr = total ? Math.round((e.wins || 0) / total * 100) : 0;
+                return `
+                <div style="padding:6px 10px;border-bottom:1px solid #1a1408;${e.name === player.name ? 'background:#1a1a08' : ''}">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
+                        <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ` <span style="color:#888;font-size:10px">${tr('common.you')}</span>` : ''}</span>
+                        <span style="color:#ffcc40;font-family:Consolas,monospace;min-width:54px;text-align:right;font-weight:700">${e.rating}</span>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:#7a6520;margin-left:34px">
+                        <span style="color:#6fbf6f">✔ ${e.wins || 0}</span><span style="color:#bf6f6f">✘ ${e.losses || 0}</span><span>${tr('ranking.arena_winrate', {n: wr})}</span>
                     </div>
                 </div>`;
             }).join('')}`;

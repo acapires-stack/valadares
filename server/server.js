@@ -188,6 +188,7 @@ async function handleHttpRequest(req, res){
             pvp:    topRanking('pkKills',   limit),
             bosses: topRanking('bossKills', limit),
             gold:   topRanking('gold',      limit),
+            arena:  topArenaRanking(limit),
             guilds: topGuildRanking(limit),
             season: {
                 id: seasonState.id,
@@ -3079,6 +3080,22 @@ function topRanking(field, limit){
         .map(([name, r]) => ({ name, value: r[field] || 0 }))
         .filter(e => e.value > 0)
         .sort((a,b) => b.value - a.value)
+        .slice(0, limit);
+}
+// Ranking da Arena (PvP 1v1): só quem realmente disputou (tem rating Elo setado
+// ou ao menos uma partida — empate atualiza rating sem mexer em wins/losses).
+// Ordena por rating desc. arenaRating/wins/losses vivem na própria entry de
+// `rankings` (setados por arenaEloUpdate) → já persistem no state.json.
+function topArenaRanking(limit){
+    return Array.from(rankings.entries())
+        .filter(([, r]) => r && (r.arenaRating != null || (r.arenaWins || 0) + (r.arenaLosses || 0) > 0))
+        .map(([name, r]) => ({
+            name,
+            rating: r.arenaRating != null ? r.arenaRating : 1000,
+            wins:   r.arenaWins   || 0,
+            losses: r.arenaLosses || 0,
+        }))
+        .sort((a, b) => b.rating - a.rating)
         .slice(0, limit);
 }
 
@@ -7740,6 +7757,7 @@ wss.on('connection', (ws, request) => {
                 pvp:    topRanking('pkKills',   limit),
                 bosses: topRanking('bossKills', limit),
                 gold:   topRanking('gold',      limit),
+                arena:  topArenaRanking(limit),
                 guilds: topGuildRanking(limit),
                 season: {
                     id: seasonState.id,
