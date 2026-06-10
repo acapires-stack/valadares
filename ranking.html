@@ -146,7 +146,7 @@
 const I18N_RK = {
   pt: {
     'rk.subtitle': `Os melhores caçadores, lutadores e mercadores de Valadares`,
-    'rk.tab_gold': `💰 Ouro`, 'rk.tab_season': `👑 Temporada`, 'rk.tab_arena': `🏟 Arena`,
+    'rk.tab_gold': `💰 Ouro`, 'rk.tab_season': `👑 Temporada`, 'rk.tab_arena': `🏟 Arena`, 'rk.tab_depths': `🕳 Profundezas`,
     'rk.cta': `Jogar Valadares`,
     'rk.f_home': `Início`, 'rk.f_play': `Jogar`, 'rk.f_privacy': `Privacidade`, 'rk.f_terms': `Termos`,
     'rk.credit': `Valadares · feito com ♥ em Paranaguá/PR · 2026`,
@@ -154,7 +154,9 @@ const I18N_RK = {
     'rk.empty': `Sem dados ainda — seja o primeiro a aparecer aqui!`,
     'rk.empty_guilds': `Sem guilds no ranking ainda.`,
     'rk.empty_arena': `Ninguém disputou a arena ainda — seja o primeiro!`,
+    'rk.empty_depths': `Ninguém desceu às Profundezas ainda — seja o primeiro!`,
     'rk.rating': `Rating`, 'rk.record': `V–D`,
+    'rk.floor': `Andar`, 'rk.boss_col': `Boss mais fundo`, 'rk.floor_n': `Andar {n}`, 'rk.no_boss': `—`,
     'rk.season_new': `Temporada nova começando…`,
     'rk.player': `Jogador`, 'rk.gold': `Ouro`, 'rk.members': `Membros`, 'rk.points': `Pontos`,
     'rk.champs': `Campeões anteriores`, 'rk.season_col': `Temporada`, 'rk.champion': `Campeão`,
@@ -163,7 +165,7 @@ const I18N_RK = {
   },
   en: {
     'rk.subtitle': `The finest hunters, fighters and merchants of Valadares`,
-    'rk.tab_gold': `💰 Gold`, 'rk.tab_season': `👑 Season`, 'rk.tab_arena': `🏟 Arena`,
+    'rk.tab_gold': `💰 Gold`, 'rk.tab_season': `👑 Season`, 'rk.tab_arena': `🏟 Arena`, 'rk.tab_depths': `🕳 The Depths`,
     'rk.cta': `Play Valadares`,
     'rk.f_home': `Home`, 'rk.f_play': `Play`, 'rk.f_privacy': `Privacy`, 'rk.f_terms': `Terms`,
     'rk.credit': `Valadares · made with ♥ in Paranaguá/PR · 2026`,
@@ -171,7 +173,9 @@ const I18N_RK = {
     'rk.empty': `No data yet — be the first to show up here!`,
     'rk.empty_guilds': `No guilds in the ranking yet.`,
     'rk.empty_arena': `Nobody has fought in the arena yet — be the first!`,
+    'rk.empty_depths': `Nobody has descended into the Depths yet — be the first!`,
     'rk.rating': `Rating`, 'rk.record': `W–L`,
+    'rk.floor': `Floor`, 'rk.boss_col': `Deepest boss`, 'rk.floor_n': `Floor {n}`, 'rk.no_boss': `—`,
     'rk.season_new': `New season starting…`,
     'rk.player': `Player`, 'rk.gold': `Gold`, 'rk.members': `Members`, 'rk.points': `Points`,
     'rk.champs': `Past champions`, 'rk.season_col': `Season`, 'rk.champion': `Champion`,
@@ -209,6 +213,7 @@ window.addEventListener('DOMContentLoaded', ()=>{ try{ applyI18n(); updateLangBu
     <button class="tab active" data-panel="mobs"   role="tab">⚔ Mobs</button>
     <button class="tab"        data-panel="pvp"    role="tab">☠ PvP</button>
     <button class="tab"        data-panel="arena"  role="tab" data-i18n="rk.tab_arena">🏟 Arena</button>
+    <button class="tab"        data-panel="depths" role="tab" data-i18n="rk.tab_depths">🕳 Profundezas</button>
     <button class="tab"        data-panel="bosses" role="tab">★ Bosses</button>
     <button class="tab"        data-panel="gold"   role="tab" data-i18n="rk.tab_gold">💰 Ouro</button>
     <button class="tab"        data-panel="guilds" role="tab">📜 Guilds</button>
@@ -219,6 +224,7 @@ window.addEventListener('DOMContentLoaded', ()=>{ try{ applyI18n(); updateLangBu
     <div class="panel active" data-panel="mobs"><div class="loading" data-i18n="rk.loading">Carregando…</div></div>
     <div class="panel"        data-panel="pvp"></div>
     <div class="panel"        data-panel="arena"></div>
+    <div class="panel"        data-panel="depths"></div>
     <div class="panel"        data-panel="bosses"></div>
     <div class="panel"        data-panel="gold"></div>
     <div class="panel"        data-panel="guilds"></div>
@@ -292,6 +298,28 @@ function renderArena(panel, entries){
   </table>`;
 }
 
+function renderDepths(panel, entries){
+  if (!entries || !entries.length){
+    panel.innerHTML = '<div class="empty">' + tr('rk.empty_depths') + ' <a href="/jogar">' + tr('rk.cta') + '</a></div>';
+    return;
+  }
+  const floorN = n => tr('rk.floor_n').replace('{n}', n);
+  let rows = '';
+  entries.forEach((e, i) => {
+    const cls = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+    rows += `<tr class="${cls}">
+      <td class="rank-num">${i+1}</td>
+      <td>${escapeHtml(e.name)}</td>
+      <td class="rank-value">${floorN(e.depth)}</td>
+      <td class="rank-value">${e.boss ? '👑 ' + floorN(e.boss) : tr('rk.no_boss')}</td>
+    </tr>`;
+  });
+  panel.innerHTML = `<table>
+    <thead><tr><th class="rank-num">#</th><th>${tr('rk.player')}</th><th class="rank-value">${tr('rk.floor')}</th><th class="rank-value">${tr('rk.boss_col')}</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 function renderGuilds(panel, entries){
   if (!entries || !entries.length){
     panel.innerHTML = '<div class="empty">' + tr('rk.empty_guilds') + '</div>';
@@ -351,6 +379,7 @@ async function load(){
     renderSimple(panels.mobs,   data.mobs,   tr('rk.player'), 'Mobs',        v => FMT.format(v));
     renderSimple(panels.pvp,    data.pvp,    tr('rk.player'), 'Kills',       v => FMT.format(v));
     renderArena(panels.arena,   data.arena);
+    renderDepths(panels.depths, data.depths);
     renderSimple(panels.bosses, data.bosses, tr('rk.player'), 'Bosses',      v => FMT.format(v));
     renderSimple(panels.gold,   data.gold,   tr('rk.player'), tr('rk.gold'), v => FMT.format(v) + ' g');
     renderGuilds(panels.guilds, data.guilds);

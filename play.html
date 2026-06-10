@@ -907,7 +907,7 @@
         /* MODAIS (baú, craft, altar, treino, stats, shop, quests, settings, tutorial) */
         #chestModal, #craftModal, #altarModal, #trainingModal,
         #shopModal, #questsModal, #statsModal, #chainDialogModal,
-        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #arenaModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #petModal, #forgotPwdModal, #partyInviteModal {
+        #settingsModal, #tutorialModal, #rankingModal, #friendsModal, #tradeModal, #tradeInviteModal, #duelInviteModal, #arenaModal, #achievementsModal, #goldShopModal, #talentsModal, #guildModal, #casinoModal, #dyeModal, #auctionModal, #petModal, #forgotPwdModal, #partyInviteModal, #dungeonEnterModal {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.82);
             display: flex; align-items: center; justify-content: center;
@@ -2334,6 +2334,7 @@
             <button class="train-tab" data-rank-tab="mobs" onclick="switchRankingTab('mobs')">MOBS</button>
             <button class="train-tab" data-rank-tab="pvp" onclick="switchRankingTab('pvp')">PvP</button>
             <button class="train-tab" data-rank-tab="arena" onclick="switchRankingTab('arena')" data-i18n="ranking.tab_arena">⚔ ARENA</button>
+            <button class="train-tab" data-rank-tab="depths" onclick="switchRankingTab('depths')" data-i18n="ranking.tab_depths">🕳 PROFUNDEZAS</button>
             <button class="train-tab" data-rank-tab="bosses" onclick="switchRankingTab('bosses')">BOSSES</button>
             <button class="train-tab" data-rank-tab="gold" onclick="switchRankingTab('gold')">GOLD</button>
             <button class="train-tab" data-rank-tab="guilds" onclick="switchRankingTab('guilds')">GUILDS</button>
@@ -2341,6 +2342,18 @@
         <div id="rankingBody" style="min-height:300px"></div>
         <div class="chest-hint" data-i18n-html="ranking.hint"><kbd>L</kbd> ou <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeRanking()">×</button>
+    </div>
+</div>
+
+<!-- 🕳️ Seletor de entrada das Profundezas (checkpoint por boss) — conteúdo montado
+     na abertura via tr() (openDungeonEnterModal), sem data-i18n -->
+<div id="dungeonEnterModal" style="display:none">
+    <div class="chest-box" style="min-width:300px;max-width:360px">
+        <div class="chest-title" id="dgEnterTitle">🕳️ AS PROFUNDEZAS</div>
+        <div id="dgEnterSub" style="color:#998060;font-size:11px;text-align:center;margin-bottom:10px"></div>
+        <div id="dgEnterBody"></div>
+        <div class="chest-hint" data-i18n-html="hint.esc_close"><kbd>ESC</kbd> fechar</div>
+        <button class="chest-close" onclick="closeDungeonEnterModal()">×</button>
     </div>
 </div>
 
@@ -2595,7 +2608,17 @@ const I18N = {
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ BANCADA',
     'hud.map': 'Mapa', 'hud.character': 'Personagem', 'hud.logout': 'sair ⏏', 'hud.adventurer': 'Aventureiro',
-    'hud.floor': 'Andar {floor}/{max}',
+    'hud.floor': 'Andar {floor}',
+    'stair.enter': '⬇ As Profundezas', 'stair.exit_city': '⬆ Sair (cidade)', 'stair.up': '⬆ Subir', 'stair.down': '⬇ Descer',
+    'toast.depths_unlock': '🕳️ Atalho desbloqueado — agora dá pra descer direto ao Andar {floor}!',
+    'dg.enter_title': '🕳️ AS PROFUNDEZAS', 'dg.enter_sub': 'PvP forçado lá embaixo. Onde começar a descida?',
+    'dg.enter_floor1': 'Andar 1 (do começo)', 'dg.enter_floorN': 'Andar {floor} (atalho do boss)',
+    'log.pvp_forced_dungeon': 'PvP é FORÇADO aqui embaixo — só dá pra desligar na superfície.',
+    'ranking.tab_depths': '🕳 PROFUNDEZAS',
+    'ranking.depths_header': 'TOP {n} · PROFUNDEZAS (andar mais fundo alcançado)',
+    'ranking.depths_floor': 'Andar {floor}',
+    'ranking.depths_boss': 'boss do Andar {floor} morto',
+    'ranking.depths_noboss': 'nenhum boss de banda morto',
     'hud.spells': 'Magias', 'hud.attack': 'Ataque', 'hud.defense': 'Defesa', 'hud.crit': 'Crítico',
     'hud.dodge': 'Esquiva', 'hud.speed': 'Velocidade', 'hud.atkspeed': 'Vel. ataque', 'hud.position': 'Posição',
     'hud.combat_tab': 'COMBATE', 'hud.f_all': 'tudo', 'hud.f_dmg': 'dano', 'hud.f_kill': 'mortes', 'hud.f_sys': 'sistema',
@@ -3273,7 +3296,17 @@ const I18N = {
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ CRAFTING BENCH',
     'hud.map': 'Map', 'hud.character': 'Character', 'hud.logout': 'log out ⏏', 'hud.adventurer': 'Adventurer',
-    'hud.floor': 'Floor {floor}/{max}',
+    'hud.floor': 'Floor {floor}',
+    'stair.enter': '⬇ The Depths', 'stair.exit_city': '⬆ Leave (city)', 'stair.up': '⬆ Up', 'stair.down': '⬇ Down',
+    'toast.depths_unlock': '🕳️ Shortcut unlocked — you can now descend straight to Floor {floor}!',
+    'dg.enter_title': '🕳️ THE DEPTHS', 'dg.enter_sub': 'PvP is forced down there. Where do you start?',
+    'dg.enter_floor1': 'Floor 1 (from the top)', 'dg.enter_floorN': 'Floor {floor} (boss shortcut)',
+    'log.pvp_forced_dungeon': 'PvP is FORCED down here — you can only turn it off at the surface.',
+    'ranking.tab_depths': '🕳 DEPTHS',
+    'ranking.depths_header': 'TOP {n} · THE DEPTHS (deepest floor reached)',
+    'ranking.depths_floor': 'Floor {floor}',
+    'ranking.depths_boss': 'Floor {floor} boss slain',
+    'ranking.depths_noboss': 'no band boss slain',
     'hud.spells': 'Spells', 'hud.attack': 'Attack', 'hud.defense': 'Defense', 'hud.crit': 'Critical',
     'hud.dodge': 'Dodge', 'hud.speed': 'Speed', 'hud.atkspeed': 'Atk. speed', 'hud.position': 'Position',
     'hud.combat_tab': 'COMBAT', 'hud.f_all': 'all', 'hud.f_dmg': 'damage', 'hud.f_kill': 'deaths', 'hud.f_sys': 'system',
@@ -7493,6 +7526,8 @@ function handleMP(msg){
         if (typeof showLoadingOverlay === 'function') showLoadingOverlay(false);
         if (msg.motd) showServerToast('event', '📜 ' + msg.motd, null, 7000);
         if (msg.dailyEvent) applyDailyEventInfo(msg.dailyEvent);
+        // 🕳️ Checkpoint das Profundezas (server-owned): habilita o seletor na entrada
+        if (typeof msg.dungeonUnlock === 'number') player.dungeonUnlock = msg.dungeonUnlock;
         // Manutenção: o server reiniciou e te jogou na PZ (a posição já vem no snapshot
         // self, aplicada abaixo). Explica o teleporte pro player não se assustar.
         if (msg.maintenance && typeof showServerToast === 'function'){
@@ -7955,6 +7990,13 @@ function handleMP(msg){
     } else if (msg.t === 'dungeonResult'){
         const errs = { not_at_entrance: tr('err.dg_not_entrance'), not_at_exit: tr('err.dg_not_exit') };
         if (msg.error && typeof showServerToast === 'function') showServerToast('warn', errs[msg.error] || tr('err.failed'), null, 4000);
+    } else if (msg.t === 'dungeonUnlock'){
+        // 🕳️ Matou o boss da banda: descida direta desbloqueada (checkpoint persistido)
+        if (typeof msg.floor === 'number' && msg.floor > (player.dungeonUnlock || 0)){
+            player.dungeonUnlock = msg.floor;
+            if (typeof showServerToast === 'function') showServerToast('event', tr('toast.depths_unlock', {floor: msg.floor}), null, 7000);
+            log(`<span class="log-sys">${tr('toast.depths_unlock', {floor: msg.floor})}</span>`);
+        }
     } else if (msg.t === 'restoreMode'){
         // Server liberou restauração da conta (admin /allowrestore). Manda o backup local.
         const bkp = (typeof readSaveRaw === 'function') ? readSaveRaw('valadares:save:bkp:' + player.name) : null;
@@ -10385,14 +10427,16 @@ function drawMinimap(){
         else icon = '🌆';
         gc.textContent = `${icon} ${fmtGameHour(d.hour)}`;
     }
-    // M4 3b: indicador de andar — visível só na masmorra (floor>=1), acento por profundidade
+    // M4 3b: indicador de andar — visível só na masmorra (floor>=1), acento por profundidade.
+    // Sem fundo: o texto perdeu o "/5". Guard !player._arena: a arena usa floor 9000+
+    // na MESMA máquina — sem o guard o badge mostrava "Andar 9001" na partida.
     const fb = document.getElementById('floorBadge');
     if (fb){
         const f = player.floor || 0;
-        if (f >= 1){
+        if (f >= 1 && !player._arena){
             const txt = document.getElementById('floorBadgeText');
-            if (txt) txt.textContent = tr('hud.floor', { floor: f, max: DUNGEON_MAX_FLOOR_C });
-            const t = Math.min(1, (f - 1) / Math.max(1, DUNGEON_MAX_FLOOR_C - 1));
+            if (txt) txt.textContent = tr('hud.floor', { floor: f });
+            const t = Math.min(1, (f - 1) / Math.max(1, DUNGEON_TINT_FULL_C - 1));
             fb.style.borderColor = `rgb(${Math.round(110 + 90*t)},${Math.round(58 - 28*t)},${Math.round(130 - 20*t)})`;
             fb.style.boxShadow = `0 2px 12px rgba(${Math.round(110 + 90*t)},20,90,0.45)`;
             if (fb.style.display === 'none') fb.style.display = '';
@@ -12411,7 +12455,7 @@ document.addEventListener('keydown', e => {
         document.getElementById('chatInput')?.focus();
     }
     if (e.key==='Tab'){ e.preventDefault(); const n = cycleBattleList(); log(n ? `<span class="${n.isPlayer?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(n.name)}${n.isPlayer?' ☠':''} [AUTO]</span>` : '<span class="log-sys">Nenhum inimigo à vista.</span>'); }
-    if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); closeDungeonEnterModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup', e => {
@@ -12975,10 +13019,13 @@ function drawDayNightTint(day){
     // — ignora o ciclo dia/noite (a masmorra não vê o céu).
     const dFloor = (player && player.floor) || 0;
     if (dFloor >= 1){
-        const t = Math.min(1, (dFloor - 1) / Math.max(1, DUNGEON_MAX_FLOOR_C - 1));
-        const a = 0.05 + 0.09 * t;
+        // Rampa 1→5 = look validado pelo dono (intocada). Masmorra sem fundo: 2ª rampa
+        // (t2, andares 6→20) aprofunda o vermelho devagar — fundura continua legível.
+        const t = Math.min(1, (dFloor - 1) / Math.max(1, DUNGEON_TINT_FULL_C - 1));
+        const t2 = Math.min(1, Math.max(0, dFloor - DUNGEON_TINT_FULL_C) / 15);
+        const a = 0.05 + 0.09 * t + 0.04 * t2;
         ctx.save();
-        ctx.fillStyle = `rgba(${Math.round(70 + 70*t)},14,${Math.round(54 + 8*t)},${a})`;
+        ctx.fillStyle = `rgba(${Math.round(70 + 70*t + 20*t2)},14,${Math.round(54 + 8*t)},${a})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
         return;
@@ -13011,12 +13058,15 @@ function drawLighting(cam, day){
     if (dFloor >= 1){
         // M4 3b polish: tonalidade por profundidade — andar 1 leve → andar 5
         // escuro e ameaçador (avermelha/arroxeia); a luz do player encolhe = claustrofobia.
-        const t = Math.min(1, (dFloor - 1) / Math.max(1, DUNGEON_MAX_FLOOR_C - 1));
-        darkness = 0.66 + 0.20 * t;
-        baseR = Math.round(14 + 28 * t);
+        // Sem fundo: 2ª rampa (t2, andares 6→20) escurece mais um pouco e encolhe a luz
+        // até ~4.0 tiles — sem zerar a jogabilidade (knobs: os coeficientes de t2).
+        const t = Math.min(1, (dFloor - 1) / Math.max(1, DUNGEON_TINT_FULL_C - 1));
+        const t2 = Math.min(1, Math.max(0, dFloor - DUNGEON_TINT_FULL_C) / 15);
+        darkness = 0.66 + 0.20 * t + 0.06 * t2;
+        baseR = Math.round(14 + 28 * t + 18 * t2);
         baseG = 8;
         baseB = Math.round(22 + 10 * t);
-        lightScale = 1 - 0.14 * t;
+        lightScale = 1 - 0.14 * t - 0.08 * t2;
     } else if (playerInCave){
         darkness = Math.max(0.78, day.darkness);
         baseR = 10; baseG = 8; baseB = 18;
@@ -13536,6 +13586,12 @@ function pvpMults(){
 }
 
 function togglePvP(){
+    // Masmorra/arena: PvP é FORÇADO (o server agora ignora t:'pvp' fora do floor 0 —
+    // sem este guard o toggle local dessincronizava do server).
+    if ((player.floor || 0) !== 0){
+        log(`<span class="log-sys">${tr('log.pvp_forced_dungeon')}</span>`);
+        return;
+    }
     if (!player.pvp && player.gold < PVP_MIN_GOLD){
         log(tr('log.pvp_requires', {req: PVP_MIN_GOLD, have: player.gold}));
         return;
@@ -13772,7 +13828,11 @@ function handleMovement(dt){
 // M4: pisar na escada dispara a transição de andar (server valida adjacência).
 // Debounce 1.2s pra não re-disparar enquanto o server processa/teleporta.
 const DUNGEON_STAIR_IN   = { x: 83, y: 17 };   // entrada no Antro do Minotauro (bate com DUNGEON_ENTRANCE do server)
-const DUNGEON_MAX_FLOOR_C = 5;                 // último andar sem escada de descida (bate com DUNGEON_MAX_FLOOR)
+// Masmorra SEM FUNDO: o teto de andares saiu do cliente — a presença de
+// stairs.down (server-autoritativa) é o que diz se dá pra descer. Constantes de
+// banda espelham o server (DUNGEON_BOSS_EVERY) só pro seletor de atalho.
+const DUNGEON_BOSS_EVERY_C = 5;                // boss/checkpoint a cada N andares (bate com DUNGEON_BOSS_EVERY)
+const DUNGEON_TINT_FULL_C  = 5;                // rampa visual 1→5 (look validado); andares >5 escurecem extra (2ª rampa)
 // M4 3b Fase 2: escadas do andar (subida/descida) são PROCEDURAIS e vêm do server
 // (dungeonEnter.stairs → dungeonStairs). SEM fallback de tile fixo: se ausentes,
 // dunStair* retornam null e a transição não dispara — em vez de chutar 50,50/50,57
@@ -13789,19 +13849,47 @@ function checkDungeonStairs(x, y){
     if (f === 0){
         if (x === DUNGEON_STAIR_IN.x && y === DUNGEON_STAIR_IN.y){
             _lastStairTrigger = now;
-            try { ws.send(JSON.stringify({ t:'enterDungeon' })); } catch {}
+            // 🕳️ Checkpoint: com atalho desbloqueado (boss de banda morto), pisar na
+            // entrada abre o SELETOR de andar em vez de descer direto pro 1.
+            if ((player.dungeonUnlock || 0) >= DUNGEON_BOSS_EVERY_C) openDungeonEnterModal();
+            else { try { ws.send(JSON.stringify({ t:'enterDungeon' })); } catch {} }
         }
     } else {
         const sUp = dunStairUp(), sDown = dunStairDown();
         if (sUp && x === sUp.x && y === sUp.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}     // sobe 1 andar (andar 1 → cidade)
-        } else if (sDown && f < DUNGEON_MAX_FLOOR_C && x === sDown.x && y === sDown.y){
+        } else if (sDown && x === sDown.x && y === sDown.y){
             _lastStairTrigger = now;
-            try { ws.send(JSON.stringify({ t:'descendDungeon' })); } catch {}   // desce 1 andar
+            try { ws.send(JSON.stringify({ t:'descendDungeon' })); } catch {}   // desce 1 andar (server valida o teto)
         }
     }
 }
+// Seletor de entrada das Profundezas (checkpoint por boss): Andar 1 + cada banda
+// (5, 10, 15…) já desbloqueada. Conteúdo montado na abertura via tr() (i18n).
+function openDungeonEnterModal(){
+    const modal = document.getElementById('dungeonEnterModal');
+    if (!modal) return;
+    const unlock = player.dungeonUnlock || 0;
+    const opts = [1];
+    for (let fl = DUNGEON_BOSS_EVERY_C; fl <= unlock; fl += DUNGEON_BOSS_EVERY_C) opts.push(fl);
+    document.getElementById('dgEnterTitle').textContent = tr('dg.enter_title');
+    document.getElementById('dgEnterSub').textContent = tr('dg.enter_sub');
+    document.getElementById('dgEnterBody').innerHTML = opts.map(fl => `
+        <button class="train-tab" style="display:block;width:100%;margin:4px 0;padding:9px 12px;text-align:left;font-size:13px"
+            onclick="enterDepthsAt(${fl})">🕳️ ${fl === 1 ? tr('dg.enter_floor1') : tr('dg.enter_floorN', {floor: fl})}</button>`).join('');
+    modal.style.display = 'flex';
+}
+function closeDungeonEnterModal(){
+    const modal = document.getElementById('dungeonEnterModal');
+    if (modal) modal.style.display = 'none';
+}
+function enterDepthsAt(fl){
+    closeDungeonEnterModal();
+    try { ws.send(JSON.stringify({ t:'enterDungeon', floor: fl })); } catch {}
+}
+window.enterDepthsAt = enterDepthsAt;
+window.closeDungeonEnterModal = closeDungeonEnterModal;
 
 // Anti-ninja: bag de mob comum fica reservada ao dono (top-damager) + party dele por
 // alguns segundos (server carimba owner/ownerUntil). Pra MIM nunca trava (minha bag ou
@@ -14839,8 +14927,8 @@ function renderRankingBody(){
     }
     const list = _rankingCache[_rankingTab] || [];
     const labels = LANG === 'en'
-        ? { mobs:'Mobs killed', pvp:'PvP kills', bosses:'Unique bosses', gold:'Gold', guilds:'Guilds', arena:'Arena' }
-        : { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds', arena:'Arena' };
+        ? { mobs:'Mobs killed', pvp:'PvP kills', bosses:'Unique bosses', gold:'Gold', guilds:'Guilds', arena:'Arena', depths:'The Depths' }
+        : { mobs:'Mobs mortos', pvp:'PvP kills', bosses:'Bosses únicos', gold:'Ouro', guilds:'Guilds', arena:'Arena', depths:'Profundezas' };
     if (!list.length){
         el.innerHTML = `<div style="color:#666;text-align:center;padding:40px;font-style:italic">${tr('ranking.list_empty', {label: labels[_rankingTab]})}</div>`;
         return;
@@ -14887,6 +14975,23 @@ function renderRankingBody(){
                     </div>
                 </div>`;
             }).join('')}`;
+        return;
+    }
+    // Aba PROFUNDEZAS — andar mais fundo alcançado (masmorra sem fundo) + boss mais fundo morto
+    if (_rankingTab === 'depths'){
+        el.innerHTML = `
+            <div style="color:#998040;font-size:10px;letter-spacing:1.5px;padding:0 8px 8px 8px;text-align:center">${tr('ranking.depths_header', {n: list.length})}</div>
+            ${list.map((e, i) => `
+                <div style="padding:6px 10px;border-bottom:1px solid #1a1408;${e.name === player.name ? 'background:#1a1a08' : ''}">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="color:${colorMedal(i)};font-weight:600;font-size:13px;min-width:24px;text-align:center">#${i+1}</span>
+                        <span style="flex:1;color:${e.name === player.name ? '#e0c060' : '#c8a050'};font-weight:${e.name === player.name ? 600 : 400}">${escapeHtml(e.name)}${e.name === player.name ? ` <span style="color:#888;font-size:10px">${tr('common.you')}</span>` : ''}</span>
+                        <span style="color:#d070f0;font-family:Consolas,monospace;min-width:80px;text-align:right;font-weight:700">${tr('ranking.depths_floor', {floor: e.depth})}</span>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:#7a6520;margin-left:34px">
+                        <span>${e.boss ? '👑 ' + tr('ranking.depths_boss', {floor: e.boss}) : tr('ranking.depths_noboss')}</span>
+                    </div>
+                </div>`).join('')}`;
         return;
     }
     el.innerHTML = `
@@ -16501,13 +16606,15 @@ function loop(ts){
             ctx.textBaseline = 'alphabetic';
         };
         if (onFloor === 0){
-            drawStair(DUNGEON_STAIR_IN, true, '⬇ As Profundezas');
+            drawStair(DUNGEON_STAIR_IN, true, tr('stair.enter'));
         } else {
+            // Sem fundo: a escada de descida existe se o server mandou (stairs.down) —
+            // o teto saiu do cliente. Rótulos via tr() (eram o último PT hardcoded da masmorra).
             const su = dunStairUp(), sd = dunStairDown();
-            if (su) drawStair(su, false, onFloor === 1 ? '⬆ Sair (cidade)' : '⬆ Subir');
-            if (sd && onFloor < DUNGEON_MAX_FLOOR_C) drawStair(sd, true, '⬇ Descer');
+            if (su) drawStair(su, false, onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
+            if (sd) drawStair(sd, true, tr('stair.down'));
             // setas de borda: descida em destaque (roxo), subida discreta (azul)
-            if (sd && onFloor < DUNGEON_MAX_FLOOR_C) drawEdgeArrow(sd, '#f070f0', '▼');
+            if (sd) drawEdgeArrow(sd, '#f070f0', '▼');
             if (su) drawEdgeArrow(su, '#70c0ff', '▲');
         }
     }

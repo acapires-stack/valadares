@@ -189,6 +189,7 @@ async function handleHttpRequest(req, res){
             bosses: topRanking('bossKills', limit),
             gold:   topRanking('gold',      limit),
             arena:  topArenaRanking(limit),
+            depths: topDepthRanking(limit),
             guilds: topGuildRanking(limit),
             season: {
                 id: seasonState.id,
@@ -1251,15 +1252,25 @@ const LOOT = {
         ['PART_FOGO', 0.10, 1, 1], ['PART_TROVAO', 0.10, 1, 1],
     ],
 };
-function rollLoot(mobType, luck){
+function rollLoot(mobType, luck, floor){
     const table = LOOT[mobType];
     if (!table) return [];
     const lk = Math.max(0, luck || 0);   // Sortudo (t_luck): + chance relativa de ITENS (gold inalterado)
+    // Masmorra escalável: o loot PAGA a profundidade (senão descer não compensa o
+    // risco). GOLD ×(1 + 0.15·(andar−1)) na quantidade; ITEM ganha chance relativa
+    // +5%/andar (soma com o Sortudo, mesmo cap 0.95 absoluto). Cresce de propósito
+    // MAIS DEVAGAR que o HP do mob (+60%/andar) → gold/hora sobe sublinear, sem
+    // inflacionar a economia (o gold vendido na loja MP segue relevante).
+    // isDungeonFloor (não `>= 1`): arena 9000+ nunca escalaria loot.
+    const f = isDungeonFloor(floor || 0) ? (floor || 0) : 0;
+    const gMult = f >= 1 ? (1 + DUNGEON_LOOT_SCALE * (f - 1)) : 1;
+    const iLk   = f >= 1 ? DUNGEON_ITEM_LUCK_SCALE * (f - 1) : 0;
     const out = [];
     for (const [type, chance, qMin, qMax] of table){
-        const c = type === 'GOLD' ? chance : Math.min(0.95, chance * (1 + lk));
+        const c = type === 'GOLD' ? chance : Math.min(0.95, chance * (1 + lk + iLk));
         if (Math.random() < c){
-            const qty = qMin + Math.floor(Math.random() * (qMax - qMin + 1));
+            let qty = qMin + Math.floor(Math.random() * (qMax - qMin + 1));
+            if (type === 'GOLD' && gMult > 1) qty = Math.max(1, Math.round(qty * gMult));
             out.push({ type, qty });
         }
     }
@@ -1268,6 +1279,9 @@ function rollLoot(mobType, luck){
 
 const BOSS_RESPAWN_MS = 5 * 60 * 1000;
 const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
+// Drake/Golem usavam a MESMA constante do boss da masmorra — separado pra poder
+// retunar o cooldown das Profundezas sem mexer nos bosses do mundo (mesmo valor).
+const WORLD_BOSS_RESPAWN_SLOW_MS = 8 * 60 * 1000;
 // Teto de dano por hit (anti-forja de msg.amount no attackMob). O maior hit
 // LEGÍTIMO possível é ~372: arma mítica forjada (ESPADA_ETERNA base 30 +5 = 37)
 // + skill no cap (floor(200/3)=66) + variância (2) = 105, ×2 crit = 210, × mults
@@ -1287,15 +1301,16 @@ const ATTACK_MIN_INTERVAL_MS = 200;
 // e a frequência já é limitada pelo rate-limit 600ms do spellCast.
 const ATTACK_ACTION_MIN_MS = 400;
 const BOSS_POS  = { type:'ORC_LIDER',   x:46, y:95, respawn: BOSS_RESPAWN_MS };
-const DRAKE_POS = { type:'DRAKE_LIDER', x:82, y:80, respawn: DUNGEON_BOSS_RESPAWN_MS };
-const GOLEM_POS = { type:'GOLEM_REI',   x:70, y:90, respawn: DUNGEON_BOSS_RESPAWN_MS };
+const DRAKE_POS = { type:'DRAKE_LIDER', x:82, y:80, respawn: WORLD_BOSS_RESPAWN_SLOW_MS };
+const GOLEM_POS = { type:'GOLEM_REI',   x:70, y:90, respawn: WORLD_BOSS_RESPAWN_SLOW_MS };
 const BOSSES = [BOSS_POS, DRAKE_POS, GOLEM_POS];
 const bossDeath = new Map(); // type -> deathAt
 // M4 anti-farm: cooldown de respawn do boss da masmorra (Senhor das Profundezas).
 // Sem isso, spawnDungeonMobs repunha o boss no tick seguinte (8s) sempre que o andar
-// 5 tinha player e nenhum boss vivo → farm infinito ("matei e já spawnou de novo").
+// de banda tinha player e nenhum boss vivo → farm infinito ("matei e já spawnou de novo").
 // In-memory e efêmero como a própria masmorra: NÃO persiste no save nem precisa de
-// cleanup — bounded a 1 chave (DUNGEON_MAX_FLOOR) e é apagado no respawn.
+// cleanup — 1 chave por andar de BANDA visitado (5, 10, 15…; punhado na prática) e a
+// chave é apagada no respawn. Zera no restart (anti-farm de 8min some — aceitável).
 const dungeonBossDeath = new Map(); // floor -> deathAt
 const bossLevel = new Map(); // type -> 1..10 (escala stats no respawn)
 const BOSS_LEVEL_CAP = 10;
@@ -1406,22 +1421,40 @@ let nextMobId = 1;
 const SERVER_BOOT_TIME = Date.now();
 const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 
-// ─── M4 "As Profundezas" — masmorra aberta vertical ───────────────────────
-// Andar compartilhado e perigoso (PvP forçado). 5 andares (boss no 5). O server
-// é DONO do layout: genDungeonGrid gera cada andar como caverna procedural
-// (cellular automata, determinística por andar) e rastreia p.floor + posição.
+// ─── M4 "As Profundezas" — masmorra aberta vertical SEM FUNDO ──────────────
+// Andar compartilhado e perigoso (PvP forçado). Masmorra ESCALÁVEL (endgame):
+// sem teto de design — desce enquanto aguentar (o limite real emerge do TTK,
+// mobs +60%/andar contra dano de player capado). Boss a cada DUNGEON_BOSS_EVERY
+// andares (5, 10, 15…), escalando por profundidade; matar o boss da banda
+// desbloqueia DESCIDA DIRETA àquele andar na entrada (checkpoint persistido na
+// conta). Profundidade máxima alcançada entra no ranking público (entry.depth).
+// O server é DONO do layout: genDungeonGrid gera cada andar como caverna
+// procedural (cellular automata, determinística por andar) e rastreia p.floor.
 // Entrada: Antro do Minotauro (83,17). Player desce → chega em (50,52) no andar.
-// Fase 2: as escadas do andar (subida/descida/boss) são PROCEDURAIS — escolhidas
-// por genDungeonGrid em chão alcançável (subida perto da chegada e no lado OPOSTO
-// à descida pra não pisar sem querer; descida/boss no ponto mais fundo). A saída
-// do andar 1 volta pra PZ da cidade (50,50).
+// As escadas do andar (subida/descida/boss) são PROCEDURAIS — escolhidas por
+// genDungeonGrid em chão alcançável (subida perto da chegada e no lado OPOSTO
+// à descida; descida no ponto mais fundo; boss da banda fundo TAMBÉM, mas a
+// ≥3 tiles da descida — ele "guarda" a região da escada sem bloquear o tile).
+// A saída do andar 1 volta pra PZ da cidade (50,50).
 const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
 const DUNGEON_RETURN   = { x: 50, y: 50 };   // SAÍDA SEGURA: PZ da cidade (antes 83,18 = no meio dos minotauros = morte ao sair)
 const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada FIXA ao entrar/trocar de andar (genDungeonGrid garante clareira aqui)
-const DUNGEON_MAX_FLOOR = 5;                  // Fase 3: 5 andares (boss no 5 — slice 3c)
+// Teto TÉCNICO, não de design: protege a faixa 9000+ da arena (arenaFloorSeq) e
+// dá um fim formal à recursão. Inalcançável na prática (andar 999 = mobs ×600).
+const DUNGEON_FLOOR_HARD_CAP = 999;
+const DUNGEON_BOSS_EVERY  = 5;                // boss a cada N andares (5, 10, 15…)
 const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
-const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss único do último andar (3c)
-const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fundo da sala (longe da chegada 50,52; > aggro 9 → dorme até você chegar perto)
+const DUNGEON_BOSS_SCALE  = 0.30;             // boss: +30% hp/dmg/xp por andar ALÉM do 5 (andar 5 = base, igual antes)
+const DUNGEON_LOOT_SCALE  = 0.15;             // +15% de GOLD dropado por andar (andar 1 = base) — paga o risco de descer
+const DUNGEON_ITEM_LUCK_SCALE = 0.05;         // +5% de chance relativa de ITEM por andar (cap 0.95 absoluto, como o Sortudo)
+const DUNGEON_BOSS_TYPE  = 'SENHOR_PROFUNDEZAS';   // ★ boss das bandas (5, 10, 15…)
+const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fallback de spawn do boss (se o grid degenerar)
+// Andar de MASMORRA de verdade (exclui floor 0 = overworld e 9000+ = arena M7).
+// Toda lógica nova por-andar deve usar ISTO em vez de `f >= 1` — o padrão `f >= 1`
+// captura floors de arena (bug histórico do M7: mobs escalados spawnando na arena).
+function isDungeonFloor(f){ return f >= 1 && f <= DUNGEON_FLOOR_HARD_CAP; }
+// Andar de boss (banda): 5, 10, 15… O boss escala com DUNGEON_BOSS_SCALE.
+function isBossFloor(f){ return isDungeonFloor(f) && f % DUNGEON_BOSS_EVERY === 0; }
 // Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
 // Box = sala visível INTEIRA (CAVE 40-60) pra mobs usarem a beirada também.
 // Antes era 41-59 (1 tile menor): no canto/beirada só 1-2 mobs alcançavam o
@@ -1549,12 +1582,27 @@ function genDungeonGrid(floor){
         if (sc > upScore){ upScore = sc; up = c; }
     }
     if (!up) up = far;   // sala minúscula: degenera
-    const lastFloor = floor >= DUNGEON_MAX_FLOOR;
+    // Sem fundo: TODO andar tem descida (= ponto mais fundo), exceto o teto técnico.
+    // Andar de banda (5, 10, 15…): o boss nasce no 2º ponto mais fundo a ≥3 tiles da
+    // descida — "guarda" a região da escada sem ocupar o tile dela (isTransitionTile
+    // não inclui boss de propósito, senão spawnMob bloquearia o spawn do próprio boss).
+    const lastFloor = floor >= DUNGEON_FLOOR_HARD_CAP;
+    let bossSpot = null;
+    if (isBossFloor(floor)){
+        let bossD = -1;
+        for (const t of floorTiles){
+            const d = dist[idx(t.x - x0, t.y - y0)];
+            if (d < 0) continue;
+            if (Math.max(Math.abs(t.x - far.x), Math.abs(t.y - far.y)) < 3) continue;
+            if (d > bossD){ bossD = d; bossSpot = { x: t.x, y: t.y }; }
+        }
+        if (!bossSpot) bossSpot = { x: far.x, y: far.y };   // caverna minúscula: degenera pro fundo
+    }
     const stairs = {
         spawn: { x: DUNGEON_SPAWN.x, y: DUNGEON_SPAWN.y },
         up:    { x: up.x,  y: up.y  },
         down:  lastFloor ? null : { x: far.x, y: far.y },     // escada de descida = ponto mais fundo
-        boss:  lastFloor ? { x: far.x, y: far.y } : null,     // boss no ponto mais fundo do andar 5
+        boss:  bossSpot,                                       // só nas bandas (5, 10, 15…)
     };
     return { floor, region: { x0, y0, x1, y1 }, rows, walkable, floorTiles, stairs };
 }
@@ -1566,8 +1614,17 @@ function dungeonTileWalkable(floor, x, y){
     const g = dungeonFloors.get(floor);
     return !!g && g.walkable.has(x + ',' + y);
 }
-const DUNGEON_MOB_TARGET = 9;                 // população de mobs no andar 1
-const DUNGEON_MOB_TYPES  = ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // pesos: mais Sombra
+const DUNGEON_MOB_TARGET = 9;                 // população de mobs por andar
+// Mix de mobs por BANDA de profundidade (repetição = peso). Bandas fundas misturam
+// mobs do mundo (sprite/IA/loot já existem nos 2 lados) escalados pelo fMult do
+// andar — variedade de graça + fraquezas elementais pro mago variar o elemento.
+function dungeonMobTypesFor(floor){
+    if (floor >= 20) return ['SOMBRA', 'CARRASCO', 'CARRASCO', 'DRAKE', 'GOLEM', 'MINOTAUR'];
+    if (floor >= 15) return ['SOMBRA', 'CARRASCO', 'DRAKE', 'GOLEM'];
+    if (floor >= 10) return ['SOMBRA', 'CARRASCO', 'CARRASCO', 'TROLL', 'SKELETON'];
+    if (floor >= 5)  return ['SOMBRA', 'SOMBRA', 'CARRASCO', 'SKELETON'];
+    return ['SOMBRA', 'SOMBRA', 'CARRASCO'];   // 1-4: identidade original das Profundezas
+}
 // Mob pode pisar no tile? No andar usa o box da sala (sem PZ, sem grid do
 // overworld). No overworld, regra normal (walkable + fora da PZ).
 // Tiles de transição (escadas + chegada) onde mob NÃO pode ficar — senão bloqueia
@@ -2101,10 +2158,17 @@ function spawnMob(type, x, y, floor){
     const level = def.unique ? Math.max(1, Math.min(BOSS_LEVEL_CAP, bossLevel.get(type) || 1)) : 1;
     const k = level - 1;
     // Fase 3: mobs comuns escalam por profundidade da masmorra (+60%/andar; andar 1 = base).
-    const fMult = (!def.unique && (floor || 0) >= 1) ? (1 + DUNGEON_FLOOR_SCALE * ((floor || 0) - 1)) : 1;
-    const hp  = def.unique ? Math.round(def.hp  * (1 + k * 0.15)) : Math.round(def.hp  * fMult);
-    const dmg = def.unique ? Math.round(def.dmg * (1 + k * 0.10)) : Math.round(def.dmg * fMult);
-    const xp  = def.unique ? Math.round(def.xp  * (1 + k * 0.20)) : Math.round(def.xp  * fMult);
+    // isDungeonFloor (não `>= 1`): floor de arena (9000+) nunca escala — defesa extra
+    // além do guard de spawnDungeonMobs.
+    const fMult = (!def.unique && isDungeonFloor(floor || 0)) ? (1 + DUNGEON_FLOOR_SCALE * ((floor || 0) - 1)) : 1;
+    // Boss das Profundezas: escala pela BANDA (andar 5 = base ×1, igual antes; +30%/andar
+    // além — andar 10 = ×2.5, 15 = ×4, 20 = ×5.5). Mais suave que a curva dos mobs
+    // (×6.4 no 10) de propósito: a luta longa demais vira tédio, não desafio.
+    const bMult = (def.unique && type === DUNGEON_BOSS_TYPE && isDungeonFloor(floor || 0))
+        ? (1 + DUNGEON_BOSS_SCALE * Math.max(0, (floor || 0) - DUNGEON_BOSS_EVERY)) : 1;
+    const hp  = def.unique ? Math.round(def.hp  * (1 + k * 0.15) * bMult) : Math.round(def.hp  * fMult);
+    const dmg = def.unique ? Math.round(def.dmg * (1 + k * 0.10) * bMult) : Math.round(def.dmg * fMult);
+    const xp  = def.unique ? Math.round(def.xp  * (1 + k * 0.20) * bMult) : Math.round(def.xp  * fMult);
     const m = {
         id: nextMobId++, type, x, y, dir:'down',
         spawnX: x, spawnY: y,    // âncora pra wandering (volta pra perto)
@@ -2175,11 +2239,11 @@ function spawnInitial(){
 function spawnDungeonMobs(){
     // Fase 3: mantém população em CADA andar com player; limpa andares vazios
     // (masmorra efêmera — não simula andar sem ninguém e evita acúmulo de mobs).
-    // M7 FIX: só andares de MASMORRA (1..DUNGEON_MAX_FLOOR). A arena usa floor 9000+ como
-    // instância isolada e NÃO pode entrar aqui — senão este tick (8s) spawnava SOMBRA/CARRASCO
-    // escalados por 1.6^9000 (≈1.2M HP / one-shot de 60k) na arena, e deletava o grid da arena
-    // no meio da partida. O grid/limpeza da arena é gerido por endArenaMatch/returnFromArena.
-    const isDungeonFloor = (f) => f >= 1 && f <= DUNGEON_MAX_FLOOR;
+    // M7 FIX: só andares de MASMORRA (isDungeonFloor, agora helper GLOBAL). A arena usa
+    // floor 9000+ como instância isolada e NÃO pode entrar aqui — senão este tick (8s)
+    // spawnava SOMBRA/CARRASCO escalados pelo fMult linear do andar 9000+ (≈1.2M HP /
+    // one-shot de 60k) na arena, e deletava o grid da arena no meio da partida. O
+    // grid/limpeza da arena é gerido por endArenaMatch/returnFromArena.
     const floorsWithPlayers = new Set();
     for (const p of players.values()){ const f = p.floor || 0; if (isDungeonFloor(f)) floorsWithPlayers.add(f); }
     for (const m of Array.from(monsters.values())){
@@ -2189,11 +2253,11 @@ function spawnDungeonMobs(){
     for (const f of [...dungeonFloors.keys()]){ if (isDungeonFloor(f) && !floorsWithPlayers.has(f)) dungeonFloors.delete(f); }
     for (const floor of floorsWithPlayers){
         const g = getDungeonFloor(floor);   // M4 3b: grid do andar (layout/escadas/floor tiles)
-        // ★ Boss do último andar: 1 por vez, com cooldown de respawn pós-morte (anti-farm)
-        if (floor === DUNGEON_MAX_FLOOR){
+        // ★ Boss das BANDAS (andar 5, 10, 15…): 1 por andar, com cooldown pós-morte (anti-farm)
+        if (isBossFloor(floor)){
             const hasBoss = Array.from(monsters.values()).some(mm => mm.type === DUNGEON_BOSS_TYPE && (mm.floor||0) === floor && mm.hp > 0);
             // Cooldown anti-farm: só repõe o boss DUNGEON_BOSS_RESPAWN_MS (8min) após a
-            // última morte. Sem isso, matar e ficar no andar 5 = respawn no tick (8s).
+            // última morte NAQUELE andar. Sem isso, matar e ficar = respawn no tick (8s).
             // 1ª descida (sem morte registrada) → deadAt 0 → spawna na hora. OK.
             const deadAt = dungeonBossDeath.get(floor) || 0;
             const bs = g.stairs.boss || DUNGEON_BOSS_SPAWN;
@@ -2216,7 +2280,8 @@ function spawnDungeonMobs(){
             const x = t.x, y = t.y;
             if (stairTiles.has(x + ',' + y)) continue;   // longe das escadas/chegada
             if (mobAt(x, y, floor)) continue;
-            const type = DUNGEON_MOB_TYPES[Math.floor(Math.random() * DUNGEON_MOB_TYPES.length)];
+            const mix = dungeonMobTypesFor(floor);
+            const type = mix[Math.floor(Math.random() * mix.length)];
             const mob = spawnMob(type, x, y, floor);
             if (mob) count++;
         }
@@ -2230,6 +2295,12 @@ function enterDungeonFloor(p, id, floor, dir){
     p.floor = floor;
     const g = getDungeonFloor(floor);          // M4 3b: server é dono do layout do andar
     p.x = g.stairs.spawn.x; p.y = g.stairs.spawn.y;
+    // Ranking de profundidade: andar mais fundo ALCANÇADO (persiste no state.json
+    // junto com a entry — mesmo veículo do arenaRating). Arena não passa por aqui.
+    if (isDungeonFloor(floor)){
+        const r = ensureRanking(p.name);
+        if (r && floor > (r.depth || 0)) r.depth = floor;
+    }
     spawnDungeonMobs();
     if (p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
@@ -3096,6 +3167,17 @@ function topArenaRanking(limit){
             losses: r.arenaLosses || 0,
         }))
         .sort((a, b) => b.rating - a.rating)
+        .slice(0, limit);
+}
+// Ranking das Profundezas (masmorra sem fundo): andar mais fundo ALCANÇADO
+// (entry.depth, setado em enterDungeonFloor) — tiebreak pelo boss mais fundo
+// MORTO (entry.depthBoss, setado em onDungeonBossDeath). Vive na entry de
+// `rankings` como o arenaRating → persiste no state.json sem mudança de schema.
+function topDepthRanking(limit){
+    return Array.from(rankings.entries())
+        .filter(([, r]) => r && (r.depth || 0) >= 1)
+        .map(([name, r]) => ({ name, depth: r.depth || 0, boss: r.depthBoss || 0 }))
+        .sort((a, b) => b.depth - a.depth || b.boss - a.boss)
         .slice(0, limit);
 }
 
@@ -4254,6 +4336,38 @@ function creditQuestVisit(p, x, y){
     }
 }
 
+// ★ Boss da banda das Profundezas morreu — caminho ÚNICO pros 2 sites de morte
+// (attackMob e DoT/handleMobDeath). Além do cooldown anti-farm:
+//  - CHECKPOINT: quem deu dano no boss (online, no andar) + o killer desbloqueia
+//    descida DIRETA a este andar na entrada (p.dungeonUnlock, persistido na conta —
+//    gravado já no acc.save aqui E re-stampado a cada saveUpload, server-owned).
+//  - Ranking: registra o boss mais fundo morto (entry.depthBoss, tiebreak do
+//    ranking de profundidade; entry.depth = andar mais fundo ALCANÇADO, setado
+//    em enterDungeonFloor).
+function onDungeonBossDeath(m, killer){
+    const floor = m.floor || 0;
+    dungeonBossDeath.set(floor, Date.now());
+    const grant = new Set();
+    for (const pid in (m.damageBy || {})){
+        const pp = players.get(Number(pid));
+        if (pp && !pp.disconnected && (pp.floor || 0) === floor) grant.add(pp);
+    }
+    if (killer && !killer.disconnected) grant.add(killer);
+    for (const pp of grant){
+        const r = ensureRanking(pp.name);
+        if (r && floor > (r.depthBoss || 0)) r.depthBoss = floor;
+        if ((pp.dungeonUnlock || 0) < floor){
+            pp.dungeonUnlock = floor;
+            // Persiste direto (não espera o próximo saveUpload do cliente — crash não perde o unlock)
+            const acc = pp.authedName ? getAccount(pp.authedName) : null;
+            if (acc && acc.save){ acc.save.dungeonUnlock = floor; queueSaveAccounts(); }
+            sendTo(pp.id, { t:'dungeonUnlock', floor });
+        }
+    }
+    saveStateToDisk();   // depthBoss no ranking (espelha os world-bosses, que também salvam no kill)
+    console.log(`[dungeon] ${DUNGEON_BOSS_TYPE} morto no andar ${floor} (killer=${killer ? killer.name : '?'}) → cooldown ${DUNGEON_BOSS_RESPAWN_MS/60000}min · unlock p/ ${grant.size} player(s)`);
+}
+
 // Resolve a morte de um mob (extração da lógica do attackMob handler) —
 // reutilizado pra mortes por DoT (veneno/sangra/fogo).
 function handleMobDeath(m, killerId){
@@ -4269,9 +4383,8 @@ function handleMobDeath(m, killerId){
             console.log(`[boss] ${m.type} morto (Lv${cur}) por DoT/killer=${killerId} → próximo Lv${next}`);
             saveStateToDisk();
             checkMegaBossSpawn();
-        } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da masmorra: registra cooldown anti-farm (não escala/persiste como os do mundo)
-            dungeonBossDeath.set(m.floor || 0, Date.now());
-            console.log(`[dungeon] ${DUNGEON_BOSS_TYPE} morto no andar ${m.floor||0} (DoT/killer=${killerId}) → cooldown ${DUNGEON_BOSS_RESPAWN_MS/60000}min`);
+        } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da banda: cooldown + checkpoint + ranking (caminho único)
+            onDungeonBossDeath(m, players.get(killerId));
         }
     }
     // Hunter HL: se foi o último caçador do target, credita bonus
@@ -4294,7 +4407,7 @@ function handleMobDeath(m, killerId){
     }
     monsters.delete(m.id);
     const killer = players.get(killerId);
-    const loot = rollLoot(m.type, ((killer && killer.permaBuffs && killer.permaBuffs.rareLuck) || 0) + (killer ? petBuffVal(killer, 'rareLuck') : 0));
+    const loot = rollLoot(m.type, ((killer && killer.permaBuffs && killer.permaBuffs.rareLuck) || 0) + (killer ? petBuffVal(killer, 'rareLuck') : 0), m.floor);
     const isBoss = !!m.unique;
     // M5 talent t_loot (+15% gold) — espelha o caminho do attackMob.
     if (!isBoss && killer){
@@ -5039,7 +5152,7 @@ setInterval(safeTick('tickDuels', tickDuels), 5_000);
 // é Elo (base 1000). Recompensa cosmética semanal fica pra fase 2 do M7.
 const arenaQueue = [];                       // [{ id, name, wager, joinedAt }]
 const arenaMatches = new Map();              // matchId -> { id1, id2, floor, wager, startedAt }
-let arenaFloorSeq = 9000;                    // floor único por match (> DUNGEON_MAX_FLOOR=5, sem colisão)
+let arenaFloorSeq = 9000;                    // floor único por match (FAIXA RESERVADA: > DUNGEON_FLOOR_HARD_CAP=999, sem colisão — isDungeonFloor exclui)
 let arenaMatchSeq = 0;
 const ARENA_FIGHT_DELAY_MS = 3000;           // countdown 3..2..1 antes de liberar o hit
 const ARENA_MAX_MS = 3 * 60 * 1000;          // empate por timeout (espelha DUEL_MAX_MS)
@@ -5840,9 +5953,14 @@ wss.on('connection', (ws, request) => {
             if (typeof p.maxMp === 'number' && isFinite(p.maxMp)) data.maxMp = p.maxMp;
             if (typeof p.hp === 'number' && isFinite(p.hp))       data.hp    = p.hp;
             if (typeof p.mp === 'number' && isFinite(p.mp))       data.mp    = p.mp;
-            // Pos também — cliente pode mandar NaN/undefined
-            if (typeof p.x === 'number' && isFinite(p.x)) data.x = p.x;
-            if (typeof p.y === 'number' && isFinite(p.y)) data.y = p.y;
+            // Pos também — cliente pode mandar NaN/undefined. E NUNCA persiste coords de
+            // masmorra/arena (floor != 0): o join força floor=0 mas mantinha o x/y salvo,
+            // e a região 40-60 da masmorra É walkable no overworld FORA da PZ (46-54) →
+            // reconectar renascia "no mato" cercado de mob (causa-raiz do bug). Em andar,
+            // grava a saída segura (PZ) — é onde o player vai renascer mesmo.
+            const _safePos = (p.floor || 0) === 0;
+            if (typeof p.x === 'number' && isFinite(p.x)) data.x = _safePos ? p.x : DUNGEON_RETURN.x;
+            if (typeof p.y === 'number' && isFinite(p.y)) data.y = _safePos ? p.y : DUNGEON_RETURN.y;
             // M6 Tinturaria — server é dono. Sobrescreve qualquer dyes do cliente
             // pelos valores autoritativos atuais (alteráveis só via handler dyeItem).
             data.dyes = p.dyes || {};
@@ -5874,6 +5992,7 @@ wss.on('connection', (ws, request) => {
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
             data.scReadyAt = p.scReadyAt || 0;   // 🕯️ Segunda Chance: cooldown persiste (server-autoritativo, timestamp absoluto)
+            data.dungeonUnlock = p.dungeonUnlock || 0;   // 🕳️ checkpoint das Profundezas (server-owned — cliente não muda)
             // ★ TRAVA ANTI-WIPE: nunca deixa um save vazio-default sobrescrever um acc.save
             // populado. Foi ISSO que zerou contas — uma sessão fantasma (p.* vazio, ex.: 2ª
             // conexão no reconnect do deploy) gravava {gold:0, inv:{}, skills base} por cima
@@ -5963,6 +6082,12 @@ wss.on('connection', (ws, request) => {
                 // Anti-replay de daily: hidrata SÓ do save server-side (nunca de data do saveUpload)
                 if (acc.save.dailyClaim && typeof acc.save.dailyClaim === 'object') p.dailyClaim = acc.save.dailyClaim;
                 if (typeof acc.save.scReadyAt === 'number') p.scReadyAt = acc.save.scReadyAt;   // 🕯️ Segunda Chance cooldown
+                // 🕳️ Checkpoint das Profundezas: andar de banda mais fundo cujo boss já caiu
+                // (server-owned: só onDungeonBossDeath muda; saveUpload re-stampa o vivo).
+                // Sanitiza: múltiplo de DUNGEON_BOSS_EVERY dentro do teto técnico.
+                { let _du = Math.max(0, Math.min(DUNGEON_FLOOR_HARD_CAP, Math.floor(Number(acc.save.dungeonUnlock) || 0)));
+                  _du -= _du % DUNGEON_BOSS_EVERY;
+                  p.dungeonUnlock = _du; }
                 if (acc.save.questFlags && typeof acc.save.questFlags === 'object') p.questFlags = acc.save.questFlags;
                 if (acc.save.flags && typeof acc.save.flags === 'object') p.flags = acc.save.flags;
                 if (acc.save.permaBuffs && typeof acc.save.permaBuffs === 'object') p.permaBuffs = acc.save.permaBuffs;
@@ -6043,6 +6168,7 @@ wss.on('connection', (ws, request) => {
                 isAdmin: isAdmin(p.name),
                 dailyEvent: dailyEventSnapshot(),
                 groundDrops: snapshotGroundDrops(p.floor),
+                dungeonUnlock: p.dungeonUnlock || 0,   // 🕳️ checkpoint das Profundezas (entrada mostra o seletor)
                 maintenance: postRestart || undefined,   // cliente mostra toast "levado pra PZ"
             }));
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
@@ -6110,6 +6236,12 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'pvp') {
+            // PvP é FORÇADO fora da superfície (masmorra/arena) — o enforcement existia
+            // só no momento da entrada; um frame forjado desligava o PvP lá embaixo.
+            // O cliente legítimo só envia t:'pvp' no toggle manual (bloqueado na masmorra)
+            // e no reset de reconexão (quando o server já está em floor 0). Ignorar aqui
+            // não dessincroniza ninguém honesto.
+            if ((p.floor || 0) !== 0) return;
             p.pvp = !!msg.pvp;
             // Selos/Highlander são SERVER-AUTORITATIVOS (ganhos por kill em
             // processPkDeathServerSide, resetados na morte). NÃO confiamos mais em
@@ -6341,6 +6473,9 @@ wss.on('connection', (ws, request) => {
             for (const dropId of ids){
                 const d = groundDrops.get(dropId);
                 if (!d) continue;
+                // Mesmo-andar obrigatório: cidade/masmorra/arena compartilham coords (40-60)
+                // — sem isto, drop de OUTRO andar parado na mesma coordenada era catável.
+                if ((d.floor || 0) !== (p.floor || 0)) continue;
                 // Pickup auto-range: chebyshev ≤2 (5×5, mesma regra do cliente pickupAt). #3/#6:
                 // era ≤1, mas o drop 3×3 do mob + você atacando a 1 tile deixava o loot de trás
                 // (a 2 tiles) inalcançável até andar pra lá.
@@ -6483,6 +6618,11 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'pvpAttack') {
             const tgt = players.get(msg.targetId);
             if (!tgt) return;
+            // Mesmo-andar obrigatório (espelha o attackMob, audit 03/06): cidade fora da
+            // PZ, andares da masmorra (40-60) e arena (44-56) COMPARTILHAM coordenadas —
+            // sem isto, um frame forjado hitava player de OUTRO andar/superfície na mesma
+            // coord (a checagem de range abaixo só olha x/y).
+            if ((p.floor || 0) !== (tgt.floor || 0)) return;
             // Rate limit: 400ms entre hits PvP (sem isso, F12 → 100 hits/s + farm
             // infinito de XP de skill via gainSkillXpServer abaixo).
             const nowPvp = Date.now();
@@ -7209,8 +7349,9 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
-        // ─── M4 Masmorra: descer/subir andares (Fase 3: 1..DUNGEON_MAX_FLOOR) ──
-        // enterDungeon: overworld → andar 1 (escada do Antro). descendDungeon:
+        // ─── M4 Masmorra: descer/subir andares (sem fundo; teto técnico 999) ──
+        // enterDungeon: overworld → andar 1 OU andar de banda desbloqueado por boss
+        // (checkpoint — msg.floor validado contra p.dungeonUnlock). descendDungeon:
         // andar N → N+1 (escada de descida). exitDungeon: sobe 1 andar (andar 1 →
         // cidade). PvP forçado em qualquer andar; o toggle só é restaurado ao sair
         // pra cidade. Broadcast leave/join ressincroniza quem vê o player por floor.
@@ -7223,12 +7364,17 @@ wss.on('connection', (ws, request) => {
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_entrance' }));
                 return;
             }
+            // Checkpoint: aceita começar num andar de BANDA já desbloqueado (boss morto).
+            // Forjar msg.floor sem unlock cai no andar 1 (sem erro — degrada seguro).
+            let startFloor = 1;
+            const want = Math.floor(Number(msg.floor) || 1);
+            if (want > 1 && isBossFloor(want) && want <= (p.dungeonUnlock || 0)) startFloor = want;
             p._lastFloorAt = now;
             broadcast(id, { t:'leave', id }, 0);       // some do overworld
             p._pvpBeforeDungeon = !!p.pvp;             // salva PvP pra restaurar na saída
             p.pvp = true;
-            enterDungeonFloor(p, id, 1, 'down');
-            console.log(`[dungeon] ${p.name} entrou nas Profundezas (andar 1)`);
+            enterDungeonFloor(p, id, startFloor, 'down');
+            console.log(`[dungeon] ${p.name} entrou nas Profundezas (andar ${startFloor}${startFloor > 1 ? ' — atalho' : ''})`);
             return;
         }
 
@@ -7238,7 +7384,7 @@ wss.on('connection', (ws, request) => {
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
-            if (cur < 1 || cur >= DUNGEON_MAX_FLOOR) return;   // precisa estar num andar e não no último
+            if (cur < 1 || cur >= DUNGEON_FLOOR_HARD_CAP) return;   // precisa estar num andar (teto técnico 999)
             const sd = getDungeonFloor(cur).stairs.down;       // Fase 2: escada de descida do andar (procedural)
             if (!sd || chebyshev(p.x, p.y, sd.x, sd.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
@@ -7551,15 +7697,14 @@ wss.on('connection', (ws, request) => {
                         saveStateToDisk();
                         // Verifica se desbloqueou o mega boss
                         checkMegaBossSpawn();
-                    } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da masmorra: registra cooldown anti-farm
-                        dungeonBossDeath.set(m.floor || 0, Date.now());
-                        console.log(`[dungeon] ${DUNGEON_BOSS_TYPE} morto no andar ${m.floor||0} por ${p.name} → cooldown ${DUNGEON_BOSS_RESPAWN_MS/60000}min`);
+                    } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da banda: cooldown + checkpoint + ranking (caminho único)
+                        onDungeonBossDeath(m, p);
                     }
                 }
                 monsters.delete(m.id);
                 // Loot autoritativo: server roda LOOT e mantém drops no chão.
                 // Cada item ganha id server-side; broadcast spawn pra TODOS verem.
-                const loot = rollLoot(m.type, ((p.permaBuffs && p.permaBuffs.rareLuck) || 0) + petBuffVal(p, 'rareLuck'));
+                const loot = rollLoot(m.type, ((p.permaBuffs && p.permaBuffs.rareLuck) || 0) + petBuffVal(p, 'rareLuck'), m.floor);
                 // M5 talent t_loot: +15% gold de drops. Aplica antes do spawn.
                 const lootBonus = (p.permaBuffs?.lootBonus || 0) + petBuffVal(p, 'lootBonus');
                 if (lootBonus > 0){
@@ -7758,6 +7903,7 @@ wss.on('connection', (ws, request) => {
                 bosses: topRanking('bossKills', limit),
                 gold:   topRanking('gold',      limit),
                 arena:  topArenaRanking(limit),
+                depths: topDepthRanking(limit),
                 guilds: topGuildRanking(limit),
                 season: {
                     id: seasonState.id,
