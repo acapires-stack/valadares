@@ -268,6 +268,14 @@ async function handleHttpRequest(req, res){
                 total_accounts: accounts.size,
                 state_mobs: monsters.size,
             },
+            // Observabilidade (10/06): lag do event-loop + ticks lentos + memória.
+            // loop.last/max em ms (0 = saudável); slow_ticks = pior caso por tick >100ms.
+            perf: {
+                loop: { last: loopLag.last, max: loopLag.max },
+                slow_ticks: slowTicks,
+                mem_mb: Math.round(process.memoryUsage().rss / 1048576),
+                heap_mb: Math.round(process.memoryUsage().heapUsed / 1048576),
+            },
         });
     }
     // POST /api/admin/action?token=X — comandos admin via web (reset, kick, say, etc)
@@ -3995,13 +4003,36 @@ process.on('unhandledRejection', (reason) => {
 });
 function safeTick(name, fn){
     return () => {
+        const _t0 = Date.now();
         try { fn(); }
         catch (err) {
             console.error(`[tick:${name}]`, err && err.stack || err);
             try { recordError({ kind:'tick:'+name, msg: err && err.message || String(err), stack: err && err.stack || null }); } catch {}
         }
+        finally {
+            // Observabilidade (10/06): tick síncrono longo trava o event-loop inteiro
+            // (WS+HTTP). Registra o pior caso por tick pra diagnóstico via admin/state.
+            const _dt = Date.now() - _t0;
+            if (_dt > 100){
+                if (_dt > (slowTicks[name] || 0)) slowTicks[name] = _dt;
+                console.warn(`[tick:${name}] LENTO: ${_dt}ms`);
+            }
+        }
     };
 }
+// Pior duração observada por tick (>100ms) + lag do event-loop (atraso do timer de
+// 500ms = GC ou tarefa síncrona longa; mede QUALQUER bloqueio, não só os ticks).
+const slowTicks = {};
+const loopLag = { last: 0, max: 0 };
+let _loopPrevAt = Date.now();
+setInterval(() => {
+    const _n = Date.now();
+    const lag = _n - _loopPrevAt - 500;
+    _loopPrevAt = _n;
+    loopLag.last = lag;
+    if (lag > loopLag.max) loopLag.max = lag;
+    if (lag > 250) console.warn(`[loop] event-loop atrasou ${lag}ms`);
+}, 500);
 
 // Inicia mundo
 let lastResetDay = new Date().toDateString();
@@ -6194,12 +6225,27 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'pos') {
-            // Rate-limit anti-flood: cada pos re-broadcasta pro andar inteiro. O cliente
-            // legítimo anda no máximo 1 tile/80ms (playerMoveDelay tem piso Math.max(80,…)),
-            // então 40ms dá 2× de folga — nunca dropa movimento real (mesmo com jitter) e
-            // corta o flood de milhares/s. Campo dedicado pra não colidir com outros gates.
+            // Rate-limit anti-flood em TOKEN BUCKET: média 1 movimento/70ms (cliente
+            // legítimo anda no máx 1 tile/80ms — piso do playerMoveDelay) com rajada de
+            // até 5. O gate antigo (drop SILENCIOSO se <40ms) dessincronizava em rede com
+            // jitter: retransmissão TCP entrega os pos legítimos em RAJADA, o server
+            // jogava fora todos menos o 1º, e o próximo aceito vinha não-adjacente →
+            // posCorrect em cadeia ("rubber-band" relatado em 10/06). Flood sustentado
+            // continua barrado (~14 mov/s vs 12.5 legítimo) e cada pos aceito segue
+            // pagando adjacência+walkable (1 tile/msg — teleporte continua impossível).
             const _now = Date.now();
-            if (p._lastPosAt && _now - p._lastPosAt < 40) return;
+            if (p._posTokens == null){ p._posTokens = 5; p._posTokensAt = _now; }
+            p._posTokens = Math.min(5, p._posTokens + (_now - p._posTokensAt) / 70);
+            p._posTokensAt = _now;
+            if (p._posTokens < 1){
+                // Sem token: snap-back (não silencioso), throttled pra não amplificar flood.
+                if (!p._posCorrAt || _now - p._posCorrAt > 300){
+                    p._posCorrAt = _now;
+                    sendTo(id, { t:'posCorrect', x: p.x, y: p.y, dir: p.dir });
+                }
+                return;
+            }
+            p._posTokens -= 1;
             p._lastPosAt = _now;
             // Sanitiza/clampa coords antes de aceitar (cliente malicioso poderia
             // enviar {x:99999, y:99999} e quebrar tickAI/inCave/tileAt)
