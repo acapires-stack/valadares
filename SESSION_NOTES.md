@@ -51,10 +51,18 @@ bem abaixo dos ~12min históricos), confirmado por uptime_s=170 + probe do `kind
 (offline, entra no login). Curiosidade: conta-fantasma `__probe__` (probe WS antigo) devolveu
 `no_save` e validou esse caminho em prod.
 
-**⏳ Pendências:** (1) **flip do proxy no painel CF** (dono escolheu clicar: zona
-valadares.app.br → SSL/TLS **Full strict** + DNS registro `ws` → nuvem **laranja**; reversível;
-eu monitoro depois); (2) dono validar in-game: itens no inventário do `claude` + REC do app
-v1.0.11 gravando com UI. **Backlog endgame:** forja +10 (último item) · validação PvP Selos/HL.
+**✅ FLIP DO CLOUDFLARE FEITO (mesma sessão, via Chrome MCP — dono mandou print do dash e eu
+dirigi o browser dele):** SSL/TLS da zona **Full → Full (strict)** ("Encryption mode updated
+successfully") + registro `ws` **DNS only → Proxied** ("DNS record updated successfully").
+**Verificação ponta a ponta:** DNS público agora resolve IPs anycast CF (104.21.55.67 /
+172.67.170.156, antes 69.46.46.108 Railway direto) · HTTP 200 com `Server: cloudflare` +
+**`CF-RAY ...-GRU` = POP São Paulo** (a mitigação do lag: BR→US via backbone CF) · **probe WS
+real `_probe_cfws.js`: handshake wss:// OPEN em 830ms** via proxy (sem auth/join — não cria
+sessão). Reverter (se precisar): nuvem laranja → cinza no mesmo registro.
+
+**⏳ Pendências:** dono validar in-game: jogar via CF (latência percebida) + itens no inventário
+do `claude` + REC do app v1.0.11 gravando com UI. **Backlog endgame:** forja +10 (último item) ·
+validação PvP Selos/HL.
 
 ---
 
