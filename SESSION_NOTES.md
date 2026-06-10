@@ -7,6 +7,73 @@
 
 ---
 
+## 🕳️ Sessão 10/06 — MASMORRA ESCALÁVEL (sem fundo + boss por banda + checkpoint + ranking) ✅ PUSHADO via /manutencao (`cbb4039`)
+
+**Item #2 do backlog de endgame.** Decisões do dono (AskUserQuestion, todas as recomendações):
+**sem fundo + ranking de profundidade · atalho por boss · boss a cada 5 andares · mix de mobs do mundo.**
+Mapeamento prévio por workflow (4 leitores + crítico): cravou que a escala é **LINEAR** (`1+0.6·(andar−1)`,
+não 1.6^n — o comentário do M7 era notação errada), que o teto 5 tinha **3 semânticas** + espelho no
+cliente, e 2 lacunas novas: **pvpAttack sem mesmo-andar** e **groundPickup sem floor** (coords 40-60
+sobrepõem cidade/masmorra/arena).
+
+**Server (`server/server.js`):**
+- `DUNGEON_MAX_FLOOR` morreu → `DUNGEON_FLOOR_HARD_CAP=999` (teto técnico; arena 9000+ reservada) +
+  helpers GLOBAIS `isDungeonFloor`/`isBossFloor` (o local de spawnDungeonMobs saiu; fMult/rollLoot usam
+  o helper — arena nunca escala).
+- `genDungeonGrid`: TODO andar tem descida (=ponto BFS mais fundo); andar de banda (5,10,15…) ganha
+  `stairs.boss` = 2º ponto mais fundo a ≥3 tiles da descida ("guarda" a escada sem bloquear o tile).
+- Boss por banda: spawn em `isBossFloor` (era `=== 5`); escala `bMult = 1+0.30·(andar−5)` só pro
+  SENHOR_PROFUNDEZAS (andar 5 = ×1 idêntico; 10 = 12.5k hp; 20 = 27.5k). Cooldown 8min POR ANDAR
+  (`dungeonBossDeath` multi-chave). Drake/Golem desacoplados (`WORLD_BOSS_RESPAWN_SLOW_MS`).
+- Mix por banda: `dungeonMobTypesFor(floor)` — 1-4 Sombra/Carrasco · 5-9 +Esqueleto · 10-14 +Troll ·
+  15-19 +Drake/Golem · 20+ +Minotauro (sprites/IA/loot já existiam nos 2 lados; fraquezas elementais
+  dão variedade pro mago).
+- Loot paga a profundidade: `rollLoot(type, luck, floor)` — GOLD ×(1+0.15·(andar−1)), item chance
+  relativa +5%/andar (cap 0.95). Sublinear vs hp do mob (+60%/andar) de propósito (não inflaciona
+  vs loja MP). Knobs: `DUNGEON_LOOT_SCALE`/`DUNGEON_ITEM_LUCK_SCALE`.
+- **Checkpoint:** `onDungeonBossDeath` (caminho ÚNICO dos 2 sites de morte) dá `p.dungeonUnlock=floor`
+  a todo damager online no andar + killer; grava DIRETO no acc.save + re-stamp no saveUpload
+  (server-owned); `enterDungeon` aceita `{floor:N}` (válido: banda ≤ unlock; forjado degrada pro 1).
+- **Ranking de profundidade:** `entry.depth` (andar mais fundo alcançado, set em enterDungeonFloor) +
+  `entry.depthBoss` (tiebreak) na entry de `rankings` (mesmo veículo do arenaRating → persiste no
+  state.json). `topDepthRanking` + campo `depths` no `/api/ranking` e WS `getRanking`.
+- **Segurança (carona):** pvpAttack exige mesmo-andar (espelha attackMob) · groundPickup idem ·
+  handler `pvp` ignora fora do floor 0 (PvP forçado infurável) · **fix do "reconecta no mato"
+  (causa-raiz)**: saveUpload grava DUNGEON_RETURN em vez de coords vivas quando floor≠0.
+
+**Cliente (`play.html`):** gate de descida = presença de `stairs.down` (server-auth; constante
+`DUNGEON_MAX_FLOOR_C` REMOVIDA); badge `Andar X` sem /5 + guard `!player._arena` (mostrava
+"Andar 9001/5" na arena); 2ª rampa visual nos andares 6→20 (rampa 1→5 validada pelo dono INTACTA);
+**modal seletor de entrada** (`dungeonEnterModal`, monta via tr() na abertura, ESC na chain global);
+handler `dungeonUnlock` (toast) + `state.dungeonUnlock`; togglePvP bloqueado na masmorra; rótulos
+de escada via tr() (último PT hardcoded do canvas); aba 🕳 PROFUNDEZAS no ranking modal.
+**+ `ranking.html`:** aba/painel/renderDepths espelhando a Arena (tr() sem params lá → replace
+manual). **16 chaves i18n pt/en novas — paridade 701/701.**
+
+**Verificação:**
+- Harness E2E `_test_depths.js` **24/24** — server REAL com 1 patch (entrada→PZ, dispensa caminhada
+  de overworld): descida 1→6 com BFS no grid do server (a trava antiga caía no 5→6), banda 5 com
+  boss+descida, boss hp 5000 (regressão), bossSpot ≥3 da descida, mix com Esqueleto, hp ×1.6 no
+  andar 2, **boss morto por 2 clientes → unlock multi-damager**, persistência pós-reconexão,
+  atalho `enterDungeon{floor:5}` direto, floor 10 forjado degrada pro 1, getRanking depths.
+  GOTCHA do harness: attackMob espera **`monsterId`**, não `mobId`; perseguição de boss precisa
+  de **BFS real** (greedy emperra na caverna torta — o mesmo bug da IA dos mobs).
+- `_check_client.js`: sintaxe play/ranking + paridade 701/701 + 16 chaves + usadas todas definidas.
+- Preview :3333: modal seletor (screenshot), aba depths in-game (screenshot), flip EN completo,
+  ranking.html PT/EN + degradação graciosa com API velha (sem `depths` → empty state), 0 erro console.
+
+**Deploy:** dono rodou `/manutencao` → `maintenance:true` confirmado → push `769a8fd..cbb4039` na
+janela. Vercel confirmado no ar em ~45s (grep `dungeonEnterModal`). Railway monitorado pelo campo
+`depths` no `/api/ranking` (sinal de container novo — NÃO o flag maintenance, lição de 09/06).
+Revisão adversarial multi-agente rodou em paralelo ao deploy.
+
+**⏳ Validar in-game (dono):** descer além do 5 · boss do 10 (12.5k hp) · toast/seletor do atalho ·
+aba Profundezas com dado real · visual dos andares 6+ · "reconecta no mato" não acontece mais.
+**Knobs de balance** (1 linha cada): DUNGEON_BOSS_SCALE 0.30 · DUNGEON_LOOT_SCALE 0.15 ·
+DUNGEON_ITEM_LUCK_SCALE 0.05 · bandas do dungeonMobTypesFor.
+
+---
+
 ## 🏟️ Sessão 09/06 (cont.) — ARENA PÚBLICA: Elo da Arena PvP no ranking ✅ DEPLOYADO (server vazio, push direto)
 
 **Pedido do dono:** item #1 do backlog de endgame ("Arena pública", ½ sessão / maior ROI). "pode fazer automato, se não tiver gente no servidor pode subir já". Modo autônomo + deploy autorizado se servidor vazio.

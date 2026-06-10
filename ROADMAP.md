@@ -69,7 +69,14 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 
 ### 🟡 P1 — Próximas features (escolher 1 por sessão)
 
-**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] ✅ 3a/3b/3c FEITOS (procedural no ar desde 31/05; só falta polish visual do 3b)
+**M4 "As Profundezas" — masmorra ABERTA vertical** [endgame] ✅ 3a/3b/3c FEITOS + ✅ **ESCALÁVEL (10/06, `cbb4039`)**
+> 🕳️ **Masmorra SEM FUNDO (10/06)** — teto de 5 andares removido (hard cap técnico 999; arena 9000+
+> reservada). Boss a cada 5 andares escalando +30%/andar além do 5; mix de mobs do mundo por banda;
+> gold +15%/andar + chance de item +5%/andar; **checkpoint por boss** (descida direta desbloqueada,
+> persistida na conta, seletor na entrada); **ranking público de profundidade** (aba 🕳 in-game +
+> ranking.html + `/api/ranking.depths`). De carona: pvpAttack/groundPickup mesmo-andar, PvP forçado
+> infurável, e o fix de causa-raiz do "reconecta no mato". Harness `_test_depths.js` 24/24.
+> Detalhes na SESSION_NOTES 10/06.
 > Decisão de design (29/05): NÃO instanciada. Insight do dono: instância
 > fechada = farm seguro = pay-to-win fácil num jogo PvP. Em vez disso,
 > masmorra aberta e mortal estilo Tibia — melhor loot, maior perigo (mobs
