@@ -7,6 +7,57 @@
 
 ---
 
+## 🌩️🎬 Sessão 10/06 (cont.2) — Cloudflare-ready + ● REC modo-janela (app v1.0.11) + /give admin ✅ DEPLOYADO (push direto, server vazio)
+
+**Pedido do dono:** Cloudflare na frente do ws + REC-janela no Electron + Espada/Escudo do
+Guardião +5 no boneco `claude` ("para eu testar mais fundo").
+
+**Server (`054c804`):**
+- **`adminGiveItem(nome, key, qtd)`** — valida key em `ITEM_META` (aceita forja `BASE_PLUS_N`
+  até +5), online entrega na hora (`incInv`+`sendInvUpdate`), offline persiste no
+  `accounts.json` (conta sem save → `no_save`). Exposto no **chat admin `/give NOME KEY [QTD]`**
+  (+ `/help`) e no **`POST /api/admin/action kind:'give'`** (uso via ADMIN_TOKEN).
+  Harness `_test_give.js` **8/8** (erros + online com invUpdate + offline persistido; gotcha:
+  conta nova tem `acc.save=null` até o 1º saveUpload → teste força um save antes de deslogar).
+- **`clientIp()` Cloudflare-aware** — atrás do proxy laranja o último hop do XFF é um edge CF
+  (todos os players colapsariam em ~6 IPs → `MAX_CONN_PER_IP` e rate-limits quebravam); agora
+  usa `CF-Connecting-IP` **só quando o hop ∈ ranges públicos da CF** (lista v4/v6 embutida,
+  override env `CF_IP_RANGES`; parser CIDR BigInt trata v4-mapped `::ffff:`). Header forjado em
+  conexão direta no Railway segue ignorado; sem CF nada muda → **flip desacoplado do deploy**.
+  Harness `_test_cfip.js` **22/22**.
+
+**Cliente (`21acfe8`):** `startRecording` async — no desktop (`window.electronApi.isDesktop`)
+tenta `getDisplayMedia` (janela inteira COM HUD/inventário/chat); app antigo sem handler
+rejeita → **fallback canvas limpo** (provado no preview: browser puro + electronApi simulado,
+console 0-erro). Áudio via masterGain nos 2 modos; tracks da captura liberados no
+`finishRecording` (indicador do SO não fica preso); track encerrado por fora fecha limpo.
+Chave nova `log.rec_started_window` pt/en (paridade **702/702**).
+
+**Electron (`59b2721`, v1.0.11):** `setDisplayMediaRequestHandler` entrega **source sintético
+`{id: mainWindow.getMediaSourceId(), name:'Valadares'}`** — SEM picker, sempre a própria janela.
+**GOTCHAS provados no harness `_test_capture.js`:** (1) `desktopCapturer.getSources` NÃO enumera
+janelas do próprio processo no WGC/Windows (o match por id NUNCA casaria; fallback por nome
+chegou a capturar a janela do JOGO do dono aberta); (2) `data:` URL não é secure context
+(`navigator.mediaDevices` ausente) — usar `loadFile`; (3) prova final: vídeo **784x560 = janela
+800x600**, não a tela 1080p. + env `VALADARES_URL` sobrepõe a URL em dev (harness local).
+**Release publicada:** github.com/acapires-stack/valadares/releases/tag/v1.0.11 (Setup +
+Portable + blockmap + latest.yml — espelho da v1.0.10); auto-update pega em ≤15min.
+
+**Deploy:** servidor **VAZIO confirmado 2×** via `/api/admin/state` (0 online) → push direto
+`c788fa1..59b2721` (precedente 09-10/06; dono avisado e escolheu "pusha agora, fico fora").
+Vercel ~1min (grep `rec_started_window`). **Railway bootou em ~2.8min** (cache Docker quente —
+bem abaixo dos ~12min históricos), confirmado por uptime_s=170 + probe do `kind:'give'` novo.
+**Itens DADOS:** `ESPADA_GUARDIAO_PLUS_5` + `ESCUDO_GUARDIAO_PLUS_5` → save do `claude`
+(offline, entra no login). Curiosidade: conta-fantasma `__probe__` (probe WS antigo) devolveu
+`no_save` e validou esse caminho em prod.
+
+**⏳ Pendências:** (1) **flip do proxy no painel CF** (dono escolheu clicar: zona
+valadares.app.br → SSL/TLS **Full strict** + DNS registro `ws` → nuvem **laranja**; reversível;
+eu monitoro depois); (2) dono validar in-game: itens no inventário do `claude` + REC do app
+v1.0.11 gravando com UI. **Backlog endgame:** forja +10 (último item) · validação PvP Selos/HL.
+
+---
+
 ## 🕳️ Sessão 10/06 — MASMORRA ESCALÁVEL (sem fundo + boss por banda + checkpoint + ranking) ✅ PUSHADO via /manutencao (`cbb4039`)
 
 **Item #2 do backlog de endgame.** Decisões do dono (AskUserQuestion, todas as recomendações):
