@@ -1565,3 +1565,5 @@ inventa elementos → regenerar com "REGRAS RÍGIDAS: ... UMA ÚNICA VEZ" ou edi
 aprovado (resize-design faz a versão vertical de graça).
 **REC grava SÓ o canvas** (canvas.captureStream, play.html:13975) — UI/inventário não aparecem;
 pra vídeo com interface: Game Bar (Win+Alt+R). Possível follow-up: modo "REC janela" no Electron.
+
+**✅ Vídeos APROVADOS pelo dono ("gostei") na sequência — prontos pra postar.**
