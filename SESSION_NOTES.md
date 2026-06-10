@@ -1539,3 +1539,29 @@ Fix (`1c7cd0b`, push direto com 0 online + autorização do dono; monitor pelo c
    mem/heap + warns no console. Próxima reclamação de lag: 1 curl separa app de rede.
 
 **✅ VALIDADO in-game pelo dono na sequência: "andou e deu tudo certo, entrou normal na masmorra".**
+
+---
+
+## 🎬 Sessão 10/06 (tarde, cont.) — VÍDEO DE MARKETING produzido (item do backlog) ✅
+
+Dono gravou 8min com o ● REC (boss das Profundezas andar 20 + Golem Rei/Drakes à noite + campos)
+e autorizou produzir o marketing "com nosso programa full" (= Canva Pro). Pipeline:
+ffmpeg local (folhas de contato → 5 segmentos re-encodados do source) + cartões Canva Pro
+on-brand (Brand Kit kAHMAdgX2g0): abertura "VALADARES + RPG online estilo clássico — direto
+no navegador" e encerramento "JOGUE GRÁTIS + valadares.app.br" (gerado→duplicado→texto trocado
+via editing transaction = identidade idêntica; CTA gerado do zero saía fora de spec).
+Pixel art escalada ×2 com flags=neighbor (nítida), crop centrado no player, áudio do jogo
+com afades, x264 CRF18.
+
+**Entregas (marketing/video/ + cópia em Downloads):**
+- `valadares_highlight_720p.mp4` — 60.6s 1280×720 (YouTube/site/itch)
+- `valadares_highlight_vertical.mp4` — 51.6s 1080×1920 (Shorts/Reels/TikTok)
+- cartões PNG + segmentos webm (matéria-prima pra recortes)
+Canva: abertura DAHMM6IYuEQ · encerramento DAHMM6o8oM0 (cópia editada) · vertical DAHMM_UiWq4.
+
+**Gotchas Canva MCP:** thumbnails de candidato (design.canva.ai) são página JS — avaliar via
+create-design-from-candidate→export-design→curl (--ssl-no-revoke!); gerador repete o título/
+inventa elementos → regenerar com "REGRAS RÍGIDAS: ... UMA ÚNICA VEZ" ou editar cópia de design
+aprovado (resize-design faz a versão vertical de graça).
+**REC grava SÓ o canvas** (canvas.captureStream, play.html:13975) — UI/inventário não aparecem;
+pra vídeo com interface: Game Bar (Win+Alt+R). Possível follow-up: modo "REC janela" no Electron.
