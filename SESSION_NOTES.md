@@ -64,6 +64,34 @@ sessão). Reverter (se precisar): nuvem laranja → cinza no mesmo registro.
 do `claude` + REC do app v1.0.11 gravando com UI. **Backlog endgame:** forja +10 (último item) ·
 validação PvP Selos/HL.
 
+### Adendo (noite, mesma sessão) — updater consertado de verdade + fábrica de vídeos + fix do targeting
+
+- **🔴 AUTO-UPDATE NUNCA FUNCIONOU empacotado (fix `7a65971`):** dono clicou "Verificar
+  atualizações" → `updater-unavailable`. Causa: `electron-updater` em devDependencies — o
+  electron-builder só empacota dependencies → asar saía SÓ com main/preload/package.json e o
+  require falhava (em dev funciona pelo node_modules local; por isso passou em TODAS as versões).
+  Fix: movido pra dependencies (asar 3→300 entradas), **assets da release v1.0.11 SUBSTITUÍDOS
+  (`gh release upload --clobber`)**, Setup deixado nos Downloads. Dono instalou manual (monitor
+  confirmou 19:57) e o update.log nasceu: "up-to-date v1.0.11" = updater VIVO pela 1ª vez.
+- **🎬 Produção do dia (tudo em marketing/video/ + Downloads):** `valadares_bosses_720p/vertical`
+  (clipe 55s: drakes + quest concluída) · `valadares_senhor_720p/vertical` (luta inteira do mega
+  boss, morre no fim) · **`valadares_promo_tiktok.mp4`** (25s 9:16 pra IMPULSIONAR: 6 cortes +
+  captions drawtext + URL dourada fixa; gotchas: `%` exige `expansion=none`, acento via textfile
+  UTF-8 sem BOM, PS pt-BR vira "1,5" em string) · **`valadares_gameplay_ui_720p.mp4`** (56s 16:9
+  com INTERFACE: cidade → Altar de Magias → luta c/ log → masmorra → bosses; receita UI: lanczos
+  1280x672 + pad, watermark) · **`valadares_gameplay_ui_tiktok.mp4`** (9:16, vídeo nítido no
+  centro + fundo blur) · 6 cortes crus em `D:\claude\videos valadares\cortes\` pro Canva Pro.
+  Clipes novos do dono (pós-1.0.11) já saem 1920x1008 COM UI.
+- **📈 Funil TikTok diagnosticado:** 100+ likes → 0 players (25 contas). Sem porta: link de
+  legenda não clicável. Plano dado: conta Business + URL na bio · impulsionar com objetivo
+  "VISITAS AO SITE" (botão clicável) · URL no vídeo todo · hook 2s · comunidades Tibia BR ·
+  medir por total_accounts (baseline 10/06: 25).
+- **🎯 Fix do targeting (`a6c4d69`, client-only):** ESPAÇO não pegava mob na DIAGONAL colada —
+  `targetScore` usava Manhattan (diagonal=2) e com arma ranged o bônus de hp baixo fazia
+  preferir mob longe. Agora: Chebyshev + **box 3x3 com prioridade absoluta** (−100; desempate
+  por hp dentro da box); ramo de players PvP na mesma métrica. Validado com mocks no preview;
+  Vercel confirmado. ⏳ dono valida in-game (reabrir o app).
+
 ---
 
 ## 🕳️ Sessão 10/06 — MASMORRA ESCALÁVEL (sem fundo + boss por banda + checkpoint + ranking) ✅ PUSHADO via /manutencao (`cbb4039`)
