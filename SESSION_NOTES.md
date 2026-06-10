@@ -1537,3 +1537,5 @@ Fix (`1c7cd0b`, push direto com 0 online + autorização do dono; monitor pelo c
    parede e dá falso reject).
 2. **`perf` no /api/admin/state** — loop {last,max}, slow_ticks >100ms (via safeTick),
    mem/heap + warns no console. Próxima reclamação de lag: 1 curl separa app de rede.
+
+**✅ VALIDADO in-game pelo dono na sequência: "andou e deu tudo certo, entrou normal na masmorra".**
