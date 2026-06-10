@@ -69,8 +69,21 @@ Revisão adversarial multi-agente rodou em paralelo ao deploy.
 
 **⏳ Validar in-game (dono):** descer além do 5 · boss do 10 (12.5k hp) · toast/seletor do atalho ·
 aba Profundezas com dado real · visual dos andares 6+ · "reconecta no mato" não acontece mais.
+(Obs 10/06 tarde: prod já mostra `claude` depth 20/boss 20 no `/api/ranking.depths` — se foi o dono
+jogando, descida+boss por banda+checkpoint já provados em prod.)
 **Knobs de balance** (1 linha cada): DUNGEON_BOSS_SCALE 0.30 · DUNGEON_LOOT_SCALE 0.15 ·
 DUNGEON_ITEM_LUCK_SCALE 0.05 · bandas do dungeonMobTypesFor.
+
+**Revisão adversarial (follow-up 10/06 tarde):** achados recuperados do journal do workflow
+(`wf_56a68f9b-398.json` no diretório da sessão anterior — `search_session_transcripts` bloqueado
+em modo não-supervisionado, mas o JSON no disco tem o `result` completo). **1 confirmado / 0
+refutados:** `dungeonEnterModal` fora do `closeAllModals()` + `openDungeonEnterModal` não fechava
+os outros modais → hotkey (L/Q/etc.) com o seletor aberto abria o modal POR BAIXO do backdrop
+opaco ("tecla morta"; empate de z-index 200 resolve por ordem do DOM). **Fix de 2 linhas ✅
+DEPLOYADO (`39fb07a`, client-only → push direto, só Vercel, sem /manutencao):** id na lista do
+closeAllModals (play.html:6561) + `closeAllModals()` no início de openDungeonEnterModal (antes do
+display:flex, :13873). `_check_client.js` TUDO OK (paridade 701/701). Teste de UI no preview
+pulado a pedido do dono (economia de sessão; fix trivial + checker verde).
 
 ---
 
