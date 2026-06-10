@@ -74,16 +74,83 @@ const MAX_CONN_PER_IP = parseInt(process.env.MAX_CONN_PER_IP, 10) || 30;   // te
 const MSG_BUCKET_CAP       = parseInt(process.env.MSG_BUCKET_CAP, 10)       || 80;    // burst
 const MSG_BUCKET_REFILL    = parseInt(process.env.MSG_BUCKET_REFILL, 10)    || 40;    // msgs/s sustentado
 const MSG_FLOOD_DISCONNECT = parseInt(process.env.MSG_FLOOD_DISCONNECT, 10) || 400;   // descartes em flood sustentado → fecha ws
+// ─── Cloudflare na frente do WS (proxy laranja no DNS) ──────────────────────
+// Com o registro `ws` proxiado, quem conecta no edge do Railway é a CLOUDFLARE:
+// o último hop do X-Forwarded-For vira um IP da CF e TODOS os players colapsam
+// em meia dúzia de IPs → MAX_CONN_PER_IP e os rate-limits por IP quebrariam.
+// O IP real vem no header CF-Connecting-IP — mas só é confiável quando o hop
+// que bateu no Railway É da Cloudflare (senão qualquer um forja o header
+// conectando direto no *.up.railway.app). Ranges públicos:
+// https://www.cloudflare.com/ips/ (estáveis há anos; override por env
+// CF_IP_RANGES="cidr,cidr" se um dia mudarem). Funciona com e sem o proxy
+// ligado — o flip no painel é desacoplado do deploy.
+const CF_IP_RANGES = (process.env.CF_IP_RANGES || [
+    '173.245.48.0/20','103.21.244.0/22','103.22.200.0/22','103.31.4.0/22',
+    '141.101.64.0/18','108.162.192.0/18','190.93.240.0/20','188.114.96.0/20',
+    '197.234.240.0/22','198.41.128.0/17','162.158.0.0/15','104.16.0.0/13',
+    '104.24.0.0/14','172.64.0.0/13','131.0.72.0/22',
+    '2400:cb00::/32','2606:4700::/32','2803:f800::/32','2405:b500::/32',
+    '2405:8100::/32','2a06:98c0::/29','2c0f:f248::/32',
+].join(',')).split(',').map(s => s.trim()).filter(Boolean);
+// Parse de IP → BigInt (v4, v6 e v4-mapeado "::ffff:a.b.c.d"). null = inválido.
+function _ipToBigInt(ip){
+    ip = String(ip || '').trim();
+    const v4m = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+    if (v4m) ip = v4m[1];
+    if (ip.includes('.') && !ip.includes(':')){
+        const o = ip.split('.').map(Number);
+        if (o.length !== 4 || o.some(x => !Number.isInteger(x) || x < 0 || x > 255)) return null;
+        return { v: 4, n: (BigInt(o[0]) << 24n) | (BigInt(o[1]) << 16n) | (BigInt(o[2]) << 8n) | BigInt(o[3]) };
+    }
+    if (ip.includes(':')){
+        const dbl = ip.split('::');
+        if (dbl.length > 2) return null;
+        const head = dbl[0] ? dbl[0].split(':') : [];
+        const tail = (dbl.length === 2 && dbl[1]) ? dbl[1].split(':') : [];
+        const fill = 8 - head.length - tail.length;
+        if (dbl.length === 2 && fill < 1 && (head.length || tail.length)) return null;
+        const groups = dbl.length === 2 ? [...head, ...Array(Math.max(0, fill)).fill('0'), ...tail] : head;
+        if (groups.length !== 8) return null;
+        let n = 0n;
+        for (const g of groups){
+            if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return null;
+            n = (n << 16n) | BigInt(parseInt(g, 16));
+        }
+        return { v: 6, n };
+    }
+    return null;
+}
+const _cfNets = CF_IP_RANGES.map(cidr => {
+    const [base, bitsRaw] = cidr.split('/');
+    const ip = _ipToBigInt(base);
+    const bits = parseInt(bitsRaw, 10);
+    if (!ip || !Number.isFinite(bits)) return null;
+    const total = ip.v === 4 ? 32 : 128;
+    if (bits < 0 || bits > total) return null;
+    const shift = BigInt(total - bits);
+    return { v: ip.v, net: ip.n >> shift, shift };
+}).filter(Boolean);
+function isCloudflareIp(ip){
+    const p = _ipToBigInt(ip);
+    if (!p) return false;
+    for (const net of _cfNets){
+        if (net.v === p.v && (p.n >> net.shift) === net.net) return true;
+    }
+    return false;
+}
 // IP do cliente atrás do proxy do Railway. O ÚLTIMO item do X-Forwarded-For é o que o
 // proxy confiável anexou (os primeiros são injetáveis pelo cliente). Pegar split[0] era
 // spoofável → permitia burlar rate-limit E inflar o Map indefinidamente (memory leak).
+// Atrás da Cloudflare o hop confiável é um edge CF → o IP real vem do CF-Connecting-IP
+// (validado contra os ranges acima; conexão direta no Railway não engana).
 function clientIp(req){
     const xff = (req.headers['x-forwarded-for'] || '').toString();
-    if (xff){
-        const parts = xff.split(',').map(s => s.trim()).filter(Boolean);
-        if (parts.length) return parts[parts.length - 1].slice(0, 45);
-    }
-    return ((req.socket && req.socket.remoteAddress) || '').toString().slice(0, 45);
+    const parts = xff.split(',').map(s => s.trim()).filter(Boolean);
+    const hop = parts.length ? parts[parts.length - 1]
+        : ((req.socket && req.socket.remoteAddress) || '').toString();
+    const cfip = (req.headers['cf-connecting-ip'] || '').toString().trim();
+    if (cfip && isCloudflareIp(hop)) return cfip.slice(0, 45);
+    return hop.slice(0, 45);
 }
 // Comparação constant-time do admin token (audit 2026-06-03): `!==` curto-circuita no 1º
 // byte → vaza um oráculo de timing do segredo. timingSafeEqual exige buffers de mesmo tamanho.
@@ -319,6 +386,11 @@ async function handleHttpRequest(req, res){
                 spawnImpostorBot();
                 return httpJson(res, 200, { ok: !!impostorBot, alive: !!impostorBot });
             }
+            if (kind === 'give'){
+                // body: { target, item, qty? } — item aceita BASE ou BASE_PLUS_N (forja)
+                const r = adminGiveItem(body.target || '', body.item || '', body.qty);
+                return httpJson(res, r.ok ? 200 : 400, r);
+            }
             return httpJson(res, 400, { error:'unknown_kind' });
         } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
     }
@@ -508,6 +580,37 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             console.warn('[mp] erro ao persistir credit offline:', e.message);
         }
     }
+}
+
+// Dá item a um player por nome (admin: chat /give + /api/admin/action kind:'give').
+// Aceita key base de ITEM_META ou variante de forja BASE_PLUS_N (N ≤ UPGRADE_MAX).
+// Mesmo padrão do creditGoldToPlayer: online → muta p.inv + sync na hora;
+// offline → persiste no accounts.json (próximo login carrega).
+function adminGiveItem(targetName, itemKey, qty){
+    const name = String(targetName || '').trim();
+    const key  = String(itemKey || '').trim().toUpperCase();
+    const n    = Math.max(1, Math.min(100, parseInt(qty, 10) || 1));
+    if (!name || !key) return { ok:false, reason:'bad_args' };
+    const tier = getUpgradeTier(key);
+    if (!ITEM_META[tier.base]) return { ok:false, reason:'unknown_item' };
+    if (tier.plus > UPGRADE_MAX) return { ok:false, reason:'bad_plus' };
+    for (const p of players.values()){
+        if (p.disconnected || !p.name) continue;
+        if (p.name.toLowerCase() === name.toLowerCase()){
+            incInv(p, key, n);
+            sendInvUpdate(p);
+            console.log(`[admin] give online: ${p.name} +${n}× ${key}`);
+            return { ok:true, online:true, name: p.name, key, qty: n };
+        }
+    }
+    const acc = getAccount(name);
+    if (!acc) return { ok:false, reason:'not_found' };
+    if (!acc.save) return { ok:false, reason:'no_save' };   // conta nunca salvou — player precisa logar 1× antes
+    if (!acc.save.inv || typeof acc.save.inv !== 'object') acc.save.inv = {};
+    acc.save.inv[key] = (acc.save.inv[key] || 0) + n;
+    flushAccounts();
+    console.log(`[admin] give offline (save): ${name} +${n}× ${key}`);
+    return { ok:true, online:false, name: acc.name || name, key, qty: n };
 }
 
 // Em produção (Railway), Volume montado em /data; localmente fica ao lado do server.js
@@ -8221,7 +8324,7 @@ wss.on('connection', (ws, request) => {
                     return;
                 }
                 if (cmd === '/help'){
-                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /setskills NOME N · /heal · /resetquests NOME' });
+                    sendTo(id, { t:'serverMsg', level:'info', text:'Admin: /say · /event · /warn · /info · /motd · /manutencao MIN · /setboss TYPE LV · /respawnboss TYPE · /megaboss status|spawn|reset · /deluser NOME · /checkuser NOME · /resetuser NOME · /allowrestore NOME · /gold N · /skill NOME N · /setskills NOME N · /give NOME ITEM QTD · /heal · /resetquests NOME' });
                     return;
                 }
                 if (cmd === '/deluser'){
@@ -8241,6 +8344,23 @@ wss.on('connection', (ws, request) => {
                 if (cmd === '/spawn007' || cmd === '/spawnimpostor'){
                     spawnImpostorBot();
                     sendTo(id, { t:'serverMsg', level:'info', text: impostorBot ? '007 spawnado.' : 'Falhou ao spawnar 007 (já existe ou sem pos walkable).' });
+                    return;
+                }
+                if (cmd === '/give'){
+                    // Uso: /give NOME ITEM_KEY [QTD] — ITEM_KEY aceita forja (ex.: ESPADA_GUARDIAO_PLUS_5)
+                    const parts = arg.split(/\s+/).filter(Boolean);
+                    if (parts.length < 2){ sendTo(id, { t:'serverMsg', level:'warn', text:'Uso: /give NOME ITEM_KEY [QTD] (ex.: /give fulano ESPADA_GUARDIAO_PLUS_5)' }); return; }
+                    const r = adminGiveItem(parts[0], parts[1], parts[2]);
+                    if (!r.ok){
+                        const why = r.reason === 'unknown_item' ? `item desconhecido (confira a key em ITEM_META)`
+                            : r.reason === 'not_found' ? 'conta não existe'
+                            : r.reason === 'no_save' ? 'conta nunca salvou — player precisa logar 1× antes'
+                            : r.reason === 'bad_plus' ? `forja acima de +${UPGRADE_MAX}`
+                            : 'argumentos inválidos';
+                        sendTo(id, { t:'serverMsg', level:'warn', text:`/give falhou: ${why}.` });
+                        return;
+                    }
+                    sendTo(id, { t:'serverMsg', level:'info', text:`${r.qty}× ${r.key} → ${r.name} ${r.online ? '(online — entregue na hora)' : '(offline — entra no próximo login)'}` });
                     return;
                 }
                 if (cmd === '/checkuser'){
