@@ -3085,6 +3085,7 @@ const I18N = {
     'log.no_food_potion': '<span class="log-sys">Sem comida/poção disponível.</span>',
     'log.rec_unsupported': '<span class="log-sys">Gravação não suportada neste cliente.</span>',
     'log.rec_started': '<span class="log-sys">🔴 Gravando o gameplay — clique em REC de novo pra parar e baixar o clipe.</span>',
+    'log.rec_started_window': '<span class="log-sys">🔴 Gravando a janela inteira (com interface) — clique em REC de novo pra parar e baixar o clipe.</span>',
     'log.rec_failed': '<span class="log-sys">Falha ao gravar: {err}</span>',
     'log.clip_empty': '<span class="log-sys">Clipe vazio — nada foi gravado.</span>',
     'log.clip_saved': '<span class="log-sys">✅ Clipe salvo ({mb} MB) — está nos Downloads. Posta direto ou me manda que eu deixo vertical.</span>',
@@ -3773,6 +3774,7 @@ const I18N = {
     'log.no_food_potion': '<span class="log-sys">No food/potion available.</span>',
     'log.rec_unsupported': '<span class="log-sys">Recording not supported on this client.</span>',
     'log.rec_started': '<span class="log-sys">🔴 Recording gameplay — click REC again to stop and download the clip.</span>',
+    'log.rec_started_window': '<span class="log-sys">🔴 Recording the full window (with UI) — click REC again to stop and download the clip.</span>',
     'log.rec_failed': '<span class="log-sys">Recording failed: {err}</span>',
     'log.clip_empty': '<span class="log-sys">Empty clip — nothing was recorded.</span>',
     'log.clip_saved': '<span class="log-sys">✅ Clip saved ({mb} MB) — it is in your Downloads.</span>',
@@ -13958,21 +13960,38 @@ function eatBestFood(){
     }
 }
 
-// ─── Gravador de gameplay — clipe LIMPO do canvas (sem HUD, sem tela do PC) ──
-// canvas.captureStream + MediaRecorder (nativo Chromium/Electron). O áudio do jogo
-// (Web Audio) entra via um MediaStreamDestination derivado do masterGain — o som
-// continua tocando E vai pro clipe. Saída .webm baixada nos Downloads.
+// ─── Gravador de gameplay ────────────────────────────────────────────────────
+// Browser: clipe LIMPO do canvas (sem HUD, sem tela do PC) via canvas.captureStream.
+// Desktop (Electron ≥1.0.11): captura a JANELA inteira via getDisplayMedia — HUD,
+// inventário e chat entram no clipe (o main process entrega a própria janela sem
+// picker). App desktop antigo sem o handler rejeita o getDisplayMedia → cai no
+// canvas limpo como sempre. O áudio do jogo (Web Audio) entra nos dois modos via
+// MediaStreamDestination derivado do masterGain — o som continua tocando E vai
+// pro clipe. Saída .webm baixada nos Downloads.
 let _recorder = null, _recChunks = [], _recStartAt = 0, _recTimer = null, _recAudioDest = null;
+let _recDisplayStream = null, _recStarting = false;
 function toggleRecording(){
     if (_recorder && _recorder.state === 'recording') stopRecording();
     else startRecording();
 }
-function startRecording(){
+async function startRecording(){
+    if (_recStarting || (_recorder && _recorder.state === 'recording')) return;
     if (typeof MediaRecorder === 'undefined' || !canvas.captureStream){
         log(tr('log.rec_unsupported')); return;
     }
+    _recStarting = true;
     try {
-        let tracks = canvas.captureStream(30).getVideoTracks();
+        // Desktop: tenta capturar a janela inteira (com UI). Falhou/negou → canvas.
+        let videoTracks = null, recWindow = false;
+        if (window.electronApi && window.electronApi.isDesktop &&
+            navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia){
+            try {
+                _recDisplayStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+                videoTracks = _recDisplayStream.getVideoTracks();
+                recWindow = videoTracks.length > 0;
+            } catch (e){ _recDisplayStream = null; }
+        }
+        let tracks = recWindow ? videoTracks.slice() : canvas.captureStream(30).getVideoTracks();
         try {
             if (audioCtx && masterGain){
                 _recAudioDest = audioCtx.createMediaStreamDestination();
@@ -13986,15 +14005,21 @@ function startRecording(){
         _recChunks = [];
         _recorder.ondataavailable = e => { if (e.data && e.data.size) _recChunks.push(e.data); };
         _recorder.onstop = finishRecording;
+        // Se o SO/usuário encerrar a captura por fora (indicador do Windows), fecha limpo.
+        if (recWindow) videoTracks.forEach(tk => { tk.onended = stopRecording; });
         _recorder.start();
         _recStartAt = performance.now();
         const btn = document.getElementById('recBtn');
         if (btn) btn.classList.add('recording');
         if (_recTimer) clearInterval(_recTimer);
         _recTimer = setInterval(updateRecLabel, 500); updateRecLabel();
-        log(tr('log.rec_started'));
+        log(recWindow ? tr('log.rec_started_window') : tr('log.rec_started'));
     } catch (e){
+        try { if (_recDisplayStream) _recDisplayStream.getTracks().forEach(tk => tk.stop()); } catch {}
+        _recDisplayStream = null;
         log(tr('log.rec_failed', {err: (e && e.message || e)}));
+    } finally {
+        _recStarting = false;
     }
 }
 function updateRecLabel(){
@@ -14012,6 +14037,9 @@ function finishRecording(){
     if (btn){ btn.classList.remove('recording'); btn.textContent = '● REC'; }
     try { if (_recAudioDest && masterGain) masterGain.disconnect(_recAudioDest); } catch {}
     _recAudioDest = null;
+    // Solta a captura de janela (desktop) — sem isto o indicador de gravação do SO fica preso.
+    try { if (_recDisplayStream) _recDisplayStream.getTracks().forEach(tk => tk.stop()); } catch {}
+    _recDisplayStream = null;
     const blob = new Blob(_recChunks, { type: 'video/webm' });
     _recChunks = [];
     if (!blob.size){ log(tr('log.clip_empty')); return; }
