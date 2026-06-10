@@ -1516,3 +1516,24 @@ Novato não cai mais sem querer. Retorno em (83,18).
 2. **M4 3b completo** — layout **procedural por andar** (sala diferente cada andar; o
    server precisa do **grid real** pra spawn/colisão — hoje usa bounding box 40-60).
    Resolve as "escadas em linha" de quebra.
+
+---
+
+## 📡 Sessão 10/06 (tarde) — lag/quedas: diagnóstico REDE (edge Railway) + fix anti-rubber-band ✅ DEPLOYADO (`1c7cd0b`)
+
+Dono caiu várias vezes (closes 1006) + rubber-band ("demora pra sair da PZ") + seletor da
+masmorra rejeitando com snap-back 83,17→52,48. Evidência: /health externo errático (0.5s→11s,
+atrasos quantizados ~0.8/2s = retransmissão TCP) · ICMP estável · Google/Vercel rápidos ·
+server local 4ms · **container novo vazio: loop interno 0-1ms enquanto probe externo via 11.6s**
+→ 100% rota/edge Railway (CNAME direto, sem Cloudflare). Anti-wipe recusou saves vazios do
+cliente dele durante as quedas (boneco intacto). Meus pushes client-only da tarde = SKIPPED
+no Railway (não derrubaram ninguém).
+
+Fix (`1c7cd0b`, push direto com 0 online + autorização do dono; monitor pelo campo `perf`):
+1. **pos token bucket** — drop silencioso <40ms virava rubber-band com jitter (rajada de
+   retransmissão descartada → pos não-adjacente → snap-back em cadeia). Agora: média 1/70ms,
+   rajada ≤5, flood barrado com posCorrect throttled 300ms. Teleporte/speed-hack continuam
+   bloqueados. Harness `_test_posburst.js` 6/6 (caminho do teste DENTRO da PZ — fora tem
+   parede e dá falso reject).
+2. **`perf` no /api/admin/state** — loop {last,max}, slow_ticks >100ms (via safeTick),
+   mem/heap + warns no console. Próxima reclamação de lag: 1 curl separa app de rede.
