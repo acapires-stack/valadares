@@ -15,7 +15,9 @@ try {
     console.warn('[updater] electron-updater não disponível em dev.');
 }
 
-const SITE_URL = 'https://valadares.app.br/jogar';
+// VALADARES_URL: override pra harness local (ex.: http://localhost:3333/play.html).
+// Em produção a env não existe → site oficial.
+const SITE_URL = process.env.VALADARES_URL || 'https://valadares.app.br/jogar';
 
 const IS_DEV = !app.isPackaged;
 
@@ -217,6 +219,24 @@ function createWindow() {
         return fs;
     });
     ipcMain.handle('app:getZoom', () => mainWindow.webContents.getZoomLevel());
+
+    // ─── ● REC modo-janela (v1.0.11) ──────────────────────────────────────
+    // O cliente (play.html) chama getDisplayMedia quando roda no desktop; sem
+    // este handler o Electron rejeita a chamada (não tem picker nativo) e o REC
+    // cai no clipe limpo do canvas. Aqui entregamos SEMPRE a própria janela do
+    // jogo — clipe com HUD/inventário, sem picker, sem expor outras telas do PC.
+    // Source sintético {id,name} com o media source id da PRÓPRIA janela: o
+    // desktopCapturer.getSources NÃO enumera janelas do próprio processo no
+    // WGC/Windows (testado no Electron 33 — _test_capture.js prova 784x560 da
+    // janela, não a tela), então o id direto é o caminho determinístico.
+    mainWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+        try {
+            callback({ video: { id: mainWindow.getMediaSourceId(), name: 'Valadares' } });
+        } catch (e){
+            log('rec', `setDisplayMediaRequestHandler erro: ${e.message}`);
+            callback({});   // rejeita → cliente cai no clipe limpo do canvas
+        }
+    });
 
     // Links externos abrem no browser do sistema (não dentro do app)
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
