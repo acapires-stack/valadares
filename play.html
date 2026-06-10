@@ -6558,7 +6558,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
-    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal','arenaModal'].forEach(id => {
+    ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal','arenaModal','dungeonEnterModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -13870,6 +13870,7 @@ function checkDungeonStairs(x, y){
 function openDungeonEnterModal(){
     const modal = document.getElementById('dungeonEnterModal');
     if (!modal) return;
+    closeAllModals();
     const unlock = player.dungeonUnlock || 0;
     const opts = [1];
     for (let fl = DUNGEON_BOSS_EVERY_C; fl <= unlock; fl += DUNGEON_BOSS_EVERY_C) opts.push(fl);
