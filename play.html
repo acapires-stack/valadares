@@ -12486,14 +12486,18 @@ document.addEventListener('visibilitychange', () => {
 // Considera distância, HP do alvo e ALCANCE da arma — mobs fora do range
 // ganham penalidade alta pra não ficar "mirando" sem alcançar.
 function targetScore(m){
-    const d = Math.abs(m.x - player.x) + Math.abs(m.y - player.y);
     const cheb = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
     const hpPct = m.hp / m.maxHp;
     const wK = player.equipped.weapon;
     const wI = wK ? ITEMS[wK] : null;
     const range = wI ? (wI.ranged || wI.meleeRange || 1) : 1;
-    let score = d + hpPct * 5;
-    if (cheb > range) score += 25;     // fora do alcance: penalidade grande
+    // Distância em CHEBYSHEV (8 direções: diagonal colada = 1, igual reto). A métrica
+    // antiga (Manhattan) contava diagonal como 2 — com arma ranged o ESPAÇO preferia
+    // mob longe/machucado ao colado na diagonal. A box 3x3 em volta do jogador tem
+    // prioridade ABSOLUTA; fora dela, desempate por distância + hp baixo, como antes.
+    let score = cheb + hpPct * 5;
+    if (cheb <= 1) score -= 100;        // adjacente (incl. diagonal) SEMPRE vem primeiro
+    else if (cheb > range) score += 25; // fora do alcance: penalidade grande
     return score;
 }
 
@@ -12525,7 +12529,8 @@ function targetNearest(cycle, silent){
             if (cheb > _wRange) continue;   // fora do range de ataque → não é alvo
             const idN = parseInt(idK, 10);
             if (cycle && player.target && player.targetType==='player' && idN === player.target) continue;
-            const s = Math.abs(rp.x-player.x) + Math.abs(rp.y-player.y);   // mesma métrica dos mobs (sem -15)
+            // mesma métrica dos mobs (Chebyshev + prioridade da box 3x3, sem o -15 antigo)
+            const s = cheb <= 1 ? cheb - 100 : cheb;
             if (s < bestS){ bestS = s; best = rp; bestType = 'player'; bestId = idN; }
         }
     }
