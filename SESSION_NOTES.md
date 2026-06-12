@@ -7,6 +7,41 @@
 
 ---
 
+## 🐣 Sessão 12/06 — Saída da PZ lotada (onboarding) + superpopulação 5× do mundo ✅ DEPLOYADOS (`bdb2ab5` + `c1a0082`, server-only)
+
+**Queixa do dono:** "muitos monstros na saída da PZ dificulta demais usuários novos".
+
+**Fix 1 — colchão de novato + leash (`bdb2ab5`):**
+- Anel 1 spawnava a Manhattan 6 do centro (na diagonal = 1 tile da borda da PZ) e mob
+  que perseguia player até a cidade perdia o alvo (`playerInSafe`) e **acampava na porta**.
+- `PZ_BUFFER` = Chebyshev 8 do centro (knob env `PZ_SPAWN_PAD`, default 4 além da PZ):
+  spawn de ring (inicial + respawn) rejeita o colchão via `inPzBuffer()`.
+- **Leash no wandering do tickAI:** mob sem alvo dentro do colchão anda toda janela de
+  speed (sem o gate de 25%), 70% pra longe do centro / 30% aleatório (destrava bolso).
+- Anel 1: min 6→8, max 14→16, target 18→12; anel 2 min 14→16.
+
+**Fix 2 — superpopulação (`c1a0082`):** probe em prod achou **667 mobs (design ~140)**.
+- Causa: counts do `tickRespawns` usavam POSIÇÃO atual — mob orbitando ±6 da âncora saía
+  do raio da região → "déficit" espúrio → reposição infinita. Pior nas caves (r 6-8 <
+  órbita 6): Covil do Drake com 33 dentro + **85 no halo** (design 14). O excesso ainda
+  persistia no `state.json` e voltava a cada boot.
+- Counts de ring/cave/bioma agora pela **âncora** (`m.spawnX ?? m.x`); `loadState`
+  **descarta mobs comuns do overworld** (só uniques/masmorra entram; `tickRespawns`
+  repovoa no design em ~30s).
+
+**Testes:** harness `_test_pz_buffer.js` (gitignored) **17/17** — spawn hygiene no server
+real · leash com 4 ratos injetados nas portas (cópia patchada; dispersa em 4-25s) ·
+state fabricado com 600 mobs (descarte + boss unique Lv3 preservado + população estável).
+Probes novos (gitignored): `_probe_online.js` (VIVOS vs GHOSTS — ghost em grace não
+bloqueia deploy) e `_probe_dist.js` (distribuição por tipo/zona/cave em prod).
+
+**Prod verificada pós-deploy:** 147 mobs total (era 667), colchão da PZ = 0 (mob mais
+próximo a Chebyshev 9), caves no design (Drake 15/17 vs 33/85). Ritual seguido: probe →
+dono deslogou → push → monitor até população cair. ⏳ Validar in-game: sair da cidade
+e sentir a porta limpa.
+
+---
+
 ## 🌩️🎬 Sessão 10/06 (cont.2) — Cloudflare-ready + ● REC modo-janela (app v1.0.11) + /give admin ✅ DEPLOYADO (push direto, server vazio)
 
 **Pedido do dono:** Cloudflare na frente do ws + REC-janela no Electron + Espada/Escudo do
