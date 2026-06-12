@@ -645,6 +645,10 @@ function markPaymentCredited(paymentId){
 const M_W = 100, M_H = 100;
 // PZ: raio 4 (quadrado 9×9, de 46-54). Cliente em play.html:2601 deve bater.
 const SAFE_RADIUS = 4, SAFE_CX = 50, SAFE_CY = 50;
+// 🐣 Colchão de novato ao redor da PZ (fix "porta lotada" 12/06): nada NASCE a
+// Chebyshev ≤ PZ_BUFFER do centro, e mob sem alvo parado aí dentro caminha pra
+// FORA (anti-acampamento — quem perseguia até a porta dispersa em vez de esperar).
+const PZ_BUFFER = SAFE_RADIUS + (parseInt(process.env.PZ_SPAWN_PAD, 10) || 4);
 const T = { GRASS:0, DIRT:1, TREE:2, WATER:3, STONE:4, CAVE:5, CAVE_WALL:6, SNOW:7, SAND:8 };
 const walkable = t => t===T.GRASS||t===T.DIRT||t===T.STONE||t===T.CAVE||t===T.SNOW||t===T.SAND;
 
@@ -679,8 +683,10 @@ const MTYPE = {
 };
 
 const SPAWN_RINGS = [
-    { min:6,  max:14, target:18, types:['RAT','RAT','RAT','RAT','SNAKE'] },
-    { min:14, max:24, target:20, types:['SNAKE','SNAKE','SPIDER','RAT'] },
+    // 🐣 anel de novato: começa FORA do colchão da PZ (PZ_BUFFER corta Chebyshev ≤8)
+    // e mais ralo — era min:6/target:18 = porta da cidade lotada pra quem tá começando.
+    { min:8,  max:16, target:12, types:['RAT','RAT','RAT','RAT','SNAKE'] },
+    { min:16, max:24, target:20, types:['SNAKE','SNAKE','SPIDER','RAT'] },
     { min:24, max:36, target:16, types:['SPIDER','SPIDER','WOLF'] },
     { min:36, max:99, target:14, types:['WOLF','WOLF','ORC','ORC'] },
 ];
@@ -1822,6 +1828,8 @@ const monsters = new Map(); // id -> { id, type, x, y, dir, hp, maxHp, dmg, spee
 function chebyshev(ax, ay, bx, by){ return Math.max(Math.abs(ax-bx), Math.abs(ay-by)); }
 function manhattan(ax, ay, bx, by){ return Math.abs(ax-bx) + Math.abs(ay-by); }
 function inSafe(x, y){ return chebyshev(x, y, SAFE_CX, SAFE_CY) <= SAFE_RADIUS; }
+// Colchão da PZ (⊇ inSafe): zona onde mob não nasce e não fica de bobeira (só floor 0).
+function inPzBuffer(x, y){ return chebyshev(x, y, SAFE_CX, SAFE_CY) <= PZ_BUFFER; }
 // M4: zona segura SÓ vale na cidade (floor 0). Na masmorra (floor ≥ 1) não há
 // PZ — as coords coincidem com a PZ da cidade, mas lá é perigoso (mobs atacam,
 // regen normal, PvP forçado). Use este helper onde a segurança depende do player.
@@ -2305,7 +2313,7 @@ function spawnInitial(){
             const x = 5 + Math.floor(Math.random() * (M_W - 10));
             const y = 5 + Math.floor(Math.random() * (M_H - 10));
             if (!isWalkable(x, y)) continue;
-            if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
+            if (inPzBuffer(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
             const d = manhattan(x, y, M_W/2, M_H/2);
             if (d < ring.min || d >= ring.max) continue;
             spawnMob(ring.types[Math.floor(Math.random() * ring.types.length)], x, y);
@@ -2507,7 +2515,7 @@ function tickRespawns(){
                 const x = 5 + Math.floor(Math.random() * (M_W - 10));
                 const y = 5 + Math.floor(Math.random() * (M_H - 10));
                 if (!isWalkable(x, y)) continue;
-                if (inSafe(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
+                if (inPzBuffer(x, y) || inCave(x, y) || inSanctuary(x, y) || mobAt(x, y)) continue;
                 const d = manhattan(x, y, M_W/2, M_H/2);
                 if (d < ring.min || d >= ring.max) continue;
                 if (tooClose(x, y, 8)) continue;
@@ -2660,13 +2668,23 @@ function tickAI(){
             if (m.unique) continue;
             const wanderCd = Math.floor(m.speed * 1.8 * ((m.frozenUntil && now < m.frozenUntil) ? FREEZE_SLOW_MULT : 1));
             if (now - m.lastMoveAt < wanderCd) continue;
-            if (Math.random() > 0.25) continue;   // 25% chance por tentativa
+            // 🐣 Leash do colchão da PZ: mob que parou aqui (perseguiu alguém até a porta
+            // e perdeu o alvo) anda TODA janela de speed, 70% pra longe do centro —
+            // dispersa a multidão da saída da cidade em segundos.
+            const nearPz = (m.floor || 0) === 0 && inPzBuffer(m.x, m.y);
+            if (!nearPz && Math.random() > 0.25) continue;   // 25% chance por tentativa
             const sx = m.spawnX ?? m.x, sy = m.spawnY ?? m.y;
             if (m.spawnX == null){ m.spawnX = sx; m.spawnY = sy; }   // hidrata legados
             const dxh = m.x - sx, dyh = m.y - sy;
             const distHome = Math.max(Math.abs(dxh), Math.abs(dyh));
             let dx = 0, dy = 0;
-            if (distHome > 6 && Math.random() < 0.65){
+            if (nearPz && Math.random() < 0.7){
+                // afasta do centro da cidade (1 eixo por vez; os 30% restantes caem no
+                // wandering normal abaixo e destravam mob preso em bolso de árvore/água)
+                dx = Math.sign(m.x - SAFE_CX); dy = Math.sign(m.y - SAFE_CY);
+                if (Math.random() < 0.5){ if (dx) dy = 0; else if (dy) dx = 0; }
+                else { if (dy) dx = 0; else if (dx) dy = 0; }
+            } else if (distHome > 6 && Math.random() < 0.65){
                 // longe de casa: volta
                 dx = -Math.sign(dxh); dy = -Math.sign(dyh);
                 // escolhe um eixo (não diagonal)
