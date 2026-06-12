@@ -2501,10 +2501,12 @@ function tickRespawns(){
         }
         return false;
     }
-    // Rings
+    // Rings — count pela ÂNCORA de spawn, não pela posição atual (fix superpopulação
+    // 12/06): mob orbitando ±6 da âncora saía do anel → "déficit" espúrio → reposição
+    // infinita (o de fora nunca morre sozinho). Âncora não muda → count estável.
     for (const ring of SPAWN_RINGS){
         const count = Array.from(monsters.values()).filter(m => {
-            const d = manhattan(m.x, m.y, M_W/2, M_H/2);
+            const d = manhattan(m.spawnX ?? m.x, m.spawnY ?? m.y, M_W/2, M_H/2);
             return d >= ring.min && d < ring.max && ring.types.includes(m.type);
         }).length;
         const deficit = ring.target - count;
@@ -2524,10 +2526,11 @@ function tickRespawns(){
             }
         }
     }
-    // Caves
+    // Caves — count pela âncora (mesmo fix dos rings; era a PIOR fonte: cave r=7 com
+    // órbita ±6 deixava metade da população fora do raio → caves com 6-8× o target)
     for (const cave of CAVES){
         const count = Array.from(monsters.values()).filter(m =>
-            chebyshev(m.x, m.y, cave.x, cave.y) <= cave.r && cave.types.includes(m.type)
+            chebyshev(m.spawnX ?? m.x, m.spawnY ?? m.y, cave.x, cave.y) <= cave.r && cave.types.includes(m.type)
         ).length;
         const deficit = cave.target - count;
         if (deficit <= 0) continue;
@@ -2546,10 +2549,10 @@ function tickRespawns(){
             }
         }
     }
-    // Biomas
+    // Biomas — count pela âncora (mesmo fix)
     for (const b of BIOME_SPAWNS){
         const count = Array.from(monsters.values()).filter(m =>
-            b.inBounds(m.x, m.y) && b.types.includes(m.type)
+            b.inBounds(m.spawnX ?? m.x, m.spawnY ?? m.y) && b.types.includes(m.type)
         ).length;
         const deficit = b.target - count;
         if (deficit <= 0) continue;
@@ -3394,12 +3397,15 @@ function loadStateFromDisk(){
             }
         }
         monsters.clear();
-        let _stuckInWater = 0;
+        let _dropped = 0;
         if (Array.isArray(d.monsters)){
             for (const m of d.monsters){
-                // Saneamento: descarta mob comum do overworld preso em tile não-walkable
-                // (ex: lago) — respawna limpo pelo ciclo normal. Uniques/masmorra preservados.
-                if (!m.unique && (m.floor||0) === 0 && !isWalkable(m.x, m.y)){ _stuckInWater++; continue; }
+                // População COMUM do overworld não persiste (fix superpopulação 12/06):
+                // o estado vivo acumulava 5× o design (667 vs ~140 — mobs orbitando fora
+                // das regiões inflavam o respawn, ver count por âncora no tickRespawns)
+                // e era recarregado a cada boot. Agora: só uniques (bosses, level/timer)
+                // e masmorra entram; tickRespawns repovoa o overworld no design em ~30s.
+                if (!m.unique && (m.floor||0) === 0){ _dropped++; continue; }
                 monsters.set(m.id, {
                     id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir||'down',
                     hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
@@ -3410,7 +3416,7 @@ function loadStateFromDisk(){
             }
         }
         const ageMs = Date.now() - (d.savedAt || 0);
-        console.log(`[state] carregado de disco — ${monsters.size} mobs${_stuckInWater?`, ${_stuckInWater} presos em água descartados`:''}, salvo há ${(ageMs/60000).toFixed(1)}min`);
+        console.log(`[state] carregado de disco — ${monsters.size} mobs${_dropped?` (${_dropped} comuns do overworld descartados — repovoa no design)`:''}, salvo há ${(ageMs/60000).toFixed(1)}min`);
         return true;
     } catch(e){
         console.error('[state] erro ao carregar:', e.message);
