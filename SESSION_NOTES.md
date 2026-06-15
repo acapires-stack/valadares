@@ -224,7 +224,7 @@ pulado a pedido do dono (economia de sessão; fix trivial + checker verde).
 
 **Deploy:** **servidor VAZIO confirmado** via `/api/admin/state` (token do Railway, sem criar sessão-fantasma de WS) → **ONLINE: 0**, uptime 1831s. Push direto `2533495..bb15140` (autorizado p/ server vazio; sem `/manutencao` pois não há ninguém pra deslogar — o gotcha do build>lock de 09/06 não se aplica sem players). **Vercel já no ar** (cliente novo serve a aba em `/ranking` e `/jogar`). **Railway em build (~12min)** — monitor em background polando `/api/ranking` até o campo `arena` aparecer (sinal definitivo do container novo, não o flag `maintenance` que auto-expira).
 
-**Pendência:** confirmar boot do container novo (monitor) + olhada in-game do dono (1ª vez que a aba aparece com dados reais quando alguém jogar arena). Risco baixo — server-auth intacto, só leitura/exposição de dado já existente.
+**Status final:** boot do container novo confirmado (monitor, ~430s) + **dono APROVOU ("ficou ótimo") = feature fechada.** A aba já mostra os 2 registros reais (claude/ClaudeBot); enche mais conforme players disputam arena. Risco baixo — server-auth intacto, só leitura/exposição de dado já existente.
 
 ---
 
