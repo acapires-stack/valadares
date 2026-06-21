@@ -3928,6 +3928,31 @@ const RESET_REQUEST_COOLDOWN_MS = 60 * 1000;  // 1 reset / minuto / conta
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RESEND_FROM = process.env.RESEND_FROM || 'Valadares <noreply@send.valadares.app.br>';
 const SITE_BASE_URL = process.env.SITE_BASE_URL || 'https://valadares.app.br';
+// ─── Alertas pro dono: nova conta / login (via Resend, reaproveita sendEmail) ──
+// Liga/desliga com ALERTS_ENABLED=0. Destino: ALERT_EMAIL (default abaixo).
+const ALERT_EMAIL = process.env.ALERT_EMAIL || 'acapires@gmail.com';
+const ALERTS_ENABLED = (process.env.ALERTS_ENABLED || '1') !== '0';
+const _loginAlertAt = new Map();   // nameLower -> ts do último alerta de login
+const LOGIN_ALERT_COOLDOWN_MS = Number(process.env.LOGIN_ALERT_COOLDOWN_MS || 3 * 60 * 60 * 1000);   // 1 alerta por player / 3h
+function _alertOwner(subject, html){
+    if (!ALERTS_ENABLED) return;
+    Promise.resolve(sendEmail(ALERT_EMAIL, subject, html))
+        .then(r => { if (!r || !r.ok) console.error('[alert] envio falhou:', r && r.error); })
+        .catch(e => console.error('[alert] erro:', e && e.message));
+}
+function alertNewAccount(name){
+    _alertOwner(`🆕 Valadares: nova conta "${name}"`,
+        `<p><b>${name}</b> acabou de criar uma conta.</p><p>Total de contas agora: <b>${accounts.size}</b>.</p><p style="color:#888;font-size:12px">Alerta automático do servidor Valadares.</p>`);
+}
+function alertLogin(name){
+    const k = String(name || '').toLowerCase();
+    const now = Date.now();
+    if (now - (_loginAlertAt.get(k) || 0) < LOGIN_ALERT_COOLDOWN_MS) return;   // anti-spam
+    _loginAlertAt.set(k, now);
+    const onlineCount = [...players.values()].filter(pp => !pp.disconnected && pp.name && pp.name !== 'Anônimo').length;
+    _alertOwner(`🟢 Valadares: ${name} entrou`,
+        `<p><b>${name}</b> entrou no jogo.</p><p>Players online agora: <b>${onlineCount}</b>.</p><p style="color:#888;font-size:12px">Alerta automático do servidor Valadares.</p>`);
+}
 async function sendEmail(to, subject, html){
     if (!RESEND_API_KEY){
         console.log(`[email:dev] TO=${to} SUBJECT="${subject}"\n${html}`);
@@ -6011,12 +6036,14 @@ wss.on('connection', (ws, request) => {
                     t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0,
                     hasEmail: !!acc.email,
                 }));
+                if (!isNew) alertLogin(acc.name);
             };
             if (!existingAcc){
                 // Email opcional no registro inicial — user pode adicionar depois.
                 // Se passou email inválido ou em uso, conta é criada sem ele.
                 createAccount(name, pwHash, optEmail).then(acc => {
                     console.log(`[auth] nova conta: ${name}${acc.email ? ' (com email)' : ''}`);
+                    alertNewAccount(acc.name);
                     finishAuth(acc, true);
                 }).catch(onAuthErr);
             } else {
