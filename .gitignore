@@ -8,3 +8,7 @@ server/mp_credited.json
 server/_*.js
 electron/node_modules/
 electron/dist/
+# segredos — nunca commitar (.env mora só nas env vars do Railway)
+.env
+*.env
+server/.env
