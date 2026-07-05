@@ -106,10 +106,11 @@
     color: var(--gold); letter-spacing: 2px;
   }
   .nav-brand::before { content: "✦ "; color: var(--gold-bright); }
-  .nav-links { display: flex; gap: 24px; }
+  .nav-links { display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end; }
   .nav-links a {
     color: var(--text-dim); font-size: 14px;
     text-transform: uppercase; letter-spacing: 1px;
+    white-space: nowrap;
   }
   .nav-links a:hover { color: var(--gold); text-decoration: none; }
 
@@ -351,6 +352,64 @@
   .lang-switch button:hover { color: var(--gold); border-color: var(--gold); }
   .lang-switch button.lang-active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   html[data-lang="en"] .dl-card.recommended::before { content: "RECOMMENDED"; }
+
+  /* ─── PORTAL DE JOGOS (pool) ─── */
+  .portal { padding-top: 56px; padding-bottom: 40px; }
+  .game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 22px;
+  }
+  .game-card {
+    position: relative;
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, var(--bg-elev), var(--bg-card));
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 24px 24px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+  }
+  .game-card::after {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: .55;
+  }
+  .game-card:hover {
+    border-color: var(--gold);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .game-card.featured { border-color: var(--gold); }
+  .game-card.featured::before {
+    content: "PRINCIPAL";
+    position: absolute; top: 14px; right: 14px;
+    background: var(--gold); color: var(--bg);
+    font: 700 10px/1 inherit; letter-spacing: 1px;
+    padding: 5px 10px; border-radius: 3px;
+  }
+  html[data-lang="en"] .game-card.featured::before { content: "MAIN"; }
+  .game-card.soon { opacity: .5; }
+  .game-icon { font-size: 44px; line-height: 1; margin-bottom: 14px; }
+  .game-name {
+    font-family: "Cinzel", Georgia, serif;
+    font-size: 24px; color: var(--gold-bright);
+    letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .game-tag {
+    font-size: 12px; color: var(--gold); text-transform: uppercase;
+    letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .game-desc { font-size: 14px; color: var(--text-dim); line-height: 1.5; margin-bottom: 20px; flex: 1; }
+  .game-cta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-sm { padding: 11px 20px; font-size: 13px; letter-spacing: 1px; }
+  .game-soon-tag {
+    display: inline-block; align-self: flex-start;
+    font-size: 12px; letter-spacing: 2px; color: var(--text-dim);
+    text-transform: uppercase;
+    border: 1px dashed var(--border); border-radius: 4px; padding: 10px 16px;
+  }
+  @media (max-width: 600px) { .game-name { font-size: 20px; } }
 </style>
 </head>
 <body>
@@ -364,6 +423,15 @@ const I18N_LANDING = {
     'doc.title': `Valadares — RPG online tile-based no navegador (PC e Celular)`,
     'nav.features': `Recursos`, 'nav.how': `Como jogar`, 'nav.devlog': `Devlog`,
     'nav.ranking': `Ranking`, 'nav.download': `Download`, 'nav.play': `Jogar`, 'nav.tactics': `Tactics`,
+    'nav.games': `Jogos`,
+    'portal.title': `NOSSOS JOGOS`, 'portal.subtitle': `o portal de jogos Valadares`,
+    'portal.play': `⚔ Jogar`, 'portal.more': `Saiba mais`,
+    'portal.mmo_tag': `RPG · MMO Online`,
+    'portal.mmo_desc': `O RPG tile-based multiplayer no navegador. PvP, raid bosses, forja, guilds e party — PC e celular, mesma conta.`,
+    'portal.tactics_tag': `Tático · Turnos`,
+    'portal.tactics_desc': `Batalhas táticas por turnos no mesmo universo. Campanha, heróis e arena PvP — estilo Fire Emblem / FF Tactics.`,
+    'portal.soon_name': `Em breve`, 'portal.soon_tag': `Novo mundo`, 'portal.soon_badge': `Aguarde`,
+    'portal.soon_desc': `Mais um jogo do universo Valadares está a caminho. Fique de olho.`,
     'hero.tagline': `RPG tile-based online direto no navegador — agora também no celular.`,
     'hero.sub': `PvP · Raid bosses · Forja · Guilds · Party · Trade · Mobile`,
     'hero.play': `⚔ Jogar agora`, 'hero.download': `⬇ Baixar cliente desktop`,
@@ -420,6 +488,15 @@ const I18N_LANDING = {
     'doc.title': `Valadares — tile-based online RPG in your browser (PC & Mobile)`,
     'nav.features': `Features`, 'nav.how': `How to play`, 'nav.devlog': `Devlog`,
     'nav.ranking': `Ranking`, 'nav.download': `Download`, 'nav.play': `Play`, 'nav.tactics': `Tactics`,
+    'nav.games': `Games`,
+    'portal.title': `OUR GAMES`, 'portal.subtitle': `the Valadares games hub`,
+    'portal.play': `⚔ Play`, 'portal.more': `Learn more`,
+    'portal.mmo_tag': `RPG · Online MMO`,
+    'portal.mmo_desc': `The tile-based multiplayer RPG in your browser. PvP, raid bosses, forging, guilds and party — PC and mobile, same account.`,
+    'portal.tactics_tag': `Tactics · Turn-based`,
+    'portal.tactics_desc': `Turn-based tactical battles in the same universe. Campaign, heroes and PvP arena — Fire Emblem / FF Tactics style.`,
+    'portal.soon_name': `Coming soon`, 'portal.soon_tag': `New world`, 'portal.soon_badge': `Stay tuned`,
+    'portal.soon_desc': `Another game from the Valadares universe is on the way. Stay tuned.`,
     'hero.tagline': `A tile-based online RPG right in your browser — now on mobile too.`,
     'hero.sub': `PvP · Raid bosses · Forging · Guilds · Party · Trade · Mobile`,
     'hero.play': `⚔ Play now`, 'hero.download': `⬇ Download desktop client`,
@@ -510,6 +587,7 @@ window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLan
 <nav>
   <a href="/" class="nav-brand">VALADARES</a>
   <div class="nav-links">
+    <a href="#jogos" data-i18n="nav.games">Jogos</a>
     <a href="#features" data-i18n="nav.features">Recursos</a>
     <a href="#como-jogar" data-i18n="nav.how">Como jogar</a>
     <a href="/devlog" data-i18n="nav.devlog">Devlog</a>
@@ -523,6 +601,46 @@ window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLan
     <button type="button" data-lang-btn="en" onclick="setLang('en')">EN</button>
   </span>
 </nav>
+
+<section id="jogos" class="portal">
+  <h2 class="section-title" data-i18n="portal.title">NOSSOS JOGOS</h2>
+  <p class="section-subtitle" data-i18n="portal.subtitle">o portal de jogos Valadares</p>
+  <div class="game-grid">
+
+    <!-- Valadares MMO (jogo principal) -->
+    <div class="game-card featured">
+      <span class="game-icon">⚔️</span>
+      <h3 class="game-name">Valadares</h3>
+      <p class="game-tag" data-i18n="portal.mmo_tag">RPG · MMO Online</p>
+      <p class="game-desc" data-i18n="portal.mmo_desc">O RPG tile-based multiplayer no navegador. PvP, raid bosses, forja, guilds e party — PC e celular, mesma conta.</p>
+      <div class="game-cta">
+        <a href="/jogar" class="btn btn-primary btn-sm" data-i18n="portal.play">⚔ Jogar</a>
+        <a href="#features" class="btn btn-secondary btn-sm" data-i18n="portal.more">Saiba mais</a>
+      </div>
+    </div>
+
+    <!-- Valadares Tactics -->
+    <div class="game-card">
+      <span class="game-icon">♟️</span>
+      <h3 class="game-name">Valadares Tactics</h3>
+      <p class="game-tag" data-i18n="portal.tactics_tag">Tático · Turnos</p>
+      <p class="game-desc" data-i18n="portal.tactics_desc">Batalhas táticas por turnos no mesmo universo. Campanha, heróis e arena PvP — estilo Fire Emblem / FF Tactics.</p>
+      <div class="game-cta">
+        <a href="https://tactics.valadares.app.br" target="_blank" rel="noopener" class="btn btn-primary btn-sm" data-i18n="portal.play">⚔ Jogar</a>
+      </div>
+    </div>
+
+    <!-- Em breve -->
+    <div class="game-card soon">
+      <span class="game-icon">✦</span>
+      <h3 class="game-name" data-i18n="portal.soon_name">Em breve</h3>
+      <p class="game-tag" data-i18n="portal.soon_tag">Novo mundo</p>
+      <p class="game-desc" data-i18n="portal.soon_desc">Mais um jogo do universo Valadares está a caminho. Fique de olho.</p>
+      <span class="game-soon-tag" data-i18n="portal.soon_badge">Aguarde</span>
+    </div>
+
+  </div>
+</section>
 
 <header class="hero">
   <h1 class="hero-title">VALADARES</h1>
