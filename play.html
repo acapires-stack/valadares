@@ -4106,6 +4106,28 @@ function petBuffText(def, lvl){
 function petXpNextClient(lvl){ return Math.floor(120 * Math.pow(1.5, Math.max(1, lvl) - 1)); }
 
 function npcVisible(n){ return !n.hiddenUntil || (player.flags && player.flags[n.hiddenUntil]); }
+// Só o BONECO do NPC (sem sombra/nome/marcador/brilho): o render 2D chama daqui e o
+// ctx-gravador do 3D também, então os dois não podem divergir.
+function drawNpcBody(npc, nx, ny){
+    // corpo (túnica)
+    ctx.fillStyle = npc.body;
+    ctx.fillRect(nx+14, ny+22, 20, 22);
+    // cinto
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(nx+14, ny+30, 20, 2);
+    // cabeça
+    ctx.fillStyle = '#e8c090';
+    ctx.fillRect(nx+16, ny+8, 16, 14);
+    // olhos
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(nx+19, ny+13, 3, 3);
+    ctx.fillRect(nx+26, ny+13, 3, 3);
+    // chapéu
+    ctx.fillStyle = npc.hat;
+    ctx.fillRect(nx+14, ny+5, 20, 5);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(nx+14, ny+8, 20, 2);
+}
 function npcAt(x, y){
     if ((player.floor || 0) !== 0) return null;   // M4: NPCs só na cidade
     for (const n of NPCS){
@@ -16258,6 +16280,11 @@ function r3dMobSprite(color, size){
         ctx.clearRect(x+6, y-1, 36, 3);
     });
 }
+// NPC: o boneco é fixo por NPC (body/hat da tabela), então a assinatura é o id.
+// Sombra/nome/marcador ficam fora — o 3D põe os seus.
+function r3dNpcSprite(npc){
+    return r3dRasterize((x, y) => drawNpcBody(npc, x, y));
+}
 // Chave de cache: TUDO que muda o visual do boneco. O plano avisou que voxelizar
 // por equip explode a combinatória sem cache — esta é a assinatura.
 function r3dEquipSig(equip, dir){
@@ -16318,6 +16345,10 @@ function r3dBridge(){
         PAD: R3D_PAD, SIDE: R3D_SIDE,
         getMonsters: () => monsters,
         getRemotePlayers: () => remotePlayers,
+        // NPCs: tabela fixa, só os visíveis (o Vend. de Almas depende de flag)
+        getNpcs: () => NPCS.filter(npcVisible),
+        npcSprite: r3dNpcSprite,
+        npcName,
         playerSprite: r3dPlayerSprite,
         mobSprite: r3dMobSprite,
         equipSig: r3dEquipSig,
@@ -16698,24 +16729,7 @@ function loop(ts){
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.beginPath(); ctx.ellipse(nx+TS/2, ny+TS-4, 10, 4, 0, 0, Math.PI*2); ctx.fill();
-        // corpo (túnica)
-        ctx.fillStyle = npc.body;
-        ctx.fillRect(nx+14, ny+22, 20, 22);
-        // cinto
-        ctx.fillStyle = '#3a2410';
-        ctx.fillRect(nx+14, ny+30, 20, 2);
-        // cabeça
-        ctx.fillStyle = '#e8c090';
-        ctx.fillRect(nx+16, ny+8, 16, 14);
-        // olhos
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(nx+19, ny+13, 3, 3);
-        ctx.fillRect(nx+26, ny+13, 3, 3);
-        // chapéu
-        ctx.fillStyle = npc.hat;
-        ctx.fillRect(nx+14, ny+5, 20, 5);
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(nx+14, ny+8, 20, 2);
+        drawNpcBody(npc, nx, ny);
         // marcador de quest disponível (✦ amarelo se tem chain ativa pronta ou nova)
         const hint = npcInteractionHint(npc);
         if (hint.marker){

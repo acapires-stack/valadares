@@ -536,7 +536,13 @@ function textTexture(text, color) {
         const c = document.createElement('canvas');
         c.width = 256; c.height = 64;
         const g = c.getContext('2d');
-        g.font = 'bold 34px monospace';
+        // Encolhe a fonte até caber: nome longo ("Mestre da Arena" ≈ 306px em 34px
+        // monospace) estourava os 256 do canvas e saía cortado nas DUAS pontas.
+        let px = 34;
+        const MAXW = 256 - 14;             // folga pro contorno (lineWidth 7 de cada lado)
+        g.font = `bold ${px}px monospace`;
+        const w = g.measureText(text).width;
+        if (w > MAXW) { px = Math.max(11, Math.floor(px * MAXW / w)); g.font = `bold ${px}px monospace`; }
         g.textAlign = 'center'; g.textBaseline = 'middle';
         g.lineWidth = 7; g.strokeStyle = 'rgba(0,0,0,0.9)';
         g.strokeText(text, 128, 34);
@@ -912,6 +918,21 @@ export function drawScene3d(now, dt) {
         g.userData.bitColor = m.color;
     }
 
+    // NPCs — só na cidade (floor 0), como no 2D. Nome SEMPRE aceso: são 8 fixos na praça
+    // e é por eles que o jogador se orienta (mercador, banco, quests…). Não é o "mar de
+    // etiquetas" dos mobs — ali eram ~150 nomes móveis, aqui são poucos e parados.
+    if (floor === 0) {
+        for (const n of bridge.getNpcs()) {
+            const ex = n.pos.x, ey = n.pos.y;
+            if (!near(ex, ey)) continue;
+            const key = 'n' + n.id;
+            seen.add(key);
+            const g = syncEnt(key, 'npc|' + n.id, () => bridge.npcSprite(n),
+                ex + 0.5, ey + 0.5, null, bridge.npcName(n), '#ffd060', now);
+            g.userData.bitColor = 0xffd060;
+        }
+    }
+
     const remotes = bridge.getRemotePlayers();
     for (const id in remotes) {
         const p = remotes[id];
@@ -944,9 +965,12 @@ export function drawScene3d(now, dt) {
     // Quem sumiu solta os recursos de GPU. E se sumiu BEM DENTRO da janela, morreu
     // (mob não teleporta) → desmonta em cubinhos. Perto da borda é só quem andou pra
     // fora do alcance — esse sai sem explodir.
+    // (NPC nunca "morre": ao descer pra masmorra o floor muda e eles saem do `seen`, mas
+    // as coords da masmorra se sobrepõem às da cidade — sem o `k[0] !== 'n'` a praça
+    // inteira explodiria em cubinhos dourados na cara de quem entra.)
     for (const [k, g] of entGroups) if (!seen.has(k)) {
         const ud = g.userData;
-        if (Math.abs(g.position.x - cx) < RAD - 3 && Math.abs(g.position.z - cy) < RAD - 3 && k !== 'self') {
+        if (Math.abs(g.position.x - cx) < RAD - 3 && Math.abs(g.position.z - cy) < RAD - 3 && k !== 'self' && k[0] !== 'n') {
             spawnDeathBits(g.position.x, g.position.z, ud.bitColor || 0xbfc7cf, now);
         }
         disposeEntGroup(g); entGroups.delete(k);
