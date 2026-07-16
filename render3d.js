@@ -706,7 +706,25 @@ function drawJuice(now) {
 // ═══════════════════════════════════════════════════════════════════════════
 const SUN_I = 3.4, HEMI_I = 2.2;      // calibrados na Etapa 1 (irradiância ≈ π = tom do 2D)
 const TORCH_MAX = 10;                 // teto de PointLight (cada uma custa no shader de cada fragmento)
-let torchPool = [], playerLight = null, tintQuad = null;
+let torchPool = [], playerLight = null, tintQuad = null, altarLight = null, altarGlow = null;
+
+// Disco de luz radial (branco→transparente). A COR vem do material, então dá pra
+// tingir com o glow da magia equipada. sRGB explícito: canvas sem colorSpace é
+// tratado como linear pelo Three ≥r152 e o tom sai lavado (a lição da reforma).
+function radialTex() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const rg = g.createRadialGradient(32, 32, 1, 32, 32, 31);
+    rg.addColorStop(0, 'rgba(255,255,255,1)');
+    rg.addColorStop(0.55, 'rgba(255,255,255,0.32)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = rg;
+    g.fillRect(0, 0, 64, 64);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+}
 const DAY_SKY = 0x8fa8cf, NIGHT_SKY = 0x2c3a5e;
 const DAY_GND = 0x35301f, NIGHT_GND = 0x14161f;
 const DAY_FOG = 0x28405c;
@@ -715,6 +733,21 @@ function buildAtmosphere() {
     // luz do player: no 2D é o _carve(ppx,ppy,6*TS). Aqui é uma PointLight morna.
     playerLight = new THREE.PointLight(0xffd9a0, 0, 9, 1.6);
     scene.add(playerLight);
+    // Runa do altar: a única luz que NÃO depende do darkness — no 2D ela pulsa de dia e
+    // de noite, e é ela que identifica o altar (o corpo é pedra cinza no chão de pedra
+    // cinza; sem a runa vira um bloco anônimo). A cor é a da magia equipada.
+    // PointLight sozinha NÃO resolve: ela ilumina o ENTORNO e some no sol do meio-dia.
+    // O que lê como runa é o glow ADITIVO (o 2D faz igual: gradiente radial por cima).
+    altarLight = new THREE.PointLight(0xaacfff, 0, 6, 1.8);
+    altarLight.visible = false;
+    scene.add(altarLight);
+    altarGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: radialTex(), transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, opacity: 0.9,
+    }));
+    altarGlow.scale.set(1.1, 1.1, 1);
+    altarGlow.visible = false;
+    scene.add(altarGlow);
     for (let i = 0; i < TORCH_MAX; i++) {
         const l = new THREE.PointLight(0xffa447, 0, 7, 1.7);
         l.visible = false;
@@ -918,6 +951,10 @@ export function drawScene3d(now, dt) {
         g.userData.bitColor = m.color;
     }
 
+    // apaga por padrão: sem isso a runa fica acesa no meio da masmorra, órfã do altar
+    if (altarLight) altarLight.visible = false;
+    if (altarGlow) altarGlow.visible = false;
+
     // NPCs — só na cidade (floor 0), como no 2D. Nome SEMPRE aceso: são 8 fixos na praça
     // e é por eles que o jogador se orienta (mercador, banco, quests…). Não é o "mar de
     // etiquetas" dos mobs — ali eram ~150 nomes móveis, aqui são poucos e parados.
@@ -930,6 +967,29 @@ export function drawScene3d(now, dt) {
             const g = syncEnt(key, 'npc|' + n.id, () => bridge.npcSprite(n),
                 ex + 0.5, ey + 0.5, null, bridge.npcName(n), '#ffd060', now);
             g.userData.bitColor = 0xffd060;
+        }
+        // Props (baús, altar, bancada, treino) — SEM nome: são 7 objetos e o 2D já mostra
+        // o hint ([B] abrir, [M] altar…) quando o jogador chega perto. Etiqueta em tudo
+        // aqui só recriaria o mural de texto que a reforma tirou.
+        for (const p of bridge.getProps()) {
+            if (!near(p.x, p.y)) continue;
+            const key = 'x' + p.key;      // 'x' e não 'p': 'p'+id é jogador remoto
+            seen.add(key);
+            syncEnt(key, 'prop|' + p.key, () => bridge.propSprite(p.kind, p.arg),
+                p.x + 0.5, p.y + 0.5, null, null, null, now);
+            if (p.kind === 'altar' && altarLight) {
+                const wx = p.x + 0.5, wz = p.y + 0.5, cor = p.glow || '#aacfff';
+                const pulso = 0.6 + Math.sin(now / 240) * 0.4;                    // pulso do 2D
+                const alto = gy(wx, wz) + 0.72;
+                altarLight.visible = true;
+                altarLight.color.set(cor);
+                altarLight.intensity = 2.6 * pulso;
+                altarLight.position.set(wx, alto + 0.15, wz);
+                altarGlow.visible = true;
+                altarGlow.material.color.set(cor);
+                altarGlow.material.opacity = 0.55 + 0.35 * pulso;
+                altarGlow.position.set(wx, alto, wz);
+            }
         }
     }
 
@@ -965,12 +1025,13 @@ export function drawScene3d(now, dt) {
     // Quem sumiu solta os recursos de GPU. E se sumiu BEM DENTRO da janela, morreu
     // (mob não teleporta) → desmonta em cubinhos. Perto da borda é só quem andou pra
     // fora do alcance — esse sai sem explodir.
-    // (NPC nunca "morre": ao descer pra masmorra o floor muda e eles saem do `seen`, mas
-    // as coords da masmorra se sobrepõem às da cidade — sem o `k[0] !== 'n'` a praça
-    // inteira explodiria em cubinhos dourados na cara de quem entra.)
+    // (NPC e prop nunca "morrem": ao descer pra masmorra o floor muda e eles saem do
+    // `seen`, mas as coords da masmorra se sobrepõem às da cidade — sem a guarda de
+    // prefixo a praça inteira explodiria em cubinhos na cara de quem entra.)
     for (const [k, g] of entGroups) if (!seen.has(k)) {
         const ud = g.userData;
-        if (Math.abs(g.position.x - cx) < RAD - 3 && Math.abs(g.position.z - cy) < RAD - 3 && k !== 'self' && k[0] !== 'n') {
+        const estatico = k[0] === 'n' || k[0] === 'x';
+        if (Math.abs(g.position.x - cx) < RAD - 3 && Math.abs(g.position.z - cy) < RAD - 3 && k !== 'self' && !estatico) {
             spawnDeathBits(g.position.x, g.position.z, ud.bitColor || 0xbfc7cf, now);
         }
         disposeEntGroup(g); entGroups.delete(k);

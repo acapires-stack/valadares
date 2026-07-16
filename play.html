@@ -4039,6 +4039,73 @@ function atDummy(){
     if ((player.floor || 0) !== 0) return false;   // M4: treino só na cidade
     return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
 }
+// Corpos dos props da PZ, sem sombra/brilho/hint/barra: o render 2D chama daqui e o
+// ctx-gravador do 3D também (mesma regra do drawNpcBody) — assim os dois não divergem.
+function drawChestBody(c, cpx, cpy){
+    ctx.fillStyle = '#6a4018'; ctx.fillRect(cpx+8, cpy+18, 32, 22);
+    ctx.fillStyle = '#8a5520'; ctx.fillRect(cpx+8, cpy+12, 32, 10);
+    ctx.fillStyle = '#3a2818';
+    ctx.fillRect(cpx+8, cpy+18, 32, 2);
+    ctx.fillRect(cpx+12, cpy+12, 2, 28);
+    ctx.fillRect(cpx+34, cpy+12, 2, 28);
+    // fechadura colorida por categoria
+    ctx.fillStyle = c.lock; ctx.fillRect(cpx+22, cpy+22, 4, 5);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(cpx+23, cpy+25, 2, 2);
+}
+function drawDummyBody(dpx, dpy, shake){
+    // poste
+    ctx.fillStyle = '#4a2818';
+    ctx.fillRect(dpx+22, dpy+24, 4, 20);
+    // boneco de palha (cabeça + corpo)
+    ctx.fillStyle = '#c8a050';
+    ctx.fillRect(dpx+14+shake, dpy+10, 20, 18);
+    // cabeça (pano)
+    ctx.fillStyle = '#a08040';
+    ctx.beginPath(); ctx.arc(dpx+TS/2+shake, dpy+8, 7, 0, Math.PI*2); ctx.fill();
+    // marcas / flechas
+    ctx.fillStyle = '#5a2818';
+    ctx.fillRect(dpx+18+shake, dpy+14, 2, 1);
+    ctx.fillRect(dpx+24+shake, dpy+18, 1, 2);
+    ctx.fillRect(dpx+20+shake, dpy+22, 3, 1);
+}
+// A runa pulsante do altar NÃO entra aqui: é gradiente radial com alpha animado, que
+// bakeado num voxel viraria borrão. O 3D acende a runa com luz de verdade.
+function drawAltarBody(apx, apy){
+    // base de pedra
+    ctx.fillStyle = '#4a4a55';
+    ctx.fillRect(apx+10, apy+30, 28, 14);
+    ctx.fillStyle = '#5a5a65';
+    ctx.fillRect(apx+10, apy+30, 28, 4);
+    // pilar
+    ctx.fillStyle = '#5a5566';
+    ctx.fillRect(apx+18, apy+12, 12, 20);
+    ctx.fillStyle = '#6a6577';
+    ctx.fillRect(apx+18, apy+12, 12, 3);
+    // núcleo
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(apx+TS/2-2, apy+16, 4, 4);
+}
+function drawCraftBody(cpx, cpy){
+    // base
+    ctx.fillStyle = '#5a3818';
+    ctx.fillRect(cpx+6, cpy+22, 36, 18);
+    ctx.fillStyle = '#7a4a20';
+    ctx.fillRect(cpx+6, cpy+22, 36, 4);     // topo da mesa
+    // pernas
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(cpx+8, cpy+40, 4, 6);
+    ctx.fillRect(cpx+36, cpy+40, 4, 6);
+    // martelo apoiado
+    ctx.fillStyle = '#5a3818';
+    ctx.fillRect(cpx+12, cpy+10, 3, 14);
+    ctx.fillStyle = '#776655';
+    ctx.fillRect(cpx+9, cpy+8, 9, 6);
+    // bigorna
+    ctx.fillStyle = '#3a4050';
+    ctx.fillRect(cpx+22, cpy+14, 12, 9);
+    ctx.fillStyle = '#5a6070';
+    ctx.fillRect(cpx+24, cpy+12, 8, 4);
+}
 // ─── NPCs (PZ + mundo) ─────────────────────────────────────────────────────
 const NPCS = [
     // PZ — layout simétrico nas bordas do quadrado 9×9 (PZ raio 4 ao redor de 50,50).
@@ -16285,6 +16352,27 @@ function r3dMobSprite(color, size){
 function r3dNpcSprite(npc){
     return r3dRasterize((x, y) => drawNpcBody(npc, x, y));
 }
+// Props da PZ (baús/altar/bancada/treino). Todos estáticos → 1 sprite por prop, cacheado
+// pela chave. O boneco de treino vai com shake 0 (o balanço é do 2D durante o treino).
+function r3dPropSprite(kind, arg){
+    return r3dRasterize((x, y) => {
+        if (kind === 'chest') drawChestBody(arg, x, y);
+        else if (kind === 'altar') drawAltarBody(x, y);
+        else if (kind === 'craft') drawCraftBody(x, y);
+        else if (kind === 'dummy') drawDummyBody(x, y, 0);
+    });
+}
+// Lista pronta pro 3D: posição + chave de cache + o que rasterizar.
+function r3dProps(){
+    const out = [];
+    for (const c of CHESTS) out.push({ key: 'c' + c.id, x: c.x, y: c.y, kind: 'chest', arg: c });
+    // `glow` = a MESMA cor que o 2D usa na runa (muda com a magia equipada)
+    const sp = SPELLS[player.activeSpell];
+    out.push({ key: 'altar', x: ALTAR_POS.x, y: ALTAR_POS.y, kind: 'altar', glow: sp ? sp.glow : '#aacfff' });
+    out.push({ key: 'craft', x: CRAFT_POS.x, y: CRAFT_POS.y, kind: 'craft' });
+    out.push({ key: 'dummy', x: DUMMY_POS.x, y: DUMMY_POS.y, kind: 'dummy' });
+    return out;
+}
 // Chave de cache: TUDO que muda o visual do boneco. O plano avisou que voxelizar
 // por equip explode a combinatória sem cache — esta é a assinatura.
 function r3dEquipSig(equip, dir){
@@ -16349,6 +16437,9 @@ function r3dBridge(){
         getNpcs: () => NPCS.filter(npcVisible),
         npcSprite: r3dNpcSprite,
         npcName,
+        // Props da PZ: baús, altar, bancada, boneco de treino
+        getProps: r3dProps,
+        propSprite: r3dPropSprite,
         playerSprite: r3dPlayerSprite,
         mobSprite: r3dMobSprite,
         equipSig: r3dEquipSig,
@@ -16575,15 +16666,7 @@ function loop(ts){
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(cpx+TS/2, cpy+TS-4, 18, 5, 0, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#6a4018'; ctx.fillRect(cpx+8, cpy+18, 32, 22);
-        ctx.fillStyle = '#8a5520'; ctx.fillRect(cpx+8, cpy+12, 32, 10);
-        ctx.fillStyle = '#3a2818';
-        ctx.fillRect(cpx+8, cpy+18, 32, 2);
-        ctx.fillRect(cpx+12, cpy+12, 2, 28);
-        ctx.fillRect(cpx+34, cpy+12, 2, 28);
-        // fechadura colorida por categoria
-        ctx.fillStyle = c.lock; ctx.fillRect(cpx+22, cpy+22, 4, 5);
-        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(cpx+23, cpy+25, 2, 2);
+        drawChestBody(c, cpx, cpy);
         // brilho + hint só quando perto
         if (c === nearC){
             ctx.strokeStyle = 'rgba(255,200,80,0.6)'; ctx.lineWidth = 2;
@@ -16627,26 +16710,13 @@ function loop(ts){
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(dpx+TS/2, dpy+TS-4, 14, 4, 0, 0, Math.PI*2); ctx.fill();
-        // poste
-        ctx.fillStyle = '#4a2818';
-        ctx.fillRect(dpx+22, dpy+24, 4, 20);
-        // boneco de palha (cabeça + corpo)
-        let shake = 0;
         // Só balança se o treino ATIVO é no boneco
+        let shake = 0;
         if (training && training.location === 'dummy'){
             const t = (performance.now() - training.lastTick) / TRAINING_TIME;
             shake = Math.sin(t * Math.PI * 6) * 1.5;
         }
-        ctx.fillStyle = '#c8a050';
-        ctx.fillRect(dpx+14+shake, dpy+10, 20, 18);
-        // cabeça (pano)
-        ctx.fillStyle = '#a08040';
-        ctx.beginPath(); ctx.arc(dpx+TS/2+shake, dpy+8, 7, 0, Math.PI*2); ctx.fill();
-        // marcas / flechas
-        ctx.fillStyle = '#5a2818';
-        ctx.fillRect(dpx+18+shake, dpy+14, 2, 1);
-        ctx.fillRect(dpx+24+shake, dpy+18, 1, 2);
-        ctx.fillRect(dpx+20+shake, dpy+22, 3, 1);
+        drawDummyBody(dpx, dpy, shake);
         // brilho ao aproximar
         if (atDummy()){
             ctx.strokeStyle = 'rgba(255,200,80,0.6)';
@@ -16674,17 +16744,9 @@ function loop(ts){
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(apx+TS/2, apy+TS-4, 18, 5, 0, 0, Math.PI*2); ctx.fill();
-        // base de pedra
-        ctx.fillStyle = '#4a4a55';
-        ctx.fillRect(apx+10, apy+30, 28, 14);
-        ctx.fillStyle = '#5a5a65';
-        ctx.fillRect(apx+10, apy+30, 28, 4);
-        // pilar
-        ctx.fillStyle = '#5a5566';
-        ctx.fillRect(apx+18, apy+12, 12, 20);
-        ctx.fillStyle = '#6a6577';
-        ctx.fillRect(apx+18, apy+12, 12, 3);
-        // runa brilhante pulsante
+        drawAltarBody(apx, apy);
+        // runa brilhante pulsante — vai POR CIMA do corpo, e o núcleo é repintado depois
+        // dela (a ordem original: o ponto branco fica na frente do glow, não atrás)
         const pulse = Math.sin(waterT*4) * 0.4 + 0.6;
         const sp = SPELLS[player.activeSpell];
         const runeColor = sp ? sp.glow : '#aacfff';
@@ -16799,25 +16861,7 @@ function loop(ts){
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(cpx+TS/2, cpy+TS-4, 20, 4, 0, 0, Math.PI*2); ctx.fill();
-        // base
-        ctx.fillStyle = '#5a3818';
-        ctx.fillRect(cpx+6, cpy+22, 36, 18);
-        ctx.fillStyle = '#7a4a20';
-        ctx.fillRect(cpx+6, cpy+22, 36, 4);     // topo da mesa
-        // pernas
-        ctx.fillStyle = '#3a2410';
-        ctx.fillRect(cpx+8, cpy+40, 4, 6);
-        ctx.fillRect(cpx+36, cpy+40, 4, 6);
-        // martelo apoiado
-        ctx.fillStyle = '#5a3818';
-        ctx.fillRect(cpx+12, cpy+10, 3, 14);
-        ctx.fillStyle = '#776655';
-        ctx.fillRect(cpx+9, cpy+8, 9, 6);
-        // bigorna
-        ctx.fillStyle = '#3a4050';
-        ctx.fillRect(cpx+22, cpy+14, 12, 9);
-        ctx.fillStyle = '#5a6070';
-        ctx.fillRect(cpx+24, cpy+12, 8, 4);
+        drawCraftBody(cpx, cpy);
         // brilho ao aproximar
         if (atCraft()){
             ctx.strokeStyle = 'rgba(255,200,80,0.6)';
