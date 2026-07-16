@@ -7,6 +7,53 @@
 
 ---
 
+## 👹 16/07 (cont.2) — "dá para jogar?" → o 3D revelou **1035 mobs** no mundo: vazamento do Cerco ✅ **NO AR** (`c0d641d`)
+
+> **Print do dono com a pergunta "veja se dá para jogar" + queixa em "bonecos/etiquetas".** Tela
+> com dezenas de **caixas pretas com pontinhos brancos**, HUD marcando **146 chars**.
+>
+> **O que era:** não são etiquetas — é o **mar de monstros**. Aranha `#3a1a3a` e morcego
+> `#3a2a44` fazem as caixas escuras; esqueleto `#cccccc` são os pontinhos brancos. Provado
+> **reproduzindo**: injetei a densidade da prod no array `monsters` do cliente local e o PNG
+> saiu igual à print. **O 3D não causou, REVELOU** — viewport 2D = 15×11 tiles, janela 3D =
+> ~25×25. Mesma janela, mesmo lugar: design local **14 chars** vs prod **146**.
+>
+> **Causa-raiz** (`server.js` ~5199, evento diário `siege`): spawna 3-4 de
+> `['ORC','SKELETON','WOLF','SPIDER']` — **os 4 tipos que vazaram** (prod: SPIDER 227 / WOLF 229
+> / ORC 245 / SKELETON 242; todo o resto no design) — e rastreava só os 60 últimos ids:
+> **`shift()` esquecia o ID e deixava o MOB vivo pra sempre**. ~210 spawns/cerco − 60 limpos =
+> ~150 órfãos; siege cai 1 a cada 3 dias × 25 dias de uptime ≈ o excesso de ~895. Os órfãos
+> nascem no raio 12-25 do centro, onde a âncora não cai em ring/cave/bioma nenhum → **nenhum
+> count do `tickRespawns` os enxerga** (probe: `anel3 manh24-36` = 492 mobs). Era a queixa de
+> 12/06 ("monstros na saída da PZ") voltando por outra porta.
+>
+> **Fix:** despawna o mob mais antigo ao passar do teto em vez de só esquecer o id —
+> `SIEGE_MAX_ALIVE` (env, default 60). **Estoque se limpou sozinho no restart** (`loadState` já
+> descarta comuns do overworld). Harness `_test_siege.js` **3/3**: código antigo **+461 mobs**
+> em ~140 ticks, com o fix **+0**.
+>
+> **Deploy:** server vazio confirmado 2× → push direto autorizado. Container novo aos ~60s;
+> **1010 → 147 mobs**. Probe pós-deploy: SPIDER 17 · WOLF 12 · ORC 6 · SKELETON 15 ·
+> **colchão da PZ 9 → 1** · anel3 492 → 23.
+>
+> **🚧 Gotchas:** o `setInterval(tickDailyEvent, 30_000)` é só o **check** — quem manda no spawn
+> é o **`nextTickAt` (60s pro siege)**; patchar só o setInterval não reproduz o bug (1º harness
+> deu Δ+3 e corrigiu minha conta de 420→210 spawns/cerco). `m.fromEvent` é setado e nunca lido.
+> Injetar mob no array do cliente pra testar render **tem que ser síncrono**, senão o snapshot
+> do WS reconstrói o array.
+>
+> **⚠️ Erro meu, registrado:** diagnostiquei "mar de etiquetas" grepando `aggro` **só no server**
+> (`MTYPE.aggro` = raio em tiles) e assumindo ser o mesmo campo do cliente. **No cliente é flag
+> booleana** (`play.html:8496`) — a condição já estava certa e meu "fix" teria **apagado o nome
+> de quem te persegue**. Revertido; sobrou só um comentário em `render3d.js:899`. Só não foi pro
+> ar porque fui ver o valor real no lado que executa. **O corte de etiquetas da reforma
+> funciona** (PNG da PZ: zero nomes).
+>
+> **⏳ Pendente:** dono validar in-game e **rejulgar o visual/FPS com a população normal** — a
+> print que motivou tudo mostrava um mundo 7× lotado.
+
+---
+
 ## 🎨 16/07 (cont.) — 3D: dono viu in-game e chamou de FEIO → **REFORMA VISUAL ✅ NO AR** (`aaa41d2`)
 
 > **"nossa que coisa feia que fizemos, concorda?"** — concordei. A 1ª versão passou em TODAS as
