@@ -187,11 +187,22 @@ BlogPosting em cada post. Pra adicionar post novo: criar `.md` em
 - 28/05 tarde: privacy/terms, ranking público, cassino, fase 5.5 auth+email+reset
 - 28/05 ~13h+: pots curando (fix lockdown), party UX (right-click + modal), admin UI completo (`/deluser` `/checkuser` `/resetuser`), boneco repositionado, hardening de save (clamp x/y, force hp/mp server-side no save)
 
+**Julho 2026:**
+- 05/07: `valadares.app.br` virou portal de jogos (MMO + Tactics + slot "em breve")
+- 16/07: **MODO 3D no ar** (`render3d.js`, toggle em Opções → GRÁFICOS, **default OFF**) — port do piloto do Tactics. 4 etapas num dia: chão em janela rolante (InstancedMesh) · personagens voxel (o `drawCharacter`/`drawMonster` do 2D rasterizado por ctx-gravador, cache por equip+dir) · atmosfera (sol pelo ciclo dia/noite, tochas e luz do player como PointLight, rampas da masmorra) · juice (dano flutuante, morte em cubinhos, anel de alvo). Depois **reforma visual** (`aaa41d2`): textura de chão via ctx-gravador no `drawTile`, relevo quantizado, corte do mar de etiquetas. Client-only → os 2 deploys saíram com Railway **SKIPPED** (server intacto). Plano/knobs: seção "Modo 3D" do `CLAUDE.md` + `Cofre/Projetos/Valadares - Plano de Evolução.md`.
+
 > Histórico cronológico detalhado: `SESSION_NOTES.md` (sessão atual) e `docs/archive/sessions-pre-may28.md` (sessões anteriores).
 
 ---
 
 ## ⚠️ Lições aprendidas (não cair de novo)
+
+**Trabalho visual (3D, 16/07) — métrica verde NÃO é prova**
+- A 1ª versão do 3D passou em TUDO que eu medi (i18n 709/709, console limpo, 60fps in-game, não-regressão provada, deploy sem derrubar ninguém) e o dono abriu no jogo: **"nossa que coisa feia que fizemos"**. Ele estava certo. Nenhuma das minhas métricas era capaz de dizer "está feio" — eu tinha testado, não verificado.
+- **Se o entregável é visual, VER é parte da verificação.** `preview_screenshot`/`computer` estoura 30s no jogo → contorno que funciona: `canvas.toDataURL` → POST pra um receptor node descartável → PNG no disco → `Read`. Cada olhada nesses PNGs pegou um bug que métrica nenhuma pegou.
+- **Inclinar a câmera sobre um chão plano não faz mundo 3D — faz imagem 2D torta.** Era a raiz do "feio". Relevo é obrigatório; e **rampa suave lê PLANO** (a 1ª tentativa tinha altura e leu plana igual): terreno voxel lê por **DEGRAU**, tem que quantizar.
+- **Three ≥r152: textura de canvas sem `colorSpace = SRGBColorSpace` sai LAVADA** (a arte 2D é sRGB e ele assume linear). Cor por instância (`setColorAt`) já converte sozinha — só a textura precisa ser marcada na mão.
+- **Não chutar densidade.** Eu estimei "10-20 personagens na tela"; o HUD real do dono mostrou **269** (errei 15×). Se o número importa pra decisão, meça — ou diga que é chute.
 
 **MercadoPago**
 - Preference API (Checkout Pro) > Payment API direto. Não exige homologação.
