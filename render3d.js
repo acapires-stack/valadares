@@ -462,6 +462,10 @@ const NAME_Y = 1.45;       // altura do nome/barra acima dos pés (acima do bone
 // o dono pediu "+30%" no feedback F1 (UNIT_SCALE 1.3 lá). Escala a partir dos PÉS
 // (mesh montada com y=0 no chão), então o boneco cresce pra cima sem flutuar.
 const CHAR_SCALE = 1.35;
+// Item no chão é MENOR que boneco (≈0.2 tile contra 0.63×0.88) e sofre o mesmo
+// encurtamento da câmera — na escala do 2D ele some. Aqui a fidelidade perde pra
+// legibilidade: loot que não se acha não é loot.
+const ITEM_SCALE = 2.0;
 
 const _spriteCache = new Map();   // sig → {cells, maxGy} (a rasterização é o caro; isto é o cache)
 const entGroups = new Map();      // chave da entidade → THREE.Group
@@ -503,7 +507,7 @@ function spriteFor(sig, make) {
 
 // cells → InstancedMesh (1 draw call). Pés no chão (maxGy = fileira mais baixa),
 // centrado no tile e virado pra +Z (a câmera padrão olha do sul, como o 2D).
-function makeVoxelMesh(s) {
+function makeVoxelMesh(s, escala = CHAR_SCALE) {
     const { cells, maxGy } = s;
     if (!cells.length) return null;
     const TS = bridge.TS, PAD = bridge.PAD;
@@ -523,7 +527,7 @@ function makeVoxelMesh(s) {
         inst.setMatrixAt(i, m4);
         inst.setColorAt(i, col.setHex(c.color));
     });
-    inst.scale.setScalar(CHAR_SCALE);   // cresce a partir dos pés (y=0), não flutua
+    inst.scale.setScalar(escala);       // cresce a partir dos pés (y=0), não flutua
     inst.castShadow = SHADOWS;
     return { inst, mat };
 }
@@ -574,13 +578,13 @@ function makeEntGroup() {
 }
 
 // desenha/atualiza UMA entidade. `sig` troca (equip/dir/cor) → remonta os voxels.
-function syncEnt(key, sig, make, wx, wz, hpPct, name, nameColor, now) {
+function syncEnt(key, sig, make, wx, wz, hpPct, name, nameColor, now, escala) {
     let g = entGroups.get(key);
     if (!g) { g = makeEntGroup(); entGroups.set(key, g); scene.add(g); }
     const ud = g.userData;
     if (ud.sig !== sig) {
         if (ud.vox) { g.remove(ud.vox); ud.vox.dispose(); ud.mat.dispose(); ud.vox = null; }
-        const r = makeVoxelMesh(spriteFor(sig, make));
+        const r = makeVoxelMesh(spriteFor(sig, make), escala);
         if (r) { ud.vox = r.inst; ud.mat = r.mat; g.add(r.inst); }
         ud.sig = sig;
     }
@@ -618,7 +622,7 @@ function disposeEntGroup(g) {
 // Pools: depois de aquecidos, zero alocação por frame.
 // ═══════════════════════════════════════════════════════════════════════════
 const DEATH_BIT_MS = 620;
-let floatPool = [], partPool = [], bitPool = [], targetRing = null;
+let floatPool = [], partPool = [], bitPool = [], targetRing = null, glowPool = [];
 
 function poolGet(pool, make) {
     for (const o of pool) if (!o.visible) { o.visible = true; return o; }
@@ -993,6 +997,34 @@ export function drawScene3d(now, dt) {
         }
     }
 
+    // ─── LOOT NO CHÃO ───
+    // Escala PRÓPRIA: o item é desenhado com ~10px de um tile de 48 (≈0.2 tile). Na
+    // câmera 3D (janela de 25 tiles, pitch 53°) isso vira um pontinho invisível — a mesma
+    // lição do CHAR_SCALE, e aqui é pior porque o item é chão, não boneco.
+    // O brilho pulsante é o que faz o loot SALTAR no 2D; sem ele, achar o que caiu vira
+    // caça ao tesouro. Aditivo (não PointLight — ver a runa do altar).
+    poolReset(glowPool);
+    for (const it of bridge.getGround()) {
+        if (!near(it.x, it.y)) continue;
+        const key = 'g' + it.id;
+        seen.add(key);
+        const trancado = bridge.lootLockedToOther(it);
+        const wx = it.x + 0.5, wz = it.y + 0.5;
+        syncEnt(key, 'item|' + it.type, () => bridge.groundSprite(it.type),
+            wx, wz, null, it.qty > 1 ? String(it.qty) : null, '#ffffff', now, ITEM_SCALE);
+        const brilho = poolGet(glowPool, () => new THREE.Sprite(new THREE.SpriteMaterial({
+            map: radialTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
+        brilho.material.color.set(trancado ? '#606070' : bridge.itemGlow(it.type));
+        // pulso por item (o 2D usa itemPulse + id) → não piscam todos juntos
+        const fase = typeof it.id === 'number' ? it.id : (parseInt(String(it.id).replace(/\D/g, ''), 10) || 0);
+        // Comedido de propósito: o glow do 2D tem raio 8-11px (~0.2 tile). Um halo grande
+        // demais ENGOLE o item — o ovo branco virava uma bola de luz sem forma.
+        const p = 0.5 + 0.5 * Math.sin(now / 260 + fase);
+        brilho.material.opacity = trancado ? 0.14 + 0.06 * p : 0.3 + 0.22 * p;
+        brilho.scale.setScalar(0.5 + 0.06 * p);
+        brilho.position.set(wx, gy(wx, wz) + 0.12, wz);
+    }
+
     const remotes = bridge.getRemotePlayers();
     for (const id in remotes) {
         const p = remotes[id];
@@ -1025,13 +1057,14 @@ export function drawScene3d(now, dt) {
     // Quem sumiu solta os recursos de GPU. E se sumiu BEM DENTRO da janela, morreu
     // (mob não teleporta) → desmonta em cubinhos. Perto da borda é só quem andou pra
     // fora do alcance — esse sai sem explodir.
-    // (NPC e prop nunca "morrem": ao descer pra masmorra o floor muda e eles saem do
-    // `seen`, mas as coords da masmorra se sobrepõem às da cidade — sem a guarda de
-    // prefixo a praça inteira explodiria em cubinhos na cara de quem entra.)
+    // Só MOB e PLAYER morrem. NPC/prop ('n'/'x') somem ao trocar de andar — e como as
+    // coords da masmorra se sobrepõem às da cidade, sem esta guarda a praça inteira
+    // explodiria em cubinhos na cara de quem entra. Loot ('g') some porque foi PEGO:
+    // explodir daria a leitura errada (parece que o item foi destruído).
     for (const [k, g] of entGroups) if (!seen.has(k)) {
         const ud = g.userData;
-        const estatico = k[0] === 'n' || k[0] === 'x';
-        if (Math.abs(g.position.x - cx) < RAD - 3 && Math.abs(g.position.z - cy) < RAD - 3 && k !== 'self' && !estatico) {
+        const naoMorre = k[0] === 'n' || k[0] === 'x' || k[0] === 'g';
+        if (Math.abs(g.position.x - cx) < RAD - 3 && Math.abs(g.position.z - cy) < RAD - 3 && k !== 'self' && !naoMorre) {
             spawnDeathBits(g.position.x, g.position.z, ud.bitColor || 0xbfc7cf, now);
         }
         disposeEntGroup(g); entGroups.delete(k);

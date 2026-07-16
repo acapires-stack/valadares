@@ -5306,21 +5306,11 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob){
 // ITENS NO CHÃO
 // ═══════════════════════════════════════════════════════════════════════════
 let itemPulse = 0;
-function drawGroundItem(it, px, py){
+// Só o FORMATO do item, ao redor de (cx,cy): sem sombra, sem o glow pulsante, sem qty
+// e sem cadeado. O render 2D chama daqui e o ctx-gravador do 3D também (mesma regra do
+// drawNpcBody) — o 3D refaz glow/qty com os recursos dele.
+function drawItemShape(it, cx, cy){
     const def = ITEMS[it.type];
-    const cx = px + TS/2, cy = py + TS/2 + 4;
-    // sombra
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath(); ctx.ellipse(cx, cy+8, 8, 3, 0, 0, Math.PI*2); ctx.fill();
-    // brilho pulsante (it.id pode ser string 'g123' do server ou number local — extrai num)
-    const idNum = typeof it.id === 'number' ? it.id : (parseInt(String(it.id).replace(/\D/g, ''), 10) || 0);
-    const glow = 8 + Math.sin(itemPulse + idNum) * 3;
-    const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, glow);
-    g.addColorStop(0, def.color);
-    g.addColorStop(0.6, def.color+'88');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(cx, cy, glow, 0, Math.PI*2); ctx.fill();
     // formato por kind
     if (def.kind === 'gold'){
         // moeda
@@ -5355,6 +5345,24 @@ function drawGroundItem(it, px, py){
         ctx.fillStyle = def.color;
         ctx.fillRect(cx-5, cy-5, 10, 10);
     }
+}
+
+function drawGroundItem(it, px, py){
+    const def = ITEMS[it.type];
+    const cx = px + TS/2, cy = py + TS/2 + 4;
+    // sombra
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(cx, cy+8, 8, 3, 0, 0, Math.PI*2); ctx.fill();
+    // brilho pulsante (it.id pode ser string 'g123' do server ou number local — extrai num)
+    const idNum = typeof it.id === 'number' ? it.id : (parseInt(String(it.id).replace(/\D/g, ''), 10) || 0);
+    const glow = 8 + Math.sin(itemPulse + idNum) * 3;
+    const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, glow);
+    g.addColorStop(0, def.color);
+    g.addColorStop(0.6, def.color+'88');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, glow, 0, Math.PI*2); ctx.fill();
+    drawItemShape(it, cx, cy);
     // qty
     if (it.qty > 1){
         ctx.font = 'bold 10px monospace'; ctx.textAlign = 'right';
@@ -16352,6 +16360,14 @@ function r3dMobSprite(color, size){
 function r3dNpcSprite(npc){
     return r3dRasterize((x, y) => drawNpcBody(npc, x, y));
 }
+// Loot no chão: o formato só depende do TYPE (a qty é texto, o glow é do 3D), então o
+// cache é por tipo — cai 1 potion ou 50, é o mesmo sprite. O shape é desenhado ao redor
+// do CENTRO do tile (o drawGroundItem usa cx=px+TS/2, cy=py+TS/2+4).
+function r3dGroundSprite(type){
+    return r3dRasterize((x, y) => drawItemShape({ type, qty:1, id:0 }, x + TS/2, y + TS/2 + 4));
+}
+// cor do glow = a mesma que o 2D usa no gradiente pulsante do item
+function r3dItemGlow(type){ const d = ITEMS[type]; return d ? d.color : '#ffffff'; }
 // Props da PZ (baús/altar/bancada/treino). Todos estáticos → 1 sprite por prop, cacheado
 // pela chave. O boneco de treino vai com shake 0 (o balanço é do 2D durante o treino).
 function r3dPropSprite(kind, arg){
@@ -16440,6 +16456,11 @@ function r3dBridge(){
         // Props da PZ: baús, altar, bancada, boneco de treino
         getProps: r3dProps,
         propSprite: r3dPropSprite,
+        // Loot no chão
+        getGround: () => groundItems,
+        groundSprite: r3dGroundSprite,
+        itemGlow: r3dItemGlow,
+        lootLockedToOther,          // bag reservada a outro player → o 3D apaga o brilho
         playerSprite: r3dPlayerSprite,
         mobSprite: r3dMobSprite,
         equipSig: r3dEquipSig,
