@@ -7,6 +7,36 @@
 
 ---
 
+## 💰 16/07 (cont.4) — **loot no chão no 3D** ✅ **NO AR** (`2510bd3`)
+
+> "agora coloca o loot no chao" — o item que faltava e o mais grave pra jogar: sem ele o
+> jogador mata o mob e **não vê o que caiu** (dá pra pegar pela tecla, mas às cegas).
+>
+> `drawItemShape` sai do `drawGroundItem` (que desenhava sombra + glow pulsante
+> incondicionalmente, igual à barra de HP do `drawMonster`). **Cache por TYPE, não por id** —
+> cai 1 poção ou 50, é o mesmo sprite. Prefixo `'g'`; qty vira billboard quando >1;
+> `lootLockedToOther` (bag de outro player) apaga o brilho.
+>
+> **🔴 2 decisões que só olhar o PNG resolveu:**
+> 1. **ESCALA.** O item tem ~10px de um tile de 48 (≈0.2 tile) e **some** na câmera 3D — mesma
+>    lição do `CHAR_SCALE`, pior aqui (item é chão, não boneco). Comecei em **2.8** e VI que
+>    ficava **do tamanho dos baús** — loot competindo com mobília. **`ITEM_SCALE = 2.0`** lê
+>    como loot e continua achável. Fidelidade perde pra legibilidade de propósito.
+> 2. **GLOW comedido.** O do 2D tem raio 8-11px (~0.2 tile); meu 1º halo tinha 0.85 tile e
+>    **engolia o item** (o ovo branco virou bola de luz sem forma). Aditivo, **não PointLight**
+>    — mesma conclusão da runa do altar.
+>
+> `makeVoxelMesh`/`syncEnt` ganharam `escala` opcional (default `CHAR_SCALE`). Item pego **não
+> explode** em cubinhos (pickup ≠ morte) — guarda `naoMorre` cobre `n`/`x`/`g`.
+>
+> **Verificado:** 6 tipos (gold/queijo/ovo/carne/poção/adaga) legíveis com qty · 2D INTACTO ·
+> pickup remove os 6 sem explodir · `_check_client.js` OK · console 0 erro.
+>
+> **⏳ Ainda fora do 3D:** tochas (a LUZ existe, o poste não), pets, projéteis/auras/trails,
+> coroa de boss único, overlay de fantasma.
+
+---
+
 ## 🏛 16/07 (cont.3) — "cadê os npcs para jogar?" → **NPCs + props no 3D** ✅ **NO AR** (`5dfafdd` + `bd4a93c`)
 
 > **Pergunta do dono na print da praça.** Os NPCs (e baús/altar/bancada/treino) nunca foram
