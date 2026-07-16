@@ -7,7 +7,49 @@
 
 ---
 
-## 🧊 16/07 — PORT DO 3D PRO MMO: **ETAPAS 1-4 FEITAS + ✅ NO AR** (`9a7f5fe`) · ⏳ dono liga e julga o FPS/visual
+## 🎨 16/07 (cont.) — 3D: dono viu in-game e chamou de FEIO → **REFORMA VISUAL ✅ NO AR** (`aaa41d2`)
+
+> **"nossa que coisa feia que fizemos, concorda?"** — concordei. A 1ª versão passou em TODAS as
+> métricas (i18n 709/709, console limpo, 60fps, não-regressão, Railway SKIPPED) **e mesmo assim ficou
+> feia**. Lição durável na memória `feedback_visual_medir_vs_olhar`: métrica verde não é prova em
+> trabalho visual — **tem que OLHAR**. Dono: "2 e faz relevo tambem".
+
+**As 3 feiuras e as 3 correções:**
+1. **Laje de concreto** — o chão pintava o tile com UMA cor chapada e jogava fora todo o detalhe do 2D.
+   **Fix: apontar o ctx-gravador (o mesmo da Etapa 2) pro `drawTile`** → o desenho 2D vira TEXTURA.
+   Voltam as pedrinhas 3×3 da praça (o `getStoneTiles()` já existia como canvas pronto!), o cascalho da
+   caverna, os tufos de grama. 1 InstancedMesh por textura (tipo×banda×tint) ≈ 25-31 grupos.
+   O gravador agora troca **`ctx` E `map`** (mapa fake 3×3 uniforme pro `_blendEdges` não bakear a cor
+   do vizinho na textura) — os 2 voltam ao lugar, verificado.
+2. **Mundo plano** — ERA A RAIZ. **Inclinar a câmera sobre uma folha lisa não faz mundo 3D, faz imagem
+   2D TORTA**: perde a leitura limpa do topo-baixo e não ganha profundidade em troca. Fix: relevo
+   (`reliefAt`/`groundY`), lago afundado com barranco, praça num platô com aresta. Entidades, luzes,
+   anel de alvo, floats e cubinhos de morte assentam no `gy()`. **100% cosmético — o server é 2D.**
+3. **Mar de etiquetas** — a janela 3D mostrava ~7× a área do viewport 2D = ~7× mais nomes que o 2D
+   jamais teve. Fix: nome só em boss único / alvo / quem te caça; HP só em ferido ou alvo;
+   RAD 14→12 e maxDist 24→18.
+
+**⚠️ 2 bugs que SÓ A INSPEÇÃO VISUAL PEGOU (nenhuma métrica acusou):**
+- **Textura sem `colorSpace = THREE.SRGBColorSpace` sai LAVADA** — a grama #3d7d2a virou verde-menta.
+  Three ≥r152 trata canvas como LINEAR. `setColorAt` já converte sozinho; **só a textura precisa ser
+  marcada na mão.**
+- **Relevo com rampa suave = plano de novo.** A 1ª tentativa TINHA altura (±0.34, onda de ~58 tiles) e
+  leu plana: numa janela de 25 tiles é imperceptível. **Terreno voxel lê por DEGRAU** → `REL_STEP`
+  quantiza em terraços. Foi isso que fez aparecer.
+- (bis) **CAVE**: a textura do `drawCaveFloor` trouxe de volta os 2 tons que diferem ~3% → borrão liso
+  no escuro da masmorra. Contraste recuperado multiplicando a textura por banda (`CAVE_BAND`).
+
+**Perf pós-reforma:** **269 chars** (a carga REAL do HUD do dono) = **4,11ms · 642 draws** (eram 757);
+15 mobs = 0,57ms. ⚠️ **Minha estimativa "densidade real 10-20 chars" estava errada por 15×** — a janela
+real tem ~269. O gate passou folgado mesmo assim (ele viu 58-60fps in-game).
+
+**Deploy ✅** (dono: "pode subir"): `aaa41d2`, client-only → **Railway SKIPPED** (10:49:05), server
+intacto, `maintenance:false`. Prod verificada: colorSpace/tileSprite no ar, módulo carrega, Three do
+CDN, cena monta, 235ms a frio, console 0 erro.
+
+---
+
+## 🧊 16/07 — PORT DO 3D PRO MMO: **ETAPAS 1-4 FEITAS + ✅ NO AR** (`9a7f5fe`) · versão superseded pela reforma acima
 
 > Gatilhos do dono: *"…comece a Etapa 1"* → depois *"preciso ir trabalhar, siga com o plano, caso termine
 > a parte 1 vá para 2 assim por diante, em automato"*. **Deploy NÃO foi autorizado** (ele não respondeu à
