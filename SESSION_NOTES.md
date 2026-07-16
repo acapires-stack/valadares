@@ -7,6 +7,43 @@
 
 ---
 
+## 🏛 16/07 (cont.3) — "cadê os npcs para jogar?" → **NPCs + props no 3D** ✅ **NO AR** (`5dfafdd` + `bd4a93c`)
+
+> **Pergunta do dono na print da praça.** Os NPCs (e baús/altar/bancada/treino) nunca foram
+> portados — ficaram fora das etapas 1-4 de propósito, junto com itens no chão, pets e
+> projéteis (o 2D roda invisível embaixo). Na praça não custava nada; **no centro da cidade,
+> que é onde os 15 NPCs moram, o lugar ficava deserto.**
+>
+> **Receita (a mesma dos mobs):** extrair o CORPO do laço inline do 2D → `drawNpcBody`,
+> `drawChestBody`, `drawAltarBody`, `drawCraftBody`, `drawDummyBody`. O 2D chama de lá e o
+> ctx-gravador também → **não divergem**. `render3d.js` reusa o `syncEnt` (voxel + billboard).
+> NPC leva nome (8 fixos e parados, é por eles que o jogador se orienta); **prop não leva** —
+> o hint do 2D ([B] abrir, [M] altar) já aparece de perto.
+>
+> **🔴 3 coisas que só olhar o PNG pegou:**
+> 1. **"Mestre da Arena" saía CORTADO** nas duas pontas — `textTexture` escreve num canvas de
+>    256px com fonte 34px monospace e o nome mede ~306px. Fix: a fonte encolhe até caber.
+> 2. **Altar lia como bloco de pedra anônimo** (corpo cinza sobre chão de pedra cinza). A runa
+>    é o que o identifica. **PointLight NÃO resolveu** — luz ilumina o ENTORNO e some no sol do
+>    meio-dia. O que lê como runa é o **glow ADITIVO** (o 2D faz igual: gradiente radial por
+>    cima): Sprite `AdditiveBlending` tingido pela cor da magia + PointLight suave por baixo.
+>    Textura radial com `colorSpace = SRGBColorSpace`.
+> 3. **Prefixo 'p' colidia com jogador remoto** (`'p'+id`) → o cleanup trataria prop como gente
+>    e a praça explodiria em cubinhos ao entrar na masmorra. Props usam **'x'**; a guarda de
+>    estático cobre `'n'` e `'x'`; a runa apaga por padrão a cada frame (senão fica órfã acesa
+>    no meio da masmorra).
+>
+> **Verificado:** 15 estáticos na cena · **2D PIXEL-IDÊNTICO** depois de mexer em 5 blocos do
+> render (o caminho que está em produção pra todo mundo) · floor=1 remove os 15 sem explodir e
+> apaga a runa · `_check_client.js` OK · console 0 erro. **Deploy client-only → Vercel, Railway
+> SKIPPED** (confirmado por `railway deployment list`).
+>
+> **⏳ Ainda fora do 3D:** itens no chão (loot!), tochas (a LUZ existe, o poste não), pets,
+> projéteis, auras, coroa de boss único. O loot é o mais grave pra jogar — o dono deixou pra
+> depois.
+
+---
+
 ## 👹 16/07 (cont.2) — "dá para jogar?" → o 3D revelou **1035 mobs** no mundo: vazamento do Cerco ✅ **NO AR** (`c0d641d`)
 
 > **Print do dono com a pergunta "veja se dá para jogar" + queixa em "bonecos/etiquetas".** Tela
