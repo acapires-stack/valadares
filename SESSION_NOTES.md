@@ -7,6 +7,34 @@
 
 ---
 
+## 🔖 MARCADO 15/07 — PORT DO 3D PRO MMO (pedido do dono; NADA foi tocado ainda)
+
+O **piloto 3D no Valadares Tactics terminou e está 100% no ar** (tactics.valadares.app.br).
+O dono mandou marcar o mesmo caminho pro MMO. **Nenhuma linha deste repo foi alterada.**
+
+- **Plano vigente (etapas, riscos, levantamento):**
+  `C:\Users\Alcione\Documents\Cofre\Projetos\Valadares - Plano de Evolução.md`
+  → seção **▶ PORT DO 3D PRO MMO**
+- **Fonte pra copiar:** `D:\claude\valadares-tactics\src\render3d.js` (~800 linhas):
+  Three.js via `import()` de CDN (zero build), toggle 2D/3D + fallback, voxelização
+  da arte procedural (ctx-gravador → InstancedMesh, 1 draw call/char), câmera orbital
+  com clamps + raycast, hemisphere+sol c/ shadow map, céu por bioma + fog, juice.
+- **Juntas do `play.html` já mapeadas (15/07):** `loop(ts)` **16173** · `getCamera()`
+  **12591** · laço do viewport → `drawTile` **~16291** · `drawTile` **4547** /
+  `drawGrass` **4421** · `drawCharacter(px,py,dir,equip,…)` **4896** ·
+  `drawLighting` **13056** / `drawDayNightTint` **13026**. Só 2 `drawImage` em 17k
+  linhas = tudo procedural.
+- **Riscos:** perf com muitos chars em tempo real (gargalo nº1) · scroll do mundo exige
+  stream/reciclagem de tiles (novo — o tactics não tinha) · `drawCharacter` é paramétrico
+  por `equip` → voxel precisa de cache por assinatura · play.html é monolítico
+  (precisa `<script type="module">` separado, não dá `import` como no tactics).
+- **Deploy:** `play.html` é **client-only → Vercel, SEM ritual de /manutencao**
+  (o ritual vale só pra `server/**`). Cada etapa é deployável sozinha.
+- **Gatilho:** *"Leia a seção 'PORT DO 3D PRO MMO' do plano de evolução no cofre e
+  comece a Etapa 1"*.
+
+---
+
 ## 🐣 Sessão 12/06 — Saída da PZ lotada (onboarding) + superpopulação 5× do mundo ✅ DEPLOYADOS (`bdb2ab5` + `c1a0082`, server-only)
 
 **Queixa do dono:** "muitos monstros na saída da PZ dificulta demais usuários novos".
