@@ -7,6 +7,57 @@
 
 ---
 
+## 🧊 16/07 — PORT DO 3D PRO MMO: **ETAPAS 1, 2, 3 e 4 FEITAS — o plano acabou** · local, NÃO commitado/deployado · ⏳ dono liga e julga
+
+> Gatilhos do dono: *"…comece a Etapa 1"* → depois *"preciso ir trabalhar, siga com o plano, caso termine
+> a parte 1 vá para 2 assim por diante, em automato"*. **Deploy NÃO foi autorizado** (ele não respondeu à
+> pergunta do push; "siga com o plano" = as etapas de implementação) → nada foi pushado.
+> Plano + pegadinhas + knobs: `Cofre/Projetos/Valadares - Plano de Evolução.md`, seção ▶ PORT DO 3D PRO MMO.
+
+**Entregue:** `render3d.js` NOVO (~900 linhas, ES module, 0 dep no repo; Three por `import()` de CDN)
+· `play.html` +~200 linhas · `vercel.json` (no-cache do render3d.js). **Ligar: Opções (O) → GRÁFICOS → 🧊.**
+
+| Etapa | O quê |
+|---|---|
+| 1 espinha | janela rolante 29×29 em InstancedMesh · câmera orbital seguindo o player · toggle+fallback · HUD de perf |
+| 2 personagens | ctx-gravador voxeliza drawCharacter/drawMonster · cache por assinatura equip+dir · nome+HP em billboard |
+| 3 atmosfera | sol percorre o céu pela hora · tochas e luz do player viram PointLight · rampas da masmorra · fog/céu por fase |
+| 4 juice | dano flutuante · partículas · morte desmonta em cubinhos · anel de alvo |
+
+**Perf (RTX 3090, aba headless):** realista (15 mobs/dia/overworld) **0,88ms · 199 draws · 22k tris**;
+masmorra 0,48ms; stress 60 mobs 1,27ms. Curva LINEAR (~0,0135ms/char). **43 voxels por personagem**
+(vs ~1000 pixels opacos) graças ao merge de corridas em X + amostragem de 2px.
+
+**⚠️ FPS ABSOLUTO SEGUE SEM MEDIÇÃO CONFIÁVEL:** aba `hidden` → rAF pausado + GPU desprioriza (na Etapa 1
+o harness se contradisse: controle 2,49ms vs stress com 4× mais pixel 1,75ms). Números acima são
+relativos/estruturais e de uma 3090 — **não prometem FPS em máquina fraca**. É pra isso que serve o HUD.
+
+**Verificação:** `_check_client.js` TUDO OK (i18n **709/709**) · console 0 erro · visual conferido em PNG
+real (PZ, mato, lago/neve, mobs com nome, dia/pôr/noite, masmorra 1/5/20, dano flutuante, morte).
+**Não-regressão provada:** quem não liga o 3D **não baixa nada** (sem render3d.js, sem CDN, 1 canvas) e
+`ctx === canvas.getContext('2d')` em todos os estados (liga/desliga).
+
+**Mudança sensível no monolito:** `const ctx` → **`let ctx`** (4302). Único motivo: o ctx-gravador troca o
+alvo, roda o drawCharacter/drawMonster num canvas offscreen e devolve — síncrono, ninguém observa.
+**Fora disso o `ctx` NUNCA deve ser reatribuído.**
+
+**Pegadinhas caras (todas no plano, resumo):** (1) **névoa tem que sair de `ORBIT.dist`, não de número
+fixo** — `far=12.6` com câmera a 13.5 afogou o mundo inteiro numa parede de magenta. (2) CSS mobile
+`#gameContainer canvas{width:100vw !important}` pega o canvas 3D → overlay só casa com
+`setProperty(...,'important')`. (3) overlay casa com o RETÂNGULO do canvas 2D, não com o `#gameContainer`
+(o `#chatPanel` mora lá). (4) luz do Three ≥r155 é física (`albedo×irradiância÷π`) → calcular, não chutar.
+(5) boneco na escala certa LÊ pequeno (cos(53°)) → `CHAR_SCALE=1.35`, a mesma lição do F1 do tactics.
+(6) `computer/preview_screenshot` estoura 30s → `toDataURL` → POST pra receptor node → PNG → `Read`.
+(7) `camTarget` faz lerp: assentar ~150 frames antes de amostrar pixel (me enganei uma vez achando bug).
+
+**Fora do 3D (o 2D segue rodando embaixo):** projéteis, auras, trails, pets, itens no chão, baús, NPCs.
+Piso da PZ é cinza chapado; tom do chão de caverna foi ABERTO de propósito (os 2 tons do 2D diferem 3%).
+
+**Deploy:** client-only (`play.html`+`render3d.js`+`vercel.json`) → Vercel, **SEM /manutencao**
+(não toca `server/**`). **NÃO pushei — aguardando o dono.**
+
+---
+
 ## 🔖 MARCADO 15/07 — PORT DO 3D PRO MMO (pedido do dono; NADA foi tocado ainda)
 
 O **piloto 3D no Valadares Tactics terminou e está 100% no ar** (tactics.valadares.app.br).

@@ -79,6 +79,16 @@
         #recBtn:hover { opacity: 1; color: #ff8c8c; border-color: #8a4040; }
         #recBtn.recording { opacity: 1; color: #fff; background: rgba(190,30,30,0.9); border-color: #ff5454; animation: recPulse 1.2s infinite; }
         @keyframes recPulse { 0%,100%{ box-shadow:0 0 0 0 rgba(255,60,60,.5); } 50%{ box-shadow:0 0 9px 2px rgba(255,60,60,.75); } }
+        /* Medidor do modo 3D (beta) — Etapa 1 do port existe pra produzir ESTE número.
+           `absolute` (não `fixed`) dentro do #gameContainer, que é position:relative —
+           mesmo padrão do #recBtn. */
+        #r3dPerf {
+            position: absolute; top: 6px; left: 6px; z-index: 30; display: none;
+            background: rgba(10,14,20,0.72); color: #7fd4ff;
+            border: 1px solid #2a4a5a; border-radius: 3px;
+            font-size: 10px; font-family: monospace; letter-spacing: 0.4px;
+            padding: 3px 7px; pointer-events: none; white-space: nowrap;
+        }
         /* Canvas no tamanho natural (720×528). Quem quiser maior usa zoom
            do navegador (Ctrl+= / Ctrl+-) — funciona sem perder coords. */
         canvas#canvas {
@@ -1917,6 +1927,7 @@
     <!-- GAME -->
     <div id="gameContainer">
         <canvas id="canvas"></canvas>
+        <div id="r3dPerf">3D —</div>
         <button id="recBtn" title="Gravar um clipe do gameplay (só a tela do jogo, sem HUD)" data-i18n-title="hud.rec_title" onclick="toggleRecording()">● REC</button>
 
         <!-- LOG / CHAT — abaixo do canvas -->
@@ -2396,6 +2407,12 @@
         <button class="chest-btn" style="margin-top:6px" onclick="uiToggleFullscreen()" id="uiFullscreenBtn" data-i18n="settings.fullscreen">⛶ Tela cheia (F11)</button>
         <div style="color:#666;font-size:10px;padding:6px 6px 0;letter-spacing:0.3px" data-i18n-html="settings.access_hint">atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia</div>
 
+        <div class="chest-head" style="margin-top:14px" data-i18n="settings.graphics">GRÁFICOS</div>
+        <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px" data-i18n="settings.r3d_desc">Modo 3D (beta). Nesta primeira versão só o TERRENO aparece em 3D — personagens, monstros e efeitos ainda não. Serve pra testar desempenho. Arraste pra girar a câmera, use a roda pra aproximar.</div>
+        <button class="chest-btn" id="r3dBtn" onclick="toggle3d()" data-i18n="settings.r3d_off">🧊 Ligar modo 3D (beta)</button>
+        <div id="r3dStatus" style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:6px 6px 0;min-height:14px"></div>
+        <div style="color:#666;font-size:10px;padding:2px 6px 0;letter-spacing:0.3px" data-i18n="settings.r3d_hint">Se o jogo ficar lento, desligue aqui. Sua escolha fica salva.</div>
+
         <div id="systemSectionHead" class="chest-head" style="margin-top:14px;display:none" data-i18n="settings.system">SISTEMA (DESKTOP)</div>
         <div id="systemSection" style="display:none">
             <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px">Versão instalada: <span id="appVersion" style="color:#ffd060;font-weight:bold">—</span></div>
@@ -2551,6 +2568,13 @@ const I18N = {
     'settings.zoom_reset': '↺ Padrão',
     'settings.fullscreen': '⛶ Tela cheia (F11)',
     'settings.access_hint': 'atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia',
+    'settings.graphics': 'GRÁFICOS',
+    'settings.r3d_desc': 'Modo 3D (beta). Nesta primeira versão só o TERRENO aparece em 3D — personagens, monstros e efeitos ainda não. Serve pra testar desempenho. Arraste pra girar a câmera, use a roda pra aproximar.',
+    'settings.r3d_off': '🧊 Ligar modo 3D (beta)',
+    'settings.r3d_on': '🧊 Desligar modo 3D (voltar ao 2D)',
+    'settings.r3d_loading': 'carregando o 3D…',
+    'settings.r3d_fail': 'não deu pra ligar o 3D neste aparelho (sem WebGL ou o CDN não respondeu) — seguindo em 2D.',
+    'settings.r3d_hint': 'Se o jogo ficar lento, desligue aqui. Sua escolha fica salva.',
     'settings.system': 'SISTEMA (DESKTOP)',
     'settings.check_updates': '🔄 Verificar atualizações',
     'settings.tutorial_head': 'TUTORIAL',
@@ -3240,6 +3264,13 @@ const I18N = {
     'settings.zoom_reset': '↺ Default',
     'settings.fullscreen': '⛶ Fullscreen (F11)',
     'settings.access_hint': 'shortcuts: <kbd>Ctrl</kbd>+<kbd>=</kbd> zoom in · <kbd>Ctrl</kbd>+<kbd>−</kbd> zoom out · <kbd>Ctrl</kbd>+<kbd>0</kbd> reset · <kbd>F11</kbd> fullscreen',
+    'settings.graphics': 'GRAPHICS',
+    'settings.r3d_desc': '3D mode (beta). In this first version only the TERRAIN is rendered in 3D — characters, monsters and effects are not. It exists to test performance. Drag to orbit the camera, scroll to zoom.',
+    'settings.r3d_off': '🧊 Turn 3D mode on (beta)',
+    'settings.r3d_on': '🧊 Turn 3D mode off (back to 2D)',
+    'settings.r3d_loading': 'loading 3D…',
+    'settings.r3d_fail': "couldn't start 3D on this device (no WebGL or the CDN didn't answer) — staying in 2D.",
+    'settings.r3d_hint': 'If the game gets slow, turn it off here. Your choice is saved.',
     'settings.system': 'SYSTEM (DESKTOP)',
     'settings.check_updates': '🔄 Check for updates',
     'settings.tutorial_head': 'TUTORIAL',
@@ -3939,6 +3970,9 @@ function setLang(l){
   try { localStorage.setItem('valadares_lang', l); } catch(e){}
   applyI18n();
   updateLangButtons();
+  // o rótulo do toggle 3D depende do estado (ligar/desligar), não só da chave —
+  // applyI18n acabou de repor o texto "off", então corrige aqui
+  try { updateR3dBtn(); } catch(e){}
 }
 // Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
 window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLangButtons(); } catch(e){} });
@@ -4265,7 +4299,12 @@ function inSanctuary(x, y){
 }
 
 const canvas = document.getElementById('canvas');
-const ctx    = canvas.getContext('2d');
+// `let` (não `const`) por UM motivo: o modo 3D precisa rasterizar o desenho
+// procedural de personagem/mob num canvas offscreen pra virar voxel, e todo o
+// render 2D escreve NESTE alvo global. O r3dRasterize() troca o alvo, roda o
+// desenho e devolve — tudo síncrono, ninguém observa a troca. Fora isso o `ctx`
+// é o mesmo de sempre e NUNCA deve ser reatribuído.
+let ctx      = canvas.getContext('2d');
 canvas.width = TS*VP_W; canvas.height = TS*VP_H;
 
 // ===== Iluminação dinâmica + ciclo dia/noite =====
@@ -16170,6 +16209,157 @@ function restoreFromBackup(){
 }
 window.restoreFromBackup = restoreFromBackup;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MODO 3D (beta) — ETAPA 1 do "port do 3D pro MMO"
+// O render 2D NÃO é reescrito: o 3D entra AO LADO, com toggle e fallback. Nesta
+// etapa o 3D desenha só o TERRENO (chão + árvores + paredes + água) e a câmera
+// segue o player; personagens são a Etapa 2. Por isso o 2D segue rodando embaixo.
+// Three.js entra por import() de CDN só quando o jogador liga — quem não liga não
+// baixa nada. Sem WebGL / CDN fora → fica no 2D (nada quebra).
+// ═══════════════════════════════════════════════════════════════════════════
+let r3d = null;            // namespace do módulo (só existe depois do import())
+let r3dOn = false;         // o jogador quer 3D?
+let r3dBusy = false, _r3dRestored = false;
+const R3D_PREF = 'valadares:3d';
+
+// ─── ctx-gravador (Etapa 2) ───
+// Não existe tabela de sprites no MMO: personagem e mob são DESENHADOS por código
+// (só 2 drawImage em 17k linhas). Então pra virar voxel a gente rasteriza o próprio
+// desenho 2D num canvas transparente e lê os pixels. Fonte única da verdade: se o
+// drawCharacter mudar, o 3D acompanha sozinho.
+const R3D_PAD = 16;                    // mob size 1.9 → 53px de largura, transborda o tile de 48
+const R3D_SIDE = TS + R3D_PAD*2;
+let _r3dOff = null, _r3dOffCtx = null;
+function r3dRasterize(draw){
+    if (!_r3dOff){
+        _r3dOff = document.createElement('canvas');
+        _r3dOff.width = _r3dOff.height = R3D_SIDE;
+        _r3dOffCtx = _r3dOff.getContext('2d', { willReadFrequently: true });
+    }
+    _r3dOffCtx.clearRect(0, 0, R3D_SIDE, R3D_SIDE);
+    const real = ctx;
+    ctx = _r3dOffCtx;                  // <- por isso o `ctx` é `let`
+    try { draw(R3D_PAD, R3D_PAD); } finally { ctx = real; }
+    return _r3dOffCtx.getImageData(0, 0, R3D_SIDE, R3D_SIDE);
+}
+// Player/remoto: nameTag/hpPct/mpPct = null → SÓ o corpo, sem nome nem barras
+// (o 3D desenha as suas). A sombra elíptica sai pelo filtro de alpha (ela é 0.32).
+function r3dPlayerSprite(equip, dir){
+    return r3dRasterize((x, y) => drawCharacter(x, y, dir, equip, null, null, 0, null, 0));
+}
+// Mob: o desenho é genérico (só `color` e `size` mudam entre os tipos). Nome/coroa/
+// DoT/alvo são neutralizados pelo objeto falso; a barra de HP é INCONDICIONAL no
+// drawMonster → apago o retângulo exato dela (play.html:5762 `fillRect(px+6,py-1,36,3)`).
+function r3dMobSprite(color, size){
+    const fake = { color, size, hp:1, maxHp:1, x:0, y:0, renderX:0, renderY:0,
+                   id:-999, name:'', unique:false, aggro:false, dots:[] };
+    return r3dRasterize((x, y) => {
+        drawMonster(fake, x, y);
+        ctx.clearRect(x+6, y-1, 36, 3);
+    });
+}
+// Chave de cache: TUDO que muda o visual do boneco. O plano avisou que voxelizar
+// por equip explode a combinatória sem cache — esta é a assinatura.
+function r3dEquipSig(equip, dir){
+    const e = equip || {}, d = e.dyes || {};
+    return [e.weapon, e.offhand, e.armor, e.head, e.feet, e.cape, e.bodyColor,
+            d.armor, d.feet, d.head, d.cosmetic, dir].join('|');
+}
+
+// Ponte EXPLÍCITA: play.html é script clássico (não é ES module), então o
+// render3d.js não consegue importar nada daqui. Tudo que ele precisa passa por
+// este objeto — o módulo não adivinha global nenhum.
+function r3dBridge(){
+    return {
+        TS, VP_W, VP_H, M_W, M_H, T, vr,
+        getMap: () => map,          // troca de referência ao entrar na masmorra
+        getPlayer: () => player,
+        getCamera,                  // herda de graça o clamp de borda + o spectator
+        inSafeZone, inSanctuary,
+        // Etapa 2
+        PAD: R3D_PAD, SIDE: R3D_SIDE,
+        getMonsters: () => monsters,
+        getRemotePlayers: () => remotePlayers,
+        playerSprite: r3dPlayerSprite,
+        mobSprite: r3dMobSprite,
+        equipSig: r3dEquipSig,
+        withCosmetics, getWalkBob,
+        // Etapa 3 — atmosfera: as MESMAS fontes que o drawLighting/drawDayNightTint
+        // do 2D usam, então o 3D herda o ciclo e as rampas da masmorra de graça.
+        getDayPhase, activeTorches, inCave,
+        DUNGEON_TINT_FULL: DUNGEON_TINT_FULL_C,
+        // Etapa 4 — juice. Os MESMOS arrays que o 2D anima e consome; o 3D só lê
+        // (quem cria/expira segue sendo o 2D, então nada duplica nem diverge).
+        getFloats: () => floatTexts,
+        getParticles: () => particles,
+    };
+}
+
+function updateR3dBtn(){
+    const b = document.getElementById('r3dBtn');
+    if (b) b.textContent = tr(r3dOn ? 'settings.r3d_on' : 'settings.r3d_off');
+}
+function r3dSay(msg){
+    const s = document.getElementById('r3dStatus');
+    if (s) s.textContent = msg || '';
+}
+function r3dPerfShow(on){
+    const el = document.getElementById('r3dPerf');
+    if (el) el.style.display = on ? 'block' : 'none';
+}
+function r3dOff(){
+    r3dOn = false;
+    if (r3d) r3d.set3dVisible(false);
+    r3dPerfShow(false);
+    updateR3dBtn();
+}
+
+async function toggle3d(){
+    if (r3dBusy) return;
+    if (r3dOn){
+        r3dOff();
+        try { localStorage.setItem(R3D_PREF, '0'); } catch(e){}
+        r3dSay('');
+        return;
+    }
+    r3dBusy = true;
+    r3dSay(tr('settings.r3d_loading'));
+    try {
+        if (!r3d) r3d = await import('./render3d.js');
+        const ok = await r3d.ensure3d(canvas, r3dBridge());
+        if (!ok){ r3dSay(tr('settings.r3d_fail')); r3d = null; return; }   // fallback: segue 2D
+        r3dOn = true;
+        r3d.set3dVisible(true);
+        try { localStorage.setItem(R3D_PREF, '1'); } catch(e){}
+        r3dSay('');
+        r3dPerfShow(true);
+    } catch(e){
+        console.warn('[3d] falhou ao ligar:', e);
+        r3dSay(tr('settings.r3d_fail'));
+        r3d = null;
+    } finally {
+        r3dBusy = false;
+        updateR3dBtn();
+    }
+}
+
+// Medidor — é o ENTREGÁVEL desta etapa: `ms` é o custo ISOLADO do frame 3D, o
+// número que responde "o chão com scroll aguenta?" sem se confundir com o custo
+// do 2D que já rodava antes.
+let _r3dFps = 0, _r3dFrames = 0, _r3dFpsT = 0, _r3dMs = 0;
+function r3dPerfTick(dt, ms3d){
+    _r3dFrames++; _r3dFpsT += dt;
+    _r3dMs = _r3dMs ? _r3dMs*0.9 + ms3d*0.1 : ms3d;   // média móvel
+    if (_r3dFpsT < 500) return;
+    _r3dFps = Math.round(_r3dFrames*1000/_r3dFpsT);
+    _r3dFrames = 0; _r3dFpsT = 0;
+    const el = document.getElementById('r3dPerf');
+    if (!el || !r3d) return;
+    const i = r3d.r3dInfo();
+    if (!i) return;
+    el.textContent = `3D ${_r3dFps}fps · ${_r3dMs.toFixed(1)}ms · ${i.chars} chars · ${i.calls} draws · ${(i.tris/1000).toFixed(1)}k tris · ${i.drawSize.w}×${i.drawSize.h}@${i.drawSize.dpr}`;
+}
+
 function loop(ts){
     if (!started) return;   // logout pausa o loop
     const dt = Math.min(ts-lastTs, 80); lastTs = ts;
@@ -16821,6 +17011,27 @@ function loop(ts){
     if (player.hurtTimer > 0) player.hurtTimer = Math.max(0, player.hurtTimer - dt);
 
     updateSidebar();
+
+    // ─── MODO 3D (Etapa 1) ───
+    // Roda DEPOIS do 2D e desenha por cima. Um frame 3D que estoure NÃO pode
+    // derrubar o jogo: cai pro 2D e segue.
+    if (r3dOn && r3d && r3d.is3dReady()){
+        const t0 = performance.now();
+        try {
+            r3d.drawScene3d(ts, dt);
+            r3dPerfTick(dt, performance.now() - t0);
+        } catch(e){
+            console.warn('[3d] frame falhou — voltando pro 2D:', e);
+            r3dOff();
+        }
+    }
+    // Preferência salva: religa o 3D no 1º frame depois do login (aqui o layout do
+    // canvas já assentou — ensure3d precisa do tamanho real pra montar o overlay).
+    if (!_r3dRestored){
+        _r3dRestored = true;
+        try { if (localStorage.getItem(R3D_PREF) === '1') toggle3d(); } catch(e){}
+    }
+
     requestAnimationFrame(loop);
 }
 
