@@ -7,7 +7,7 @@
 
 ---
 
-## 🧊 16/07 — PORT DO 3D PRO MMO: **ETAPAS 1, 2, 3 e 4 FEITAS — o plano acabou** · local, NÃO commitado/deployado · ⏳ dono liga e julga
+## 🧊 16/07 — PORT DO 3D PRO MMO: **ETAPAS 1-4 FEITAS + ✅ NO AR** (`9a7f5fe`) · ⏳ dono liga e julga o FPS/visual
 
 > Gatilhos do dono: *"…comece a Etapa 1"* → depois *"preciso ir trabalhar, siga com o plano, caso termine
 > a parte 1 vá para 2 assim por diante, em automato"*. **Deploy NÃO foi autorizado** (ele não respondeu à
@@ -53,8 +53,11 @@ fixo** — `far=12.6` com câmera a 13.5 afogou o mundo inteiro numa parede de m
 **Fora do 3D (o 2D segue rodando embaixo):** projéteis, auras, trails, pets, itens no chão, baús, NPCs.
 Piso da PZ é cinza chapado; tom do chão de caverna foi ABERTO de propósito (os 2 tons do 2D diferem 3%).
 
-**Deploy:** client-only (`play.html`+`render3d.js`+`vercel.json`) → Vercel, **SEM /manutencao**
-(não toca `server/**`). **NÃO pushei — aguardando o dono.**
+**Deploy ✅ FEITO** (dono: "pode subir"): commit `9a7f5fe` — diff cirúrgico de **1166 inserções e 1 remoção**
+(a única linha removida é o `const ctx`). Client-only → **Railway saiu SKIPPED** (provado por `railway deployment
+list`: deploy de 10:26:59 SKIPPED) = server intacto, `maintenance:false`, ninguém caiu. **Verificado em prod:**
+`/render3d.js` HTTP 200 + header no-cache + content-type ok · módulo importa de valadares.app.br · Three baixa do
+CDN · cena monta (WebGL ok) · **411ms pra ligar a frio** · toggle off volta pro 2D · console 0 erro.
 
 ---
 
