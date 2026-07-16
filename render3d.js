@@ -899,6 +899,9 @@ export function drawScene3d(now, dt) {
         // ETIQUETA SÓ ONDE INFORMA. Nome em TODO mob virava um mar de texto: a janela
         // 3D mostra ~4× a área do viewport 2D, então ~4× mais nomes que o 2D jamais
         // teve na tela. Fica: boss único (sempre), alvo atual, e quem está te caçando.
+        // (`m.aggro` aqui é a flag do CLIENTE — play.html:8496 nasce false e vira true
+        // quando você provoca/targeta o mob. Não confundir com MTYPE.aggro do server,
+        // que é o raio de agro em tiles.)
         const alvo = player.targetType !== 'player' && player.target === m.id;
         const mostraNome = m.unique || alvo || m.aggro;
         // barra de HP só quando diz algo: ferido, ou é o alvo

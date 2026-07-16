@@ -5107,6 +5107,8 @@ const DAILY_EVENT_TYPES = [
     { id:'siege',     name:'Cerco Demoníaco',     emoji:'👹', desc:'Hordas extras de mobs no centro do mapa',           durationMin: 60 },
     { id:'wisdom',    name:'Bênção da Sabedoria', emoji:'📜', desc:'+50% de XP em todas as skills',                     durationMin: 60 },
 ];
+// Quantos mobs de cerco podem estar vivos ao mesmo tempo (o cerco repõe a cada 30s).
+const SIEGE_MAX_ALIVE = parseInt(process.env.SIEGE_MAX_ALIVE, 10) || 60;
 function getBrtDate(){ return new Date(Date.now() - 3*60*60*1000); }
 function getDayN(){ return Math.floor(getBrtDate().getTime() / 86400000); }
 function getCurrentDailyEvent(){
@@ -5221,7 +5223,17 @@ function applyDailyEventTick(){
             if (m){
                 m.fromEvent = true;
                 dailyEventState.extraMobIds.push(m.id);
-                if (dailyEventState.extraMobIds.length > 60) dailyEventState.extraMobIds.shift();
+                // Teto de mobs de cerco VIVOS. O shift() sozinho esquecia o id e deixava o
+                // mob no mundo pra sempre: são ~420 spawns por cerco (120 ticks × 3-4) e o
+                // cleanup só removia os 60 rastreados. Os órfãos não caem em ring/cave/bioma
+                // nenhum (âncora fica no raio 12-25), então nenhum count os enxerga.
+                while (dailyEventState.extraMobIds.length > SIEGE_MAX_ALIVE){
+                    const velho = dailyEventState.extraMobIds.shift();
+                    if (monsters.has(velho)){
+                        monsters.delete(velho);
+                        broadcast(null, { t:'mobDead', mobId: velho, byName:'evento encerrou', level: 1 });
+                    }
+                }
             }
         }
     }
