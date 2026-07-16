@@ -37,14 +37,60 @@ const ORBIT = {
     yaw: 0, pitch: 0.93, dist: 13.5,
     minYaw: -1.15, maxYaw: 1.15,       // ±66° em volta do sul
     minPitch: 0.55, maxPitch: 1.30,    // 31°..74° de inclinação
-    minDist: 8, maxDist: 24,
+    // teto do zoom-out apertado (era 24): afastar demais mostrava ~7× a área do
+    // viewport 2D e a tela virava um mar de etiquetas de nome.
+    minDist: 8, maxDist: 18,
 };
-const RAD = 14;                 // raio da janela de tiles (29×29 = 841 no pior caso)
+const RAD = 12;                 // raio da janela (25×25). Era 14 — ver maxDist acima.
 const MAX_TILES = (RAD * 2 + 1) * (RAD * 2 + 1);
 const TREE_H = 0.95;            // altura do tronco+copa da árvore
 const WALL_H_CAVE = 1.05;       // altura da parede de caverna
 const CAM_LERP = 0.16;          // suavização do deslize da câmera
 let SHADOWS = true;             // knob de perf: sombra é o maior custo (r3dShadows)
+
+// ─── RELEVO ────────────────────────────────────────────────────────────────
+// A 1ª versão tinha o chão PERFEITAMENTE PLANO — e é por isso que ela ficou feia:
+// inclinar a câmera sobre uma folha lisa não faz um mundo 3D, faz uma imagem 2D
+// TORTA (perde a leitura limpa do topo-baixo e não ganha profundidade em troca).
+// Aqui o terreno ondula de leve, o lago afunda (a margem vira barranco) e a praça
+// fica plana num platô.
+// ⚠️ 100% COSMÉTICO: o server é 2D e a colisão/pathfinding não sabem de altura.
+// Nada aqui pode virar regra de jogo.
+const REL_AMP = 0.62;           // amplitude da ondulação do terreno (em tiles)
+// ⚠️ QUANTIZAR é o que faz o relevo LER. Rampa contínua e suave, numa janela de 25
+// tiles, é imperceptível — foi assim que a 1ª tentativa saiu "plana" de novo mesmo
+// tendo altura. Terreno voxel lê por DEGRAU: com o passo, cada mudança vira um
+// terraço com aresta e sombra própria.
+const REL_STEP = 0.22;
+const WATER_DROP = 0.46;        // o lago afunda: a margem vira barranco de verdade
+const TILE_THICK = 1.7;         // espessura da caixa de chão — o degrau entre 2 tiles
+                                // vira PAREDE sólida (sem isso, buraco no barranco)
+
+// Campo suave e determinístico (nada de ruído por tile, que sairia espetado).
+// Comprimentos de onda ~30-50 tiles: 1-2 morros por janela. Muito mais longo que
+// isso não aparece; muito mais curto vira serra.
+function reliefAt(mx, my) {
+    const h = (Math.sin(mx / 4.7) * Math.cos(my / 5.9) * 0.55
+             + Math.sin((mx + my) / 8.3) * 0.30
+             + Math.cos((mx - my) / 6.7) * 0.15) * REL_AMP;
+    return Math.round(h / REL_STEP) * REL_STEP;
+}
+// A praça é CONSTRUÍDA: plana e um degrau acima do terreno local (não um número
+// solto, senão ela cairia num buraco dependendo de onde o ruído estivesse).
+let _plazaY = null;
+function plazaY() {
+    if (_plazaY == null) _plazaY = reliefAt(bridge.SAFE_CX, bridge.SAFE_CY) + REL_STEP;
+    return _plazaY;
+}
+// Altura do TOPO do tile. A masmorra é plana de propósito (é caverna cavada).
+function groundY(mx, my, floor) {
+    if (floor >= 1) return 0;
+    if (bridge.inSafeZone(mx, my)) return plazaY();
+    const row = bridge.getMap()[my];
+    const t = row && row[mx];
+    const h = reliefAt(mx, my);
+    return t === bridge.T.WATER ? h - WATER_DROP : h;
+}
 
 let THREE = null;
 let renderer = null, scene = null, camera = null, camBase = null, camTarget = null;
@@ -53,8 +99,11 @@ let ready = false, _loading = null;
 let sun = null, hemi = null, skyDome = null, skyMat = null;
 const GEO = {};                 // geometrias compartilhadas (nunca por instância)
 
-// malhas instanciadas da janela de chão (1 draw call cada)
-let mFloor = null, mWater = null, mTrunk = null, mCanopy = null, mWall = null;
+// Chão: 1 InstancedMesh por TEXTURA (tipo de tile × variação de tom × tint). Não dá
+// pra ter textura por instância numa malha só sem shader custom; como são ~30 grupos
+// e a maioria fica com count 0 numa janela qualquer, o custo real é baixo.
+const floorGroups = new Map();  // chave → {mesh, n}
+let mTrunk = null, mCanopy = null;
 let world = null;               // grupo que segura tudo do chão
 
 // controle da janela: só refaz quando o tile inteiro do centro (ou o mapa) muda
@@ -72,25 +121,10 @@ function mix(from, to, t) {
     return (((r1 + (r2 - r1) * t) | 0) << 16) | (((g1 + (g2 - g1) * t) | 0) << 8) | ((b1 + (b2 - b1) * t) | 0);
 }
 
-// paleta por tile — MESMOS tons do render 2D (drawGrass/drawDirt/... no play.html).
-// `v` é o vr(tx,ty) do 2D: a variação determinística por tile, portada de graça.
-function tileColor(t, v) {
-    const T = bridge.T;
-    if (t === T.GRASS) return v < 0.35 ? 0x2d5a1b : v < 0.65 ? 0x357022 : 0x3d7d2a;
-    if (t === T.DIRT) return v < 0.4 ? 0x8b6520 : v < 0.7 ? 0x9a7230 : 0x7a5510;
-    if (t === T.TREE) return 0x111e0c;                       // chão sob a árvore
-    if (t === T.WATER) return 0x164888;
-    if (t === T.STONE) return v < 0.5 ? 0x585858 : 0x646464;
-    // CAVE/CAVE_WALL: os 2 tons do 2D diferem só ~3% (42,37,48 vs 50,42,56). No 2D o
-    // tile ainda lê porque o drawCaveFloor põe cascalho por cima; aqui, sem essa
-    // textura, o chão vira um borrão liso. Abro o leque de tom pra a GRADE aparecer —
-    // é o único ponto onde a paleta 3D se afasta de propósito do 2D.
-    if (t === T.CAVE) return v < 0.5 ? 0x221d28 : 0x3a3142;
-    if (t === T.CAVE_WALL) return v < 0.5 ? 0x141020 : 0x241c30;
-    if (t === T.SNOW) return v < 0.4 ? 0xccd8e8 : v < 0.7 ? 0xdde8f4 : 0xeef4fc;
-    if (t === T.SAND) return v < 0.4 ? 0xc8a840 : v < 0.7 ? 0xd4b858 : 0xbfa040;
-    return 0x3d7d2a;
-}
+// Altura do chão numa posição de MUNDO (fracionária) — pra assentar boneco, luz e
+// anel em cima do relevo. `_floorNow` é o andar do frame corrente.
+let _floorNow = 0;
+function gy(wx, wz) { return groundY(Math.floor(wx), Math.floor(wz), _floorNow); }
 
 // ─── ciclo de vida ─────────────────────────────────────────────────────────
 export function is3dReady() { return ready; }
@@ -105,10 +139,13 @@ export function r3dShadows(on) {
     SHADOWS = !!on;
     if (renderer) renderer.shadowMap.enabled = SHADOWS;
     if (sun) sun.castShadow = SHADOWS;
-    for (const m of [mTrunk, mCanopy, mWall]) if (m) m.castShadow = SHADOWS;
-    if (mFloor) mFloor.receiveShadow = SHADOWS;
+    for (const m of [mTrunk, mCanopy]) if (m) m.castShadow = SHADOWS;
     // materiais precisam recompilar quando o shadowMap liga/desliga
-    for (const m of [mFloor, mWater, mTrunk, mCanopy, mWall]) if (m) m.material.needsUpdate = true;
+    for (const m of [mTrunk, mCanopy]) if (m) m.material.needsUpdate = true;
+    for (const g of floorGroups.values()) {
+        g.mesh.castShadow = g.mesh.receiveShadow = SHADOWS;
+        g.mesh.material.needsUpdate = true;
+    }
     for (const g of entGroups.values()) {
         const ud = g.userData;
         if (ud.vox) { ud.vox.castShadow = SHADOWS; ud.mat.needsUpdate = true; }
@@ -218,22 +255,15 @@ function build(canvas2d) {
     targetRing.visible = false;
     scene.add(targetRing);
 
-    // ─── as 5 malhas da janela rolante (1 draw call cada) ───
+    // ─── árvores (o chão é montado sob demanda por textura, em floorGroup) ───
     world = new THREE.Group();
     const lam = () => new THREE.MeshLambertMaterial({ color: 0xffffff });
-    mFloor = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.1, 1), lam(), MAX_TILES);
-    mFloor.receiveShadow = SHADOWS;
-    // água: cor global animada (sem cor por instância — o 2D também só ondula)
-    mWater = new THREE.InstancedMesh(
-        new THREE.BoxGeometry(1, 0.1, 1),
-        new THREE.MeshLambertMaterial({ color: 0x164888 }), MAX_TILES);
-    mWater.receiveShadow = SHADOWS;
+    GEO.tileBox = new THREE.BoxGeometry(1, 1, 1);   // escalado por instância (altura do relevo)
     mTrunk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, TREE_H * 0.55, 0.22), lam(), MAX_TILES);
     // copa low-poly (20 tris) em vez de esfera (96) — estilizado e barato
     mCanopy = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.42, 0), lam(), MAX_TILES);
-    mWall = new THREE.InstancedMesh(new THREE.BoxGeometry(1, WALL_H_CAVE, 1), lam(), MAX_TILES);
-    for (const m of [mTrunk, mCanopy, mWall]) { m.castShadow = SHADOWS; m.receiveShadow = SHADOWS; }
-    for (const m of [mFloor, mWater, mTrunk, mCanopy, mWall]) {
+    for (const m of [mTrunk, mCanopy]) {
+        m.castShadow = SHADOWS; m.receiveShadow = SHADOWS;
         m.count = 0;
         m.frustumCulled = false;   // a janela JÁ é o culling; o bounding sphere default mente
         world.add(m);
@@ -241,6 +271,33 @@ function build(canvas2d) {
     scene.add(world);
 
     buildAtmosphere();
+}
+
+// InstancedMesh por textura, criado na 1ª vez que aquele tile aparece na janela.
+function floorGroup(key, makeCanvas, tint) {
+    let g = floorGroups.get(key);
+    if (!g) {
+        const tex = new THREE.CanvasTexture(makeCanvas());
+        // ⚠️ SEM isto o Three (≥r152) trata os pixels do canvas como LINEARES, e a
+        // arte 2D (que é sRGB) sai LAVADA: a grama #3d7d2a virava verde-menta pálido.
+        // As cores por instância (setColorAt/setHex) já convertem sozinhas — a textura
+        // é o único caminho que precisa ser marcado na mão.
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.magFilter = THREE.NearestFilter;   // pixel art: não borrar
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.anisotropy = 4;                    // o chão é visto bem rasante
+        const mat = new THREE.MeshLambertMaterial({ map: tex });
+        if (tint != null) mat.color.setHex(tint);
+        const mesh = new THREE.InstancedMesh(GEO.tileBox, mat, MAX_TILES);
+        mesh.frustumCulled = false;
+        mesh.receiveShadow = SHADOWS;
+        mesh.castShadow = SHADOWS;             // barranco/parede projetam sombra
+        mesh.count = 0;
+        world.add(mesh);
+        g = { mesh, n: 0 };
+        floorGroups.set(key, g);
+    }
+    return g;
 }
 
 // ─── câmera ────────────────────────────────────────────────────────────────
@@ -299,17 +356,29 @@ function wireOrbit() {
 // Refeita só quando o tile inteiro do centro muda (ou troca de mapa/andar):
 // ~1× por passo do player, não 1× por frame. É o que segura o custo do scroll.
 const _m4 = { }; // preenchido no 1º uso (precisa do THREE carregado)
+const V_BANDS = [0.17, 0.5, 0.83];   // 3 variações de tom por tipo — casam com os
+                                     // cortes do drawTile (v<0.35 / v<0.65 / else)
+const CAVE_BAND = [0x8c8c96, 0xc0c0cc, 0xffffff];   // ver comentário em rebuildWindow
 function rebuildWindow(cx, cy, map) {
-    if (!_m4.m) { _m4.m = new THREE.Matrix4(); _m4.c = new THREE.Color(); _m4.q = new THREE.Quaternion(); _m4.s = new THREE.Vector3(1, 1, 1); _m4.p = new THREE.Vector3(); }
+    if (!_m4.m) { _m4.m = new THREE.Matrix4(); _m4.c = new THREE.Color(); }
     const m4 = _m4.m, col = _m4.c;
     const { M_W, M_H, T, vr } = bridge;
     const floor = bridge.getPlayer().floor || 0;
-    let fi = 0, wi = 0, ti = 0, ci = 0, ai = 0;
+    let ti = 0, ci = 0;
 
-    const put = (mesh, idx, x, y, z, color) => {
+    for (const g of floorGroups.values()) g.n = 0;
+
+    // caixa de chão: TOPO em `top`, descendo `h`. A espessura é o que faz o degrau
+    // entre dois tiles virar barranco sólido em vez de folha flutuando.
+    const putTile = (g, top, h, wx, wz) => {
+        m4.makeScale(1, h, 1);
+        m4.setPosition(wx, top - h / 2, wz);
+        g.mesh.setMatrixAt(g.n++, m4);
+    };
+    const putCol = (mesh, idx, x, y, z, color) => {
         m4.makeTranslation(x, y, z);
         mesh.setMatrixAt(idx, m4);
-        if (color != null) mesh.setColorAt(idx, col.setHex(color));
+        mesh.setColorAt(idx, col.setHex(color));
     };
 
     for (let dy = -RAD; dy <= RAD; dy++) {
@@ -320,37 +389,48 @@ function rebuildWindow(cx, cy, map) {
             if (mx < 0 || mx >= M_W) continue;
             const t = map[my][mx];
             const v = vr(mx, my);
+            const band = Math.min(2, Math.floor(v * 3));
             const wx = mx + 0.5, wz = my + 0.5;
+            const top = groundY(mx, my, floor);
 
-            if (t === T.WATER) {
-                put(mWater, wi++, wx, -0.08, wz, null);   // água afundada, cor global
-                continue;
-            }
-
-            // cor do chão + os mesmos tints do laço 2D do viewport
-            let c = tileColor(t, v);
+            // PZ: as pedrinhas 3×3 do 2D já existem como canvas prontos (getStoneTiles).
+            // É exatamente o que faltava pra praça deixar de ser uma laje de concreto.
             if (floor === 0 && bridge.inSafeZone(mx, my)) {
-                c = mix(0x5a5246, 0x5096dc, 0.10);        // piso da praça + tint azul da PZ
-            } else if (bridge.inSanctuary && bridge.inSanctuary(mx, my)) {
-                c = mix(c, 0x78d282, 0.13);               // tint verde do santuário
-            }
-
-            if (t === T.CAVE_WALL) {
-                put(mWall, ai++, wx, WALL_H_CAVE / 2, wz, c);
+                const idx = (mx * 13 + my * 23) & 3;
+                const g = floorGroup('pz' + idx, () => bridge.stoneTiles()[idx], mix(0xffffff, 0x5096dc, 0.10));
+                putTile(g, top, TILE_THICK, wx, wz);
                 continue;
             }
 
-            put(mFloor, fi++, wx, -0.05, wz, c);
+            const sanct = bridge.inSanctuary && bridge.inSanctuary(mx, my);
+            // Tint do material (multiplica a textura):
+            //  · santuário = banho verde do 2D
+            //  · CAVERNA = contraste. Os 2 tons do 2D diferem ~3% (42,37,48 vs
+            //    50,42,56) e no escuro da masmorra o chão vira um borrão liso sem
+            //    grade. Separo as bandas na mão — único lugar onde a paleta 3D se
+            //    afasta do 2D de propósito.
+            const caveish = (t === T.CAVE || t === T.CAVE_WALL);
+            const tint = sanct ? mix(0xffffff, 0x78d282, 0.13)
+                       : caveish ? CAVE_BAND[band] : null;
+            const key = (sanct ? 's' : 'n') + t + band;
+            const g = floorGroup(key, () => bridge.tileSprite(t, V_BANDS[band]), tint);
+
+            if (t === T.CAVE_WALL) { putTile(g, top + WALL_H_CAVE, TILE_THICK + WALL_H_CAVE, wx, wz); continue; }
+            putTile(g, top, TILE_THICK, wx, wz);
 
             if (t === T.TREE) {
-                put(mTrunk, ti++, wx, TREE_H * 0.275, wz, 0x4a2d0c);
-                put(mCanopy, ci++, wx, TREE_H, wz, v < 0.5 ? 0x174d10 : 0x1d5a13);
+                putCol(mTrunk, ti++, wx, top + TREE_H * 0.275, wz, 0x4a2d0c);
+                putCol(mCanopy, ci++, wx, top + TREE_H, wz, v < 0.5 ? 0x174d10 : 0x1d5a13);
             }
         }
     }
 
-    mFloor.count = fi; mWater.count = wi; mTrunk.count = ti; mCanopy.count = ci; mWall.count = ai;
-    for (const m of [mFloor, mWater, mTrunk, mCanopy, mWall]) {
+    for (const g of floorGroups.values()) {
+        g.mesh.count = g.n;
+        g.mesh.instanceMatrix.needsUpdate = true;
+    }
+    mTrunk.count = ti; mCanopy.count = ci;
+    for (const m of [mTrunk, mCanopy]) {
         m.instanceMatrix.needsUpdate = true;
         if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
@@ -498,7 +578,7 @@ function syncEnt(key, sig, make, wx, wz, hpPct, name, nameColor, now) {
         if (r) { ud.vox = r.inst; ud.mat = r.mat; g.add(r.inst); }
         ud.sig = sig;
     }
-    g.position.set(wx, 0, wz);
+    g.position.set(wx, gy(wx, wz), wz);   // assenta no relevo
     // billboards encaram a câmera
     if (hpPct != null) {
         ud.hp.visible = true;
@@ -545,15 +625,16 @@ function poolReset(pool) { for (const o of pool) o.visible = false; }
 // morte: o boneco "desmonta" numa rajada de cubinhos que voam, caem e somem.
 // Cosmético → Math.random é ok (o 2D faz igual nas partículas).
 function spawnDeathBits(wx, wz, color, now) {
+    const base = gy(wx, wz);          // os cubinhos caem no CHÃO daquele ponto, não no zero
     for (let i = 0; i < 10; i++) {
         const m = poolGet(bitPool, () => new THREE.Mesh(GEO.voxel, new THREE.MeshLambertMaterial({ transparent: true, depthWrite: false })));
         m.material.color.setHex(color);
         m.material.opacity = 1;
         m.scale.setScalar(0.05 + Math.random() * 0.07);
         const ang = Math.random() * 6.283, sp = 0.015 + Math.random() * 0.05;
-        m.position.set(wx + (Math.random() - 0.5) * 0.3, 0.4 + Math.random() * 0.5, wz + (Math.random() - 0.5) * 0.3);
+        m.position.set(wx + (Math.random() - 0.5) * 0.3, base + 0.4 + Math.random() * 0.5, wz + (Math.random() - 0.5) * 0.3);
         m.userData = { vx: Math.cos(ang) * sp, vy: 0.05 + Math.random() * 0.06, vz: Math.sin(ang) * sp,
-                       rvx: (Math.random() - 0.5) * 0.4, rvy: (Math.random() - 0.5) * 0.4, t0: now };
+                       rvx: (Math.random() - 0.5) * 0.4, rvy: (Math.random() - 0.5) * 0.4, t0: now, base };
     }
 }
 function updateDeathBits(now) {
@@ -563,7 +644,8 @@ function updateDeathBits(now) {
         if (t >= 1) { m.visible = false; continue; }
         d.vy -= 0.006;
         m.position.x += d.vx; m.position.y += d.vy; m.position.z += d.vz;
-        if (m.position.y < 0.03) { m.position.y = 0.03; d.vy = 0; d.vx *= 0.6; d.vz *= 0.6; }
+        const floorY = d.base + 0.03;
+        if (m.position.y < floorY) { m.position.y = floorY; d.vy = 0; d.vx *= 0.6; d.vz *= 0.6; }
         m.rotation.x += d.rvx; m.rotation.y += d.rvy;
         m.material.opacity = 1 - t * t;
     }
@@ -586,7 +668,7 @@ function drawJuice(now) {
         const pop = 1 + Math.max(0, 0.4 - age * 3);        // nasce maior e assenta
         sp.scale.set((big ? 1.5 : 1.05) * pop, (big ? 0.38 : 0.26) * pop, 1);
         sp.material.opacity = 1 - age * age;
-        sp.position.set(fx + 0.5, 1.5 + age * 0.9 - (f.offsetY || 0) / TS, fy + 0.5);
+        sp.position.set(fx + 0.5, gy(fx + 0.5, fy + 0.5) + 1.5 + age * 0.9 - (f.offsetY || 0) / TS, fy + 0.5);
         sp.renderOrder = 900;
     }
 
@@ -601,7 +683,7 @@ function drawJuice(now) {
         m.material.opacity = a;
         m.scale.setScalar(0.06 * (0.45 + 0.55 * a));
         m.rotation.set((1 - a) * 5 + pi * 1.7, (1 - a) * 7 + pi, 0);
-        m.position.set(p.x + 0.5, 0.55 + (1 - a) * 0.4, p.y + 0.5);
+        m.position.set(p.x + 0.5, gy(p.x + 0.5, p.y + 0.5) + 0.55 + (1 - a) * 0.4, p.y + 0.5);
         pi++;
     }
 
@@ -711,7 +793,7 @@ function applyAtmosphere(now) {
 
     // ── luz do player (o _carve do 2D): raio espelha o 5.2/4.5/6 tiles do 2D
     const pr = floor >= 1 ? 5.2 * lightScale : (inCaveNow ? 4.5 : 6);
-    playerLight.position.set(player.renderX + 0.5, 1.1, player.renderY + 0.5);
+    playerLight.position.set(player.renderX + 0.5, gy(player.renderX + 0.5, player.renderY + 0.5) + 1.1, player.renderY + 0.5);
     playerLight.distance = pr * 1.5;
     // de dia a céu aberto ela é desnecessária — só acende conforme escurece
     playerLight.intensity = 3.2 * Math.min(1, darkness * 1.25);
@@ -723,7 +805,7 @@ function applyAtmosphere(now) {
         if (Math.abs(t.x - camTarget.x) > RAD || Math.abs(t.y - camTarget.z) > RAD) continue;
         const l = torchPool[ti++];
         l.visible = true;
-        l.position.set(t.x + 0.5, 1.3, t.y + 0.5);
+        l.position.set(t.x + 0.5, gy(t.x + 0.5, t.y + 0.5) + 1.3, t.y + 0.5);
         const flick = Math.sin(_waterT * 3 + t.x + t.y) * 0.12;
         l.intensity = (2.6 + flick) * Math.min(1, darkness * 1.4);
         l.distance = 7.5 + flick * 4;
@@ -775,6 +857,7 @@ export function drawScene3d(now, dt) {
     const map = bridge.getMap();
     const player = bridge.getPlayer();
     const floor = player.floor || 0;
+    _floorNow = floor;                  // o gy() do frame inteiro depende disto
 
     // Alvo da câmera = CENTRO do viewport 2D. Reusar getCamera() de graça herda o
     // clamp nas bordas do mapa E o modo spectator (câmera segue o killer ao morrer).
@@ -782,6 +865,8 @@ export function drawScene3d(now, dt) {
     const tx = cam.x + bridge.VP_W / 2, tz = cam.y + bridge.VP_H / 2;
     camTarget.x += (tx - camTarget.x) * CAM_LERP;
     camTarget.z += (tz - camTarget.z) * CAM_LERP;
+    // a câmera sobe/desce com o relevo, senão o boneco escala o morro e sai do quadro
+    camTarget.y += (gy(camTarget.x, camTarget.z) - camTarget.y) * CAM_LERP;
     updateCamera();
 
     // janela de tiles: só refaz quando o centro inteiro muda / trocou mapa ou andar
@@ -793,10 +878,8 @@ export function drawScene3d(now, dt) {
     // o céu acompanha a câmera (o shadow map de ±15 tiles cobre só a janela)
     skyDome.position.set(camTarget.x, 0, camTarget.z);
 
-    // água ondulando — o 2D usa waterT; aqui a cor global pulsa (sem custo por tile)
+    // o flicker das tochas usa esta base de tempo (o 2D usa a dele, `waterT`)
     _waterT += (dt || 16) * 0.002;
-    const wv = (Math.sin(_waterT) + 1) / 2;
-    mWater.material.color.setHex(mix(0x123f7a, 0x1d5399, wv));
 
     // Etapa 3: dia/noite, tochas, masmorra (depende do _waterT pro flicker)
     applyAtmosphere(now);
@@ -813,9 +896,16 @@ export function drawScene3d(now, dt) {
         if (!near(ex, ey)) continue;
         const key = 'm' + m.id;
         seen.add(key);
+        // ETIQUETA SÓ ONDE INFORMA. Nome em TODO mob virava um mar de texto: a janela
+        // 3D mostra ~4× a área do viewport 2D, então ~4× mais nomes que o 2D jamais
+        // teve na tela. Fica: boss único (sempre), alvo atual, e quem está te caçando.
+        const alvo = player.targetType !== 'player' && player.target === m.id;
+        const mostraNome = m.unique || alvo || m.aggro;
+        // barra de HP só quando diz algo: ferido, ou é o alvo
+        const hpPct = m.maxHp > 0 ? m.hp / m.maxHp : 1;
         const g = syncEnt(key, 'mob|' + m.color + '|' + m.size, () => bridge.mobSprite(m.color, m.size),
-            ex + 0.5, ey + 0.5, m.maxHp > 0 ? m.hp / m.maxHp : null,
-            m.name, m.unique ? '#ffcc40' : (m.aggro ? '#ff8060' : '#aaaaaa'), now);
+            ex + 0.5, ey + 0.5, (hpPct < 1 || alvo) ? hpPct : null,
+            mostraNome ? m.name : null, m.unique ? '#ffcc40' : (alvo ? '#ff6050' : '#ff8060'), now);
         g.userData.bitColor = m.color;
     }
 
@@ -867,7 +957,8 @@ export function drawScene3d(now, dt) {
         else if (t != null) te = bridge.getMonsters().find(m => m.id === t && m.hp > 0);
         if (te) {
             targetRing.visible = true;
-            targetRing.position.set((te.renderX ?? te.x) + 0.5, 0.05, (te.renderY ?? te.y) + 0.5);
+            const trx = (te.renderX ?? te.x) + 0.5, trz = (te.renderY ?? te.y) + 0.5;
+            targetRing.position.set(trx, gy(trx, trz) + 0.06, trz);
             targetRing.material.opacity = 0.55 + 0.35 * Math.sin(now / 190);
         } else targetRing.visible = false;
     }
@@ -883,7 +974,9 @@ export function r3dInfo() {
     return {
         calls: renderer.info.render.calls,
         tris: renderer.info.render.triangles,
-        instances: { floor: mFloor.count, water: mWater.count, trunk: mTrunk.count, canopy: mCanopy.count, wall: mWall.count },
+        tiles: [...floorGroups.values()].reduce((a, g) => a + g.n, 0),
+        texGrupos: floorGroups.size,
+        arvores: mTrunk.count,
         chars: entGroups.size,
         charKeys: [...entGroups.keys()],
         voxPorChar: [...entGroups.values()].map(g => g.userData.vox ? g.userData.vox.count : 0),

@@ -16266,6 +16266,44 @@ function r3dEquipSig(equip, dir){
             d.armor, d.feet, d.head, d.cosmetic, dir].join('|');
 }
 
+// ─── textura do chão (mesmo gravador, agora no drawTile) ───
+// O 1º 3D pintava o tile com UMA cor chapada → a praça virava laje de concreto e a
+// grama virava tabuleiro de xadrez. Aqui o próprio drawTile é rasterizado e vira
+// TEXTURA: voltam as pedrinhas da praça, o cascalho da caverna, os tufos de grama.
+// Acha uma coord do mapa cujo vr() caia na banda pedida (o drawTile lê vr(tx,ty) por
+// dentro, então é assim que se escolhe a variação de tom).
+function r3dCoordForV(target){
+    let best = {x:1,y:1}, bestD = 9;
+    for (let y=1; y<70; y++) for (let x=1; x<70; x++){
+        const d = Math.abs(vr(x,y) - target);
+        if (d < bestD){ bestD = d; best = {x,y}; }
+    }
+    return best;
+}
+let _r3dTileOff = null, _r3dTileCtx = null;
+function r3dTileSprite(type, vTarget){
+    if (!_r3dTileOff){
+        _r3dTileOff = document.createElement('canvas');
+        _r3dTileOff.width = _r3dTileOff.height = TS;
+        _r3dTileCtx = _r3dTileOff.getContext('2d', { willReadFrequently: true });
+    }
+    const { x: tx, y: ty } = r3dCoordForV(vTarget);
+    // Mapa FAKE 3×3 uniforme em volta de (tx,ty): o _blendEdges do drawTile lê os 4
+    // vizinhos e pintaria a cor deles na borda — numa textura isso ficaria bakeado
+    // pra sempre. Vizinho do mesmo tipo = nenhum blend. (`map` é `let`, dá pra trocar.)
+    const row = []; row[tx-1] = type; row[tx] = type; row[tx+1] = type;
+    const fake = []; fake[ty-1] = row; fake[ty] = row; fake[ty+1] = row;
+    const realMap = map, realCtx = ctx;
+    _r3dTileCtx.clearRect(0, 0, TS, TS);
+    map = fake; ctx = _r3dTileCtx;
+    try { drawTile(type, 0, 0, tx, ty); }
+    finally { map = realMap; ctx = realCtx; }
+    const out = document.createElement('canvas');
+    out.width = out.height = TS;
+    out.getContext('2d').drawImage(_r3dTileOff, 0, 0);
+    return out;                       // canvas → CanvasTexture no módulo
+}
+
 // Ponte EXPLÍCITA: play.html é script clássico (não é ES module), então o
 // render3d.js não consegue importar nada daqui. Tudo que ele precisa passa por
 // este objeto — o módulo não adivinha global nenhum.
@@ -16292,6 +16330,11 @@ function r3dBridge(){
         // (quem cria/expira segue sendo o 2D, então nada duplica nem diverge).
         getFloats: () => floatTexts,
         getParticles: () => particles,
+        // Textura do chão: o drawTile rasterizado + as pedrinhas da praça (que já
+        // vivem como canvas offscreen prontos no 2D).
+        tileSprite: r3dTileSprite,
+        stoneTiles: getStoneTiles,
+        SAFE_CX, SAFE_CY, SAFE_RADIUS,
     };
 }
 
