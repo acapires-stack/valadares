@@ -1730,6 +1730,7 @@
         .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
     <link rel="stylesheet" href="/ui-polish.css?v=20261003a">
+    <link rel="stylesheet" href="/adventure-guide.css?v=20261003a">
 </head>
 <body>
 
@@ -7615,7 +7616,6 @@ function handleMP(msg){
     if (msg.t === 'authOk'){
         _wsAuthed = true;
         document.body.classList.add('game-active');
-        if (window.valadaresUi) window.valadaresUi.onAuth();
         // Reconexão durante jogo: NÃO sobrescreve com save server (pode estar atrasado
         // se o player jogou offline). Em vez disso, faz push do estado atual.
         if (_didInitialAuth){
@@ -7630,6 +7630,9 @@ function handleMP(msg){
         }
         _didInitialAuth = true;
         sendJoinNow();
+        // A UI lê somente o personagem já reconciliado com o save da conta.
+        if (window.valadaresUi) window.valadaresUi.onAuth();
+        if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onReady();
         return;
     }
     if (msg.t === 'secondChance'){
@@ -15864,6 +15867,7 @@ function logout(){
     document.getElementById('login').style.display = 'flex';
     document.body.classList.remove('game-active', 'panel-equipment', 'panel-inventory', 'menu-open');
     if (window.valadaresUi) window.valadaresUi.onLogout();
+    if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onLogout();
     document.getElementById('charInput').value = '';
     document.getElementById('pwdInput').value = '';
     document.getElementById('loginError').textContent = '';
@@ -17345,6 +17349,7 @@ function loop(ts){
 </script>
 <script src="/render2d-polish.js?v=20261003a"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
+<script src="/adventure-guide.js?v=20261003a"></script>
 <!-- M4 3b: indicador de andar da masmorra — filho DIRETO do body (NÃO do #gameWrapper,
      que é flex-row e esticaria a altura do fixed). Visível só em floor>=1; acento por profundidade. -->
 <div id="floorBadge" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,8,22,0.85);border:1px solid #5a2a6a;color:#e6c8f5;font-family:monospace;font-weight:700;font-size:13px;letter-spacing:1px;padding:4px 14px;border-radius:7px;box-shadow:0 2px 12px rgba(80,20,90,0.4);text-shadow:0 1px 2px #000;display:none">🕳️ <span id="floorBadgeText">—</span></div>

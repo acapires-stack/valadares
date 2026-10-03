@@ -1,0 +1,25 @@
+#adventureGuide[hidden], #adventureGuidePanel[hidden], #adventureGuideOpen[hidden] { display: none !important; }
+#adventureGuide {
+    position: absolute; top: 39px; right: 8px; z-index: 36;
+    width: min(236px, 38%); pointer-events: none;
+    font: 12px/1.35 'Segoe UI', system-ui, sans-serif; color: #eee0c2;
+}
+#adventureGuide button { pointer-events: auto; cursor: pointer; color: #f5e5c7; border: 1px solid #977548; border-radius: 4px; background: #382714; }
+#adventureGuide button:hover { background: #594020; }
+#adventureGuideOpen { display: block; margin-left: auto; padding: 5px 8px; font-size: 11px; box-shadow: 0 3px 10px #000a; }
+#adventureGuidePanel {
+    pointer-events: auto; padding: 8px 10px; border: 1px solid #9c7840; border-radius: 5px;
+    background: rgba(23, 19, 15, .95); box-shadow: 0 5px 18px #000b;
+}
+#adventureGuide .ag-head { display: flex; align-items: center; justify-content: space-between; gap: 5px; color: #f1d490; }
+#adventureGuide .ag-head button { border: 0; background: transparent; font-size: 18px; line-height: 18px; padding: 0 2px; }
+#adventureGuide .ag-step { margin-top: 5px; color: #ddbc79; font-size: 11px; font-weight: 600; }
+#adventureGuide p { margin: 5px 0; }
+#adventureGuide .ag-detail { color: #bdd9b0; font-size: 11px; }
+#adventureGuide .ag-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+#adventureGuide .ag-actions button { padding: 4px 7px; font-size: 11px; }
+#adventureGuide .ag-actions button:disabled { opacity: .5; cursor: default; }
+@media (max-width: 900px) {
+    #adventureGuide { top: 35px; right: 5px; width: min(210px, 42%); font-size: 11px; }
+    #adventureGuidePanel { padding: 6px 7px; }
+}

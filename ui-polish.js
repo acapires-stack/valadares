@@ -78,7 +78,9 @@
             }
             const name = typeof player !== 'undefined' ? player.name : '';
             if (!name || pref('valadares:firstSteps:' + name) === '1' || pref('valadares:tutSeen:' + name) === '1') return;
-            setTimeout(() => { if (body.classList.contains('game-active')) firstSteps.hidden = false; }, 450);
+            setTimeout(() => {
+                if (body.classList.contains('game-active') && !window.valadaresAdventureGuide?.isGuiding()) firstSteps.hidden = false;
+            }, 450);
         },
         onLogout() {
             body.classList.remove('game-active', 'panel-equipment', 'panel-inventory', 'menu-open');
