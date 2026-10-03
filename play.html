@@ -5913,46 +5913,55 @@ function drawMonster(m, px, py){
     ctx.fillStyle = `rgba(0,0,0,${0.32 - Math.abs(b)*0.04})`;
     ctx.beginPath(); ctx.ellipse(px+TS/2,py+TS-5,11*sz*shadowScale,5*sz*shadowScale,0,0,Math.PI*2); ctx.fill();
     py += b;
-    // corpo
-    ctx.fillStyle = m.color;
-    ctx.fillRect(px+TS/2-w/2, py+TS/2-h/2+4, w, h);
-    // pernas/garras
-    ctx.fillStyle = m.color;
-    ctx.fillRect(px+TS/2-w/2-2, py+TS-12, 5, 8);
-    ctx.fillRect(px+TS/2+w/2-3, py+TS-12, 5, 8);
-    // olhos vermelhos
-    ctx.fillStyle='#ff4040';
-    ctx.fillRect(px+TS/2-7, py+TS/2-h/2+8, 3, 3);
-    ctx.fillRect(px+TS/2+4, py+TS/2-h/2+8, 3, 3);
-    // dentes
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(px+TS/2-4, py+TS/2+2, 2, 3);
-    ctx.fillRect(px+TS/2+2, py+TS/2+2, 2, 3);
+    // A arte 2D só troca o corpo; os indicadores e a área de seleção continuam no tile.
+    const artNow = performance.now();
+    const newBodyDrawn = ctx === gameplay2dContext && !r3dOn &&
+        window.ValadaresMonsterArt2D && window.ValadaresMonsterArt2D.drawBody(ctx, m, px, py, {
+            walkPhase: b / 1.6,
+            attackPhase: m.artAttackAt == null ? 0 : Math.max(0, 1 - (artNow - m.artAttackAt) / 220),
+            timeMs: artNow,
+        });
+    if (!newBodyDrawn){
+        ctx.fillStyle = m.color;
+        ctx.fillRect(px+TS/2-w/2, py+TS/2-h/2+4, w, h);
+        // pernas/garras
+        ctx.fillRect(px+TS/2-w/2-2, py+TS-12, 5, 8);
+        ctx.fillRect(px+TS/2+w/2-3, py+TS-12, 5, 8);
+        // olhos e dentes
+        ctx.fillStyle='#ff4040';
+        ctx.fillRect(px+TS/2-7, py+TS/2-h/2+8, 3, 3);
+        ctx.fillRect(px+TS/2+4, py+TS/2-h/2+8, 3, 3);
+        ctx.fillStyle='#ffffff';
+        ctx.fillRect(px+TS/2-4, py+TS/2+2, 2, 3);
+        ctx.fillRect(px+TS/2+2, py+TS/2+2, 2, 3);
+    }
+    // Deixa os indicadores acima dos chifres/asas das criaturas maiores.
+    const labelY = py - (newBodyDrawn && sz > 1 ? Math.ceil((sz - 1) * 42) + 4 : 0);
     // hp bar (sempre visível)
     const hpPct = m.hp/m.maxHp;
-    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(px+6,py-1,36,3);
+    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(px+6,labelY-1,36,3);
     ctx.fillStyle = hpPct>0.5?'#4caf50':hpPct>0.25?'#ffaa00':'#cc3030';
-    ctx.fillRect(px+6,py-1,36*hpPct,3);
+    ctx.fillRect(px+6,labelY-1,36*hpPct,3);
     // coroa (boss únicos)
     if (m.unique){
         ctx.fillStyle='#ffd040';
         // base
-        ctx.fillRect(px+TS/2-7, py-2, 14, 3);
+        ctx.fillRect(px+TS/2-7, labelY-2, 14, 3);
         // 3 pontas
         ctx.beginPath();
-        ctx.moveTo(px+TS/2-7, py-2); ctx.lineTo(px+TS/2-5, py-7); ctx.lineTo(px+TS/2-3, py-2);
-        ctx.moveTo(px+TS/2-2, py-2); ctx.lineTo(px+TS/2,   py-9); ctx.lineTo(px+TS/2+2, py-2);
-        ctx.moveTo(px+TS/2+3, py-2); ctx.lineTo(px+TS/2+5, py-7); ctx.lineTo(px+TS/2+7, py-2);
+        ctx.moveTo(px+TS/2-7, labelY-2); ctx.lineTo(px+TS/2-5, labelY-7); ctx.lineTo(px+TS/2-3, labelY-2);
+        ctx.moveTo(px+TS/2-2, labelY-2); ctx.lineTo(px+TS/2, labelY-9); ctx.lineTo(px+TS/2+2, labelY-2);
+        ctx.moveTo(px+TS/2+3, labelY-2); ctx.lineTo(px+TS/2+5, labelY-7); ctx.lineTo(px+TS/2+7, labelY-2);
         ctx.fill();
         // rubi central
         ctx.fillStyle='#ff3050';
-        ctx.fillRect(px+TS/2-1, py-1, 2, 2);
+        ctx.fillRect(px+TS/2-1, labelY-1, 2, 2);
     }
     // nome
     ctx.font = m.unique ? 'bold 10px monospace' : '9px monospace';
     ctx.textAlign='center';
     ctx.fillStyle = m.unique ? '#ffcc40' : (m.aggro ? '#ff8060' : '#aaa');
-    ctx.fillText(m.name, px+TS/2, py - (m.unique ? 12 : 4));
+    ctx.fillText(m.name, px+TS/2, labelY - (m.unique ? 12 : 4));
     // target marker
     if (player.target === m.id){
         ctx.strokeStyle='#ff4040'; ctx.lineWidth=2;
@@ -5964,7 +5973,7 @@ function drawMonster(m, px, py){
         const colorMap = { poison:'#74d176', bleed:'#cc3030', burn:'#ff8030', freeze:'#50b0ff', shock:'#b080ff' };
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        const cy = py - (m.unique ? 22 : 14);
+        const cy = labelY - (m.unique ? 22 : 14);
         const stepX = 10;
         const startX = px + TS/2 - ((m.dots.length-1) * stepX) / 2;
         for (let i = 0; i < m.dots.length; i++){
@@ -8607,6 +8616,9 @@ function handleMP(msg){
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
     } else if (msg.t === 'mobHit'){
         if (_isUpdating) return;   // janela de auto-update — ignora dano
+        // Apenas pose local do atacante confirmado pelo servidor, inclusive em esquiva.
+        const attacker = monsters.find(m => m.id === msg.mobId);
+        if (attacker && !msg.immune) attacker.artAttackAt = performance.now();
         // T2: dano aplicado server-side (vem via pstats). Cliente usa msg.actual
         // pro float/log/FX. Fallback pra cálculo local se server não mandou actual
         // (Electron v1.0.0/v1.0.1 conversando com server novo: server SEMPRE manda).
@@ -17378,6 +17390,7 @@ function loop(ts){
 </script>
 <script src="/item-art.js?v=20261003a"></script>
 <script src="/character-art.js?v=20261003a"></script>
+<script src="/monster-art.js?v=20261003a"></script>
 <script src="/render2d-polish.js?v=20261003a"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261003a"></script>
