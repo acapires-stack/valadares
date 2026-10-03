@@ -1729,6 +1729,7 @@
         .lang-btn:hover { opacity: 0.9; }
         .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
+    <link rel="stylesheet" href="/ui-polish.css?v=20261003a">
 </head>
 <body>
 
@@ -1807,6 +1808,7 @@
 <div id="login">
     <div class="box">
         <h2>⚔ VALADARES ⚔</h2>
+        <p class="login-intro" data-i18n="ui.login_intro">Seu nome e senha criam um personagem novo ou retomam o seu personagem.</p>
         <input type="text" id="charInput" placeholder="Nome do personagem" data-i18n-ph="login.char_ph" maxlength="14" autocomplete="off">
         <input type="password" id="pwdInput" placeholder="Senha" data-i18n-ph="login.pwd_ph" maxlength="40" autocomplete="off">
         <input type="email" id="emailInput" placeholder="Email (opcional — recuperar senha)" data-i18n-ph="login.email_ph" maxlength="120" autocomplete="email" style="font-size:11px">
@@ -1851,6 +1853,12 @@
 
 <div id="title">⚔ &nbsp;VALADARES&nbsp; ⚔</div>
 <div id="connStatus" class="offline">— OFFLINE —</div>
+<div id="displayControls" aria-label="Layout do jogo">
+    <button id="layoutModeBtn" type="button" aria-pressed="true" data-i18n="ui.layout_classic">Layout clássico</button>
+    <button id="equipmentPanelBtn" type="button" aria-expanded="false" data-i18n="ui.equipment">Equipamento e status</button>
+    <button id="inventoryPanelBtn" type="button" aria-expanded="false" data-i18n="ui.inventory">Inventário</button>
+    <button id="chatSizeBtn" type="button" aria-expanded="false" data-i18n="ui.chat_expand">Expandir chat</button>
+</div>
 
 <!-- Toasts do servidor (info/warn/event/admin) — empilham no topo central -->
 <div id="toastContainer"></div>
@@ -1927,6 +1935,11 @@
     <!-- GAME -->
     <div id="gameContainer">
         <canvas id="canvas"></canvas>
+        <div id="firstSteps" role="status" aria-live="polite" hidden>
+            <strong data-i18n="ui.first_title">Primeiros passos</strong>
+            <span data-i18n="ui.first_body">Mova-se com WASD, use Espaço perto de um NPC para conversar e abra Q para ver as missões.</span>
+            <button type="button" id="firstStepsDismiss" data-i18n="ui.got_it">Entendi</button>
+        </div>
         <div id="r3dPerf">3D —</div>
         <button id="recBtn" title="Gravar um clipe do gameplay (só a tela do jogo, sem HUD)" data-i18n-title="hud.rec_title" onclick="toggleRecording()">● REC</button>
 
@@ -2544,6 +2557,14 @@ const blocksLineOfSight = t => t===T.TREE || t===T.CAVE_WALL;
 // ═══════════════════════════════════════════════════════════════════════════
 const I18N = {
   pt: {
+    'ui.login_intro': 'Seu nome e senha criam um personagem novo ou retomam o seu personagem.',
+    'ui.login_ready': '— pronto para entrar —',
+    'ui.layout_classic': 'Layout clássico', 'ui.layout_focus': 'Modo foco',
+    'ui.equipment': 'Equipamento e status', 'ui.inventory': 'Inventário',
+    'ui.chat_expand': 'Expandir chat', 'ui.chat_reduce': 'Reduzir chat',
+    'ui.first_title': 'Primeiros passos',
+    'ui.first_body': 'Mova-se com WASD, use Espaço perto de um NPC para conversar e abra Q para ver as missões.',
+    'ui.got_it': 'Entendi',
     'login.char_ph': 'Nome do personagem',
     'login.pwd_ph': 'Senha',
     'login.email_ph': 'Email (opcional — recuperar senha)',
@@ -3240,6 +3261,14 @@ const I18N = {
     /*F2PT*/
   },
   en: {
+    'ui.login_intro': 'Your name and password create a new character or resume your character.',
+    'ui.login_ready': '— ready to enter —',
+    'ui.layout_classic': 'Classic layout', 'ui.layout_focus': 'Focus mode',
+    'ui.equipment': 'Equipment and stats', 'ui.inventory': 'Inventory',
+    'ui.chat_expand': 'Expand chat', 'ui.chat_reduce': 'Reduce chat',
+    'ui.first_title': 'First steps',
+    'ui.first_body': 'Move with WASD, press Space near an NPC to talk, and press Q to see quests.',
+    'ui.got_it': 'Got it',
     'login.char_ph': 'Character name',
     'login.pwd_ph': 'Password',
     'login.email_ph': 'Email (optional — password recovery)',
@@ -3970,6 +3999,7 @@ function setLang(l){
   try { localStorage.setItem('valadares_lang', l); } catch(e){}
   applyI18n();
   updateLangButtons();
+  if (window.valadaresUi) window.valadaresUi.updateLabels();
   // o rótulo do toggle 3D depende do estado (ligar/desligar), não só da chave —
   // applyI18n acabou de repor o texto "off", então corrige aqui
   try { updateR3dBtn(); } catch(e){}
@@ -4176,6 +4206,8 @@ function npcVisible(n){ return !n.hiddenUntil || (player.flags && player.flags[n
 // Só o BONECO do NPC (sem sombra/nome/marcador/brilho): o render 2D chama daqui e o
 // ctx-gravador do 3D também, então os dois não podem divergir.
 function drawNpcBody(npc, nx, ny){
+    const art = polishedArt2D();
+    if (art && art.drawNpcBody(ctx, npc, nx, ny)) return;
     // corpo (túnica)
     ctx.fillStyle = npc.body;
     ctx.fillRect(nx+14, ny+22, 20, 22);
@@ -4394,6 +4426,12 @@ const canvas = document.getElementById('canvas');
 // desenho e devolve — tudo síncrono, ninguém observa a troca. Fora isso o `ctx`
 // é o mesmo de sempre e NUNCA deve ser reatribuído.
 let ctx      = canvas.getContext('2d');
+const gameplay2dContext = ctx;
+function polishedArt2D(){
+    // The optional 3D rasterizer temporarily replaces ctx. Keep its original art.
+    return ctx === gameplay2dContext && !r3dOn && (player.floor || 0) === 0
+        ? window.ValadaresArt2D : null;
+}
 canvas.width = TS*VP_W; canvas.height = TS*VP_H;
 
 // ===== Iluminação dinâmica + ciclo dia/noite =====
@@ -4673,6 +4711,8 @@ function _blendEdges(t, tx, ty, px, py){
     if (tx < M_W-1)  apply(map[ty][tx+1], 'E');
 }
 function drawTile(t,px,py,tx,ty){
+    const art = polishedArt2D();
+    if (art && art.drawTile(ctx, t, px, py, tx, ty, { map })) return;
     const v=vr(tx,ty);
     if(t===T.GRASS)drawGrass(px,py,v);
     else if(t===T.DIRT)drawDirt(px,py,v);
@@ -7574,6 +7614,8 @@ function sendJoinNow(){
 function handleMP(msg){
     if (msg.t === 'authOk'){
         _wsAuthed = true;
+        document.body.classList.add('game-active');
+        if (window.valadaresUi) window.valadaresUi.onAuth();
         // Reconexão durante jogo: NÃO sobrescreve com save server (pode estar atrasado
         // se o player jogou offline). Em vez disso, faz push do estado atual.
         if (_didInitialAuth){
@@ -12204,6 +12246,12 @@ function syncChatHeight(){
     const chat = document.getElementById('chatMessages');
     const wrapper = document.getElementById('gameWrapper');
     if (!log || !chat || !wrapper) return;
+    if (document.body.classList.contains('layout-focus') || document.body.classList.contains('touch') || window.innerWidth <= 900){
+        const height = document.body.classList.contains('chat-expanded') ? 220 : 72;
+        log.style.height = height + 'px';
+        chat.style.height = height + 'px';
+        return;
+    }
     // Mede a barra de abas e o input REAIS (antes era TABS_H=28 fixo — mas na aba
     // COMBATE a barra ganha os #logFilters e fica mais alta, então o #log calculado
     // com 28 estourava pra fora da tela ao trocar pra COMBATE). #1
@@ -12230,6 +12278,12 @@ function syncInvHeight(){
     const wrapper = document.getElementById('gameWrapper');
     const inv = document.getElementById('invSidebar');
     if (!wrapper || !inv) return;
+    if (document.body.classList.contains('layout-focus') || document.body.classList.contains('touch') || window.innerWidth <= 900){
+        for (const el of [document.getElementById('leftSidebar'), document.getElementById('rightSidebar'), inv]){
+            if (el) el.style.height = '';
+        }
+        return;
+    }
     const leftSidebar = wrapper.children[0];
     const rightSidebar = wrapper.children[2];
     if (!leftSidebar) return;
@@ -14239,9 +14293,7 @@ function loginStatus(){
     const name = document.getElementById('charInput').value.trim();
     const el = document.getElementById('loginStatus');
     document.getElementById('loginError').textContent = '';
-    if (!name){ el.textContent = '— digite seu nome —'; return; }
-    const acc = getAccount(name);
-    el.textContent = acc ? '— entrar —' : '— nova conta —';
+    el.textContent = name ? tr('ui.login_ready') : tr('login.status_default');
 }
 
 const SESSION_KEY = 'valadares:session';
@@ -15810,10 +15862,12 @@ function logout(){
     }
     // volta para tela de login
     document.getElementById('login').style.display = 'flex';
+    document.body.classList.remove('game-active', 'panel-equipment', 'panel-inventory', 'menu-open');
+    if (window.valadaresUi) window.valadaresUi.onLogout();
     document.getElementById('charInput').value = '';
     document.getElementById('pwdInput').value = '';
     document.getElementById('loginError').textContent = '';
-    document.getElementById('loginStatus').textContent = '— digite seu nome —';
+    document.getElementById('loginStatus').textContent = tr('login.status_default');
     document.getElementById('charInput').focus();
     started = false;
     invSignature = null;
@@ -15939,13 +15993,8 @@ function startGame(multiplayer, name){
     if (restored) log(tr('log.progress_restored'));
     log(tr('log.controls_hint'));
     started = true;
-    // Tutorial só na primeira vez por usuário (flag em localStorage).
-    // No mobile (body.touch) abre versão específica que explica controles touch,
-    // não WASD/SPACE como o desktop.
-    setTimeout(() => {
-        if (document.body.classList.contains('touch')) openMobileTut(false);
-        else openTutorial(false);
-    }, 500);
+    // A orientação inicial curta aparece após autenticação. Os tutoriais completos
+    // continuam acessíveis em Opções, sem bloquear a entrada no mundo.
     // Limpa intervals antigos antes de criar novos (re-login na mesma aba)
     if (_saveStateIntervalId) clearInterval(_saveStateIntervalId);
     if (_playerSyncIntervalId) clearInterval(_playerSyncIntervalId);
@@ -16646,10 +16695,14 @@ function loop(ts){
             // Na PZ (só no overworld), sobrescreve com piso de pedra (chão de
             // praça). No andar da masmorra, desenha sempre o tile do grid.
             if ((player.floor || 0) === 0 && inSafeZone(mx, my)){
-                const tiles = getStoneTiles();
-                const idx = (mx * 13 + my * 23) & 3;
-                ctx.drawImage(tiles[idx], sx, sy);
-                ctx.fillStyle = 'rgba(80, 150, 220, 0.10)';
+                const art = polishedArt2D();
+                if (art) art.drawPlazaTile(ctx, sx, sy, mx, my);
+                else {
+                    const tiles = getStoneTiles();
+                    const idx = (mx * 13 + my * 23) & 3;
+                    ctx.drawImage(tiles[idx], sx, sy);
+                }
+                ctx.fillStyle = art ? 'rgba(80, 150, 220, 0.025)' : 'rgba(80, 150, 220, 0.10)';
                 ctx.fillRect(sx, sy, TS, TS);
                 const isEdge = Math.max(Math.abs(mx-SAFE_CX), Math.abs(my-SAFE_CY)) === SAFE_RADIUS;
                 if (isEdge){
@@ -17290,6 +17343,8 @@ function loop(ts){
     }
 })();
 </script>
+<script src="/render2d-polish.js?v=20261003a"></script>
+<script src="/ui-polish.js?v=20261003a"></script>
 <!-- M4 3b: indicador de andar da masmorra — filho DIRETO do body (NÃO do #gameWrapper,
      que é flex-row e esticaria a altura do fixed). Visível só em floor>=1; acento por profundidade. -->
 <div id="floorBadge" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,8,22,0.85);border:1px solid #5a2a6a;color:#e6c8f5;font-family:monospace;font-weight:700;font-size:13px;letter-spacing:1px;padding:4px 14px;border-radius:7px;box-shadow:0 2px 12px rgba(80,20,90,0.4);text-shadow:0 1px 2px #000;display:none">🕳️ <span id="floorBadgeText">—</span></div>
