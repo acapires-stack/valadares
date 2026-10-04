@@ -5,6 +5,7 @@
     "dockerfilePath": "Dockerfile",
     "watchPatterns": [
       "server/**",
+      "equipment-rules.js",
       "package.json",
       "package-lock.json",
       "Dockerfile",

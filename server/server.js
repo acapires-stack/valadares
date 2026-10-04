@@ -6,6 +6,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const equipmentRules = require('../equipment-rules');
+const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 // Token de admin pro painel web (env var). Sem isso, /api/admin/* rejeita 401.
@@ -588,15 +590,20 @@ function creditGoldToPlayer(playerName, gold, paymentId){
 // offline → persiste no accounts.json (próximo login carrega).
 function adminGiveItem(targetName, itemKey, qty){
     const name = String(targetName || '').trim();
-    const key  = String(itemKey || '').trim().toUpperCase();
+    const rawKey = String(itemKey || '').trim();
+    const key  = rawKey.includes('~') ? rawKey : rawKey.toUpperCase();
     const n    = Math.max(1, Math.min(100, parseInt(qty, 10) || 1));
     if (!name || !key) return { ok:false, reason:'bad_args' };
     const tier = getUpgradeTier(key);
-    if (!ITEM_META[tier.base]) return { ok:false, reason:'unknown_item' };
+    if (!itemMetaForKey(key)) return { ok:false, reason:'unknown_item' };
+    if (tier.enchanted && n !== 1) return { ok:false, reason:'unique_qty' };
+    if (tier.enchanted && enchantedIdExists(tier.id)) return { ok:false, reason:'duplicate_id' };
     if (tier.plus > UPGRADE_MAX) return { ok:false, reason:'bad_plus' };
     for (const p of players.values()){
         if (p.disconnected || !p.name) continue;
         if (p.name.toLowerCase() === name.toLowerCase()){
+            if (tier.enchanted && p.equipmentVersion !== equipmentRules.VERSION) return {ok:false,reason:'update_required'};
+            if (!canAddKeys(p.inv,[key],SAVE_CAPS.invKeys)) return {ok:false,reason:'inventory_full'};
             incInv(p, key, n);
             sendInvUpdate(p);
             console.log(`[admin] give online: ${p.name} +${n}× ${key}`);
@@ -607,6 +614,7 @@ function adminGiveItem(targetName, itemKey, qty){
     if (!acc) return { ok:false, reason:'not_found' };
     if (!acc.save) return { ok:false, reason:'no_save' };   // conta nunca salvou — player precisa logar 1× antes
     if (!acc.save.inv || typeof acc.save.inv !== 'object') acc.save.inv = {};
+    if (!canAddKeys(acc.save.inv,[key],SAVE_CAPS.invKeys)) return {ok:false,reason:'inventory_full'};
     acc.save.inv[key] = (acc.save.inv[key] || 0) + n;
     flushAccounts();
     console.log(`[admin] give offline (save): ${name} +${n}× ${key}`);
@@ -722,6 +730,7 @@ const ITEM_META = {
     // mats
     SILK:{kind:'mat'}, ASA_MORCEGO:{kind:'mat'}, OSSO:{kind:'mat'}, CHIFRE:{kind:'mat'},
     ESCAMA:{kind:'mat'}, GARRA:{kind:'mat'}, PEDRA_GOLEM:{kind:'mat'}, ESSENCIA:{kind:'mat'},
+    ESSENCIA_ARCANA:{kind:'mat'},
     // armas 1H
     ADAGA:        { kind:'weapon', hand:'1h', base:3, def:1 },
     ESPADA:       { kind:'weapon', hand:'1h', base:4, def:2 },
@@ -999,12 +1008,62 @@ const UPGRADE_MAX       = 5;
 const UPGRADE_FAIL      = [0, 0.20, 0.35, 0.50, 0.65, 0.80];
 const UPGRADE_COST_MULT = [0, 3, 8, 20, 50, 120];
 function getUpgradeTier(key){
-    const m = key && key.match(/^(.+)_PLUS_(\d+)$/);
-    if (m) return { base: m[1], plus: parseInt(m[2], 10) };
-    return { base: key, plus: 0 };
+    return equipmentRules.parse(key);
 }
-function makeUpgradeKey(baseKey, plus){
-    return plus > 0 ? baseKey + '_PLUS_' + plus : baseKey;
+function itemKeyFromMessage(value){
+    return typeof value === 'string' && value.length <= equipmentRules.MAX_KEY_LENGTH ? value : null;
+}
+function itemMetaForKey(key){
+    const tier = getUpgradeTier(key), meta = tier.valid && ITEM_META[tier.base];
+    return meta && (!(tier.plus || tier.enchanted) || equipmentRules.KINDS.includes(meta.kind))
+        && (!tier.enchanted || equipmentRules.validFor(key, meta.kind)) ? meta : null;
+}
+function canAddKeys(bag, additions, max){
+    const keys = new Set(Object.keys(bag || {}).filter(k => (bag[k] || 0) > 0));
+    for (const key of additions) keys.add(key);
+    return keys.size <= max;
+}
+function ownsEnchantedItems(save){
+    if (!save) return false;
+    const bags = [save.inv, save.equipped, ...Object.values(save.chests || {})];
+    return bags.some(bag => bag && Object.keys(bag).some(k => equipmentRules.parse(k).enchanted)
+        || bag && Object.values(bag).some(v => typeof v === 'string' && equipmentRules.parse(v).enchanted));
+}
+function enchantedIdExists(id){
+    if (!id) return false;
+    const has = state => {
+        if (!state) return false;
+        const bags = [state.inv,...Object.values(state.chests || {})];
+        return bags.some(b => b && Object.keys(b).some(k => equipmentRules.parse(k).id === id))
+            || Object.values(state.equipped || {}).some(k => equipmentRules.parse(k).id === id);
+    };
+    for (const p of players.values()) if (has(p)) return true;
+    for (const a of accounts.values()) if (has(a.save)) return true;
+    for (const a of auctions.values()) if (equipmentRules.parse(a.itemKey).id === id) return true;
+    for (const d of groundDrops.values()) if (equipmentRules.parse(d.type).id === id) return true;
+    return false;
+}
+function updateEnchantSave(p){
+    const acc = p.authedName && getAccount(p.authedName);
+    if (!acc) return false;
+    if (!acc.save) acc.save = { x:p.x,y:p.y,chests:p.chests,skills:p.skills,
+        quests:p.quests,questFlags:p.questFlags,flags:p.flags,talents:p.talents,
+        permaBuffs:p.permaBuffs,dyes:p.dyes,pets:p.pets,pet:p.pet };
+    Object.assign(acc.save, { inv:p.inv, equipped:p.equipped, gold:p.gold, enchantOps:p.enchantOps,
+        enchantToken:p.enchantToken, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
+    acc.savedAt = Date.now();
+    return flushAccounts();
+}
+function equippedAffixes(p){
+    return equipmentRules.bonuses(p.equipped, base => ITEM_META[base]?.kind);
+}
+function grantManaOnKill(p){
+    if (!p || p.disconnected) return;
+    const amount = equippedAffixes(p).manaOnKill;
+    if (amount > 0 && (p.mp || 0) < (p.maxMp || 0)){
+        p.mp = Math.min(p.maxMp,p.mp + amount);
+        broadcastPstatsAll(p);
+    }
 }
 function forgeCostFor(baseKey, targetPlus){
     const sell = sellPriceFor(baseKey);
@@ -1024,7 +1083,8 @@ function hasInv(p, key, qty){
 }
 function sendInvUpdate(p, extra){
     if (!p || p.ws.readyState !== 1) return;
-    const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null };
+    const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null,
+        enchantToken:p.enchantToken || null };
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
 }
@@ -1113,18 +1173,25 @@ function recomputeMaxStatsServer(p){
     const above = Math.max(0, sumSkills - 60);
     const hpExtra = (p.permaBuffs?.hpBonus) || 0;
     const mpExtra = (p.permaBuffs?.manaBonus) || 0;   // talent t_mana (Pacto Arcano)
-    const newMaxHp = 100 + above + hpExtra;
-    const newMaxMp = 100 + Math.floor(above / 2) + mpExtra;
+    const gear = equippedAffixes(p);
+    const newMaxHp = 100 + above + hpExtra + gear.hp;
+    const newMaxMp = 100 + Math.floor(above / 2) + mpExtra + gear.mp;
     const oldMaxHp = p.maxHp || 100;
     const oldMaxMp = p.maxMp || 100;
-    const dHp = newMaxHp - oldMaxHp;
-    const dMp = newMaxMp - oldMaxMp;
+    // Skill/talent growth still grants the new capacity. Swapping gear never heals.
+    const oldGearHp = p._gearHp || 0, oldGearMp = p._gearMp || 0;
+    const dHp = (newMaxHp - gear.hp) - (oldMaxHp - oldGearHp);
+    const dMp = (newMaxMp - gear.mp) - (oldMaxMp - oldGearMp);
     if (dHp > 0) p.hp = (p.hp ?? oldMaxHp) + dHp;
     if (dMp > 0) p.mp = (p.mp ?? oldMaxMp) + dMp;
     if (dHp < 0) p.hp = Math.min(p.hp ?? newMaxHp, newMaxHp);
     if (dMp < 0) p.mp = Math.min(p.mp ?? newMaxMp, newMaxMp);
     p.maxHp = newMaxHp;
     p.maxMp = newMaxMp;
+    p._gearHp = gear.hp;
+    p._gearMp = gear.mp;
+    p.hp = Math.min(p.hp ?? newMaxHp, newMaxHp);
+    p.mp = Math.min(p.mp ?? newMaxMp, newMaxMp);
 }
 
 // Aplica uma reward de quest (espelha applyReward do cliente).
@@ -1194,6 +1261,8 @@ function grantItemByName(name, itemKey, qty, reason){
     for (const p of players.values()){
         if (p.disconnected) continue;
         if (p.name && p.name.toLowerCase() === String(name).toLowerCase()){
+            if (equipmentRules.parse(itemKey).enchanted && p.equipmentVersion !== equipmentRules.VERSION) return false;
+            if (!canAddKeys(p.inv,[itemKey],SAVE_CAPS.invKeys)) return false;
             incInv(p, itemKey, qty);
             sendInvUpdate(p, { itemDelta:{ itemKey, qty, reason } });
             return true;
@@ -1203,6 +1272,7 @@ function grantItemByName(name, itemKey, qty, reason){
         const acc = getAccount(name);
         if (acc && acc.save){
             acc.save.inv = acc.save.inv || {};
+            if (!canAddKeys(acc.save.inv,[itemKey],SAVE_CAPS.invKeys)) return false;
             acc.save.inv[itemKey] = (acc.save.inv[itemKey] || 0) + qty;
             flushAccounts();
             return true;
@@ -1370,8 +1440,7 @@ const LOOT = {
     ],
 };
 function rollLoot(mobType, luck, floor){
-    const table = LOOT[mobType];
-    if (!table) return [];
+    const table = LOOT[mobType] || [];
     const lk = Math.max(0, luck || 0);   // Sortudo (t_luck): + chance relativa de ITENS (gold inalterado)
     // Masmorra escalável: o loot PAGA a profundidade (senão descer não compensa o
     // risco). GOLD ×(1 + 0.15·(andar−1)) na quantidade; ITEM ganha chance relativa
@@ -1391,6 +1460,9 @@ function rollLoot(mobType, luck, floor){
             out.push({ type, qty });
         }
     }
+    // Essence has its own chance; bosses guarantee a depth-scaled stack.
+    if (MTYPE[mobType]?.unique) out.push({ type:equipmentRules.MATERIAL, qty:Math.min(8, 3 + Math.floor(f / 10)) });
+    else if (Math.random() < (f >= 1 ? 0.18 : 0.10)) out.push({ type:equipmentRules.MATERIAL, qty:1 });
     return out;
 }
 
@@ -1411,12 +1483,11 @@ const MAX_HIT_DMG = 600;
 // 3,4× de folga e nunca bloqueia jogo limpo — mas impede rajada de hits forjados.
 const ATTACK_MIN_INTERVAL_MS = 200;
 // Deploy 2b: cadência mínima por AÇÃO de ataque de ARMA. O ataque legítimo MAIS
-// rápido é ~510ms (attackDelay 800 × atkSpd máx 0,15 da forja × Fúria 0,25 =
-// 800×0,85×0,75). 400ms fica 110ms abaixo disso → nunca engole hit limpo (mesmo com
-// jitter) mas corta o spam forjado (era 200ms/hit = ~2× DPS mesmo após o cap de dano).
+// rápido com +5, Fúria e até 20% de afixos fica ~408ms. 320ms deixa margem
+// para jitter de rede sem aceitar a cadência antiga de spam de 200ms.
 // Magia (janela do spellCast) é ISENTA — o Exori dispara vários attackMob no mesmo tick
 // e a frequência já é limitada pelo rate-limit 600ms do spellCast.
-const ATTACK_ACTION_MIN_MS = 400;
+const ATTACK_ACTION_MIN_MS = 320;
 const BOSS_POS  = { type:'ORC_LIDER',   x:46, y:95, respawn: BOSS_RESPAWN_MS };
 const DRAKE_POS = { type:'DRAKE_LIDER', x:82, y:80, respawn: WORLD_BOSS_RESPAWN_SLOW_MS };
 const GOLEM_POS = { type:'GOLEM_REI',   x:70, y:90, respawn: WORLD_BOSS_RESPAWN_SLOW_MS };
@@ -1831,8 +1902,8 @@ function tickAuctionExpire(){
     let expired = 0;
     for (const a of [...auctions.values()]){
         if (a.expiresAt > now) continue;
-        auctions.delete(a.id);
         if (grantItemByName(a.sellerName, a.itemKey, a.qty, 'auction_expired')){
+            auctions.delete(a.id);
             expired++;
         } else {
             console.warn(`[auction] expired but couldn't return ${a.qty}× ${a.itemKey} to ${a.sellerName}`);
@@ -3105,13 +3176,13 @@ function weaponSkillOf(p){
     // Strip sufixo _PLUS_N (forja) — ESPADA_HL_PLUS_2 → ESPADA_HL
     const w = p.equipped?.weapon;
     if (!w) return 'Punho';
-    const base = String(w).replace(/_PLUS_\d+$/, '');
+    const base = getUpgradeTier(w).base;
     return WEAPON_SKILL[base] || 'Punho';
 }
 function hasShieldEquipped(p){
     const o = p.equipped?.offhand;
     if (!o) return false;
-    const base = String(o).replace(/_PLUS_\d+$/, '');
+    const base = getUpgradeTier(o).base;
     return ITEM_META[base]?.kind === 'offhand';
 }
 
@@ -3403,15 +3474,16 @@ function loadStateFromDisk(){
         if (Array.isArray(d.auctions)){
             auctions.clear();
             for (const a of d.auctions){
-                if (!a || typeof a.id !== 'number' || !a.sellerName || !a.itemKey) continue;
+                if (!a || typeof a.id !== 'number' || !a.sellerName || !itemKeyFromMessage(a.itemKey) || !itemMetaForKey(a.itemKey)) continue;
+                const listedAt = Number(a.listedAt), expiresAt = Number(a.expiresAt);
                 auctions.set(a.id, {
                     id: a.id,
                     sellerName: String(a.sellerName).slice(0, 32),
-                    itemKey: String(a.itemKey).slice(0, 40),
+                    itemKey: a.itemKey,
                     qty: Math.max(1, a.qty | 0),
                     price: Math.max(1, a.price | 0),
-                    listedAt: a.listedAt | 0,
-                    expiresAt: a.expiresAt | 0,
+                    listedAt: Number.isFinite(listedAt) && listedAt > 0 ? listedAt : Date.now(),
+                    expiresAt: Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : Date.now() + AUCTION_DURATION_MS,
                 });
             }
         }
@@ -3517,7 +3589,9 @@ function sanitizeSave(data, ownerName){
         const keys = Object.keys(data.inv);
         if (keys.length > SAVE_CAPS.invKeys){
             log('inv keys', keys.length, SAVE_CAPS.invKeys);
-            for (const k of keys.slice(SAVE_CAPS.invKeys)) delete data.inv[k];
+            const enchanted = keys.filter(k => equipmentRules.parse(k).enchanted);
+            const keep = new Set([...enchanted,...keys.filter(k => !equipmentRules.parse(k).enchanted)].slice(0,Math.max(SAVE_CAPS.invKeys,enchanted.length)));
+            for (const k of keys) if (!keep.has(k)) delete data.inv[k];
         }
         for (const k of Object.keys(data.inv)){
             const orig = data.inv[k];
@@ -3534,7 +3608,9 @@ function sanitizeSave(data, ownerName){
             const keys = Object.keys(chest);
             if (keys.length > SAVE_CAPS.chestKeys){
                 log(`chest.${cId} keys`, keys.length, SAVE_CAPS.chestKeys);
-                for (const k of keys.slice(SAVE_CAPS.chestKeys)) delete chest[k];
+                const enchanted = keys.filter(k => equipmentRules.parse(k).enchanted);
+                const keep = new Set([...enchanted,...keys.filter(k => !equipmentRules.parse(k).enchanted)].slice(0,Math.max(SAVE_CAPS.chestKeys,enchanted.length)));
+                for (const k of keys) if (!keep.has(k)) delete chest[k];
             }
             for (const k of Object.keys(chest)){
                 const orig = chest[k];
@@ -4044,7 +4120,7 @@ function flushAccounts(){
         // Trava: nunca grava 0 contas sobre um arquivo que TINHA contas (anti-wipe de arquivo).
         if (out.accounts.length === 0 && _diskAccountsCount() > 0){
             console.warn('[accounts] BLOQUEADO flush de 0 contas sobre arquivo populado');
-            return;
+            return false;
         }
         // Backup rotativo do estado ATUAL antes de sobrescrever (no máx 1/10min).
         const now = Date.now();
@@ -4054,7 +4130,8 @@ function flushAccounts(){
         const tmp = ACCOUNTS_FILE + '.tmp';
         fs.writeFileSync(tmp, JSON.stringify(out), 'utf8');
         fs.renameSync(tmp, ACCOUNTS_FILE);
-    } catch(e){ console.error('[accounts] erro ao salvar:', e.message); }
+        return true;
+    } catch(e){ console.error('[accounts] erro ao salvar:', e.message); return false; }
 }
 function queueSaveAccounts(){
     if (_accountsSaveTimer) return;
@@ -4473,7 +4550,15 @@ function distributeBossLoot(m, loot, fallbackKiller){
     for (const g of got.values()){
         const pp = g.p;
         if (g.gold > 0){ pp.gold = (pp.gold || 0) + g.gold; syncGoldRank(pp.name, pp.gold); }
-        for (const type in g.items) incInv(pp, type, g.items[type]);
+        for (const type in g.items){
+            if (canAddKeys(pp.inv,[type],SAVE_CAPS.invKeys)) incInv(pp, type, g.items[type]);
+            else {
+                const until = Date.now() + LOOT_LOCK_MS;
+                const d = spawnGroundDrop(m.x,m.y,type,g.items[type],m.floor,pp.id,pp.name,until);
+                broadcast(null,{t:'groundSpawn',drops:[{id:d.id,x:d.x,y:d.y,type:d.type,qty:d.qty,owner:pp.id,ownerName:pp.name,ownerUntil:until}]},m.floor);
+                delete g.items[type];
+            }
+        }
         sendInvUpdate(pp, {
             goldDelta: g.gold > 0 ? { amount: g.gold, reason:'boss_loot' } : undefined,
             bossLoot: { boss: m.type, gold: g.gold, items: g.items },
@@ -4626,6 +4711,7 @@ function handleMobDeath(m, killerId){
     // T1: XP authoritative na skill da arma equipada do killer
     let xpGained = 0, skillUsed = null, petGain = null;
     if (killer){
+        grantManaOnKill(killer);
         skillUsed = weaponSkillOf(killer);
         gainSkillXpServer(killer, skillUsed, m.xp || 1);
         xpGained = m.xp || 1;
@@ -4721,10 +4807,10 @@ function totalDefenseServer(p){
         const tier = getUpgradeTier(k);
         const meta = ITEM_META[tier.base];
         if (meta && typeof meta.def === 'number') total += meta.def;
-        const up = srvUpgradeBonusArmor(k);
+        const up = meta && !['weapon','wand'].includes(meta.kind) ? srvUpgradeBonusArmor(k) : null;
         if (up && typeof up.def === 'number') total += up.def;
     }
-    return total;
+    return total + equippedAffixes(p).def;
 }
 // Propaga o estado PvP (pvp on/off + Highlander) de um player pros outros clientes.
 // Selos não vão no snapshot dos remotos (só o dono precisa do número exato); a coroa
@@ -4896,7 +4982,7 @@ function attackDamageCapServer(p, spellWin){
         // spellWin.damage já inclui a base da wand (janela aberta no spellCast). ×6 cobre
         // crit×2 + afinidade×1.2 + fraqueza×1.5 (Fase 2) + variância; slack cobre talentos.
         const dmgB  = (p.permaBuffs && p.permaBuffs.damageBonus)  || 0;
-        const critB = (p.permaBuffs && p.permaBuffs.critDmgBonus) || 0;
+        const critB = ((p.permaBuffs && p.permaBuffs.critDmgBonus) || 0) + equippedAffixes(p).critDamage / 100;
         const slack = (1 + dmgB) * (1 + critB / 2);
         return Math.round(((spellWin.damage + Math.floor(magia / 3)) * 6 + 50) * slack);
     }
@@ -4909,7 +4995,7 @@ function attackDamageCapServer(p, spellWin){
     // Fase 2: o cap precisa acomodar Golpe Pesado (+dano) e Precisão Mortal (crit ×2→×2.x),
     // senão o hit legítimo buffado seria clipado. Folga POR PLAYER → sem talento, cap = o de antes.
     const dmgB  = (p.permaBuffs && p.permaBuffs.damageBonus)  || 0;
-    const critB = (p.permaBuffs && p.permaBuffs.critDmgBonus) || 0;
+    const critB = ((p.permaBuffs && p.permaBuffs.critDmgBonus) || 0) + equippedAffixes(p).critDamage / 100;
     const slack = (1 + dmgB) * (1 + critB / 2);
     return Math.round(((base + tier.plus * 5 + skillBonus + 7) * 4 + 40) * slack);
 }
@@ -5997,6 +6083,7 @@ wss.on('connection', (ws, request) => {
         // Cliente manda hash leve da senha; server aplica sha256(salt+hash).
         // Cria conta se não existir, devolve save server-side se houver.
         if (msg.t === 'auth') {
+            if (p.authed) return;   // uma conexão não troca de conta sem reconectar
             // Lock de manutenção: rejeita novas conexões na janela do deploy (auto-expira;
             // o processo novo nasce com lock=0). Evita reconectar no server velho a ser morto.
             if (Date.now() < _maintenanceLockUntil){
@@ -6125,6 +6212,9 @@ wss.on('connection', (ws, request) => {
         // Agora nenhum handler com estado roda sem auth, e a autorização de
         // admin usa p.authedName (conta provada), nunca o p.name falsificável.
         if (!p.authed || !p.authedName) return;
+        // A conta autenticada ainda não é um personagem carregado. Impede que um
+        // cliente recusado no join grave os defaults vazios sobre o save real.
+        if (msg.t !== 'join' && !p.joined) return;
 
         // ─── SAVE upload (snapshot do save do player) ─────────────────────
         if (msg.t === 'saveUpload') {
@@ -6218,6 +6308,8 @@ wss.on('connection', (ws, request) => {
             if (p.skills && typeof p.skills === 'object') data.skills = p.skills;
             if (p.equipped && typeof p.equipped === 'object') data.equipped = p.equipped;
             if (p.chests && typeof p.chests === 'object') data.chests = p.chests;
+            data.enchantOps = p.enchantOps || [];
+            data.enchantToken = p.enchantToken || null;
             // talents (RANKS) + permaBuffs: persiste os do SERVER (vivos), não os do cliente —
             // senão o save do cliente reverteria os ranks (era a causa do "reseta ao escolher outro").
             if (p.talents && typeof p.talents === 'object') data.talents = p.talents;
@@ -6279,6 +6371,15 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'join') {
+            if (p.joined) return;
+            const acc = p.authedName ? getAccount(p.authedName) : null;
+            if (acc && ownsEnchantedItems(acc.save) && msg.equipmentVersion !== equipmentRules.VERSION){
+                sendTo(id, { t:'equipmentUpdateRequired', equipmentVersion:equipmentRules.VERSION });
+                // Legacy clients already understand authFail and reload the current web game.
+                sendTo(id, { t:'authFail', reason:'equipment_update' });
+                setTimeout(() => { try { ws.close(4001,'equipment-update-required'); } catch {} },200);
+                return;
+            }
             // Auth é obrigatório (portão acima) → o nome é SEMPRE o da conta provada.
             // Nunca confiar em msg.name: era o vetor de impersonate e de admin sem
             // senha (join com name='alcione'). (audit 2026-06-03)
@@ -6296,8 +6397,11 @@ wss.on('connection', (ws, request) => {
             // N3 fase 2: hidrata inv/equipped/gold/chests do save (server vira dono).
             // Se cliente legado (sem auth) ou conta nova, pega do msg como antes.
             ensurePlayerInvSlots(p);
-            const acc = p.authedName ? getAccount(p.authedName) : null;
+            p.equipmentVersion = msg.equipmentVersion === equipmentRules.VERSION ? equipmentRules.VERSION : 0;
+            p.enchantToken = typeof acc?.save?.enchantToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.enchantToken)
+                ? acc.save.enchantToken : crypto.randomUUID();
             if (acc && acc.save){
+                p.enchantOps = Array.isArray(acc.save.enchantOps) ? acc.save.enchantOps.slice(-20) : [];
                 // Posição: última PERSISTIDA no server (validada). Default SAFE acima cobre
                 // save sem x/y, tile inválido, ou logout na masmorra (coord não-walkable no
                 // overworld → cai na PZ). Fecha o teleporte por msg.x/y forjado. (audit 2026-06-03)
@@ -6377,6 +6481,9 @@ wss.on('connection', (ws, request) => {
             if (p.maxMp == null && typeof msg.maxMp === 'number') p.maxMp = msg.maxMp;
             if (p.hp == null && typeof msg.hp === 'number') p.hp = msg.hp;
             if (p.mp == null && typeof msg.mp === 'number') p.mp = msg.mp;
+            // O maxHp salvo já pode incluir bônus do equipamento.
+            p._gearHp = equippedAffixes(p).hp;
+            p._gearMp = equippedAffixes(p).mp;
             recomputeMaxStatsServer(p);
             // Garante hp/mp dentro do novo cap (se save tava com cap maior)
             if (typeof p.hp === 'number') p.hp = Math.min(p.hp, p.maxHp);
@@ -6403,9 +6510,19 @@ wss.on('connection', (ws, request) => {
             // M4: login sempre nasce no overworld (masmorra é efêmera — deslogar
             // lá embaixo te traz pra cidade). Snapshots filtrados pelo floor do player.
             p.floor = 0;
+            if (acc?.save?.enchantToken !== p.enchantToken && !updateEnchantSave(p)){
+                p.name = 'Anônimo';
+                sendTo(id,{t:'serverMsg',level:'warn',text:'Não foi possível salvar sua sessão. Tente entrar novamente.'});
+                setTimeout(() => { try { ws.close(1011,'save-failed'); } catch {} },200);
+                return;
+            }
+            p.joined = true;
             ws.send(JSON.stringify({
                 t:'state', you: id,
                 weaponDotsAuthoritative: true,
+                equipmentVersion: equipmentRules.VERSION,
+                enchantingEnabled: ENCHANTING_ENABLED,
+                enchantToken: p.enchantToken,
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
@@ -6601,11 +6718,11 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             if (op === 'sell'){
-                const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+                const itemKey = itemKeyFromMessage(msg.itemKey);
                 if (!itemKey) return;
                 // Permite vender items upgrade _PLUS_N — preço base do tier base
                 const tier = getUpgradeTier(itemKey);
-                if (!ITEM_META[tier.base]){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item') }); return; }
+                if (!itemMetaForKey(itemKey)){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item') }); return; }
                 const have = (p.inv && p.inv[itemKey]) || 0;
                 if (have <= 0) return;
                 let qty = 1;
@@ -6644,44 +6761,131 @@ wss.on('connection', (ws, request) => {
 
         // ─── N3: Forja server-side ───────────────────────────────────────
         if (msg.t === 'invForge') {
-            const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
-            if (!itemKey) return;
+            const itemKey = itemKeyFromMessage(msg.itemKey);
+            const rejectForge = error => sendInvUpdate(p,{forge:{ok:false,error,itemKey}});
+            if (!itemKey){ rejectForge('bad_item'); return; }
             const tier = getUpgradeTier(itemKey);
-            const baseMeta = ITEM_META[tier.base];
+            const baseMeta = itemMetaForKey(itemKey);
             if (!baseMeta || !['weapon','wand','offhand','armor','head','feet','neck'].includes(baseMeta.kind)){
-                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item_forge') }); return;
+                rejectForge('bad_item'); return;
             }
             const targetPlus = tier.plus + 1;
-            if (targetPlus > UPGRADE_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.max_level', {n: UPGRADE_MAX}) }); return; }
-            const have = (p.inv && p.inv[itemKey]) || 0;
-            if (have < 3){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.need_3x_forge') }); return; }
+            if (targetPlus > UPGRADE_MAX){ rejectForge('max_level'); return; }
+            const equippedSlot = Object.keys(p.equipped || {}).find(slot => p.equipped[slot] === itemKey);
+            const targetEquipped = !!tier.enchanted && !!equippedSlot;
+            const plainKey = tier.stem;
+            const have = (p.inv && p.inv[plainKey]) || 0;
+            if (tier.enchanted ? (!targetEquipped && !hasInv(p, itemKey, 1)) || have < 2 : have < 3){
+                rejectForge('no_materials'); return;
+            }
             const cost = forgeCostFor(tier.base, targetPlus);
-            if ((p.gold || 0) < cost){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.no_gold_g', {g: cost}) }); return; }
-            // Desconta 3× material + ouro ANTES do roll
-            incInv(p, itemKey, -3);
+            if ((p.gold || 0) < cost){ rejectForge('no_gold'); return; }
+            const newKey = equipmentRules.upgrade(itemKey, targetPlus);
+            const projected = { ...p.inv };
+            projected[plainKey] -= tier.enchanted ? 2 : 3;
+            if (projected[plainKey] <= 0) delete projected[plainKey];
+            if (tier.enchanted && !targetEquipped){ projected[itemKey]--; if (projected[itemKey] <= 0) delete projected[itemKey]; }
+            if (!targetEquipped) projected[newKey] = (projected[newKey] || 0) + 1;
+            if (Object.keys(projected).length > SAVE_CAPS.invKeys){
+                sendInvUpdate(p, { forge:{ ok:false, error:'inventory_full', itemKey } }); return;
+            }
+            const beforeForge = { inv:{...p.inv}, equipped:{...p.equipped}, gold:p.gold,
+                hp:p.hp,maxHp:p.maxHp,mp:p.mp,maxMp:p.maxMp,_gearHp:p._gearHp,_gearMp:p._gearMp };
+            const saveForge = () => {
+                if (updateEnchantSave(p)) return true;
+                Object.assign(p,beforeForge);
+                const acc = getAccount(p.authedName);
+                if (acc && acc.save) Object.assign(acc.save,{inv:p.inv,equipped:p.equipped,gold:p.gold,
+                    hp:p.hp,maxHp:p.maxHp,mp:p.mp,maxMp:p.maxMp});
+                sendInvUpdate(p,{forge:{ok:false,error:'save_failed',itemKey}});
+                return false;
+            };
+            // Enchanted target keeps its identity; only unenchanted copies are materials.
+            incInv(p, plainKey, tier.enchanted ? -2 : -3);
+            if (tier.enchanted && !targetEquipped) incInv(p, itemKey, -1);
             p.gold = (p.gold || 0) - cost;
             const failChance = UPGRADE_FAIL[targetPlus];
             if (Math.random() < failChance){
-                // Falha: devolve 2 de 3 (perde só 1)
-                incInv(p, itemKey, 2);
+                incInv(p, plainKey, tier.enchanted ? 1 : 2);
+                if (tier.enchanted && !targetEquipped) incInv(p, itemKey, 1);
+                if (!saveForge()) return;
                 sendInvUpdate(p, { forge:{ ok:false, itemKey, cost } });
                 return;
             }
-            // Sucesso — cria item upgrade no inv server
-            const newKey = makeUpgradeKey(tier.base, targetPlus);
-            incInv(p, newKey, 1);
+            if (targetEquipped){ p.equipped[equippedSlot] = newKey; recomputeMaxStatsServer(p); }
+            else incInv(p, newKey, 1);
+            if (!saveForge()) return;
+            if (targetEquipped) broadcastPstatsAll(p);
             sendInvUpdate(p, { forge:{ ok:true, itemKey, newKey, cost, plus: targetPlus } });
+            return;
+        }
+
+        if (msg.t === 'invEnchant') {
+            const itemKey = itemKeyFromMessage(msg.itemKey), slot = msg.slot;
+            const opId = typeof msg.opId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(msg.opId) ? msg.opId : null;
+            const reply = result => sendInvUpdate(p, { enchant:{ opId, itemKey, slot, ...result } });
+            if (!opId){ reply({ok:false,error:'bad_op_id'}); return; }
+            p.enchantOps = p.enchantOps || [];
+            const previous = p.enchantOps.find(x => x.opId === opId);
+            if (previous){ reply(previous.result); return; }
+            if (opId !== p.enchantToken){ reply({ok:false,error:'stale_op'}); return; }
+            if (!ENCHANTING_ENABLED){ reply({ok:false,error:'disabled'}); return; }
+            if (p.equipmentVersion !== equipmentRules.VERSION){ reply({ok:false,error:'update_required'}); return; }
+            if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId || chebyshev(p.x,p.y,51,52) > 1){
+                reply({ok:false,error:'not_at_bench'}); return;
+            }
+            const meta = itemMetaForKey(itemKey), tier = getUpgradeTier(itemKey);
+            if (!meta || !equipmentRules.KINDS.includes(meta.kind) || !Number.isInteger(slot) || slot < 0 || slot > 2){
+                reply({ok:false,error:'bad_item'}); return;
+            }
+            const equippedSlot = Object.keys(p.equipped || {}).find(s => p.equipped[s] === itemKey);
+            if (!equippedSlot && !hasInv(p,itemKey,1)){ reply({ok:false,error:'no_item'}); return; }
+            if (slot > tier.affixes.length){ reply({ok:false,error:'locked_slot'}); return; }
+            const cost = equipmentRules.cost(slot, slot < tier.affixes.length);
+            if (!hasInv(p,equipmentRules.MATERIAL,cost.essence) || (p.gold || 0) < cost.gold){
+                reply({ok:false,error:'no_resources',cost}); return;
+            }
+            const affixes = equipmentRules.roll(meta.kind,tier.affixes,slot);
+            let itemId = tier.id;
+            if (!itemId){ do { itemId = crypto.randomBytes(6).toString('hex'); } while (enchantedIdExists(itemId)); }
+            const newKey = equipmentRules.make(tier.base,tier.plus,itemId,affixes);
+            const projected = { ...p.inv };
+            projected[equipmentRules.MATERIAL] -= cost.essence;
+            if (projected[equipmentRules.MATERIAL] <= 0) delete projected[equipmentRules.MATERIAL];
+            if (!equippedSlot){ projected[itemKey]--; if (projected[itemKey] <= 0) delete projected[itemKey]; projected[newKey] = (projected[newKey] || 0) + 1; }
+            if (Object.keys(projected).length > SAVE_CAPS.invKeys){ reply({ok:false,error:'inventory_full'}); return; }
+            const old = { inv:p.inv, equipped:p.equipped, gold:p.gold, enchantOps:p.enchantOps,
+                enchantToken:p.enchantToken,
+                hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, _gearHp:p._gearHp, _gearMp:p._gearMp };
+            p.inv = projected;
+            p.equipped = { ...p.equipped };
+            if (equippedSlot) p.equipped[equippedSlot] = newKey;
+            p.gold -= cost.gold;
+            if (equippedSlot) recomputeMaxStatsServer(p);
+            const result = {ok:true,opId,itemKey,newKey,slot,cost};
+            p.enchantOps = [...p.enchantOps,{opId,result}].slice(-20);
+            p.enchantToken = crypto.randomUUID();
+            if (!updateEnchantSave(p)){
+                Object.assign(p,old);
+                const acc = getAccount(p.authedName);
+                if (acc && acc.save) Object.assign(acc.save,{inv:p.inv,equipped:p.equipped,gold:p.gold,enchantOps:p.enchantOps,
+                    enchantToken:p.enchantToken,
+                    hp:p.hp,maxHp:p.maxHp,mp:p.mp,maxMp:p.maxMp});
+                reply({ok:false,error:'save_failed'}); return;
+            }
+            if (equippedSlot) broadcastPstatsAll(p);
+            reply(result);
             return;
         }
 
         // ─── N3 fase 2: Equip / Unequip server-side ─────────────────────
         if (msg.t === 'invEquip') {
             ensurePlayerInvSlots(p);
-            const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+            const itemKey = itemKeyFromMessage(msg.itemKey);
             if (!itemKey) return;
             // Item upgrade _PLUS_N usa o base pra slot lookup
             const tier = getUpgradeTier(itemKey);
-            const def = ITEM_META[tier.base];
+            const def = itemMetaForKey(itemKey);
             if (!def){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item') }); return; }
             const slot = SLOT_OF_KIND[def.kind];
             if (!slot){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_equipable') }); return; }
@@ -6689,6 +6893,13 @@ wss.on('connection', (ws, request) => {
                 sendInvUpdate(p, { equipOp:{ ok:false, reason:'no_item' } });
                 return;
             }
+            const returning = [p.equipped[slot]];
+            if (slot === 'weapon' && def.hand === '2h') returning.push(p.equipped.offhand);
+            if (slot === 'offhand' && p.equipped.weapon && ITEM_META[getUpgradeTier(p.equipped.weapon).base]?.hand === '2h') returning.push(p.equipped.weapon);
+            const projected = { ...p.inv };
+            projected[itemKey]--; if (projected[itemKey] <= 0) delete projected[itemKey];
+            for (const k of returning.filter(Boolean)) projected[k] = (projected[k] || 0) + 1;
+            if (Object.keys(projected).length > SAVE_CAPS.invKeys){ sendInvUpdate(p,{equipOp:{ok:false,reason:'inventory_full'}}); return; }
             // Conflito 2H ↔ escudo
             if (slot === 'weapon' && def.hand === '2h' && p.equipped.offhand){
                 incInv(p, p.equipped.offhand, 1);
@@ -6706,9 +6917,10 @@ wss.on('connection', (ws, request) => {
             if (p.equipped[slot]) incInv(p, p.equipped[slot], 1);
             incInv(p, itemKey, -1);
             p.equipped[slot] = itemKey;
+            recomputeMaxStatsServer(p);
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey } });
             // Broadcast pstats pros outros verem o visual
-            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [] });
+            broadcastPstatsAll(p);
             return;
         }
         if (msg.t === 'invUnequip') {
@@ -6717,10 +6929,12 @@ wss.on('connection', (ws, request) => {
             if (!slot || !(slot in p.equipped)) return;
             const k = p.equipped[slot];
             if (!k) return;
+            if (!canAddKeys(p.inv,[k],SAVE_CAPS.invKeys)){ sendInvUpdate(p,{equipOp:{ok:false,reason:'inventory_full'}}); return; }
             incInv(p, k, 1);
             p.equipped[slot] = null;
+            recomputeMaxStatsServer(p);
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey:null } });
-            broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [] });
+            broadcastPstatsAll(p);
             return;
         }
 
@@ -6748,6 +6962,8 @@ wss.on('connection', (ws, request) => {
                     const sameParty = !!(op && op.members.some(n => n.toLowerCase() === p.name.toLowerCase()));
                     if (!sameParty) continue;   // ainda travado pra esse player
                 }
+                if (equipmentRules.parse(d.type).enchanted && p.equipmentVersion !== equipmentRules.VERSION) continue;
+                if (d.type !== 'GOLD' && !canAddKeys(p.inv,[d.type],SAVE_CAPS.invKeys)) continue;
                 groundDrops.delete(dropId);
                 if (d.type === 'GOLD'){
                     p.gold = (p.gold | 0) + (d.qty | 0);
@@ -6782,7 +6998,7 @@ wss.on('connection', (ws, request) => {
             }
             if (!p.chests[cid]) p.chests[cid] = {};
             const bag = p.chests[cid];
-            const itemKey = typeof msg.itemKey === 'string' ? msg.itemKey.slice(0, 64) : null;
+            const itemKey = itemKeyFromMessage(msg.itemKey);
             const rawQty  = msg.qty;
             const wantAll = rawQty === 'all';
             const reqQty  = wantAll ? 0 : Math.max(1, rawQty | 0);
@@ -6800,6 +7016,7 @@ wss.on('connection', (ws, request) => {
                 if (!have) return;
                 const qty = wantAll ? have : Math.min(have, reqQty);
                 if (qty <= 0) return;
+                if (!canAddKeys(bag,[itemKey],SAVE_CAPS.chestKeys)){ replyChests({error:'chest_full'}); return; }
                 incInv(p, itemKey, -qty);
                 bag[itemKey] = (bag[itemKey] || 0) + qty;
                 replyChests({ moved:{ item:itemKey, qty, dir:'in' } });
@@ -6811,6 +7028,7 @@ wss.on('connection', (ws, request) => {
                 if (!have) return;
                 const qty = wantAll ? have : Math.min(have, reqQty);
                 if (qty <= 0) return;
+                if (!canAddKeys(p.inv,[itemKey],SAVE_CAPS.invKeys)){ replyChests({error:'inventory_full'}); return; }
                 bag[itemKey] -= qty;
                 if (bag[itemKey] <= 0) delete bag[itemKey];
                 incInv(p, itemKey, qty);
@@ -6838,6 +7056,7 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             if (op === 'depositAll'){
+                if (!canAddKeys(bag,Object.keys(p.inv || {}),SAVE_CAPS.chestKeys)){ replyChests({error:'chest_full'}); return; }
                 let moved = 0;
                 for (const [k, q] of Object.entries(p.inv || {})){
                     if (!q) continue;
@@ -6856,6 +7075,7 @@ wss.on('connection', (ws, request) => {
                 return;
             }
             if (op === 'withdrawAll'){
+                if (!canAddKeys(p.inv,Object.keys(bag).filter(k => k !== '_GOLD'),SAVE_CAPS.invKeys)){ replyChests({error:'inventory_full'}); return; }
                 let moved = 0;
                 for (const [k, q] of Object.entries(bag)){
                     if (k === '_GOLD' || !q) continue;
@@ -7510,14 +7730,16 @@ wss.on('connection', (ws, request) => {
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_at_npc' }));
                 return;
             }
-            const itemKey = String(msg.itemKey || '').slice(0, 40);
+            const itemKey = itemKeyFromMessage(msg.itemKey);
             const qty   = Math.max(1, Math.min(999, msg.qty | 0));
             const price = Math.max(AUCTION_MIN_PRICE, Math.min(AUCTION_MAX_PRICE, msg.price | 0));
             // Aceita itens de ITEM_META ou variantes _PLUS_N (forja)
-            const baseKey = itemKey.split('_PLUS_')[0];
-            if (!ITEM_META[itemKey] && !ITEM_META[baseKey]){
+            if (!itemMetaForKey(itemKey)){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'unknown_item' }));
                 return;
+            }
+            if (equipmentRules.parse(itemKey).enchanted && (qty !== 1 || (p.inv[itemKey] || 0) !== 1)){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'invalid_unique_stack' })); return;
             }
             if (!hasInv(p, itemKey, qty)){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'no_item' }));
@@ -7559,7 +7781,15 @@ wss.on('connection', (ws, request) => {
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'not_owner' }));
                 return;
             }
+            if (equipmentRules.parse(a.itemKey).enchanted && p.equipmentVersion !== equipmentRules.VERSION){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'update_required' })); return;
+            }
             auctions.delete(id);
+            if (!canAddKeys(p.inv,[a.itemKey],SAVE_CAPS.invKeys)){
+                auctions.set(id,a);
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'inventory_full' }));
+                return;
+            }
             incInv(p, a.itemKey, a.qty);
             sendInvUpdate(p, { auctionResult:{ ok:true, op:'cancel', id, itemKey: a.itemKey, qty: a.qty } });
             sendAuctionsTo(p);
@@ -7588,6 +7818,12 @@ wss.on('connection', (ws, request) => {
             if ((p.gold || 0) < a.price){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'no_gold' }));
                 return;
+            }
+            if (equipmentRules.parse(a.itemKey).enchanted && p.equipmentVersion !== equipmentRules.VERSION){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'update_required' })); return;
+            }
+            if (!canAddKeys(p.inv,[a.itemKey],SAVE_CAPS.invKeys)){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'auctionResult', error:'inventory_full' })); return;
             }
             auctions.delete(id);
             p.gold -= a.price;
@@ -7899,7 +8135,10 @@ wss.on('connection', (ws, request) => {
             // não mais o flat 600. Mantém o msg.amount (o número que o player vê é o roll
             // dele); só barra o exagero (arma fraca mandando 600 → capada no real dela).
             // MAX_HIT_DMG fica como teto absoluto de segurança (>372 legítimo → nunca clipa).
-            const dmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
+            const baseDmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
+            const dmg = m.unique && !msg.throwSpear
+                ? Math.min(MAX_HIT_DMG, Math.round(baseDmg * (1 + equippedAffixes(p).bossDamage / 100)))
+                : baseDmg;
             const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
             // Vampirismo (t_lifesteal): cura % do dano causado (cap maxHp); sincroniza HP via pstats.
@@ -7964,6 +8203,7 @@ wss.on('connection', (ws, request) => {
             // float visual em todos
             broadcast(null, { t:'mobFloat', mobId:m.id, text:`-${dmg}`, color:'#ff8060', crit:!!msg.crit });
             if (m.hp === 0){
+                grantManaOnKill(p);
                 // morte
                 if (m.unique){
                     if (m.type === MEGA_BOSS_TYPE){
@@ -8290,6 +8530,7 @@ wss.on('connection', (ws, request) => {
             const cleanItems = {};
             for (const [k, q] of Object.entries(offer.items || {})){
                 const qty = Math.max(0, Math.min(q | 0, p.inv[k] || 0));
+                if (equipmentRules.parse(k).enchanted && (qty !== 1 || (p.inv[k] || 0) !== 1)) continue;
                 if (qty > 0) cleanItems[k] = qty;
             }
             const goldClean = Math.max(0, Math.min(offer.gold | 0, p.gold || 0));
@@ -8325,6 +8566,17 @@ wss.on('connection', (ws, request) => {
                 for (const [k, q] of Object.entries(trade.bOffer.items)) if ((b.inv[k]||0) < q){ cancelTrade(trade, 'oferta inválida'); return; }
                 if ((a.gold||0) < trade.aOffer.gold || (b.gold||0) < trade.bOffer.gold){
                     cancelTrade(trade, 'oferta inválida'); return;
+                }
+                const aReceive = Object.keys(trade.bOffer.items), bReceive = Object.keys(trade.aOffer.items);
+                if (aReceive.some(k => equipmentRules.parse(k).enchanted) && a.equipmentVersion !== equipmentRules.VERSION
+                    || bReceive.some(k => equipmentRules.parse(k).enchanted) && b.equipmentVersion !== equipmentRules.VERSION){
+                    cancelTrade(trade,'Atualize o jogo para receber equipamento encantado.'); return;
+                }
+                const aAfter = {...a.inv}, bAfter = {...b.inv};
+                for (const [k,q] of Object.entries(trade.aOffer.items)){ aAfter[k] -= q; if (aAfter[k] <= 0) delete aAfter[k]; }
+                for (const [k,q] of Object.entries(trade.bOffer.items)){ bAfter[k] -= q; if (bAfter[k] <= 0) delete bAfter[k]; }
+                if (!canAddKeys(aAfter,aReceive,SAVE_CAPS.invKeys) || !canAddKeys(bAfter,bReceive,SAVE_CAPS.invKeys)){
+                    cancelTrade(trade,'Inventário cheio.'); return;
                 }
                 // Transfere A→B
                 for (const [k, q] of Object.entries(trade.aOffer.items)){
