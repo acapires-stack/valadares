@@ -2731,6 +2731,8 @@ const I18N = {
     'log.player_logged_off': '<span class="log-die">💤 {name} deslogou (corpo fica 3 min)</span>',
     'log.item_received': '<span class="log-up">📦 +{qty}× {item} ({reason})</span>',
     'log.boss_loot_share': '<span class="log-up">🏆 Sua parte do loot de {boss}: {parts}</span>',
+    'log.boss_loot_highlights': '<span class="log-up">🏆 {boss}: {parts}</span>',
+    'log.boss_loot_no_special': 'nenhum item especial',
     'log.equip_rejected': '<span class="log-sys">Servidor rejeitou a operação de equip.</span>',
     'log.gold_picked': '<span class="log-xp">+{g} ouro ({total})</span>',
     'log.gold_rain': '<span class="log-up">💰 Chuva de Ouro: +{g}g</span>',
@@ -3440,6 +3442,8 @@ const I18N = {
     'log.player_logged_off': '<span class="log-die">💤 {name} logged off (body stays 3 min)</span>',
     'log.item_received': '<span class="log-up">📦 +{qty}× {item} ({reason})</span>',
     'log.boss_loot_share': '<span class="log-up">🏆 Your loot share from {boss}: {parts}</span>',
+    'log.boss_loot_highlights': '<span class="log-up">🏆 {boss}: {parts}</span>',
+    'log.boss_loot_no_special': 'no special item',
     'log.equip_rejected': '<span class="log-sys">Server rejected the equip operation.</span>',
     'log.gold_picked': '<span class="log-xp">+{g} gold ({total})</span>',
     'log.gold_rain': '<span class="log-up">💰 Gold Rain: +{g}g</span>',
@@ -7985,13 +7989,22 @@ function handleMP(msg){
         if (msg.bossLoot){
             const bl = msg.bossLoot;
             const parts = [];
+            const highlights = [];
             if (bl.gold > 0) parts.push(`${bl.gold.toLocaleString('pt-BR')}g`);
+            if (bl.gold > 0) highlights.push(`${bl.gold.toLocaleString('pt-BR')}g`);
             for (const type in (bl.items || {})){
-                parts.push(`${bl.items[type]}× ${escapeHtml(itemDisplayName(type))}`);
+                const label = `${bl.items[type]}× ${escapeHtml(itemDisplayName(type))}`;
+                parts.push(label);
+                // Recursos de forja, equipamentos, cosméticos e itens desconhecidos ficam visíveis.
+                // Só consumíveis rotineiros somem do resumo; o registro completo permanece em Tudo.
+                if (!['food', 'potion', 'ammo'].includes(ITEMS[type]?.kind)) highlights.push(label);
             }
             if (parts.length){
                 const bossName = mobName(bl.boss) || 'boss';
-                log(tr('log.boss_loot_share', {boss: escapeHtml(bossName), parts: parts.join(', ')}));
+                const hasSpecialItem = highlights.length > (bl.gold > 0 ? 1 : 0);
+                if (!hasSpecialItem) highlights.push(tr('log.boss_loot_no_special'));
+                log(tr('log.boss_loot_share', {boss: escapeHtml(bossName), parts: parts.join(', ')}),
+                    'loot', tr('log.boss_loot_highlights', {boss: escapeHtml(bossName), parts: highlights.join(' · ')}));
                 // Toast COMPACTO (resumo). A lista completa fica no log. Antes o toast listava
                 // tudo + um 2º toast de "ouro creditado" empilhavam 2 banners gigantes na tela.
                 const _nItems = Object.values(bl.items || {}).reduce((a, b) => a + b, 0);
@@ -12742,7 +12755,7 @@ document.addEventListener('click', e => {
     if (chCh){ withdrawItem(chCh.dataset.key, 1); return; }
 });
 
-const logLines = [];          // { html, cat }
+const logLines = [];          // { html, cat, lootHtml? }
 let logFilter = 'all';
 
 function categorize(html){
@@ -12763,9 +12776,9 @@ function escapeHtml(s){
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
-function log(html, cat){
+function log(html, cat, lootHtml){
     const c = cat || categorize(html);
-    logLines.push({ html, cat: c });
+    logLines.push({ html, cat: c, lootHtml });
     if (logLines.length > 200) logLines.shift();
     renderLog();
 }
@@ -12786,7 +12799,7 @@ function renderLog(){
         : logLines.filter(l => l.cat === logFilter
             || (logFilter === 'kill' && l.cat === 'kill')
             || (logFilter === 'loot' && l.cat === 'loot'));
-    el.innerHTML = filtered.map(l => l.html).join('<br>');
+    el.innerHTML = filtered.map(l => logFilter === 'loot' ? (l.lootHtml || l.html) : l.html).join('<br>');
     scrollLogToEnd();
 }
 function setLogFilter(f){
