@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- Analytics (GA4 + Microsoft Clarity) — carregados só após consentimento. Ver consent.js -->
+<!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1919,8 +1919,8 @@
             <div class="s-label" style="margin-top:4px"><span data-i18n="hud.speed">Velocidade</span> <span style="float:right;color:#8acdef" id="spdVal">—</span></div>
             <div class="s-label" style="margin-top:4px"><span data-i18n="hud.atkspeed">Vel. ataque</span> <span style="float:right;color:#a0c8ff" id="atkSpdVal">—</span></div>
             <div class="s-label" id="procsRow" style="margin-top:4px;display:none">Procs <span style="float:right" id="procsVal">—</span></div>
-            <div class="s-label" style="margin-top:6px" data-i18n="hud.position">Posição</div>
-            <div class="s-value" id="posVal" style="font-size:11px">—</div>
+            <div class="s-label" style="margin-top:6px"><span data-i18n="hud.regen_hp">Regen HP</span> <span style="float:right;color:#74d176" id="regenHpVal">—</span></div>
+            <div class="s-label" style="margin-top:4px"><span data-i18n="hud.regen_mp">Regen mana</span> <span style="float:right;color:#79aaff" id="regenMpVal">—</span></div>
         </div>
     </div>
 
@@ -2636,7 +2636,7 @@ const I18N = {
     'modal.craft': '⚒ BANCADA',
     'hud.map': 'Mapa', 'hud.character': 'Personagem', 'hud.logout': 'sair ⏏', 'hud.adventurer': 'Aventureiro',
     'hud.floor': 'Andar {floor}',
-    'stair.enter': '⬇ As Profundezas', 'stair.exit_city': '⬆ Sair (cidade)', 'stair.up': '⬆ Subir', 'stair.down': '⬇ Descer',
+    'stair.enter': '⬇ As Profundezas', 'stair.exit_city': '⬆ Sair (cidade)', 'stair.up': '⬆ Subir', 'stair.down': '⬇ Descer', 'stair.town': '⌂ Cidade',
     'toast.depths_unlock': '🕳️ Atalho desbloqueado — agora dá pra descer direto ao Andar {floor}!',
     'dg.enter_title': '🕳️ AS PROFUNDEZAS', 'dg.enter_sub': 'PvP forçado lá embaixo. Onde começar a descida?',
     'dg.enter_floor1': 'Andar 1 (do começo)', 'dg.enter_floorN': 'Andar {floor} (atalho do boss)',
@@ -2648,6 +2648,9 @@ const I18N = {
     'ranking.depths_noboss': 'nenhum boss de banda morto',
     'hud.spells': 'Magias', 'hud.attack': 'Ataque', 'hud.defense': 'Defesa', 'hud.crit': 'Crítico',
     'hud.dodge': 'Esquiva', 'hud.speed': 'Velocidade', 'hud.atkspeed': 'Vel. ataque', 'hud.position': 'Posição',
+    'hud.regen_hp': 'Regen HP', 'hud.regen_mp': 'Regen mana',
+    'hud.regen_tip': '{n} a cada {s}s, enquanto a regeneração está ativa. Inclui equipamento, talentos, pet e bônus da zona.',
+    'hud.regen_paused': 'Regeneração pausada fora da aba ou enquanto morto.',
     'hud.combat_tab': 'COMBATE', 'hud.f_all': 'tudo', 'hud.f_dmg': 'dano', 'hud.f_kill': 'mortes', 'hud.f_sys': 'sistema',
     'hud.chat_ph': 'Diga algo... (Enter envia, Esc cancela, máx 240 chars)',
     'hud.rec_title': 'Gravar um clipe do gameplay (só a tela do jogo, sem HUD)',
@@ -2825,6 +2828,7 @@ const I18N = {
     'tip.proc_poison': '☠ {pct}% chance de veneno ({dmg} dano × {ticks} ticks)',
     'tip.proc_bleed': '🩸 {pct}% chance de sangra ({dmg} × {ticks})',
     'tip.proc_burn': '🔥 {pct}% chance de fogo ({dmg} × {ticks})',
+    'tip.proc_scaled': '{effect}: {scale}% do dano do golpe por ciclo (mín. {min}), {ticks} ciclos a cada 3s',
     'tip.speed': '+{n} velocidade',
     'tip.move_speed': 'Velocidade de movimento +{pct}%',
     'tip.hp_regen': 'Regen de HP +{n}',
@@ -2861,9 +2865,13 @@ const I18N = {
     'craft.need_gold': 'falta ouro',
     'craft.hint_recipes': 'click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
     'craft.hint_forge': '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói 1 dos 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
-    'forge.no_candidates_html': 'Sem candidatos.<br><br>Precisa de <b>3× items equipáveis iguais</b> (arma, armadura, escudo, elmo, botas ou colar) com mesmo nível.',
-    'forge.header_legend': '3× consumidos por tentativa &nbsp;·&nbsp; <span style="color:#ff8060">falha destrói todos</span> &nbsp;·&nbsp; sucesso retorna 1× upgraded',
+    'forge.no_candidates_html': 'Nenhum equipamento para aprimorar.<br><br>Armas, cajados, armaduras, escudos, elmos, botas e colares aparecem aqui. São necessárias <b>3 cópias iguais, do mesmo nível, na mochila</b>.',
+    'forge.header_legend': '3 cópias iguais na mochila + ouro &nbsp;·&nbsp; <span style="color:#ff8060">falha perde 1 item e o ouro</span> &nbsp;·&nbsp; sucesso entrega 1 item aprimorado',
     'forge.available': '{n}× disponíveis',
+    'forge.backpack': '{n}/3 na mochila',
+    'forge.equipped': 'equipado',
+    'forge.max_level': 'Nível máximo (+{n})',
+    'forge.missing': 'Faltam {n} cópias iguais',
     'forge.fail_pct': '{pct}% falha',
     'forge.btn': 'forjar +{n}',
     'forge.bonus_poison': '☠ veneno {pct}%',
@@ -2878,6 +2886,9 @@ const I18N = {
     'casino.spinning': '🎲 Girando...',
     'casino.refund': '{payout}g de volta ({kind})',
     'casino.lose': '−{bet}g · sem combo',
+    'casino.not_at_npc': 'Aproxime-se do Crupiê.',
+    'casino.no_gold': 'Ouro insuficiente para essa aposta.',
+    'casino.spin_failed': 'Não foi possível concluir o giro.',
     'auction.browse_empty_html': 'Nenhuma listagem ativa no momento.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar a primeira.',
     'auction.mine_empty_html': 'Você não tem listagens ativas.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar uma.',
     'auction.by': 'por',
@@ -3333,7 +3344,7 @@ const I18N = {
     'modal.craft': '⚒ CRAFTING BENCH',
     'hud.map': 'Map', 'hud.character': 'Character', 'hud.logout': 'log out ⏏', 'hud.adventurer': 'Adventurer',
     'hud.floor': 'Floor {floor}',
-    'stair.enter': '⬇ The Depths', 'stair.exit_city': '⬆ Leave (city)', 'stair.up': '⬆ Up', 'stair.down': '⬇ Down',
+    'stair.enter': '⬇ The Depths', 'stair.exit_city': '⬆ Leave (city)', 'stair.up': '⬆ Up', 'stair.down': '⬇ Down', 'stair.town': '⌂ Town',
     'toast.depths_unlock': '🕳️ Shortcut unlocked — you can now descend straight to Floor {floor}!',
     'dg.enter_title': '🕳️ THE DEPTHS', 'dg.enter_sub': 'PvP is forced down there. Where do you start?',
     'dg.enter_floor1': 'Floor 1 (from the top)', 'dg.enter_floorN': 'Floor {floor} (boss shortcut)',
@@ -3345,6 +3356,9 @@ const I18N = {
     'ranking.depths_noboss': 'no band boss slain',
     'hud.spells': 'Spells', 'hud.attack': 'Attack', 'hud.defense': 'Defense', 'hud.crit': 'Critical',
     'hud.dodge': 'Dodge', 'hud.speed': 'Speed', 'hud.atkspeed': 'Atk. speed', 'hud.position': 'Position',
+    'hud.regen_hp': 'HP regen', 'hud.regen_mp': 'Mana regen',
+    'hud.regen_tip': '{n} every {s}s while regeneration is active. Includes equipment, talents, pet and zone bonuses.',
+    'hud.regen_paused': 'Regeneration paused while the tab is inactive or the character is dead.',
     'hud.combat_tab': 'COMBAT', 'hud.f_all': 'all', 'hud.f_dmg': 'damage', 'hud.f_kill': 'deaths', 'hud.f_sys': 'system',
     'hud.chat_ph': 'Say something... (Enter sends, Esc cancels, max 240 chars)',
     'hud.rec_title': 'Record a gameplay clip (game screen only, no HUD)',
@@ -3522,6 +3536,7 @@ const I18N = {
     'tip.proc_poison': '☠ {pct}% poison chance ({dmg} dmg × {ticks} ticks)',
     'tip.proc_bleed': '🩸 {pct}% bleed chance ({dmg} × {ticks})',
     'tip.proc_burn': '🔥 {pct}% burn chance ({dmg} × {ticks})',
+    'tip.proc_scaled': '{effect}: {scale}% of hit damage per tick (min. {min}), {ticks} ticks every 3s',
     'tip.speed': '+{n} speed',
     'tip.move_speed': 'Movement speed +{pct}%',
     'tip.hp_regen': 'HP regen +{n}',
@@ -3558,9 +3573,13 @@ const I18N = {
     'craft.need_gold': 'need gold',
     'craft.hint_recipes': 'click <b>craft</b> &nbsp;|&nbsp; gold costs scale with item power &nbsp;|&nbsp; <kbd>ESC</kbd> close',
     'craft.hint_forge': '3 identical items + gold try to raise the level &nbsp;|&nbsp; <b style="color:#ff8060">failure destroys 1 of the 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> close',
-    'forge.no_candidates_html': 'No candidates.<br><br>You need <b>3× identical equippable items</b> (weapon, armor, shield, helmet, boots or amulet) at the same level.',
-    'forge.header_legend': '3× consumed per attempt &nbsp;·&nbsp; <span style="color:#ff8060">failure destroys all</span> &nbsp;·&nbsp; success returns 1× upgraded',
+    'forge.no_candidates_html': 'No equipment to upgrade.<br><br>Weapons, staves, armor, shields, helmets, boots and amulets appear here. You need <b>3 identical copies at the same level in your backpack</b>.',
+    'forge.header_legend': '3 identical copies in your backpack + gold &nbsp;·&nbsp; <span style="color:#ff8060">failure loses 1 item and the gold</span> &nbsp;·&nbsp; success gives 1 upgraded item',
     'forge.available': '{n}× available',
+    'forge.backpack': '{n}/3 in backpack',
+    'forge.equipped': 'equipped',
+    'forge.max_level': 'Maximum level (+{n})',
+    'forge.missing': 'Need {n} more identical copies',
     'forge.fail_pct': '{pct}% fail',
     'forge.btn': 'forge +{n}',
     'forge.bonus_poison': '☠ poison {pct}%',
@@ -3575,6 +3594,9 @@ const I18N = {
     'casino.spinning': '🎲 Spinning...',
     'casino.refund': '{payout}g back ({kind})',
     'casino.lose': '−{bet}g · no combo',
+    'casino.not_at_npc': 'Get closer to the Croupier.',
+    'casino.no_gold': 'Not enough gold for that bet.',
+    'casino.spin_failed': 'Could not complete the spin.',
     'auction.browse_empty_html': 'No active listings right now.<br><br>Go to the <b style="color:#c8a050">SELL</b> tab to create the first one.',
     'auction.mine_empty_html': 'You have no active listings.<br><br>Go to the <b style="color:#c8a050">SELL</b> tab to create one.',
     'auction.by': 'by',
@@ -3974,6 +3996,7 @@ function setLang(l){
   updateLangButtons();
   if (window.valadaresUi) window.valadaresUi.updateLabels();
   invSignature = null; // rótulos do inventário dependem do idioma
+  syncInvHeight();
 }
 // Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
 window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLangButtons(); } catch(e){} });
@@ -5994,14 +6017,17 @@ function applyMobDot(m, type, spec){
 }
 // Tenta aplicar os procs do weapon equipado contra mob (chama applyMobDot
 // pra cada status disponível com roll). Retorna lista de procs aplicados.
-function rollWeaponStatusOnMob(wItem, m){
+function rollWeaponStatusOnMob(wItem, m, hitDamage){
     if (!wItem || !m) return [];
+    if (serverAuthMobs && serverWeaponDots) return []; // somente confirmação do servidor
     const out = [];
     for (const type of ['poison','bleed','burn']){
         const spec = wItem[type];
         if (spec && Math.random() < (spec.chance || 0)){
-            applyMobDot(m, type, spec);
-            out.push({ type, dmg: spec.dmg, ticks: spec.ticks });
+            const dmg = !serverAuthMobs && spec.hitScale
+                ? Math.max(spec.dmg, Math.round((hitDamage || 0) * spec.hitScale)) : spec.dmg;
+            applyMobDot(m, type, { ...spec, dmg });
+            out.push({ type, dmg, ticks: spec.ticks });
         }
     }
     return out;
@@ -6487,9 +6513,7 @@ function itemFullDesc(def, key){
         if (def.meleeRange && def.meleeRange > 1) lines.push(tr('tip.melee_range', {n: def.meleeRange}));
         if (def.ranged && def.kind !== 'wand') lines.push(tr('tip.range_arrows', {n: def.ranged}));
         if (def.kind === 'wand') lines.push(tr('tip.range_wand', {n: def.ranged, cost: WAND_MANA_COST}));
-        if (def.poison) lines.push(tr('tip.proc_poison', {pct: Math.round(def.poison.chance*100), dmg: def.poison.dmg, ticks: def.poison.ticks}));
-        if (def.bleed)  lines.push(tr('tip.proc_bleed', {pct: Math.round(def.bleed.chance*100), dmg: def.bleed.dmg, ticks: def.bleed.ticks}));
-        if (def.burn)   lines.push(tr('tip.proc_burn', {pct: Math.round(def.burn.chance*100), dmg: def.burn.dmg, ticks: def.burn.ticks}));
+        for (const type of ['poison','bleed','burn']) if (def[type]) lines.push(weaponProcDescription(type, def[type]));
     } else {
         if (def.def) lines.push(tr('tip.defense', {n: def.def}));
         if (def.speed) lines.push(tr('tip.speed', {n: def.speed}));
@@ -6506,6 +6530,12 @@ function itemFullDesc(def, key){
 function hasShield(){
     const k = player.equipped.offhand;
     return !!k && ITEMS[k] && ITEMS[k].kind === 'offhand';
+}
+function weaponProcDescription(type, spec){
+    const pct = Math.round(spec.chance * 100);
+    return spec.hitScale ? tr('tip.proc_scaled', {
+        effect: tr('forge.bonus_'+type, {pct}), scale:Math.round(spec.hitScale*100), min:spec.dmg, ticks:spec.ticks,
+    }) : tr('tip.proc_'+type, {pct, dmg:spec.dmg, ticks:spec.ticks});
 }
 function totalDefense(){
     // Bônus de skill Escudo só conta se você está usando escudo
@@ -6750,6 +6780,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
+    if (document.getElementById('casinoModal')?.style.display === 'flex') stopCasinoAnimation();
     ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal','arenaModal','dungeonEnterModal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -7374,7 +7405,6 @@ function doAttack(m){
         // Mantém decremento local otimista — invUpdate do server reconcilia.
         player.inv[arrowKey]--;
         if (player.inv[arrowKey] <= 0) delete player.inv[arrowKey];
-        invSignature = null;
         if (Math.random() < m.dodge){
             log(tr('log.dodged_arrow', {mob: m.name}));
             gainSkillXpLocal('Distância', 1);
@@ -7400,7 +7430,7 @@ function doAttack(m){
         gainSkillXpLocal('Distância', 1);
         player.attackTimer = effectiveAttackDelay();
         // DoT procs (veneno/sangra/fogo do weapon +N)
-        const procsR = rollWeaponStatusOnMob(wItem, m);
+        const procsR = rollWeaponStatusOnMob(wItem, m, dmgR);
         if (serverAuthMobs && ws && ws.readyState === 1){
             ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
             player.target = m.id; m.aggro = true;
@@ -7441,7 +7471,7 @@ function doAttack(m){
     }
     player.attackTimer = effectiveAttackDelay();
     // DoT procs do weapon equipado (veneno/sangra/fogo)
-    const procs = rollWeaponStatusOnMob(wItem, m);
+    const procs = rollWeaponStatusOnMob(wItem, m, dmg);
     if (serverAuthMobs && ws && ws.readyState === 1){
         // Lança 1H tem meleeRange (até 3 sqm); demais armas melee usam 1
         const attackRange = (wItem && wItem.meleeRange) || 1;
@@ -7563,6 +7593,7 @@ function connectMP(){
         }
     };
     ws.onclose = (ev) => {
+        resetCasinoOnDisconnect();
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
         if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
@@ -7700,6 +7731,8 @@ function handleMP(msg){
         return;
     }
     if (msg.t === 'state'){
+        serverWeaponDots = msg.weaponDotsAuthoritative === true;
+        player.regen = null;
         // estado completo: jogadores e monstros do servidor
         myWsId = msg.you;
         player.isAdmin = !!msg.isAdmin;
@@ -7838,6 +7871,7 @@ function handleMP(msg){
         // server-side + dano de mob server-side). Atualiza player.hp/mp e
         // dispara playerDie() quando hp chega a 0.
         if (msg.id === myWsId){
+            if (msg.regen) player.regen = msg.regen;
             const wasAlive = (player.hp ?? 100) > 0;
             if (typeof msg.hp === 'number') player.hp = msg.hp;
             if (typeof msg.maxHp === 'number') player.maxHp = msg.maxHp;
@@ -8020,7 +8054,8 @@ function handleMP(msg){
         }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
         if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
-        invSignature = null;
+        // As assinaturas detectam quantidades, itens e equipamento. Atualizar
+        // apenas XP não deve reconstruir toda a interface a cada golpe.
         // Forja: feedback de sucesso/falha
         if (msg.forge){
             if (msg.forge.ok){
@@ -8122,7 +8157,7 @@ function handleMP(msg){
             if (typeof sndLevelUp === 'function') sndLevelUp();
             saveState();
         }
-        // invSignature=null força re-render na próxima frame
+        // A próxima frame reconcilia somente o que mudou no inventário.
     } else if (msg.t === 'hlHuntResult'){
         if (msg.ok){
             // T4: server confirma último hunter morto + bonus creditado via goldDelta.
@@ -8365,6 +8400,18 @@ function handleMP(msg){
         }
     } else if (msg.t === 'casinoResult'){
         // M6 — server rolou os 3 símbolos + payout. Cliente só renderiza.
+        stopCasinoAnimation();
+        casinoSpinPending = false;
+        // Conta a espera a partir da resposta: variação de latência não
+        // deixa a próxima aposta chegar dentro do limite silencioso do servidor.
+        casinoLastSpinAt = Date.now();
+        const out = document.getElementById('casinoResult');
+        if (msg.error){
+            document.querySelectorAll('#casinoReels .reel').forEach(r => { r.textContent = '—'; });
+            const errors = { not_at_npc: tr('casino.not_at_npc'), no_gold: tr('casino.no_gold') };
+            if (out) out.textContent = errors[msg.error] || tr('casino.spin_failed');
+            return;
+        }
         const reels = document.querySelectorAll('#casinoReels .reel');
         const sym = msg.symbols || [];
         if (reels.length === 3 && sym.length === 3){
@@ -8372,7 +8419,6 @@ function handleMP(msg){
                 reels[i].textContent = CASINO_SYMBOLS[sym[i]] || '?';
             }
         }
-        const out = document.getElementById('casinoResult');
         if (!out) return;
         if (msg.payout > 0){
             const net = msg.payout - msg.bet;
@@ -8738,6 +8784,7 @@ function mobKilledByServer(m, serverLoot, serverDrops){
 
 // ─── Multiplayer authoritative state ─────────────────────────────────────────
 let serverAuthMobs = false;  // true quando recebemos o primeiro snapshot de mobs
+let serverWeaponDots = false; // negociação permite atualização gradual cliente/servidor
 let mpWasConnected = false;  // já teve conexão MP bem-sucedida nesta sessão
 let mpDisconnected = false;  // perdeu conexão temporariamente (bloqueia ataques pra evitar farm offline)
 let _reconnectTimer = null;
@@ -9100,13 +9147,34 @@ window.closeGoldShop = closeGoldShop;
 // 3 reels, símbolos com pesos. Server (handler casinoSpin) é fonte do RNG +
 // payout. Cliente só envia aposta e renderiza resultado de `casinoResult`.
 const CASINO_SYMBOLS = { CHERRY:'🍒', LEMON:'🍋', GRAPE:'🍇', SEVEN:'7️⃣', DIAMOND:'💎' };
+let casinoSpinInterval = null;
+let casinoSpinTimeout = null;
+let casinoSpinPending = false;
+let casinoLastSpinAt = 0;
+function stopCasinoAnimation(){
+    if (casinoSpinInterval !== null){ clearInterval(casinoSpinInterval); casinoSpinInterval = null; }
+    if (casinoSpinTimeout !== null){ clearTimeout(casinoSpinTimeout); casinoSpinTimeout = null; }
+}
+function resetCasinoOnDisconnect(){
+    if (!casinoSpinPending) return;
+    stopCasinoAnimation();
+    casinoSpinPending = false;
+    casinoLastSpinAt = 0;
+    const out = document.getElementById('casinoResult');
+    if (out) out.textContent = tr('common.no_connection');
+}
 function openCasino(){
     closeAllModals();
     document.getElementById('casinoModal').style.display = 'flex';
-    document.getElementById('casinoResult').textContent = '';
+    document.getElementById('casinoResult').textContent = casinoSpinPending ? tr('casino.spinning') : '';
 }
-function closeCasino(){ document.getElementById('casinoModal').style.display = 'none'; }
+function closeCasino(){
+    stopCasinoAnimation();
+    document.getElementById('casinoModal').style.display = 'none';
+}
 function casinoSpin(amount){
+    if (casinoSpinPending) return;
+    if (Date.now() - casinoLastSpinAt < 800) return;
     if (!ws || ws.readyState !== 1 || !_wsAuthed){
         document.getElementById('casinoResult').innerHTML = `<span style="color:#cc3030">${tr('common.no_connection')}</span>`;
         return;
@@ -9116,18 +9184,26 @@ function casinoSpin(amount){
         return;
     }
     // Animação de spin: roda reels com símbolos aleatórios por 600ms
+    stopCasinoAnimation();
     const reels = document.querySelectorAll('#casinoReels .reel');
     const allKeys = Object.keys(CASINO_SYMBOLS);
-    const spinInterval = setInterval(() => {
+    casinoSpinInterval = setInterval(() => {
         reels.forEach(r => {
             r.textContent = CASINO_SYMBOLS[allKeys[Math.floor(Math.random() * allKeys.length)]];
         });
     }, 80);
     document.getElementById('casinoResult').innerHTML = `<span style="color:#c8a050">${tr('casino.spinning')}</span>`;
-    setTimeout(() => clearInterval(spinInterval), 600);
+    casinoSpinTimeout = setTimeout(stopCasinoAnimation, 600);
+    casinoSpinPending = true;
+    casinoLastSpinAt = Date.now();
     try {
         ws.send(JSON.stringify({ t:'casinoSpin', amount }));
-    } catch {}
+    } catch {
+        stopCasinoAnimation();
+        casinoSpinPending = false;
+        casinoLastSpinAt = 0;
+        document.getElementById('casinoResult').textContent = tr('common.no_connection');
+    }
 }
 window.openCasino = openCasino;
 window.closeCasino = closeCasino;
@@ -10198,9 +10274,9 @@ const WEAPON_UPGRADES = [
     null,
     { base: 1 },
     { base: 2, atkSpd: 0.05 },
-    { base: 3, atkSpd: 0.05, poison: { chance: 0.10, dmg: 2, ticks: 4 } },
-    { base: 5, atkSpd: 0.10, poison: { chance: 0.15, dmg: 2, ticks: 4 }, bleed: { chance: 0.10, dmg: 3, ticks: 3 } },
-    { base: 7, atkSpd: 0.15, poison: { chance: 0.20, dmg: 2, ticks: 4 }, bleed: { chance: 0.15, dmg: 3, ticks: 3 }, burn: { chance: 0.10, dmg: 4, ticks: 3 } },
+    { base: 3, atkSpd: 0.05, poison: { chance: 0.10, dmg: 2, hitScale:0.10, ticks: 4 } },
+    { base: 5, atkSpd: 0.10, poison: { chance: 0.15, dmg: 2, hitScale:0.10, ticks: 4 }, bleed: { chance: 0.10, dmg: 3, hitScale:0.15, ticks: 3 } },
+    { base: 7, atkSpd: 0.15, poison: { chance: 0.20, dmg: 2, hitScale:0.10, ticks: 4 }, bleed: { chance: 0.15, dmg: 3, hitScale:0.15, ticks: 3 }, burn: { chance: 0.10, dmg: 4, hitScale:0.20, ticks: 3 } },
 ];
 // Stats pra armaduras/escudos/elmos/botas/colares
 const ARMOR_UPGRADES = [
@@ -10212,7 +10288,7 @@ const ARMOR_UPGRADES = [
     { def: 7, moveSpd: 0.10, hpRegen: 3 },
 ];
 function isUpgradableKind(kind){
-    return ['weapon','offhand','armor','head','feet','neck'].includes(kind);
+    return ['weapon','wand','offhand','armor','head','feet','neck'].includes(kind);
 }
 // Decomp: ESPADA_PLUS_2 → { base:'ESPADA', plus:2 }; ESPADA → { base:'ESPADA', plus:0 }
 function getUpgradeTier(itemKey){
@@ -10233,7 +10309,7 @@ function ensureUpgradeItem(baseKey, plus){
     const baseDef = ITEMS[baseKey];
     if (!baseDef) return null;
     const newDef = { ...baseDef, name: baseDef.name + ' +' + plus };
-    const isWeapon = baseDef.kind === 'weapon';
+    const isWeapon = baseDef.kind === 'weapon' || baseDef.kind === 'wand';
     const isArmor  = ['armor','offhand','head','feet','neck'].includes(baseDef.kind);
     const up = isWeapon ? WEAPON_UPGRADES[plus] : (isArmor ? ARMOR_UPGRADES[plus] : null);
     if (up){
@@ -10323,7 +10399,7 @@ window.switchCraftTab = switchCraftTab;
 function describeUpgradeBonuses(itemKey, target){
     const def = ITEMS[itemKey];
     const tier = getUpgradeTier(itemKey);
-    const isWeapon = def.kind === 'weapon';
+    const isWeapon = def.kind === 'weapon' || def.kind === 'wand';
     const up = isWeapon ? WEAPON_UPGRADES[target] : ARMOR_UPGRADES[target];
     if (!up) return '';
     const parts = [];
@@ -10367,9 +10443,13 @@ function renderForja(){
     const rb = (_forgeResult && Date.now() - _forgeResult.at < 30000)
         ? `<div style="position:sticky;top:0;z-index:5;flex-shrink:0;margin:0 0 8px;padding:9px;border-radius:3px;text-align:center;font-weight:700;font-size:13px;box-shadow:0 3px 8px rgba(0,0,0,0.6);${_forgeResult.ok?'background:#16301a;border:1px solid #3a7a3a;color:#9be89b':'background:#301414;border:1px solid #7a2a2a;color:#ff9090'}">${_forgeResult.text}</div>`
         : '';
-    const candidates = Object.entries(player.inv)
-        .filter(([k,q]) => q >= 3 && ITEMS[k] && isUpgradableKind(ITEMS[k].kind))
-        .filter(([k]) => getUpgradeTier(k).plus < UPGRADE_MAX)
+    // Itens sem três cópias e os já equipados continuam visíveis, com o motivo
+    // que impede a tentativa. Equipamento vestido nunca conta como material.
+    const equippedKeys = new Set(Object.values(player.equipped || {}).filter(Boolean));
+    const owned = new Map(Object.entries(player.inv).filter(([,q]) => q > 0));
+    for (const k of equippedKeys) if (!owned.has(k)) owned.set(k, 0);
+    const candidates = [...owned]
+        .filter(([k]) => ITEMS[k] && isUpgradableKind(ITEMS[k].kind))
         .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
     if (!candidates.length){
         el.innerHTML = rb + `<div class="chest-empty" style="padding:24px;text-align:center;font-style:italic;color:#666">${tr('forge.no_candidates_html')}</div>`;
@@ -10379,23 +10459,24 @@ function renderForja(){
         candidates.map(([k,q]) => {
             const def = ITEMS[k];
             const tier = getUpgradeTier(k);
-            const target = tier.plus + 1;
-            const cost = forgeCostFor(tier.base, target);
+            const maxed = tier.plus >= UPGRADE_MAX;
+            const target = Math.min(UPGRADE_MAX, tier.plus + 1);
+            const cost = maxed ? 0 : forgeCostFor(tier.base, target);
             const fail = Math.round(UPGRADE_FAIL[target] * 100);
-            const canPay = player.gold >= cost;
-            const bonusLine = describeUpgradeBonuses(k, target);
+            const canForge = !maxed && q >= 3 && player.gold >= cost;
+            const reason = maxed ? tr('forge.max_level', {n: UPGRADE_MAX})
+                : q < 3 ? tr('forge.missing', {n: 3-q}) : player.gold < cost ? tr('craft.need_gold') : '';
+            const bonusLine = maxed ? reason : describeUpgradeBonuses(k, target);
             return `<div class="craft-row">
                 <div class="craft-out">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
                     <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(itmName(k))}</span>
-                    <span style="margin-left:6px;color:#888;font-size:10px">${tr('forge.available', {n: q})}</span>
+                    <span style="margin-left:6px;color:#aaa;font-size:10px">${maxed ? tr('forge.available', {n:q}) : tr('forge.backpack', {n:q})}${equippedKeys.has(k) ? ' · '+tr('forge.equipped') : ''}</span>
                 </div>
                 <div class="craft-in" style="color:#aaa;font-size:10.5px;line-height:1.5">
-                    ${bonusLine}<br>
-                    <span style="color:#ffcc40">${cost}g</span> &nbsp;·&nbsp;
-                    <span style="color:#ff8060">${tr('forge.fail_pct', {pct: fail})}</span>
+                    ${bonusLine}${maxed ? '' : `<br><span style="color:#ffcc40">${cost}g</span> &nbsp;·&nbsp; <span style="color:#ff8060">${tr('forge.fail_pct', {pct: fail})}</span>${reason ? '<br>'+reason : ''}`}
                 </div>
-                <button class="craft-btn" ${canPay ? '' : 'disabled'} onclick="attemptForge('${k}')">${tr('forge.btn', {n: target})}</button>
+                <button class="craft-btn" ${canForge ? '' : 'disabled'} title="${escapeHtml(reason)}" onclick="attemptForge('${k}')">${maxed ? '+'+UPGRADE_MAX : tr('forge.btn', {n: target})}</button>
             </div>`;
         }).join('');
 }
@@ -10941,6 +11022,25 @@ function buildSkillList(){
         <div class="skill-bar"><div class="skill-fill" id="skb-${n}" style="width:${s.xp/s.xpNext*100}%"></div></div>
     `).join('');
 }
+function renderRegenStats(){
+    const regen = player.regen;
+    const format = n => Number(n.toFixed(2)).toLocaleString(LANG === 'pt' ? 'pt-BR' : 'en-US');
+    for (const [kind,id] of [['hp','regenHpVal'],['mp','regenMpVal']]){
+        const el = document.getElementById(id);
+        if (!el) continue;
+        let text = '—', title = '';
+        if (regen && Number.isFinite(regen[kind+'Tick']) && Number.isFinite(regen[kind+'IntervalMs'])){
+            // O pulso de regeneração acontece a cada 500ms. Considera essa
+            // cadência para não prometer 3 ganhos/s quando só cabem 2 pulsos.
+            const pulse = regen.tickMs || 500;
+            const every = Math.max(pulse, Math.ceil(regen[kind+'IntervalMs']/pulse)*pulse);
+            text = format(regen.active ? regen[kind+'Tick']*1000/every : 0)+'/s';
+            title = regen.active ? tr('hud.regen_tip', {n:format(regen[kind+'Tick']),s:format(every/1000)}) : tr('hud.regen_paused');
+        }
+        if (el.textContent !== text) el.textContent = text;
+        if (el.title !== title) el.title = title;
+    }
+}
 function updateSidebar(){
     document.getElementById('barHp').style.width = (player.hp/player.maxHp*100)+'%';
     document.getElementById('barMp').style.width = (player.mp/player.maxMp*100)+'%';
@@ -11000,6 +11100,8 @@ function updateSidebar(){
     const procsRow = document.getElementById('procsRow');
     const procsVal = document.getElementById('procsVal');
     if (procsRow && procsVal){
+        const procTip = wI ? ['poison','bleed','burn'].filter(t => wI[t]).map(t => weaponProcDescription(t,wI[t])).join('\n') : '';
+        if (procsVal.title !== procTip) procsVal.title = procTip;
         const procs = [];
         if (wI && wI.poison) procs.push(`<span style="color:#74d176">☠${Math.round(wI.poison.chance*100)}%</span>`);
         if (wI && wI.bleed)  procs.push(`<span style="color:#cc6060">🩸${Math.round(wI.bleed.chance*100)}%</span>`);
@@ -11042,7 +11144,7 @@ function updateSidebar(){
         mpFlash = Math.max(0, mpFlash - 16);
         mpEl.style.boxShadow = `0 0 ${10*mpFlash/600}px ${4*mpFlash/600}px rgba(120,255,120,${0.8*mpFlash/600})`;
     } else mpEl.style.boxShadow = '';
-    document.getElementById('posVal').textContent = `${player.x}, ${player.y}`;
+    renderRegenStats();
     document.getElementById('charName').textContent = player.name;
     // Espelha nome no top-bar mobile (player.name pode mudar no auth/save reload)
     const mtbN = document.getElementById('mtbName');
@@ -12122,6 +12224,8 @@ function drawAmmoIcon(P, c, dark, light){
 }
 
 let invSignature = null;
+let invKeysSignature = null;
+let equipSignature = null;
 // Categorização compartilhada entre inventário e baús
 const ITEM_CATEGORIES = [
     { label: 'Armas',        kinds: ['weapon','wand'] },
@@ -12199,8 +12303,12 @@ document.addEventListener('click', (e) => {
 
 function renderInventoryIfChanged(){
     const sig = JSON.stringify([player.equipped, player.inv]);
-    if (sig === invSignature) return;
-    invSignature = sig;
+    const keysSig = JSON.stringify(Object.keys(player.inv).filter(k => player.inv[k] > 0 && ITEMS[k]));
+    const eqSig = JSON.stringify([player.equipped, player.inv.FLECHA || 0,
+        player.inv.FLECHA_PERF || 0, player.mp < WAND_MANA_COST, LANG]);
+    if (sig === invSignature && eqSig === equipSignature) return;
+    const rebuildInventory = invSignature === null || keysSig !== invKeysSignature;
+    const rebuildEquipment = invSignature === null || eqSig !== equipSignature;
 
     // Paper doll layout (grid 3x4):
     //   .   HEAD    .
@@ -12215,6 +12323,7 @@ function renderInventoryIfChanged(){
     let hasRanged = false;
     let hasWand = false;
 
+    if (rebuildEquipment){
     const slotHtml = ['head','weapon','armor','offhand','neck','feet','cosmetic'].map(slot => {
         const k = player.equipped[slot];
         const area = slotGrid[slot];
@@ -12244,8 +12353,22 @@ function renderInventoryIfChanged(){
         ammoLine = `<div class="paper-ammo ${player.mp < WAND_MANA_COST ? 'low':''}">${tr('inv.mana_per_shot', {n: WAND_MANA_COST})}</div>`;
     }
     eqEl.innerHTML = `<div class="paper-doll">${slotHtml}</div>${ammoLine}`;
+    }
 
     const invEl = document.getElementById('inventory');
+    if (!rebuildInventory){
+        // Uma poção, loot empilhado ou munição altera só a quantidade. Preserva
+        // nós, eventos delegados e posição da lista durante o combate.
+        invEl.querySelectorAll('.inv-item').forEach(item => {
+            const qty = item.querySelector('.inv-qty');
+            const text = '×' + player.inv[item.dataset.item];
+            if (qty && qty.textContent !== text) qty.textContent = text;
+        });
+        invSignature = sig;
+        equipSignature = eqSig;
+        if (rebuildEquipment) syncInvHeight();
+        return;
+    }
     const prevInvScroll = invEl.scrollTop;   // preserva o scroll: re-render (loot/poção) não joga a lista pro topo
     // showEmpty=true: mostra todas as 7 categorias no inv lateral mesmo com 0 items
     // (player espera ver "Equipamento" mesmo sem ter — sabe onde aparece quando pegar)
@@ -12277,6 +12400,9 @@ function renderInventoryIfChanged(){
             .join('');
     }
 
+    invSignature = sig;
+    invKeysSignature = keysSig;
+    equipSignature = eqSig;
     syncInvHeight();
     invEl.scrollTop = prevInvScroll;   // restaura após rebuild + ajuste de altura (browser faz clamp se a lista encolheu)
 }
@@ -12285,15 +12411,33 @@ function renderInventoryIfChanged(){
 // caber inteiro na viewport sem scroll. Mede o overhead real (topo até o
 // wrapper + footer keybindings/margem inferior) em vez de chutar paddings.
 // Mínimo 72px; o chat cede espaço para o jogo em telas mais curtas.
+let layoutFrame = 0;
+let sidebarFrame = 0;
+let layoutNeedsSidebar = false;
 function syncChatHeight(){
+    if (layoutFrame) return;
+    layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = 0;
+        const updateSidebar = layoutNeedsSidebar;
+        layoutNeedsSidebar = false;
+        syncChatHeightNow(updateSidebar);
+    });
+}
+function syncChatHeightNow(updateSidebar){
     const log = document.getElementById('log');
     const chat = document.getElementById('chatMessages');
     const wrapper = document.getElementById('gameWrapper');
     if (!log || !chat || !wrapper) return;
-    if (document.body.classList.contains('layout-focus') || document.body.classList.contains('touch') || window.innerWidth <= 900){
+    const compact = document.body.classList.contains('layout-focus') || document.body.classList.contains('touch') || window.innerWidth <= 900;
+    if (compact){
         const height = document.body.classList.contains('chat-expanded') ? 220 : 72;
         log.style.height = height + 'px';
         chat.style.height = height + 'px';
+        if (updateSidebar){
+            for (const el of [document.getElementById('leftSidebar'), document.getElementById('rightSidebar'), document.getElementById('invSidebar')]){
+                if (el) el.style.height = '';
+            }
+        }
         return;
     }
     // Mede a barra de abas e o input REAIS (antes era TABS_H=28 fixo — mas na aba
@@ -12314,34 +12458,31 @@ function syncChatHeight(){
     const target = Math.max(72, available - canvasH - TABS_H - INPUT_H);
     log.style.height = target + 'px';
     chat.style.height = target + 'px';
+    if (updateSidebar){
+        const left = document.getElementById('leftSidebar');
+        const right = document.getElementById('rightSidebar');
+        const inv = document.getElementById('invSidebar');
+        for (const el of [left, right, inv]) if (el) el.style.height = '';
+        // Deixa o navegador aplicar estas escritas antes de medir a altura final.
+        if (sidebarFrame) cancelAnimationFrame(sidebarFrame);
+        sidebarFrame = requestAnimationFrame(() => {
+            sidebarFrame = 0;
+            if (!left || !inv) return;
+            const leftH = left.getBoundingClientRect().height;
+            const game = document.getElementById('gameContainer');
+            const gameH = game ? game.getBoundingClientRect().height : 0;
+            const height = Math.max(leftH, gameH) + 'px';
+            left.style.height = height;
+            inv.style.height = height;
+            if (right) right.style.height = height;
+        });
+    }
 }
 
 // Alinha altura das 3 sidebars laterais com o game container (canvas + chatPanel)
 function syncInvHeight(){
-    syncChatHeight();   // chat dinâmico primeiro — sidebars seguem
-    const wrapper = document.getElementById('gameWrapper');
-    const inv = document.getElementById('invSidebar');
-    if (!wrapper || !inv) return;
-    if (document.body.classList.contains('layout-focus') || document.body.classList.contains('touch') || window.innerWidth <= 900){
-        for (const el of [document.getElementById('leftSidebar'), document.getElementById('rightSidebar'), inv]){
-            if (el) el.style.height = '';
-        }
-        return;
-    }
-    const leftSidebar = wrapper.children[0];
-    const rightSidebar = wrapper.children[2];
-    if (!leftSidebar) return;
-    // reset pra medir natural
-    leftSidebar.style.height = '';
-    inv.style.height = '';
-    if (rightSidebar) rightSidebar.style.height = '';
-    const leftH = leftSidebar.getBoundingClientRect().height;
-    const canvasEl = document.getElementById('gameContainer');
-    const canvasH = canvasEl ? canvasEl.getBoundingClientRect().height : 0;
-    const target = Math.max(leftH, canvasH);
-    leftSidebar.style.height = target + 'px';
-    inv.style.height = target + 'px';
-    if (rightSidebar) rightSidebar.style.height = target + 'px';
+    layoutNeedsSidebar = true;
+    syncChatHeight();
 }
 window.addEventListener('resize', syncInvHeight);
 window.addEventListener('load', syncInvHeight);
@@ -12612,6 +12753,15 @@ function log(html, cat){
     if (logLines.length > 200) logLines.shift();
     renderLog();
 }
+let logScrollFrame = 0;
+function scrollLogToEnd(){
+    if (logScrollFrame) return;
+    logScrollFrame = requestAnimationFrame(() => {
+        logScrollFrame = 0;
+        const el = document.getElementById('log');
+        if (el && el.style.display !== 'none') el.scrollTop = el.scrollHeight;
+    });
+}
 function renderLog(){
     const el = document.getElementById('log');
     if (!el) return;
@@ -12621,7 +12771,7 @@ function renderLog(){
             || (logFilter === 'kill' && l.cat === 'kill')
             || (logFilter === 'loot' && l.cat === 'loot'));
     el.innerHTML = filtered.map(l => l.html).join('<br>');
-    el.scrollTop = el.scrollHeight;
+    scrollLogToEnd();
 }
 function setLogFilter(f){
     logFilter = f;
@@ -14083,6 +14233,7 @@ const DUNGEON_TINT_FULL_C  = 5;                // rampa visual 1→5 (look valid
 let dungeonStairs = null;
 function dunStairUp(){   return (dungeonStairs && dungeonStairs.up)   || null; }
 function dunStairDown(){ return (dungeonStairs && dungeonStairs.down) || null; }
+function dunStairTown(){ return (dungeonStairs && dungeonStairs.town) || null; }
 let _lastStairTrigger = 0;
 function checkDungeonStairs(x, y){
     if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
@@ -14098,8 +14249,11 @@ function checkDungeonStairs(x, y){
             else { try { ws.send(JSON.stringify({ t:'enterDungeon' })); } catch {} }
         }
     } else {
-        const sUp = dunStairUp(), sDown = dunStairDown();
-        if (sUp && x === sUp.x && y === sUp.y){
+        const sUp = dunStairUp(), sDown = dunStairDown(), sTown = dunStairTown();
+        if (sTown && x === sTown.x && y === sTown.y){
+            _lastStairTrigger = now;
+            try { ws.send(JSON.stringify({ t:'returnDungeonTown' })); } catch {}
+        } else if (sUp && x === sUp.x && y === sUp.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'exitDungeon' })); } catch {}     // sobe 1 andar (andar 1 → cidade)
         } else if (sDown && x === sDown.x && y === sDown.y){
@@ -15881,6 +16035,7 @@ function logout(){
     floatTexts.length = 0;
     Object.keys(remotePlayers).forEach(k => delete remotePlayers[k]);
     if (ws){ try { ws.close(); } catch{} ws = null; }
+    resetCasinoOnDisconnect();
     bossDeathTime = null;
     // reset do player ao baseline (próximo login carrega só o que tiver save)
     Object.assign(player, {
@@ -15942,7 +16097,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // #chatPanel em ~37px e empurrava o layout do jogo ao alternar abas (bug reportado).
             // #1: recalcula a altura do log/chat com a barra da aba ATUAL (os filtros da aba
             // COMBATE mudam a altura da barra de abas) — senão o painel estoura pra fora da tela.
-            if (typeof syncChatHeight === 'function') syncChatHeight();
+            if (typeof syncInvHeight === 'function') syncInvHeight();
+            if (!isChat) scrollLogToEnd();
             if (isChat) document.getElementById('chatInput')?.focus();
         });
     });
@@ -16869,14 +17025,14 @@ function loop(ts){
         }
         // nome (sempre visível) — pill com padding real, borda dourada e sombra
         const label = npcName(npc);
-        ctx.font = 'bold 11px "Segoe UI", system-ui, sans-serif';
+        ctx.font = '500 14px "Segoe UI", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const labelW = ctx.measureText(label).width;
-        const PAD_X = 6, BOX_H = 14;
+        const PAD_X = 8, BOX_H = 21;
         const boxW = Math.ceil(labelW + PAD_X * 2);
-        const boxX = nx + TS/2 - boxW/2;
-        const boxY = ny + TS + 2;
+        const boxX = Math.round(nx + TS/2 - boxW/2);
+        const boxY = Math.round(ny + TS + 2);
         // sombra externa pra "elevar" do background
         ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         ctx.fillRect(boxX + 1, boxY + 1, boxW, BOX_H);
@@ -16884,12 +17040,12 @@ function loop(ts){
         ctx.fillStyle = 'rgba(10, 8, 5, 0.92)';
         ctx.fillRect(boxX, boxY, boxW, BOX_H);
         // borda dourada sutil
-        ctx.strokeStyle = 'rgba(212, 168, 71, 0.7)';
+        ctx.strokeStyle = 'rgba(212, 168, 71, 0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, BOX_H - 1);
         // texto dourado
-        ctx.fillStyle = '#ffd060';
-        ctx.fillText(label, nx + TS/2, boxY + BOX_H/2 + 0.5);
+        ctx.fillStyle = '#f3e2b5';
+        ctx.fillText(label, Math.round(nx + TS/2), boxY + 11);
         ctx.textBaseline = 'alphabetic';
         // brilho ao aproximar + hint
         if (near){
@@ -16945,7 +17101,7 @@ function loop(ts){
     // aproximar. Escada fora da tela → SETA na borda apontando a direção.
     {
         const onFloor = (player.floor || 0);
-        const drawStair = (stair, descending, label) => {
+        const drawStair = (stair, descending, label, town = false) => {
             if (!(stair.x >= cam.x-1 && stair.x < cam.x+VP_W+1 && stair.y >= cam.y-1 && stair.y < cam.y+VP_H+1)) return;
             const sx = (stair.x - cam.x) * TS;
             const sy = (stair.y - cam.y) * TS;
@@ -16959,9 +17115,9 @@ function loop(ts){
                 ctx.fillRect(sx+12, yy, TS-24, 4);
             }
             // glifo persistente ▲ (sobe/sai, azul) / ▼ (desce, roxo) — distingue de longe
-            ctx.fillStyle = descending ? '#f070f0' : '#70c0ff';
+            ctx.fillStyle = town ? '#82e0b0' : descending ? '#f070f0' : '#70c0ff';
             ctx.font = 'bold 18px "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(descending ? '▼' : '▲', sx+TS/2, sy+TS/2+1);
+            ctx.fillText(town ? '⌂' : descending ? '▼' : '▲', sx+TS/2, sy+TS/2+1);
             ctx.textBaseline = 'alphabetic';
             // rótulo sempre que a escada está na tela (não só a 1 tile)
             ctx.fillStyle = '#ffd060';
@@ -16969,7 +17125,7 @@ function loop(ts){
             ctx.fillText(label, sx+TS/2, sy-3);
             // anel ao aproximar (≤1 tile = pode usar agora)
             if (Math.max(Math.abs(player.x - stair.x), Math.abs(player.y - stair.y)) <= 1){
-                ctx.strokeStyle = descending ? 'rgba(240,80,240,0.85)' : 'rgba(120,200,255,0.85)';
+                ctx.strokeStyle = town ? '#82e0b0' : descending ? 'rgba(240,80,240,0.85)' : 'rgba(120,200,255,0.85)';
                 ctx.lineWidth = 2; ctx.strokeRect(sx+4, sy+4, TS-8, TS-8);
             }
         };
@@ -17005,6 +17161,11 @@ function loop(ts){
             const su = dunStairUp(), sd = dunStairDown();
             if (su) drawStair(su, false, onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
             if (sd) drawStair(sd, true, tr('stair.down'));
+            const town = dunStairTown();
+            if (town){
+                drawStair(town, false, tr('stair.town'), true);
+                drawEdgeArrow(town, '#82e0b0', '⌂');
+            }
             // setas de borda: descida em destaque (roxo), subida discreta (azul)
             if (sd) drawEdgeArrow(sd, '#f070f0', '▼');
             if (su) drawEdgeArrow(su, '#70c0ff', '▲');

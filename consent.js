@@ -1,11 +1,12 @@
 /* Valadares — consentimento de cookies (LGPD, opt-in).
-   Os trackers (GA4 + Microsoft Clarity) só carregam APÓS o aceite.
+   Os trackers só carregam APÓS o aceite. Clarity não roda durante o jogo.
    Escolha guardada em localStorage 'valadares_consent' = granted | denied. */
 (function () {
   'use strict';
   var KEY = 'valadares_consent';
   var GA_ID = 'G-D6FVKT85YG';
   var CLARITY_ID = 'xbcvdqlr9c';
+  var isGame = /\/(?:jogar|play\.html)\/?$/i.test(location.pathname);
 
   function getLang() {
     try {
@@ -17,11 +18,11 @@
 
   var T = {
     pt: {
-      msg: 'Usamos cookies de análise (Google Analytics e Microsoft Clarity) para entender como o jogo é usado e melhorá-lo. Você escolhe.',
+      msg: 'Usamos cookies de análise (Google Analytics' + (isGame ? '' : ' e Microsoft Clarity') + ') para entender como o jogo é usado e melhorá-lo. Você escolhe.',
       accept: 'Aceitar', reject: 'Recusar', more: 'Saiba mais'
     },
     en: {
-      msg: 'We use analytics cookies (Google Analytics and Microsoft Clarity) to understand how the game is used and improve it. Your choice.',
+      msg: 'We use analytics cookies (Google Analytics' + (isGame ? '' : ' and Microsoft Clarity') + ') to understand how the game is used and improve it. Your choice.',
       accept: 'Accept', reject: 'Decline', more: 'Learn more'
     }
   };
@@ -40,12 +41,14 @@
     window.gtag = gtag;
     gtag('js', new Date());
     gtag('config', GA_ID);
-    /* Microsoft Clarity */
-    (function (c, l, a, r, i, t, y) {
-      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
-      t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i;
-      y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
-    })(window, document, 'clarity', 'script', CLARITY_ID);
+    if (!isGame) {
+      /* Microsoft Clarity fica nas páginas do site, fora da rota de combate. */
+      (function (c, l, a, r, i, t, y) {
+        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+        t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i;
+        y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+      })(window, document, 'clarity', 'script', CLARITY_ID);
+    }
   }
 
   function removeBanner() {
