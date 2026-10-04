@@ -16,7 +16,8 @@
     const GOLD_LIGHT = '#e1b76b';
 
     function baseKey(key) {
-        return typeof key === 'string' ? key.replace(/_PLUS_\d+$/, '') : '';
+        const base = typeof key === 'string' ? key.split('~')[0].replace(/_PLUS_\d+$/, '') : '';
+        return base === 'ESSENCIA_ARCANA' ? 'ESSENCIA' : base;
     }
 
     function pixel(ctx, x, y, w, h, color) {

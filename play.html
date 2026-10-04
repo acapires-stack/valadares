@@ -3,6 +3,8 @@
 <head>
 <!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
+<script src="/equipment-rules.js?v=1"></script>
+<link rel="stylesheet" href="/enchanting.css?v=1">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#06060c">
@@ -2482,15 +2484,17 @@
 </div>
 
 <div id="craftModal" style="display:none">
-    <div class="chest-box" style="min-width:620px">
+    <div class="chest-box">
         <div class="chest-title" data-i18n="modal.craft">⚒ BANCADA</div>
         <div style="text-align:center;color:#ffcc40;font-size:11px;margin-top:-12px;margin-bottom:14px;letter-spacing:1px;font-weight:600" id="craftGoldLabel">0 g</div>
         <div style="display:flex;gap:4px;justify-content:center;margin-bottom:8px">
             <button class="train-tab active" data-craft-tab="craft" onclick="switchCraftTab('craft')" data-i18n="craft.tab_recipes">RECEITAS</button>
             <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')" data-i18n="craft.tab_forge">🔥 FORJA</button>
+            <button class="train-tab" data-craft-tab="enchant" onclick="switchCraftTab('enchant')">✧ <span data-i18n="enchant.tab">ENCANTAR</span></button>
         </div>
         <div id="craftList" class="craft-list"></div>
         <div id="forjaPanel" class="craft-list" style="display:none"></div>
+        <div id="enchantPanel" class="craft-list" style="display:none"></div>
         <div class="chest-hint" id="craftHint" data-i18n-html="craft.hint_recipes">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeCraft()">×</button>
     </div>
@@ -3996,6 +4000,7 @@ function setLang(l){
   updateLangButtons();
   if (window.valadaresUi) window.valadaresUi.updateLabels();
   invSignature = null; // rótulos do inventário dependem do idioma
+  window.ValadaresEnchantUI?.refreshIfOpen();
   syncInvHeight();
 }
 // Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
@@ -5492,7 +5497,8 @@ function mobName(type){ return (LANG === 'en' && MTYPE_EN[type]) || (MTYPE[type]
 
 // ─── Itens e drop tables ─────────────────────────────────────────────────────
 // kinds: food | potion | gold | mat | weapon | armor | head | feet
-const ITEMS = {
+const ITEMS = new Proxy({
+    ESSENCIA_ARCANA:{name:'Essência Arcana',kind:'material',color:'#ab91ed',desc:'Obtida de monstros e chefes. Usada para encantar equipamentos na bancada.'},
     // consumíveis
     CHEESE:   { name:'Queijo',         color:'#f0d040', heal:15, kind:'food' },
     EGG:      { name:'Ovo de cobra',   color:'#fff0c0', heal:25, kind:'food' },
@@ -5590,7 +5596,7 @@ const ITEMS = {
     ESCUDO_GUARDIAO: { name:'Escudo do Guardião ★', color:'#e8d878', kind:'offhand', def:12 },
     ELMO_DRACO:    { name:'Elmo Dracônico',   color:'#cc4030', kind:'head',    def:4 },
     // munições (ammo)
-    CORACAO_HL:    { name:'Coração do Highlander', color:'#cc1010', kind:'neck' },
+    CORACAO_HL:    { name:'Coração do Highlander', color:'#cc1010', kind:'neck', def:0 },
     FLECHA:        { name:'Flecha',           color:'#a08050', kind:'ammo', ammoBonus:2 },
     FLECHA_PERF:   { name:'Flecha perfurante',color:'#c0c0d0', kind:'ammo', ammoBonus:4 },
     // ── WANDS (cajados — skill Magia, 2 mãos, tiro mágico à distância, sem munição) ──
@@ -5603,9 +5609,13 @@ const ITEMS = {
     CAJADO_RAIO:      { name:'Cajado de Raio',       color:'#b080ff', kind:'wand', hand:'2h', skill:'Magia', base:13, def:2, ranged:5, element:'energy' },
     CAJADO_RUNICO:    { name:'Cajado Rúnico ★',      color:'#c060ff', kind:'wand', hand:'2h', skill:'Magia', base:20, def:4, ranged:6, element:'energy' },
     CAJADO_ETERNO:    { name:'Cajado Eterno ★★',     color:'#ffd0ff', kind:'wand', hand:'2h', skill:'Magia', base:30, def:6, ranged:6, element:'fire' },
-};
+}, {get(target,key,receiver){
+    if (typeof key === 'string' && key.includes('~') && !Object.prototype.hasOwnProperty.call(target,key)) ensureItemKey(key);
+    return Reflect.get(target,key,receiver);
+}});
 // i18n Fase 3 — nomes/descrições de item em EN (chave = id). itemName()/itemDescEn() preferem EN.
 const ITEM_EN = {
+    ESSENCIA_ARCANA:{name:'Arcane Essence',desc:'Dropped by monsters and bosses. Used to enchant equipment at the workbench.'},
     CHEESE:{name:'Cheese'}, EGG:{name:'Snake Egg'}, MEAT:{name:'Wolf Meat'}, HAM:{name:'Ham'},
     POTION:{name:'Health Potion'}, POTION_MP:{name:'Mana Potion'},
     BENCAO_FENIX:{name:'Phoenix Blessing', desc:'Saves you from your next death. Consumed automatically.'},
@@ -5649,12 +5659,13 @@ const ITEM_EN = {
 function itmName(key){
     if (!key) return key;
     const en = LANG === 'en';
-    if (ITEMS[key]) return (en && ITEM_EN[key] && ITEM_EN[key].name) || ITEMS[key].name || key;
-    if (key.includes('_PLUS_')){
-        const [base, plus] = key.split('_PLUS_');
+    const tier = getUpgradeTier(key);
+    if (tier.plus || tier.enchanted){
+        const {base,plus} = tier;
         const bn = (en && ITEM_EN[base] && ITEM_EN[base].name) || (ITEMS[base] && ITEMS[base].name) || base;
-        return bn + ' +' + plus;
+        return bn + (plus ? ' +'+plus : '') + (tier.enchanted ? ' ✧' : '');
     }
+    if (ITEMS[key]) return (en && ITEM_EN[key] && ITEM_EN[key].name) || ITEMS[key].name || key;
     return key;
 }
 function itemDescEn(key){ return (LANG === 'en' && ITEM_EN[key] && ITEM_EN[key].desc) || (ITEMS[key] && ITEMS[key].desc) || ''; }
@@ -6398,7 +6409,7 @@ const PUNHO = { skill:'Punho', base:2 };
 // Ataques ranged e magia usam só buffMult().dmg direto (decisão de design).
 function applyAttackMults(dmg){
     let mult = pvpMults().dmg;
-    if (player.equipped.neck === 'CORACAO_HL') mult *= 1.05;
+    if (getUpgradeTier(player.equipped.neck).base === 'CORACAO_HL') mult *= 1.05;
     mult *= buffMult().dmg;
     mult *= (1 + ((player.permaBuffs && player.permaBuffs.damageBonus) || 0));   // Golpe Pesado (t_power)
     return Math.floor(dmg * mult);
@@ -6408,7 +6419,7 @@ function effectiveAttackDelay(){
     const wK = player.equipped.weapon;
     const wI = wK ? ITEMS[wK] : null;
     const atk = (wI && wI.atkSpd) || 0;
-    let d = player.attackDelay * (1 - atk);
+    let d = player.attackDelay * (1 - atk) * (1-equippedEnchantBonuses().attackSpeed/100);
     // Fúria: buff.spd (0.25 = +25%) acelera o ATAQUE também. Antes só o atkSpd da arma
     // entrava aqui, então a Fúria mexia só no movimento (bug reportado). Mesma fórmula
     // (1 - spd) usada pela arma e pelo movimento (playerMoveDelay), então empilha igual.
@@ -6437,14 +6448,14 @@ function recomputeStats(){
     const s = player.skills;
     const sumSkills = Object.values(s).reduce((a,sk) => a + sk.val, 0);
     const above = Math.max(0, sumSkills - 60);
-    const hpExtra = (player.permaBuffs?.hpBonus || 0);   // talent t_hp
-    const mpExtra = (player.permaBuffs?.manaBonus || 0);  // talent t_mana (Pacto Arcano)
+    const hpExtra = (player.permaBuffs?.hpBonus || 0) + equippedEnchantBonuses().hp;
+    const mpExtra = (player.permaBuffs?.manaBonus || 0) + equippedEnchantBonuses().mp;
     const newMaxHp = 100 + above + hpExtra;
     const newMaxMp = 100 + Math.floor(above / 2) + mpExtra;
     const dHp = newMaxHp - player.maxHp;
     const dMp = newMaxMp - player.maxMp;
-    if (dHp > 0){ player.hp += dHp; hpFlash = 600; }
-    if (dMp > 0){ player.mp += dMp; mpFlash = 600; }
+    if (dHp > 0){ if (!serverAuthMobs) player.hp += dHp; hpFlash = 600; }
+    if (dMp > 0){ if (!serverAuthMobs) player.mp += dMp; mpFlash = 600; }
     if (dHp < 0){ player.hp = Math.min(player.hp, newMaxHp); }
     if (dMp < 0){ player.mp = Math.min(player.mp, newMaxMp); }
     player.maxHp = newMaxHp;
@@ -6465,6 +6476,10 @@ function recomputeStats(){
 }
 // Texto compacto de stats de um item (usado em equip slots e inv)
 function itemStatsCompact(def){
+    const base=itemStatsCompactBase(def),aff=def?.enchantAffixes;
+    return base+(aff?.length?'<span class="inv-enchant-line">✧ '+aff.map(a=>escapeHtml(ValadaresEquipment.describe(a,LANG))).join(' · ')+'</span>':'');
+}
+function itemStatsCompactBase(def){
     if (!def) return '';
     if (def.heal) return `<span style="color:#74d176">+${def.heal} hp</span>`;
     if (def.manaheal) return `<span style="color:#6fa8e8">+${def.manaheal} mp</span>`;
@@ -6495,7 +6510,7 @@ function itemDisplayMeta(key){
     const nm = (LANG === 'en' && ITEM_EN[tier.base] && ITEM_EN[tier.base].name) || baseDef.name || key;
     const starN = (nm.match(/★/g) || []).length;
     return {
-        name: nm.replace(/\s*★+\s*$/, '').trim(),
+        name: nm.replace(/\s*★+\s*$/, '').trim() + (tier.enchanted ? ' ✧' : ''),
         rarCls: starN >= 2 ? 'rar-myth' : (starN === 1 ? 'rar-leg' : ''),
         plus: tier.plus
     };
@@ -6524,6 +6539,11 @@ function itemFullDesc(def, key){
     }
     const d = key ? itemDescEn(key) : def.desc;
     if (d) lines.push(d);
+    if (def.enchantAffixes?.length){
+        lines.push('',LANG === 'en' ? 'Enchantments' : 'Encantamentos');
+        for (const a of def.enchantAffixes) lines.push('✧ '+ValadaresEquipment.describe(a,LANG));
+        lines.push((LANG === 'en' ? 'Piece ' : 'Peça ')+def.enchantId.slice(-4).toUpperCase());
+    }
     return lines.join('\n');
 }
 
@@ -6540,12 +6560,13 @@ function weaponProcDescription(type, spec){
 function totalDefense(){
     // Bônus de skill Escudo só conta se você está usando escudo
     let d = hasShield() ? (player.shieldDefense || 0) : 0;
-    for (const slot of ['weapon','offhand','armor','head','feet']){
+    for (const slot of ['weapon','offhand','armor','head','feet','neck']){
         const k = player.equipped[slot];
         if (k && ITEMS[k]) d += ITEMS[k].def || 0;
     }
     // Coração do Highlander: +3% de defesa (arredondado p/ cima)
-    if (player.equipped.neck === 'CORACAO_HL') d = Math.ceil(d * 1.03);
+    d += equippedEnchantBonuses().def;
+    if (getUpgradeTier(player.equipped.neck).base === 'CORACAO_HL') d = Math.ceil(d * 1.03);
     return d;
 }
 
@@ -7168,7 +7189,7 @@ function playerMoveDelay(){
         if (m.spd > 0) d = Math.floor(d * (1 - m.spd));
     }
     // Coração equipado: +3% spd
-    if (player.equipped.neck === 'CORACAO_HL') d = Math.floor(d * 0.97);
+    if (getUpgradeTier(player.equipped.neck).base === 'CORACAO_HL') d = Math.floor(d * 0.97);
     // Buff temporário (Fúria)
     const b = buffMult();
     if (b.spd > 0) d = Math.floor(d * (1 - b.spd));
@@ -7199,7 +7220,7 @@ function playerCritChance(){
     return Math.min(0.50, Math.min(0.25, skillBased + (mults ? mults.crit : 0)) + perma);
 }
 // Precisão Mortal (t_critdmg): crit base ×2 + critDmgBonus por rank (×2 → ×2.5 no máx).
-function critMultPlayer(){ return 2 + ((player.permaBuffs && player.permaBuffs.critDmgBonus) || 0); }
+function critMultPlayer(){ return 2 + ((player.permaBuffs && player.permaBuffs.critDmgBonus) || 0) + equippedEnchantBonuses().critDamage/100; }
 function playerDodgeChance(){
     const skillBased = 0.015 + Math.max(0, player.skills['Escudo'].val - 10) * 0.006;   // base 1.5% + 0.6%/ponto
     const perma = player.permaBuffs?.dodgeBonus || 0;   // mérito: talento/aura de quest (+5%)
@@ -7240,7 +7261,7 @@ function throwSpear(){
         return;
     }
     // Esquiva
-    if (Math.random() < m.dodge){
+    if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
         log(tr('log.dodged_spear', {mob: m.name}));
         gainSkillXpLocal('Distância', 1);
     } else {
@@ -7340,7 +7361,7 @@ function doAttack(m){
             return;
         }
         player.mp -= WAND_MANA_COST;   // otimista; o server desconta + broadcasta o mp real
-        if (Math.random() < m.dodge){
+        if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
             log(tr('log.dodged_shot', {mob: m.name}));
             gainSkillXpLocal('Magia', 1);
             player.attackTimer = effectiveAttackDelay();
@@ -7405,7 +7426,7 @@ function doAttack(m){
         // Mantém decremento local otimista — invUpdate do server reconcilia.
         player.inv[arrowKey]--;
         if (player.inv[arrowKey] <= 0) delete player.inv[arrowKey];
-        if (Math.random() < m.dodge){
+        if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
             log(tr('log.dodged_arrow', {mob: m.name}));
             gainSkillXpLocal('Distância', 1);
             player.attackTimer = effectiveAttackDelay();
@@ -7451,7 +7472,7 @@ function doAttack(m){
         }
     }
     // Monstro esquivou?
-    if (Math.random() < m.dodge){
+    if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
         log(tr('log.dodged_melee', {mob: m.name}));
         gainSkillXpLocal(w.skill, 1);
         player.attackTimer = effectiveAttackDelay();
@@ -7648,7 +7669,7 @@ function connectMP(){
 function sendJoinNow(){
     if (!ws || ws.readyState !== 1) return;
     try {
-        ws.send(JSON.stringify({t:'join', name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
+        ws.send(JSON.stringify({t:'join', equipmentVersion:1, name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
                                 hp:player.hp, maxHp:player.maxHp, equipped:player.equipped,
                                 badges: (player.equippedBadges || []).slice(0, 2)}));
     } catch {}
@@ -7707,6 +7728,7 @@ function handleMP(msg){
             bad_password: tr('err.auth_bad_pw'),
             no_password: tr('err.auth_no_pw'),
             bad_name: tr('err.auth_bad_name'),
+            equipment_update: LANG==='en'?'Updating equipment support. Your character is safe.':'Atualizando o suporte aos equipamentos. Seu personagem está salvo.',
         };
         const txt = msgs[reason] || tr('err.auth_default');
         log(tr('log.auth_rejected', {txt, reason: escapeHtml(reason)}));
@@ -7731,6 +7753,9 @@ function handleMP(msg){
         return;
     }
     if (msg.t === 'state'){
+        window.equipmentServerVersion = msg.equipmentVersion || 0;
+        window.enchantToken = msg.enchantToken || null;
+        window.enchantingEnabled = msg.enchantingEnabled !== false;
         serverWeaponDots = msg.weaponDotsAuthoritative === true;
         player.regen = null;
         // estado completo: jogadores e monstros do servidor
@@ -8054,11 +8079,20 @@ function handleMP(msg){
         }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
         if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
+        if (msg.enchantToken) window.enchantToken = msg.enchantToken;
+        if (msg.reason === 'join') _forgePending = false;
+        if (msg.enchant) window.ValadaresEnchantUI?.handleResult(msg.enchant);
+        if (msg.enchant || msg.equipped) recomputeStats();
+        window.ValadaresEnchantUI?.refreshIfOpen();
         // As assinaturas detectam quantidades, itens e equipamento. Atualizar
         // apenas XP não deve reconstruir toda a interface a cada golpe.
         // Forja: feedback de sucesso/falha
         if (msg.forge){
-            if (msg.forge.ok){
+            _forgePending = false;
+            if (msg.forge.error){
+                _forgeResult={ok:false,text:LANG==='en'?'The forge attempt was cancelled; no materials were consumed. Check your backpack, gold and free space.':'A tentativa foi cancelada; nenhum material foi consumido. Confira a mochila, o ouro e o espaço livre.',at:Date.now()};
+                log(_forgeResult.text);
+            } else if (msg.forge.ok){
                 const item = ITEMS[msg.forge.newKey];
                 const itemName = item ? item.name : msg.forge.newKey;
                 log(tr('log.forged', {item: itmName(msg.forge.newKey), cost: msg.forge.cost}));
@@ -8071,7 +8105,7 @@ function handleMP(msg){
                 if (typeof sndDeath === 'function') sndDeath();
                 addFloat(player.x, player.y, tr('float.fail'), '#ff3030', true, -10);
             }
-            _forgeResult = msg.forge.ok
+            if (!msg.forge.error) _forgeResult = msg.forge.ok
                 ? { ok:true,  text: tr('forge.banner_ok', {item: itmName(msg.forge.newKey), n: msg.forge.plus}), at: Date.now() }
                 : { ok:false, text: tr('forge.banner_fail', {item: itmName(msg.forge.itemKey), cost: msg.forge.cost}), at: Date.now() };
             if (typeof renderForja === 'function') renderForja();
@@ -10292,9 +10326,26 @@ function isUpgradableKind(kind){
 }
 // Decomp: ESPADA_PLUS_2 → { base:'ESPADA', plus:2 }; ESPADA → { base:'ESPADA', plus:0 }
 function getUpgradeTier(itemKey){
-    const m = itemKey && itemKey.match(/^(.+)_PLUS_(\d+)$/);
-    if (m) return { base: m[1], plus: parseInt(m[2], 10) };
-    return { base: itemKey, plus: 0 };
+    const t = ValadaresEquipment.parse(itemKey);
+    return t.valid ? t : {base:itemKey,plus:0,affixes:[],enchanted:false,valid:false};
+}
+function ensureItemKey(key){
+    if (Object.prototype.hasOwnProperty.call(ITEMS,key)) return key;
+    const t = ValadaresEquipment.parse(key);
+    if (!t.valid || !ITEMS[t.base]) return null;
+    const stem = ensureUpgradeItem(t.base,t.plus);
+    if (t.enchanted && ValadaresEquipment.validFor(key,ITEMS[t.base].kind)){
+        ITEMS[key] = {...ITEMS[stem],enchantAffixes:t.affixes,enchantId:t.id};
+        return key;
+    }
+    return t.enchanted ? null : stem;
+}
+let _enchantStatsCache = {sig:null,value:null};
+function equippedEnchantBonuses(){
+    const sig = JSON.stringify(player.equipped);
+    if (_enchantStatsCache.sig !== sig)
+        _enchantStatsCache = {sig,value:ValadaresEquipment.bonuses(player.equipped,k=>ITEMS[k]?.kind)};
+    return _enchantStatsCache.value;
 }
 function makeUpgradeKey(baseKey, plus){
     return plus > 0 ? baseKey + '_PLUS_' + plus : baseKey;
@@ -10314,7 +10365,7 @@ function ensureUpgradeItem(baseKey, plus){
     const up = isWeapon ? WEAPON_UPGRADES[plus] : (isArmor ? ARMOR_UPGRADES[plus] : null);
     if (up){
         if (up.base !== undefined && typeof baseDef.base === 'number') newDef.base = baseDef.base + up.base;
-        if (up.def  !== undefined && typeof baseDef.def  === 'number') newDef.def  = baseDef.def  + up.def;
+        if (up.def !== undefined && isArmor) newDef.def = (baseDef.def || 0) + up.def;
         if (up.atkSpd)  newDef.atkSpd  = up.atkSpd;
         if (up.moveSpd) newDef.moveSpd = up.moveSpd;
         if (up.hpRegen) newDef.hpRegen = up.hpRegen;
@@ -10354,14 +10405,15 @@ function forgeCostFor(baseKey, targetPlus){
 }
 function attemptForge(itemKey){
     // N3: forja é autoritativa no server. Só pre-check cosmético e envia.
+    if (_forgePending || !atCraft()) return;
     const tier = getUpgradeTier(itemKey);
     const targetPlus = tier.plus + 1;
     if (targetPlus > UPGRADE_MAX){
         log(tr('log.max_level', {n: UPGRADE_MAX}));
         return;
     }
-    const have = player.inv[itemKey] || 0;
-    if (have < 3){
+    const have = player.inv[tier.enchanted ? tier.stem : itemKey] || 0;
+    if (have < (tier.enchanted ? 2 : 3)){
         log(tr('log.need_3x', {name: itmName(itemKey)}));
         return;
     }
@@ -10369,118 +10421,73 @@ function attemptForge(itemKey){
         log(tr('log.forge_no_conn'));
         return;
     }
-    ws.send(JSON.stringify({ t:'invForge', itemKey }));
+    if (player.gold < forgeCostFor(tier.base,targetPlus)) return;
+    _forgePending = true;
+    try { ws.send(JSON.stringify({ t:'invForge', itemKey })); }
+    catch { _forgePending = false; }
+    renderForja();
 }
 window.attemptForge = attemptForge;
 
 function switchCraftTab(which){
-    document.querySelectorAll('[data-craft-tab]').forEach(t => {
-        t.classList.toggle('active', t.dataset.craftTab === which);
-    });
-    const listEl = document.getElementById('craftList');
-    const forjaEl = document.getElementById('forjaPanel');
-    const hint = document.getElementById('craftHint');
-    if (which === 'craft'){
-        listEl.style.display = '';
-        forjaEl.style.display = 'none';
-        hint.innerHTML = tr('craft.hint_recipes');
-        renderCraft();
-    } else {
-        listEl.style.display = 'none';
-        forjaEl.style.display = '';
-        hint.innerHTML = tr('craft.hint_forge');
-        renderForja();
-    }
+    document.querySelectorAll('[data-craft-tab]').forEach(t=>t.classList.toggle('active',t.dataset.craftTab===which));
+    for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel']])document.getElementById(id).style.display=tab===which?'':'none';
+    const hint=document.getElementById('craftHint');
+    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
+    if(which==='enchant')window.ValadaresEnchantUI?.render();
+    else if(which==='forja')renderForja();else renderCraft();
 }
 window.switchCraftTab = switchCraftTab;
 
 // Descreve todos os bônus que o item GANHA ao subir do nível atual pro target.
 // Compara o def atual com o que seria o def do target (precisa simular o item).
 function describeUpgradeBonuses(itemKey, target){
-    const def = ITEMS[itemKey];
-    const tier = getUpgradeTier(itemKey);
-    const isWeapon = def.kind === 'weapon' || def.kind === 'wand';
-    const up = isWeapon ? WEAPON_UPGRADES[target] : ARMOR_UPGRADES[target];
-    if (!up) return '';
+    const def=ITEMS[itemKey],tier=getUpgradeTier(itemKey);
+    const next=ITEMS[ensureUpgradeItem(tier.base,target)];
+    if(!def||!next)return '';
     const parts = [];
-    if (up.base !== undefined && typeof def.base === 'number'){
-        parts.push(`<b style="color:#ff8030">atk ${def.base} → ${def.base + up.base}</b>`);
-    }
-    if (up.def !== undefined && typeof def.def === 'number'){
-        parts.push(`<b style="color:#cce0a0">def ${def.def} → ${def.def + up.def}</b>`);
-    }
-    if (up.atkSpd){
-        const prev = def.atkSpd || 0;
-        parts.push(`<span style="color:#a0c8ff">atk spd +${Math.round(up.atkSpd*100)}%</span>${prev !== up.atkSpd ? '' : ''}`);
-    }
-    if (up.moveSpd){
-        parts.push(`<span style="color:#a0c8ff">spd +${Math.round(up.moveSpd*100)}%</span>`);
-    }
-    if (up.hpRegen){
-        parts.push(`<span style="color:#74d176">+${up.hpRegen} HP regen</span>`);
-    }
-    if (up.poison){
-        parts.push(`<span style="color:#74d176">${tr('forge.bonus_poison', {pct: Math.round(up.poison.chance*100)})}</span>`);
-    }
-    if (up.bleed){
-        parts.push(`<span style="color:#cc3030">${tr('forge.bonus_bleed', {pct: Math.round(up.bleed.chance*100)})}</span>`);
-    }
-    if (up.burn){
-        parts.push(`<span style="color:#ff8030">${tr('forge.bonus_burn', {pct: Math.round(up.burn.chance*100)})}</span>`);
-    }
+    const add=(label,from,to,color,percent=false)=>{
+        if(from===to)return;
+        const fmt=n=>percent?Math.round(n*100)+'%':n;
+        parts.push('<span style="color:'+color+'">'+label+' '+fmt(from)+' → '+fmt(to)+'</span>');
+    };
+    if(typeof def.base==='number')add('atk',def.base,next.base,'#ff8030');
+    add('def',def.def||0,next.def||0,'#cce0a0');
+    add(LANG==='en'?'Attack speed':'Vel. ataque',def.atkSpd||0,next.atkSpd||0,'#a0c8ff',true);
+    add(LANG==='en'?'Movement':'Movimento',def.moveSpd||0,next.moveSpd||0,'#a0c8ff',true);
+    add('Regen HP',def.hpRegen||0,next.hpRegen||0,'#74d176');
+    for(const [key,pt,en,color] of [['poison','Veneno','Poison','#74d176'],['bleed','Sangramento','Bleed','#ed8888'],['burn','Fogo','Fire','#ff8030']])
+        add(LANG==='en'?en:pt,def[key]?.chance||0,next[key]?.chance||0,color,true);
     return parts.join(' &nbsp; ');
 }
 
+let _forgePending = false;
 let _forgeResult = null;   // último resultado de forja (banner no painel da bancada) — {ok, text, at}
 function renderForja(){
-    const el = document.getElementById('forjaPanel');
-    if (!el) return;
-    document.getElementById('craftGoldLabel').textContent = player.gold + ' g';
-    // Banner do último resultado (✓/✗): o float de sucesso/falha aparece no player, ATRÁS da
-    // modal, então o dono não via. Mostramos aqui dentro. Expira em 30s (não fica stale ao reabrir).
-    // Banner STICKY: gruda no topo da lista ao rolar (antes scrollava junto e sumia
-    // quando o dono descia pra escolher outro item) + fundo OPACO (não vaza item atrás).
-    const rb = (_forgeResult && Date.now() - _forgeResult.at < 30000)
-        ? `<div style="position:sticky;top:0;z-index:5;flex-shrink:0;margin:0 0 8px;padding:9px;border-radius:3px;text-align:center;font-weight:700;font-size:13px;box-shadow:0 3px 8px rgba(0,0,0,0.6);${_forgeResult.ok?'background:#16301a;border:1px solid #3a7a3a;color:#9be89b':'background:#301414;border:1px solid #7a2a2a;color:#ff9090'}">${_forgeResult.text}</div>`
-        : '';
-    // Itens sem três cópias e os já equipados continuam visíveis, com o motivo
-    // que impede a tentativa. Equipamento vestido nunca conta como material.
-    const equippedKeys = new Set(Object.values(player.equipped || {}).filter(Boolean));
-    const owned = new Map(Object.entries(player.inv).filter(([,q]) => q > 0));
-    for (const k of equippedKeys) if (!owned.has(k)) owned.set(k, 0);
-    const candidates = [...owned]
-        .filter(([k]) => ITEMS[k] && isUpgradableKind(ITEMS[k].kind))
-        .sort((a,b) => ITEMS[a[0]].name.localeCompare(ITEMS[b[0]].name, 'pt-BR'));
-    if (!candidates.length){
-        el.innerHTML = rb + `<div class="chest-empty" style="padding:24px;text-align:center;font-style:italic;color:#666">${tr('forge.no_candidates_html')}</div>`;
-        return;
+    const el=document.getElementById('forjaPanel');if(!el)return;
+    const en=LANG==='en';document.getElementById('craftGoldLabel').textContent=player.gold+' g';
+    const worn=new Set(Object.values(player.equipped||{}).filter(Boolean)),owned=new Map(Object.entries(player.inv).filter(([,q])=>q>0));
+    for(const k of worn)if(!owned.has(k))owned.set(k,0);
+    const rows=[...owned].filter(([k])=>ITEMS[k]&&isUpgradableKind(ITEMS[k].kind)).sort((a,b)=>itmName(a[0]).localeCompare(itmName(b[0])));
+    let html='<div class="ench-intro"><span class="ench-kicker">'+(en?'FORGE · UP TO +5':'FORJA · ATÉ +5')+'</span><h3>'+(en?'Strengthen the piece you chose':'Fortaleça a peça que você escolheu')+'</h3><p>'+tr('forge.header_legend')+'</p></div>';
+    if(_forgeResult&&Date.now()-_forgeResult.at<30000)html+='<p class="ench-notice" role="status">'+_forgeResult.text+'</p>';
+    if(_forgePending)html+='<p class="ench-notice" role="status">'+(en?'Waiting for the forge result. If the connection drops, reconnect to check your items.':'Aguardando o resultado da forja. Se a conexão cair, reconecte para conferir seus itens.')+'</p>';
+    if(!rows.length)html+='<p class="ench-empty">'+tr('forge.no_candidates_html')+'</p>';
+    for(const[k,q]of rows){
+        const t=getUpgradeTier(k),max=t.plus>=5,target=Math.min(5,t.plus+1),cost=max?0:forgeCostFor(t.base,target);
+        const n=t.enchanted?2:3,have=t.enchanted?(player.inv[t.stem]||0):q;
+        const ready=!_forgePending&&!max&&have>=n&&player.gold>=cost;
+        const reason=max?tr('forge.max_level',{n:5}):have<n?tr('forge.missing',{n:n-have}):player.gold<cost?tr('craft.need_gold'):'';
+        const material=t.enchanted?(en?'Requires two unenchanted copies of the same forge level. Failure consumes one copy; this piece and its enchantments remain.':'Requer duas cópias sem encantamento do mesmo nível de forja. Na falha, perde uma cópia; esta peça e seus encantamentos permanecem.'):(en?'Three equal copies from the backpack.':'Três cópias iguais da mochila.');
+        html+='<div class="craft-row"><div class="craft-out"><span class="inv-icon" style="background-image:url('+getItemIconURL(k,18)+')"></span><strong style="margin-left:7px;color:#dfc17e">'+escapeHtml(itmName(k))+'</strong><small style="margin-left:7px;color:#aa9e8b">'+(t.id?'#'+t.id.slice(-4).toUpperCase()+' · ':'')+(worn.has(k)?tr('forge.equipped'):'')+'</small></div>';
+        html+='<div class="craft-in" style="line-height:1.6">'+(max?reason:describeUpgradeBonuses(k,target))+'</div>';
+        if(t.enchanted)html+='<div class="inv-enchant-line">'+t.affixes.map(a=>escapeHtml(ValadaresEquipment.describe(a,LANG))).join(' · ')+'</div>';
+        if(!max)html+='<div class="craft-in" style="font-size:11px;line-height:1.6;color:#aa9e8b">'+material+'<br>'+have+'/'+n+' · '+cost+' g · '+tr('forge.fail_pct',{pct:Math.round(UPGRADE_FAIL[target]*100)})+'</div>';
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px"><small style="color:#ac9b82">'+(max?'':escapeHtml(reason))+'</small><button class="craft-btn" data-forge-key="'+escapeHtml(k)+'" '+(ready?'':'disabled')+'>'+(max?'+5':tr('forge.btn',{n:target}))+'</button></div></div>';
     }
-    el.innerHTML = rb + `<div style="color:#998040;font-size:10px;padding:0 6px 10px 6px;letter-spacing:0.3px;text-align:center">${tr('forge.header_legend')}</div>` +
-        candidates.map(([k,q]) => {
-            const def = ITEMS[k];
-            const tier = getUpgradeTier(k);
-            const maxed = tier.plus >= UPGRADE_MAX;
-            const target = Math.min(UPGRADE_MAX, tier.plus + 1);
-            const cost = maxed ? 0 : forgeCostFor(tier.base, target);
-            const fail = Math.round(UPGRADE_FAIL[target] * 100);
-            const canForge = !maxed && q >= 3 && player.gold >= cost;
-            const reason = maxed ? tr('forge.max_level', {n: UPGRADE_MAX})
-                : q < 3 ? tr('forge.missing', {n: 3-q}) : player.gold < cost ? tr('craft.need_gold') : '';
-            const bonusLine = maxed ? reason : describeUpgradeBonuses(k, target);
-            return `<div class="craft-row">
-                <div class="craft-out">
-                    <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})"></span>
-                    <span style="margin-left:6px;color:#e0c060;font-weight:600">${escapeHtml(itmName(k))}</span>
-                    <span style="margin-left:6px;color:#aaa;font-size:10px">${maxed ? tr('forge.available', {n:q}) : tr('forge.backpack', {n:q})}${equippedKeys.has(k) ? ' · '+tr('forge.equipped') : ''}</span>
-                </div>
-                <div class="craft-in" style="color:#aaa;font-size:10.5px;line-height:1.5">
-                    ${bonusLine}${maxed ? '' : `<br><span style="color:#ffcc40">${cost}g</span> &nbsp;·&nbsp; <span style="color:#ff8060">${tr('forge.fail_pct', {pct: fail})}</span>${reason ? '<br>'+reason : ''}`}
-                </div>
-                <button class="craft-btn" ${canForge ? '' : 'disabled'} title="${escapeHtml(reason)}" onclick="attemptForge('${k}')">${maxed ? '+'+UPGRADE_MAX : tr('forge.btn', {n: target})}</button>
-            </div>`;
-        }).join('');
+    el.innerHTML=html;
+    if(!el._forgeBound){el._forgeBound=true;el.addEventListener('click',e=>{const b=e.target.closest('[data-forge-key]');if(b&&!b.disabled)attemptForge(b.dataset.forgeKey)});}
 }
-
 function sellPriceFor(itemKey){
     const def = ITEMS[itemKey];
     if (!def) return 1;
@@ -16006,6 +16013,7 @@ window.showServerInput = showServerInput;
 window.saveServerInput = saveServerInput;
 
 function logout(){
+    window.ValadaresEnchantUI?.reset();
     // Bloqueia logout se tem selos OU é Highlander OU foi atacado recentemente
     if (player.selos > 0 || player.highlander){
         const s = player.selos > 0 ? `${player.selos} selo(s)` : 'Highlander';
@@ -17023,30 +17031,18 @@ function loop(ts){
             ctx.fillText(hint.marker, nx+TS/2, ny-6);
             ctx.globalAlpha = 1;
         }
-        // nome (sempre visível) — pill com padding real, borda dourada e sombra
+        // Nome aberto: sombra junto das letras, sem placa ou moldura.
         const label = npcName(npc);
-        ctx.font = '500 14px "Segoe UI", system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const labelW = ctx.measureText(label).width;
-        const PAD_X = 8, BOX_H = 21;
-        const boxW = Math.ceil(labelW + PAD_X * 2);
-        const boxX = Math.round(nx + TS/2 - boxW/2);
-        const boxY = Math.round(ny + TS + 2);
-        // sombra externa pra "elevar" do background
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-        ctx.fillRect(boxX + 1, boxY + 1, boxW, BOX_H);
-        // fundo escuro
-        ctx.fillStyle = 'rgba(10, 8, 5, 0.92)';
-        ctx.fillRect(boxX, boxY, boxW, BOX_H);
-        // borda dourada sutil
-        ctx.strokeStyle = 'rgba(212, 168, 71, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, BOX_H - 1);
-        // texto dourado
-        ctx.fillStyle = '#f3e2b5';
-        ctx.fillText(label, Math.round(nx + TS/2), boxY + 11);
-        ctx.textBaseline = 'alphabetic';
+        const BOX_H = 17, boxY = Math.round(ny + TS + 2);
+        ctx.save();
+        ctx.font = '400 13px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round'; ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(12,9,5,0.85)';
+        ctx.strokeText(label,Math.round(nx+TS/2),boxY+9);
+        ctx.fillStyle = near ? '#fff3c8' : '#efe1bc';
+        ctx.fillText(label,Math.round(nx+TS/2),boxY+9);
+        ctx.restore();
         // brilho ao aproximar + hint
         if (near){
             ctx.strokeStyle = 'rgba(220,180,80,0.7)';
@@ -17489,5 +17485,6 @@ function loop(ts){
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261004b"></script>
 <script src="/adventure-feedback.js?v=20261004a"></script>
+<script src="/enchanting-ui.js?v=1"></script>
 </body>
 </html>

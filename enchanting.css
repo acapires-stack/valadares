@@ -1,0 +1,42 @@
+#craftModal>.chest-box{box-sizing:border-box;min-width:0;width:min(850px,calc(100vw - 24px));max-height:calc(100dvh - 24px);display:flex;flex-direction:column;overflow:hidden}
+#craftModal .craft-list{min-height:0;overflow-y:auto;overflow-x:hidden}
+@media(max-width:600px){#craftModal>.chest-box{padding:18px 12px 12px}#craftModal .chest-title{font-size:16px;letter-spacing:4px}}
+#enchantPanel{padding:12px 16px 18px;overflow-y:auto;min-height:0;color:#dfd4bd}
+#forjaPanel .craft-row{display:block;padding:12px 8px}
+#forjaPanel .craft-out{display:flex;flex-wrap:wrap;align-items:center}
+#forjaPanel .craft-in{margin-top:6px}
+.ench-intro{padding:4px 0 12px;border-bottom:1px solid #40314d}
+.ench-kicker{color:#c2a2ed;font:10px "Segoe UI",sans-serif;letter-spacing:2px}
+.ench-intro h3{font:500 22px Georgia,serif;color:#eee0bd;margin:9px 0}
+.ench-intro p,.ench-foot{font:12px/1.6 "Segoe UI",sans-serif;color:#aba18e;margin:0}
+.ench-wallet{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0;color:#d5b9fa}
+.ench-wallet small{color:#aa9dba;font-size:11px}
+.ench-label{display:block;font-size:11px;color:#afa087;margin-bottom:6px}
+#enchantItem{box-sizing:border-box;width:100%;padding:10px;border:1px solid #514163;border-radius:5px;background:#19141f;color:#e9dbef;font:13px "Segoe UI",sans-serif}
+.ench-piece{display:flex;align-items:center;gap:12px;padding:16px 0}
+.ench-icon{width:40px;height:40px;image-rendering:pixelated;background-size:contain;flex-shrink:0}
+.ench-piece strong{display:block;font-size:14px;color:#e8d9b6}
+.ench-piece small{display:block;color:#a59a86;margin-top:5px;font-size:11px}
+.ench-plus{margin-left:auto;padding:6px 10px;border:1px solid #66532e;border-radius:5px;color:#ecd191}
+.ench-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ench-slot{border:1px dashed #4d4058;background:#18141b;padding:12px 14px;border-radius:6px}
+.ench-slot.filled{border-style:solid;border-color:#756087;background:linear-gradient(110deg,#251c2f,#17141b)}
+.ench-slot-title{display:flex;gap:12px;align-items:center}
+.ench-slot-title>span{font:11px Georgia,serif;color:#927da3}
+.ench-slot-title strong{font:500 14px "Segoe UI",sans-serif;color:#d4b5ed}
+.ench-slot p{margin:8px 0 12px;font-size:12px;color:#d9cfbf}
+.ench-slot-action{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.ench-slot-action small{color:#b8a4c9;font-size:11px}
+.ench-slot button,.ench-retry{border:1px solid #9471b1;border-radius:4px;background:#392545;color:#eddcf8;padding:7px 10px;cursor:pointer;font:12px "Segoe UI",sans-serif}
+.ench-slot button:hover:enabled,.ench-retry:hover{background:#513260}
+.ench-slot button:disabled{opacity:.42;cursor:default}
+.ench-foot{margin-top:14px}
+.ench-notice{border-left:2px solid #b691d9;background:#282032;padding:10px 12px;font-size:12px;line-height:1.5;color:#eadcf0}
+.ench-empty{padding:20px 0;color:#b6a68e;font-size:13px}
+.ench-pool{margin-top:14px;color:#ad9cbb;font-size:11px;line-height:1.6}
+.ench-pool summary{cursor:pointer;color:#c8b6db}
+.ench-pool p{margin:4px 0}
+.ench-pool small{display:block;margin-top:10px;color:#9d918e}
+.inv-enchant-line{color:#ba9adb;font-size:9px;line-height:1.5;margin-top:3px}
+@media(max-width:600px){#enchantPanel{padding:10px}.ench-intro h3{font-size:18px}.ench-wallet{gap:6px}.ench-slot{padding:10px}}
+@media(max-width:700px){.ench-slots{grid-template-columns:1fr}.ench-slot-action{flex-direction:row;justify-content:space-between;align-items:center}}
