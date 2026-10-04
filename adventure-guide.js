@@ -5,6 +5,7 @@
 
     const root = document.createElement('div');
     root.id = 'adventureGuide';
+    root.hidden = true;
     root.innerHTML = '<button id="adventureGuideOpen" type="button" aria-label="Abrir guia"></button>' +
         '<section id="adventureGuidePanel" aria-label="Primeira aventura" hidden>' +
         '<div class="ag-head"><strong id="agTitle"></strong><button id="agClose" type="button" aria-label="Recolher guia">×</button></div>' +
