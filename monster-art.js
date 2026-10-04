@@ -17,6 +17,15 @@
         gold:'#b98c49', goldHi:'#e5bf70'
     };
     const cache = new Map();
+    const extraPainters = new Map();
+    function registerTypes(definitions,painter){
+        if(!definitions||typeof painter!=='function') return;
+        for(const [type,def]of Object.entries(definitions)){
+            if(TYPES.has(type)||!def||!Number.isFinite(def.size)) continue;
+            TYPES.add(type);SIZE[type]=def.size;
+            extraPainters.set(type,{paint:painter,idle:!!def.idle});
+        }
+    }
 
     function paint(g,type,dir,walk,attack,idle){
         const back=dir==='up', side=dir==='left'||dir==='right';
@@ -41,6 +50,11 @@
         };
         const flip=()=>{ if(left){g.translate(48,0);g.scale(-1,1);} };
         const step=walk===0?0:walk>0?2:-2;
+        const extra=extraPainters.get(type);
+        if(extra){
+            extra.paint(g,{type,dir,walk,attack,idle,back,side,left,step,R,P,H,V,flip,C});
+            return;
+        }
         if(attack&&['RAT','SPIDER','WOLF'].includes(type)){
             const reach=attack===2?2:1;
             g.translate(side?(left?-reach:reach):0,side?0:back?-reach:reach);
@@ -398,7 +412,7 @@
         const walk=w>.3?1:w<-.3?-1:0;
         const a=Number(opts.attackPhase)||0;
         const attack=a>.5?2:a>.05?1:0;
-        const idle=(type==='DRAKE'||type==='DRAKE_LIDER')&&Number.isFinite(opts.timeMs)&&Math.floor(opts.timeMs/600)%2!==0?1:0;
+        const idle=(type==='DRAKE'||type==='DRAKE_LIDER'||extraPainters.get(type)?.idle)&&Number.isFinite(opts.timeMs)&&Math.floor(opts.timeMs/600)%2!==0?1:0;
         const scale=Math.max(.55,Math.min(1.7,Number(m.size)||SIZE[type]));
         const key=[type,dir,walk,attack,idle].join(':');
         let sprite=cache.get(key);
@@ -407,7 +421,7 @@
             sprite.width=64;sprite.height=64;
             const g=sprite.getContext('2d');
             if(g){g.translate(8,8);paint(g,type,dir,walk,attack,idle);
-                // At most 360 direction/pose combinations (under 6 MiB of RGBA pixels).
+                // Only finite direction/pose combinations enter this cache, never entity IDs or time.
                 cache.set(key,sprite);
             }else sprite=null;
         }
@@ -426,5 +440,5 @@
         return true;
     }
 
-    window.ValadaresMonsterArt2D=Object.freeze({drawBody});
+    window.ValadaresMonsterArt2D=Object.freeze({drawBody,registerTypes});
 })();
