@@ -42,6 +42,32 @@ body:not(.touch) #leftSidebar #minimap { width: 116px; height: 116px; }
 .s-label { color: #c2a46a; font-size: 11px; letter-spacing: 1px; }
 .s-value, .skill-name, #spellList, #inventory, #equipment,
 #targetWidget, #players-online, #pvpWidget, #bossesWidget { font-size: 12px !important; }
+/* Nome em uma linha própria; vida e efeitos cabem mesmo na coluna clássica. */
+#targetWidget, #players-online {
+    min-width: 0; overflow-x: hidden; overscroll-behavior-y: contain;
+    scrollbar-width: thin; scrollbar-color: #8c6b32 #0a0805;
+}
+#targetWidget .bl-row {
+    display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto auto;
+    gap: 4px; padding: 5px 4px; min-width: 0; flex-shrink: 0;
+}
+#targetWidget .bl-dot { grid-row: 1; grid-column: 1; }
+#targetWidget .bl-name {
+    grid-row: 1; grid-column: 2 / -1; white-space: normal;
+    overflow-wrap: anywhere; line-height: 1.25;
+}
+#targetWidget .bl-row > span:not(.bl-dot):not(.bl-name) { grid-row: 2; }
+#targetWidget .bl-hp { grid-column: 1 / 3; width: 100%; min-width: 0; height: 13px; }
+#targetWidget .bl-hp-txt { font-size: 8px; }
+#targetWidget .bl-auto { justify-self: end; }
+#rightSidebar .split-half:has(> #targetWidget) { flex-grow: 2; }
+body.layout-focus #targetWidget { max-height: min(300px, 35dvh); }
+#floorBadge {
+    position: absolute; top: 10px; left: 10px; z-index: 30; pointer-events: none;
+    background: rgba(18, 8, 22, .85); border: 1px solid #5a2a6a; color: #e6c8f5;
+    font: 700 13px monospace; letter-spacing: 1px; padding: 4px 14px;
+    border-radius: 7px; box-shadow: 0 2px 12px rgba(80, 20, 90, .4); text-shadow: 0 1px 2px #000;
+}
 #leftSidebar .bar-wrap { height: 13px; }
 #chatPanel { width: 0; min-width: 100%; }
 #chatMessages, #log { font-size: 12px; line-height: 1.4; }
@@ -91,6 +117,7 @@ body.touch:not(.game-active) #orientationLock { display: none !important; }
     body.touch:not(.game-active) #orientationLock { display: none !important; }
 }
 @media (max-width: 900px) {
+    #targetWidget { max-height: min(300px, 35dvh); }
     body { padding: 0 0 env(safe-area-inset-bottom); }
     body.touch #displayControls { display: none; }
     #gameWrapper { width: 100%; padding: 0; flex-direction: column; }

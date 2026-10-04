@@ -79,16 +79,6 @@
         #recBtn:hover { opacity: 1; color: #ff8c8c; border-color: #8a4040; }
         #recBtn.recording { opacity: 1; color: #fff; background: rgba(190,30,30,0.9); border-color: #ff5454; animation: recPulse 1.2s infinite; }
         @keyframes recPulse { 0%,100%{ box-shadow:0 0 0 0 rgba(255,60,60,.5); } 50%{ box-shadow:0 0 9px 2px rgba(255,60,60,.75); } }
-        /* Medidor do modo 3D (beta) — Etapa 1 do port existe pra produzir ESTE número.
-           `absolute` (não `fixed`) dentro do #gameContainer, que é position:relative —
-           mesmo padrão do #recBtn. */
-        #r3dPerf {
-            position: absolute; top: 6px; left: 6px; z-index: 30; display: none;
-            background: rgba(10,14,20,0.72); color: #7fd4ff;
-            border: 1px solid #2a4a5a; border-radius: 3px;
-            font-size: 10px; font-family: monospace; letter-spacing: 0.4px;
-            padding: 3px 7px; pointer-events: none; white-space: nowrap;
-        }
         /* Canvas no tamanho natural (720×528). Quem quiser maior usa zoom
            do navegador (Ctrl+= / Ctrl+-) — funciona sem perder coords. */
         canvas#canvas {
@@ -1729,7 +1719,7 @@
         .lang-btn:hover { opacity: 0.9; }
         .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
-    <link rel="stylesheet" href="/ui-polish.css?v=20261004a">
+    <link rel="stylesheet" href="/ui-polish.css?v=20261004c">
     <link rel="stylesheet" href="/adventure-guide.css?v=20261003a">
 </head>
 <body>
@@ -1941,7 +1931,8 @@
             <span data-i18n="ui.first_body">Mova-se com WASD, use Espaço perto de um NPC para conversar e abra Q para ver as missões.</span>
             <button type="button" id="firstStepsDismiss" data-i18n="ui.got_it">Entendi</button>
         </div>
-        <div id="r3dPerf">3D —</div>
+        <!-- Indicador de andar acompanha o canvas; posição e aparência ficam no CSS. -->
+        <div id="floorBadge" style="display:none">🕳️ <span id="floorBadgeText">—</span></div>
         <button id="recBtn" title="Gravar um clipe do gameplay (só a tela do jogo, sem HUD)" data-i18n-title="hud.rec_title" onclick="toggleRecording()">● REC</button>
 
         <!-- LOG / CHAT — abaixo do canvas -->
@@ -2421,12 +2412,6 @@
         <button class="chest-btn" style="margin-top:6px" onclick="uiToggleFullscreen()" id="uiFullscreenBtn" data-i18n="settings.fullscreen">⛶ Tela cheia (F11)</button>
         <div style="color:#666;font-size:10px;padding:6px 6px 0;letter-spacing:0.3px" data-i18n-html="settings.access_hint">atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia</div>
 
-        <div class="chest-head" style="margin-top:14px" data-i18n="settings.graphics">GRÁFICOS</div>
-        <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px" data-i18n="settings.r3d_desc">Modo 3D (beta). Nesta primeira versão só o TERRENO aparece em 3D — personagens, monstros e efeitos ainda não. Serve pra testar desempenho. Arraste pra girar a câmera, use a roda pra aproximar.</div>
-        <button class="chest-btn" id="r3dBtn" onclick="toggle3d()" data-i18n="settings.r3d_off">🧊 Ligar modo 3D (beta)</button>
-        <div id="r3dStatus" style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:6px 6px 0;min-height:14px"></div>
-        <div style="color:#666;font-size:10px;padding:2px 6px 0;letter-spacing:0.3px" data-i18n="settings.r3d_hint">Se o jogo ficar lento, desligue aqui. Sua escolha fica salva.</div>
-
         <div id="systemSectionHead" class="chest-head" style="margin-top:14px;display:none" data-i18n="settings.system">SISTEMA (DESKTOP)</div>
         <div id="systemSection" style="display:none">
             <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px">Versão instalada: <span id="appVersion" style="color:#ffd060;font-weight:bold">—</span></div>
@@ -2590,13 +2575,6 @@ const I18N = {
     'settings.zoom_reset': '↺ Padrão',
     'settings.fullscreen': '⛶ Tela cheia (F11)',
     'settings.access_hint': 'atalhos: <kbd>Ctrl</kbd>+<kbd>=</kbd> aumenta · <kbd>Ctrl</kbd>+<kbd>−</kbd> diminui · <kbd>Ctrl</kbd>+<kbd>0</kbd> volta · <kbd>F11</kbd> tela cheia',
-    'settings.graphics': 'GRÁFICOS',
-    'settings.r3d_desc': 'Modo 3D (beta). Nesta primeira versão só o TERRENO aparece em 3D — personagens, monstros e efeitos ainda não. Serve pra testar desempenho. Arraste pra girar a câmera, use a roda pra aproximar.',
-    'settings.r3d_off': '🧊 Ligar modo 3D (beta)',
-    'settings.r3d_on': '🧊 Desligar modo 3D (voltar ao 2D)',
-    'settings.r3d_loading': 'carregando o 3D…',
-    'settings.r3d_fail': 'não deu pra ligar o 3D neste aparelho (sem WebGL ou o CDN não respondeu) — seguindo em 2D.',
-    'settings.r3d_hint': 'Se o jogo ficar lento, desligue aqui. Sua escolha fica salva.',
     'settings.system': 'SISTEMA (DESKTOP)',
     'settings.check_updates': '🔄 Verificar atualizações',
     'settings.tutorial_head': 'TUTORIAL',
@@ -3294,13 +3272,6 @@ const I18N = {
     'settings.zoom_reset': '↺ Default',
     'settings.fullscreen': '⛶ Fullscreen (F11)',
     'settings.access_hint': 'shortcuts: <kbd>Ctrl</kbd>+<kbd>=</kbd> zoom in · <kbd>Ctrl</kbd>+<kbd>−</kbd> zoom out · <kbd>Ctrl</kbd>+<kbd>0</kbd> reset · <kbd>F11</kbd> fullscreen',
-    'settings.graphics': 'GRAPHICS',
-    'settings.r3d_desc': '3D mode (beta). In this first version only the TERRAIN is rendered in 3D — characters, monsters and effects are not. It exists to test performance. Drag to orbit the camera, scroll to zoom.',
-    'settings.r3d_off': '🧊 Turn 3D mode on (beta)',
-    'settings.r3d_on': '🧊 Turn 3D mode off (back to 2D)',
-    'settings.r3d_loading': 'loading 3D…',
-    'settings.r3d_fail': "couldn't start 3D on this device (no WebGL or the CDN didn't answer) — staying in 2D.",
-    'settings.r3d_hint': 'If the game gets slow, turn it off here. Your choice is saved.',
     'settings.system': 'SYSTEM (DESKTOP)',
     'settings.check_updates': '🔄 Check for updates',
     'settings.tutorial_head': 'TUTORIAL',
@@ -4001,9 +3972,7 @@ function setLang(l){
   applyI18n();
   updateLangButtons();
   if (window.valadaresUi) window.valadaresUi.updateLabels();
-  // o rótulo do toggle 3D depende do estado (ligar/desligar), não só da chave —
-  // applyI18n acabou de repor o texto "off", então corrige aqui
-  try { updateR3dBtn(); } catch(e){}
+  invSignature = null; // rótulos do inventário dependem do idioma
 }
 // Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
 window.addEventListener('DOMContentLoaded', () => { try { applyI18n(); updateLangButtons(); } catch(e){} });
@@ -10797,6 +10766,20 @@ function pkKilledSomeone(msg){
     saveState();
 }
 
+// Evita recriar nós dos widgets a cada frame. O HTML completo é a assinatura:
+// alvo, HP, status, distância, idioma e timers continuam atualizando quando mudam.
+const _widgetRenderState = new WeakMap();
+function setWidgetHtml(el, html, className){
+    const prev = _widgetRenderState.get(el);
+    // A tradução/reentrada pode substituir os nós fora deste renderizador.
+    if (prev && prev.html === html && prev.className === className &&
+        prev.firstChild === el.firstChild && el.firstChild &&
+        (className === undefined || el.className === className)) return;
+    if (className !== undefined && el.className !== className) el.className = className;
+    el.innerHTML = html;
+    _widgetRenderState.set(el, { html, className, firstChild: el.firstChild });
+}
+
 // Lista inicial dos players (chamada no msg 'state'); o render real é dinâmico
 function updatePlayersOnline(){ renderPlayersOnline(); }
 
@@ -10824,16 +10807,16 @@ function renderPlayersOnline(){
         : `${totalOnline} online`;
 
     if (remotes.length === 0){
-        el.innerHTML = `
+        setWidgetHtml(el, `
             <div class="po-header">${headerTxt}</div>
             <div style="padding:8px 6px;color:#666;font-size:10px;text-align:center;font-style:italic">${tr('widget.only_you')}</div>
-        `;
+        `);
         return;
     }
-    el.innerHTML = `
+    setWidgetHtml(el, `
         <div class="po-header">${headerTxt}</div>
         ${remotes.map(p => renderPlayerRow(p)).join('')}
-    `;
+    `);
 }
 
 function renderPlayerRow(p){
@@ -11005,7 +10988,7 @@ function updateSidebar(){
         if (wI && wI.burn)   procs.push(`<span style="color:#ff8030">🔥${Math.round(wI.burn.chance*100)}%</span>`);
         if (procs.length){
             procsRow.style.display = '';
-            procsVal.innerHTML = procs.join(' ');
+            setWidgetHtml(procsVal, procs.join(' '));
         } else {
             procsRow.style.display = 'none';
         }
@@ -11016,18 +10999,18 @@ function updateSidebar(){
     if (spEl){
         const sp = SPELLS[player.activeSpell];
         if (!sp){
-            spEl.innerHTML = '<div style="color:#666;font-size:10px">— nenhuma equipada —</div>';
+            setWidgetHtml(spEl, '<div style="color:#666;font-size:10px">— nenhuma equipada —</div>');
         } else {
             const cd = spellCooldowns[player.activeSpell] || 0;
             const cdTxt = cd > 0 ? `<span style="color:#cc5050">${(cd/1000).toFixed(1)}s</span>` : '<span style="color:#74d176">pronto</span>';
             const manaTxt = player.mp >= sp.manaCost ? '#aaccff' : '#cc5050';
-            spEl.innerHTML = `<div style="display:flex;align-items:center;gap:6px">
+            setWidgetHtml(spEl, `<div style="display:flex;align-items:center;gap:6px">
                 <kbd style="background:#1a1408;border:1px solid #3a2d10;padding:1px 5px;font-size:9px;color:#c8a050">R</kbd>
                 <span style="flex:1;color:${sp.glow}">${spellName(player.activeSpell)}</span>
                 <span style="color:${manaTxt};font-size:10px">${sp.manaCost}mp</span>
                 <span style="font-size:10px;min-width:36px;text-align:right">${cdTxt}</span>
             </div>
-            <div style="color:#5a4818;font-size:9px;margin-top:3px;letter-spacing:1px">[M] altar p/ trocar</div>`;
+            <div style="color:#5a4818;font-size:9px;margin-top:3px;letter-spacing:1px">[M] altar p/ trocar</div>`);
         }
     }
     // glow verde nas barras quando ganha máximo
@@ -11163,18 +11146,15 @@ function renderTargetWidget(){
     const el = document.getElementById('targetWidget');
     if (!el) return;
     if (playerInSafeZone()){
-        el.className = '';
-        el.innerHTML = `<div style="text-align:center;color:#6fb8e8;padding:6px 0;font-size:11px;font-weight:600;letter-spacing:1px">${tr('widget.safe_zone')}</div>`;
+        setWidgetHtml(el, `<div style="text-align:center;color:#6fb8e8;padding:6px 0;font-size:11px;font-weight:600;letter-spacing:1px">${tr('widget.safe_zone')}</div>`, '');
         return;
     }
     const list = getBattleList();
     if (!list.length){
-        el.className = 'target-empty';
-        el.innerHTML = tr('widget.no_enemies');
+        setWidgetHtml(el, tr('widget.no_enemies'), 'target-empty');
         return;
     }
-    el.className = 'battle-list';
-    el.innerHTML = list.map(e => {
+    const html = list.map(e => {
         const isCur = player.target === e.id && player.targetType === e.type;
         const pct = Math.max(0, e.hp) / (e.maxHp || 1) * 100;
         const color = pct > 50 ? '#4caf50' : pct > 25 ? '#ffaa00' : '#cc3030';
@@ -11188,6 +11168,7 @@ function renderTargetWidget(){
             ${auto}
         </div>`;
     }).join('');
+    setWidgetHtml(el, html, 'battle-list');
 }
 
 function renderPvpWidget(){
@@ -11219,7 +11200,7 @@ function renderPvpWidget(){
                 <div class="hunt-label">${tr('pvp.hunt_in', {s: Math.ceil(remaining/1000)})}</div>`;
         }
     }
-    el.innerHTML = `<div class="pvp-skulls">${skulls}</div>${stateHtml}${pzLock}${huntBlock}`;
+    setWidgetHtml(el, `<div class="pvp-skulls">${skulls}</div>${stateHtml}${pzLock}${huntBlock}`);
 }
 
 function renderBossesWidget(){
@@ -11230,7 +11211,7 @@ function renderBossesWidget(){
         { type:'DRAKE_LIDER', name:'Drake Ancião',  deathT: (typeof drakeBossDeathTime!=='undefined'?drakeBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
         { type:'GOLEM_REI',   name:'Golem Rei',     deathT: (typeof golemBossDeathTime!=='undefined'?golemBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
     ];
-    el.innerHTML = list.map(b => {
+    const html = list.map(b => {
         const aliveMob = monsters.find(m => m.type === b.type);
         const lvl = aliveMob && aliveMob.level ? aliveMob.level : 1;
         let status, cls;
@@ -11255,6 +11236,7 @@ function renderBossesWidget(){
         }
         return `<div class="boss-row ${cls}"><span class="boss-name">${mobName(b.type)}</span>${status}</div>`;
     }).join('');
+    setWidgetHtml(el, html);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -16401,17 +16383,13 @@ function restoreFromBackup(){
 window.restoreFromBackup = restoreFromBackup;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MODO 3D (beta) — ETAPA 1 do "port do 3D pro MMO"
-// O render 2D NÃO é reescrito: o 3D entra AO LADO, com toggle e fallback. Nesta
-// etapa o 3D desenha só o TERRENO (chão + árvores + paredes + água) e a câmera
-// segue o player; personagens são a Etapa 2. Por isso o 2D segue rodando embaixo.
-// Three.js entra por import() de CDN só quando o jogador liga — quem não liga não
-// baixa nada. Sem WebGL / CDN fora → fica no 2D (nada quebra).
+// Helpers antigos do modo 3D, mantidos para eventual revisão.
+// O jogo executa apenas o canvas 2D; nenhuma função abaixo carrega render3d.js.
 // ═══════════════════════════════════════════════════════════════════════════
-let r3d = null;            // namespace do módulo (só existe depois do import())
-let r3dOn = false;         // o jogador quer 3D?
-let r3dBusy = false, _r3dRestored = false;
-const R3D_PREF = 'valadares:3d';
+// Modo 3D desativado: o canvas 2D é sempre o único renderizador ativo.
+// Mantemos os helpers de rasterização para uma eventual revisão futura.
+const r3dOn = false;
+try { localStorage.removeItem('valadares:3d'); } catch(e){}
 
 // ─── ctx-gravador (Etapa 2) ───
 // Não existe tabela de sprites no MMO: personagem e mob são DESENHADOS por código
@@ -16573,71 +16551,6 @@ function r3dBridge(){
         stoneTiles: getStoneTiles,
         SAFE_CX, SAFE_CY, SAFE_RADIUS,
     };
-}
-
-function updateR3dBtn(){
-    const b = document.getElementById('r3dBtn');
-    if (b) b.textContent = tr(r3dOn ? 'settings.r3d_on' : 'settings.r3d_off');
-}
-function r3dSay(msg){
-    const s = document.getElementById('r3dStatus');
-    if (s) s.textContent = msg || '';
-}
-function r3dPerfShow(on){
-    const el = document.getElementById('r3dPerf');
-    if (el) el.style.display = on ? 'block' : 'none';
-}
-function r3dOff(){
-    r3dOn = false;
-    if (r3d) r3d.set3dVisible(false);
-    r3dPerfShow(false);
-    updateR3dBtn();
-}
-
-async function toggle3d(){
-    if (r3dBusy) return;
-    if (r3dOn){
-        r3dOff();
-        try { localStorage.setItem(R3D_PREF, '0'); } catch(e){}
-        r3dSay('');
-        return;
-    }
-    r3dBusy = true;
-    r3dSay(tr('settings.r3d_loading'));
-    try {
-        if (!r3d) r3d = await import('./render3d.js');
-        const ok = await r3d.ensure3d(canvas, r3dBridge());
-        if (!ok){ r3dSay(tr('settings.r3d_fail')); r3d = null; return; }   // fallback: segue 2D
-        r3dOn = true;
-        r3d.set3dVisible(true);
-        try { localStorage.setItem(R3D_PREF, '1'); } catch(e){}
-        r3dSay('');
-        r3dPerfShow(true);
-    } catch(e){
-        console.warn('[3d] falhou ao ligar:', e);
-        r3dSay(tr('settings.r3d_fail'));
-        r3d = null;
-    } finally {
-        r3dBusy = false;
-        updateR3dBtn();
-    }
-}
-
-// Medidor — é o ENTREGÁVEL desta etapa: `ms` é o custo ISOLADO do frame 3D, o
-// número que responde "o chão com scroll aguenta?" sem se confundir com o custo
-// do 2D que já rodava antes.
-let _r3dFps = 0, _r3dFrames = 0, _r3dFpsT = 0, _r3dMs = 0;
-function r3dPerfTick(dt, ms3d){
-    _r3dFrames++; _r3dFpsT += dt;
-    _r3dMs = _r3dMs ? _r3dMs*0.9 + ms3d*0.1 : ms3d;   // média móvel
-    if (_r3dFpsT < 500) return;
-    _r3dFps = Math.round(_r3dFrames*1000/_r3dFpsT);
-    _r3dFrames = 0; _r3dFpsT = 0;
-    const el = document.getElementById('r3dPerf');
-    if (!el || !r3d) return;
-    const i = r3d.r3dInfo();
-    if (!i) return;
-    el.textContent = `3D ${_r3dFps}fps · ${_r3dMs.toFixed(1)}ms · ${i.chars} chars · ${i.calls} draws · ${(i.tris/1000).toFixed(1)}k tris · ${i.drawSize.w}×${i.drawSize.h}@${i.drawSize.dpr}`;
 }
 
 function loop(ts){
@@ -17232,26 +17145,6 @@ function loop(ts){
 
     updateSidebar();
 
-    // ─── MODO 3D (Etapa 1) ───
-    // Roda DEPOIS do 2D e desenha por cima. Um frame 3D que estoure NÃO pode
-    // derrubar o jogo: cai pro 2D e segue.
-    if (r3dOn && r3d && r3d.is3dReady()){
-        const t0 = performance.now();
-        try {
-            r3d.drawScene3d(ts, dt);
-            r3dPerfTick(dt, performance.now() - t0);
-        } catch(e){
-            console.warn('[3d] frame falhou — voltando pro 2D:', e);
-            r3dOff();
-        }
-    }
-    // Preferência salva: religa o 3D no 1º frame depois do login (aqui o layout do
-    // canvas já assentou — ensure3d precisa do tamanho real pra montar o overlay).
-    if (!_r3dRestored){
-        _r3dRestored = true;
-        try { if (localStorage.getItem(R3D_PREF) === '1') toggle3d(); } catch(e){}
-    }
-
     requestAnimationFrame(loop);
 }
 
@@ -17399,8 +17292,5 @@ function loop(ts){
 <script src="/render2d-polish.js?v=20261003a"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261003a"></script>
-<!-- M4 3b: indicador de andar da masmorra — filho DIRETO do body (NÃO do #gameWrapper,
-     que é flex-row e esticaria a altura do fixed). Visível só em floor>=1; acento por profundidade. -->
-<div id="floorBadge" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,8,22,0.85);border:1px solid #5a2a6a;color:#e6c8f5;font-family:monospace;font-weight:700;font-size:13px;letter-spacing:1px;padding:4px 14px;border-radius:7px;box-shadow:0 2px 12px rgba(80,20,90,0.4);text-shadow:0 1px 2px #000;display:none">🕳️ <span id="floorBadgeText">—</span></div>
 </body>
 </html>
