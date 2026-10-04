@@ -1560,6 +1560,7 @@ const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada FIXA ao entrar/trocar de
 // dá um fim formal à recursão. Inalcançável na prática (andar 999 = mobs ×600).
 const DUNGEON_FLOOR_HARD_CAP = 999;
 const DUNGEON_BOSS_EVERY  = 5;                // boss a cada N andares (5, 10, 15…)
+const DUNGEON_TOWN_STAIR_FIRST = 25;          // retorno direto à cidade nas bandas profundas
 const DUNGEON_FLOOR_SCALE = 0.6;              // +60% hp/dmg/xp por andar de profundidade (andar 1 = base)
 const DUNGEON_BOSS_SCALE  = 0.30;             // boss: +30% hp/dmg/xp por andar ALÉM do 5 (andar 5 = base, igual antes)
 const DUNGEON_LOOT_SCALE  = 0.15;             // +15% de GOLD dropado por andar (andar 1 = base) — paga o risco de descer
@@ -1715,10 +1716,27 @@ function genDungeonGrid(floor){
         }
         if (!bossSpot) bossSpot = { x: far.x, y: far.y };   // caverna minúscula: degenera pro fundo
     }
+    // Retorno à cidade nas bandas a partir do 25. Escolhe chão alcançável perto
+    // da subida, mas fora do alcance imediato das outras escadas e da chegada.
+    let town = null;
+    if (floor >= DUNGEON_TOWN_STAIR_FIRST && isBossFloor(floor)){
+        const apart = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+        for (const minGap of [3, 2]){
+            let best = Infinity;
+            for (const t of floorTiles){
+                if (apart(t, up) < minGap || apart(t, DUNGEON_SPAWN) < minGap) continue;
+                if (apart(t, far) < 2 || (bossSpot && apart(t, bossSpot) < 2)) continue;
+                const score = apart(t, up) * 100 + apart(t, DUNGEON_SPAWN);
+                if (score < best){ best = score; town = { x: t.x, y: t.y }; }
+            }
+            if (town) break;
+        }
+    }
     const stairs = {
         spawn: { x: DUNGEON_SPAWN.x, y: DUNGEON_SPAWN.y },
         up:    { x: up.x,  y: up.y  },
         down:  lastFloor ? null : { x: far.x, y: far.y },     // escada de descida = ponto mais fundo
+        town,                                                // retorno direto, sem novo checkpoint
         boss:  bossSpot,                                       // só nas bandas (5, 10, 15…)
     };
     return { floor, region: { x0, y0, x1, y1 }, rows, walkable, floorTiles, stairs };
@@ -1759,7 +1777,8 @@ function isTransitionTile(floor, x, y){
     const s = g.stairs;
     return (s.spawn && x === s.spawn.x && y === s.spawn.y) ||
            (s.up    && x === s.up.x    && y === s.up.y)    ||
-           (s.down  && x === s.down.x  && y === s.down.y);
+           (s.down  && x === s.down.x  && y === s.down.y)  ||
+           (s.town  && x === s.town.x  && y === s.town.y);
 }
 function mobTileOk(m, x, y){
     const f = m.floor || 0;
@@ -2389,7 +2408,7 @@ function spawnDungeonMobs(){
         for (const m of monsters.values()) if ((m.floor || 0) === floor && m.hp > 0 && !m.unique) count++;
         // não nasce em cima das escadas/chegada/boss (3×3 ao redor de cada uma)
         const stairTiles = new Set();
-        for (const s of [g.stairs.spawn, g.stairs.up, g.stairs.down, g.stairs.boss]){
+        for (const s of [g.stairs.spawn, g.stairs.up, g.stairs.down, g.stairs.town, g.stairs.boss]){
             if (s) for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) stairTiles.add((s.x+dx)+','+(s.y+dy));
         }
         let tries = 0;
@@ -4848,13 +4867,28 @@ function weaponRangeServer(p){
 // Mana do tiro básico da wand (Fase 2b). Descontado no attackMob (ataque de arma sem
 // janela de magia). As magias de cooldown já pagam no spellCast.
 const WAND_MANA_COST = 4;
+const FORGE_ATTACK_BONUS_SERVER = [0, 1, 2, 3, 5, 7];
 // Base da wand equipada (0 se não for wand). Entra no cap de magia e no gate de ataque.
 function wandBaseServer(p){
     const wKey = p.equipped && p.equipped.weapon;
     if (!wKey) return 0;
-    const base = String(wKey).replace(/_PLUS_\d+$/, '');
-    const meta = ITEM_META[base];
-    return (meta && meta.kind === 'wand') ? (meta.base || 0) : 0;
+    const tier = getUpgradeTier(wKey);
+    const meta = ITEM_META[tier.base];
+    return (meta && meta.kind === 'wand')
+        ? (meta.base || 0) + (FORGE_ATTACK_BONUS_SERVER[tier.plus] || 0) : 0;
+}
+// Efeitos da forja escalam com o dano efetivamente causado pelo golpe.
+// Chance, nível e dano vêm do servidor; msg.dots não concede DoTs de arma.
+function rollWeaponForgeDotsServer(p, hitDamage){
+    const tier = getUpgradeTier(p.equipped && p.equipped.weapon);
+    const meta = ITEM_META[tier.base];
+    if (!meta || !['weapon','wand'].includes(meta.kind) || tier.plus < 3 || tier.plus > UPGRADE_MAX || !(hitDamage > 0)) return [];
+    const specs = [{ type:'poison', chance:tier.plus === 3 ? 0.10 : tier.plus === 4 ? 0.15 : 0.20, min:2, scale:0.10, ticks:4 }];
+    if (tier.plus >= 4) specs.push({ type:'bleed', chance:tier.plus === 4 ? 0.10 : 0.15, min:3, scale:0.15, ticks:3 });
+    if (tier.plus === 5) specs.push({ type:'burn', chance:0.10, min:4, scale:0.20, ticks:3 });
+    return specs.filter(s => Math.random() < s.chance).map(s => ({
+        type:s.type, dmg:Math.max(s.min, Math.round(hitDamage * s.scale)), ticks:s.ticks,
+    }));
 }
 function attackDamageCapServer(p, spellWin){
     if (spellWin){
@@ -4900,8 +4934,11 @@ function pvpMultsServer(p){
     return m;
 }
 function broadcastPstatsAll(p){
+    const regen = playerRegenDetailsServer(p);
+    p._regenStatsSig = JSON.stringify(regen);
     const payload = JSON.stringify({
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
+        regen,
         cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null,
         scReadyAt: p.scReadyAt || 0   // 🕯️ Segunda Chance: cliente mostra cooldown no modal
     });
@@ -4913,38 +4950,47 @@ function broadcastPstatsAll(p){
 }
 const REGEN_HP_BASE_MS = 4000;
 const REGEN_MP_BASE_MS = 2000;
+function playerRegenDetailsServer(p){
+    const inPz = playerInSafe(p);
+    const mults = pvpMultsServer(p);
+    const talent = (p.permaBuffs && p.permaBuffs.regenBonus) || 0;
+    return {
+        active: p._tabActive !== false && (p.hp ?? 100) > 0,
+        hpTick: 1 + armorHpRegenServer(p) + (inPz ? 1 : 0) + talent + Math.round(petBuffVal(p, 'regenBonus')),
+        mpTick: (inPz ? 2 : 1) + talent,
+        hpIntervalMs: REGEN_HP_BASE_MS / (mults.regenHp * (inPz ? 4 : 1)),
+        mpIntervalMs: REGEN_MP_BASE_MS / (mults.regenMp * (inPz ? 3 : 1)),
+        tickMs: 500,
+    };
+}
 function tickPlayerRegen(){
     const now = Date.now();
     for (const p of players.values()){
         if (!p.ws || p.ws.readyState !== 1) continue;
-        if ((p.hp ?? 100) <= 0) continue;
-        if (p._tabActive === false) continue;
+        const regen = playerRegenDetailsServer(p);
+        const infoChanged = p._regenStatsSig !== JSON.stringify(regen);
+        if (!regen.active){
+            if (infoChanged) broadcastPstatsAll(p);
+            continue;
+        }
         p._regenHpAt = p._regenHpAt || now;
         p._regenMpAt = p._regenMpAt || now;
-        const inPz = playerInSafe(p);   // regen turbo só na cidade, não na masmorra
-        const pzHp = inPz ? 4 : 1;
-        const pzMp = inPz ? 3 : 1;
-        const mults = pvpMultsServer(p);
-        const armorHp = armorHpRegenServer(p);
-        const talent = (p.permaBuffs && p.permaBuffs.regenBonus) || 0;
-        const hpInterval = REGEN_HP_BASE_MS / (mults.regenHp * pzHp);
-        const mpInterval = REGEN_MP_BASE_MS / (mults.regenMp * pzMp);
         let changed = false;
         const maxHp = p.maxHp || 100;
         const maxMp = p.maxMp || 0;
-        if (now - p._regenHpAt >= hpInterval && p.hp < maxHp){
-            const heal = 1 + armorHp + (inPz ? 1 : 0) + talent + Math.round(petBuffVal(p, 'regenBonus'));
+        if (now - p._regenHpAt >= regen.hpIntervalMs && p.hp < maxHp){
+            const heal = regen.hpTick;
             p.hp = Math.min(maxHp, p.hp + heal);
             p._regenHpAt = now;
             changed = true;
         }
-        if (maxMp > 0 && now - p._regenMpAt >= mpInterval && p.mp < maxMp){
-            const mpGain = (inPz ? 2 : 1) + talent;
+        if (maxMp > 0 && now - p._regenMpAt >= regen.mpIntervalMs && p.mp < maxMp){
+            const mpGain = regen.mpTick;
             p.mp = Math.min(maxMp, p.mp + mpGain);
             p._regenMpAt = now;
             changed = true;
         }
-        if (changed) broadcastPstatsAll(p);
+        if (changed || infoChanged) broadcastPstatsAll(p);
     }
 }
 setInterval(safeTick('tickPlayerRegen', tickPlayerRegen), 500);
@@ -6359,6 +6405,7 @@ wss.on('connection', (ws, request) => {
             p.floor = 0;
             ws.send(JSON.stringify({
                 t:'state', you: id,
+                weaponDotsAuthoritative: true,
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
@@ -6601,7 +6648,9 @@ wss.on('connection', (ws, request) => {
             if (!itemKey) return;
             const tier = getUpgradeTier(itemKey);
             const baseMeta = ITEM_META[tier.base];
-            if (!baseMeta){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item_forge') }); return; }
+            if (!baseMeta || !['weapon','wand','offhand','armor','head','feet','neck'].includes(baseMeta.kind)){
+                sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_item_forge') }); return;
+            }
             const targetPlus = tier.plus + 1;
             if (targetPlus > UPGRADE_MAX){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.max_level', {n: UPGRADE_MAX}) }); return; }
             const have = (p.inv && p.inv[itemKey]) || 0;
@@ -7635,6 +7684,24 @@ wss.on('connection', (ws, request) => {
             return;
         }
 
+        if (msg.t === 'returnDungeonTown') {
+            if (p.arena || p.duel || !(p.hp > 0)) return;
+            const now = Date.now();
+            p._lastFloorAt = p._lastFloorAt || 0;
+            if (now - p._lastFloorAt < 600) return;
+            const cur = p.floor || 0;
+            if (!isDungeonFloor(cur) || cur < DUNGEON_TOWN_STAIR_FIRST || !isBossFloor(cur)) return;
+            const town = getDungeonFloor(cur).stairs.town;
+            if (!town || chebyshev(p.x, p.y, town.x, town.y) > 1){
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
+                return;
+            }
+            p._lastFloorAt = now;
+            returnPlayerToTown(p, id);
+            console.log(`[dungeon] ${p.name} voltou direto do andar ${cur} para a cidade`);
+            return;
+        }
+
         // ─── M6 Tinturaria — gold sink cosmético ────────────────────────────
         // Override de cor por slot equipado (armor/head/feet/cosmetic). Cor é
         // do slot, não do item: trocar a armor mantém a tinta. Server é dono —
@@ -7833,6 +7900,7 @@ wss.on('connection', (ws, request) => {
             // dele); só barra o exagero (arma fraca mandando 600 → capada no real dela).
             // MAX_HIT_DMG fica como teto absoluto de segurança (>372 legítimo → nunca clipa).
             const dmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
+            const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
             // Vampirismo (t_lifesteal): cura % do dano causado (cap maxHp); sincroniza HP via pstats.
             const _ls = (p.permaBuffs && p.permaBuffs.lifesteal) || 0;
@@ -7853,12 +7921,15 @@ wss.on('connection', (ws, request) => {
             if (hasShieldEquipped(p)) gainSkillXpServer(p, 'Escudo', 1);
             // Skills atualizadas — só envia se não vai morrer (mobKill abaixo envia skills no payload)
             if (m.hp > 0) sendSkillsOnly(p, 'attackHit');
-            // DoT procs (veneno/sangra/fogo de armas +N) — cliente enviou no msg.dots
-            if (Array.isArray(msg.dots) && msg.dots.length){
+            // Só golpes de arma aplicam os efeitos de forja; magias e lança
+            // arremessada conservam seu comportamento sem esses procs.
+            const damageDots = !spellWin && !msg.throwSpear && m.hp > 0
+                ? rollWeaponForgeDotsServer(p, dealtDamage) : [];
+            if (Array.isArray(damageDots) && damageDots.length){
                 m.dots = m.dots || [];
-                for (const d of msg.dots){
+                for (const d of damageDots){
                     if (!d || !d.type || !['poison','bleed','burn'].includes(d.type)) continue;
-                    const safeDmg = Math.max(1, Math.min(20, d.dmg | 0));
+                    const safeDmg = d.dmg; // já derivado do dano aceito e da arma no servidor
                     const safeTicks = Math.max(1, Math.min(8, d.ticks | 0));
                     const existing = m.dots.find(x => x.type === d.type);
                     if (existing){
