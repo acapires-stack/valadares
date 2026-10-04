@@ -5122,7 +5122,7 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob, 
         !!(window.ValadaresCharacterArt2D && window.ValadaresCharacterArt2D.drawBody(ctx, px, py, dir, {
             armor: eqArmorB, head: eqHeadB, feet: eqFeetB,
             bodyColor, armorTint: dye('armor') || (eqArmorB && !['ARMADURA','COURO'].includes(eqArmorB) ? bodyColor : null),
-            feetColor: bootsColor, hasFeet: !!(eq.feet || dye('feet')),
+            feetColor: bootsColor, feetTint: dye('feet'), hasFeet: !!(eq.feet || dye('feet')),
             headColor: dye('head') || (safeItem(eq.head) || {}).color,
             walkPhase: b / 1.6, attackPhase: attackPhase || 0
         }));
@@ -17388,8 +17388,8 @@ function loop(ts){
     }
 })();
 </script>
-<script src="/item-art.js?v=20261003a"></script>
-<script src="/character-art.js?v=20261003a"></script>
+<script src="/item-art.js?v=20261004b"></script>
+<script src="/character-art.js?v=20261004b"></script>
 <script src="/monster-art.js?v=20261003b"></script>
 <script src="/monster-art-creatures.js?v=20261003a"></script>
 <script src="/monster-art-depths.js?v=20261003a"></script>

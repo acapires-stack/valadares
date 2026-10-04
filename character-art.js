@@ -40,7 +40,9 @@
             (opts.armorTint || (opts.bodyColor && !['#3a3a3a','#1a1a1a'].includes(opts.bodyColor) ? opts.bodyColor : C.olive));
         const torsoLight = metal ? plateLight : leather ? hideLight : bone ? shade(torso, 34) : shade(torso, 32);
         const torsoDark = metal ? plateDark : leather ? hideDark : bone ? shade(torso, -38) : shade(torso, -35);
-        const boots = opts.feetColor && opts.hasFeet ? opts.feetColor : C.leather;
+        const windBoots = opts.feet === 'BOTAS_VENTO';
+        const windTint = opts.feetTint || (windBoots && opts.feetColor && opts.feetColor.toLowerCase() !== '#8acdef' ? opts.feetColor : null);
+        const boots = windBoots ? (windTint || C.leather) : opts.feetColor && opts.hasFeet ? opts.feetColor : C.leather;
         const bootLight = shade(boots, 34), bootDark = shade(boots, -33);
         const pants = C.cloth;
 
@@ -73,8 +75,17 @@
             P(lx-2,46+dy,11,2,C.ink);
             P(lx-1,45+dy,8,1,bootLight);
         }
-        if (opts.feet === 'BOTAS_VENTO'){
-            P(leftLeg,43+legA,7,1,'#a7e6ff'); P(rightLeg,43+legB,7,1,'#a7e6ff');
+        if (windBoots){
+            for (const [lx,dy] of [[leftLeg,legA],[rightLeg,legB]]){
+                // Cano de couro, punho claro e pequena asa recortada na lateral.
+                P(lx,39+dy,7,2,C.ink); P(lx+1,39+dy,5,1,'#9fd9ed');
+                P(lx,41+dy,2,3,bootLight); P(lx+5,41+dy,1,3,bootDark);
+                P(lx+2,43+dy,2,1,C.goldLight);
+                P(lx+7,39+dy,2,1,C.ink); P(lx+8,37+dy,2,2,C.ink);
+                P(lx+9,35+dy,2,2,C.ink); P(lx+10,35+dy,1,1,'#e4f7ff');
+                P(lx+8,37+dy,2,1,'#b9eaff'); P(lx+7,39+dy,2,1,'#72b9db');
+                P(lx+7,41+dy,2,1,'#d5f3ff'); P(lx,45+dy,8,1,'#2d211c');
+            }
         }
 
         // Braços atrás do tronco: mangas, braceletes, mãos. Golpe eleva só o braço direito.
@@ -96,6 +107,17 @@
         } else {
             P(10,29,6,2,C.skin); P(32,29-armLift,6,2,C.skin);
         }
+        if (bone){
+            // Ombreiras esculpidas em osso, independentes da cor da túnica.
+            const tintedBone = opts.armorTint && opts.armorTint.toLowerCase() !== '#dde0c8';
+            const ivory = tintedBone ? shade(torso, 35) : '#f4e8cf';
+            const boneShade = tintedBone ? shade(torso, -23) : '#d5c4a6';
+            const glint = tintedBone ? shade(torso, 54) : '#fff2da';
+            P(8,19,9,7,C.ink); P(9,19,7,3,ivory);
+            P(8,22,7,3,boneShade); P(10,24,5,1,glint);
+            P(31,19-armLift,9,7,C.ink); P(32,19-armLift,7,3,ivory);
+            P(33,22-armLift,7,3,boneShade); P(33,24-armLift,5,1,glint);
+        }
 
         // Gola, camisa/peitoral e cintura mantêm a leitura mesmo em escala 1:1.
         P(14,18,20,19,C.ink);
@@ -112,7 +134,18 @@
             P(17,30,14,2,plateDark);
             P(18,21,2,2,C.gold); P(28,21,2,2,C.gold);
             if (opts.armor === 'ARMADURA_ESCAMA'){
-                for (let row=0;row<3;row++) for(let col=0;col<4;col++) P(17+col*4+(row%2)*2,24+row*3,2,1,'#718f66');
+                // Escamas vermelhas sobre base escura, com reflexo no topo de cada placa.
+                const dyed = opts.armorTint && opts.armorTint.toLowerCase() !== '#cc5040';
+                const scaleDark = dyed ? shade(plate, -67) : '#671d20';
+                const scaleLight = dyed ? shade(plate, 40) : '#ed7862';
+                const scaleMid = dyed ? shade(plate, -15) : '#bd3931';
+                for (let row=0;row<3;row++) for(let col=0;col<4;col++){
+                    const sx = 17+col*4+(row%2)*2, sy = 23+row*3;
+                    P(sx,sy,3,3,scaleDark); P(sx,sy,2,1,scaleLight);
+                    P(sx+1,sy+1,2,1,scaleMid); P(sx+1,sy+2,1,1,plateDark);
+                }
+                P(10,21,5,2,scaleLight); P(33,21-armLift,5,2,scaleLight);
+                P(19,30,10,1,plateDark);
             }
             if (opts.armor === 'ARMADURA_TRONO'){
                 P(22,24,4,8,C.gold); P(19,27,10,3,C.goldLight);
@@ -125,8 +158,19 @@
             for(let yy=24;yy<=30;yy+=3){P(17,yy,1,1,hideLight);P(30,yy,1,1,hideLight);}
             P(19,22,2,2,C.gold); P(27,29,2,2,C.gold);
         } else if (bone){
-            P(17,22,14,2,'#e5dac4'); P(18,26,12,2,'#d6c9af');
-            P(19,30,10,2,'#c7b89c'); P(23,23,2,7,'#985f70');
+            // Caixa torácica em alto contraste; o fundo escuro separa cada costela.
+            const tintedBone = opts.armorTint && opts.armorTint.toLowerCase() !== '#dde0c8';
+            const rib = tintedBone ? shade(torso, 35) : '#f4e9d5';
+            const ribShade = tintedBone ? shade(torso, -22) : '#c6b79d';
+            P(17,21,14,11,tintedBone ? shade(torso, -78) : '#48372b');
+            P(22,21,4,11,rib); P(23,23,2,7,ribShade);
+            for (const [ry,inset] of [[22,0],[25,1],[28,2]]){
+                P(17+inset,ry,5-inset,2,rib);
+                P(26,ry,5-inset,2,rib);
+                P(18+inset,ry+1,3-inset,1,ribShade);
+                P(27,ry+1,3-inset,1,ribShade);
+            }
+            P(19,31,10,1,tintedBone ? shade(torso, 14) : '#e3d4b9');
         } else {
             P(18,20,12,3,torsoLight);
             if (!facingBack){P(22,22,4,4,C.skinShade);P(23,22,2,3,C.skin);}
@@ -176,14 +220,32 @@
             const hc = opts.headColor || C.steel;
             if (opts.head === 'COROA_VALADARES' || opts.head === 'COROA_VENDEDOR'){
                 const royal = opts.head === 'COROA_VALADARES';
-                P(13,4,22,4,C.ink); P(14,4,20,3,hc); P(14,4,20,1,shade(hc,40));
-                const gems = royal ? ['#40b0ff','#ff4040','#80ff80','#ff4040','#40b0ff'] : ['#8030c0','#a14ac9','#ff3030','#a14ac9','#8030c0'];
-                [[14,4],[18,6],[22,9],[26,6],[30,4]].forEach(([xx,hh],i)=>{
-                    P(xx,4-hh,3,hh,C.ink); P(xx+1,5-hh,2,hh-1,hc);
-                    P(xx+1,6-hh,1,2,gems[i]);
-                });
-                if (royal){P(17,5,1,1,'#ff60ff');P(23,5,2,1,'#ff60ff');P(30,5,1,1,'#ff60ff');}
-                else {P(10,0,3,6,'#100c13');P(9,-2,2,4,'#100c13');P(35,0,3,6,'#100c13');P(37,-2,2,4,'#100c13');}
+                if (royal){
+                    const gold = opts.headColor && opts.headColor.toLowerCase() !== '#ffd700' ? opts.headColor : '#e5ad42';
+                    const light = shade(gold, 42), dark = shade(gold, -57);
+                    // Cinco pontas nítidas, aro espesso e rubi central com safiras laterais.
+                    P(12,4,24,5,C.ink); P(13,4,22,4,dark);
+                    P(14,4,20,2,gold); P(15,4,18,1,light);
+                    P(14,7,20,1,light);
+                    for (const [tx,top,height] of [[13,0,5],[18,-3,8],[23,-5,10],[28,-3,8],[33,0,5]]){
+                        P(tx-1,top,4,height,C.ink);
+                        P(tx,top+1,2,height-1,gold);
+                        P(tx,top+1,1,Math.max(1,height-3),light);
+                    }
+                    P(23,-3,2,2,light); P(22,2,5,5,dark);
+                    P(23,2,3,4,'#aa1727'); P(24,2,1,2,'#ff6670');
+                    P(16,4,2,3,'#175ca3'); P(16,4,1,1,'#b9eaff');
+                    P(30,4,2,3,'#175ca3'); P(30,4,1,1,'#b9eaff');
+                    P(20,6,1,1,light); P(27,6,1,1,light);
+                } else {
+                    P(13,4,22,4,C.ink); P(14,4,20,3,hc); P(14,4,20,1,shade(hc,40));
+                    const gems = ['#8030c0','#a14ac9','#ff3030','#a14ac9','#8030c0'];
+                    [[14,4],[18,6],[22,9],[26,6],[30,4]].forEach(([xx,hh],i)=>{
+                        P(xx,4-hh,3,hh,C.ink); P(xx+1,5-hh,2,hh-1,hc);
+                        P(xx+1,6-hh,1,2,gems[i]);
+                    });
+                    P(10,0,3,6,'#100c13');P(9,-2,2,4,'#100c13');P(35,0,3,6,'#100c13');P(37,-2,2,4,'#100c13');
+                }
             } else {
                 P(15,3,18,12,C.ink); P(17,4,14,8,hc);
                 P(19,3,10,3,shade(hc,40)); P(17,7,2,8,shade(hc,-40));
@@ -203,15 +265,30 @@
                     P(32,0,4,5,C.ink); P(33,0,2,4,'#ddd3b7');
                 }
                 if (opts.head === 'ELMO_DRACO'){
-                    // Chifres longos curvados para fora, distintos do elmo comum.
-                    P(10,0,6,4,C.ink);P(7,-3,5,4,C.ink);P(4,-4,4,2,C.ink);
-                    P(11,1,4,2,'#bd9e77');P(8,-2,3,3,'#e0c7a1');
-                    P(32,0,6,4,C.ink);P(36,-3,5,4,C.ink);P(40,-4,4,2,C.ink);
-                    P(33,1,4,2,'#bd9e77');P(37,-2,3,3,'#e0c7a1');
-                    if (!facingBack){
-                        if (side) P(27,12,2,1,'#ed3b2d');
-                        else {P(20,12,2,1,'#ed3b2d');P(26,12,2,1,'#ed3b2d');}
+                    const red = opts.headColor && opts.headColor.toLowerCase() !== '#cc4030' ? opts.headColor : '#bd372d';
+                    const redLight = shade(red, 38), redDark = shade(red, -48);
+                    // Casco vermelho fechado, visor escuro e aro dourado.
+                    P(15,3,18,13,C.ink); P(17,4,14,10,redDark);
+                    P(18,4,12,5,red); P(19,4,5,2,redLight);
+                    P(23,2,2,10,C.ink); P(23,3,1,8,redLight);
+                    if (facingBack){
+                        P(18,10,12,6,red); P(19,11,10,3,redDark);
+                        P(23,10,2,6,C.ink);
+                    } else if (side){
+                        P(21,10,11,6,C.gold); P(22,11,10,4,C.ink);
+                        P(28,12,3,1,'#ed5542'); P(17,11,3,6,red);
+                        P(30,15,2,3,redDark);
+                    } else {
+                        P(18,10,12,6,C.gold); P(19,11,10,4,C.ink);
+                        P(20,12,3,1,'#ed5542'); P(26,12,3,1,'#ed5542');
+                        P(16,11,3,7,red); P(29,11,3,7,red);
+                        P(17,16,3,2,redDark); P(28,16,3,2,redDark);
                     }
+                    // Chifres negros curvados para fora; base rubra no casco.
+                    P(10,0,6,4,C.ink); P(7,-3,5,4,C.ink); P(4,-4,4,2,C.ink);
+                    P(11,1,4,2,'#413735'); P(8,-2,3,3,'#393436');
+                    P(32,0,6,4,C.ink); P(36,-3,5,4,C.ink); P(40,-4,4,2,C.ink);
+                    P(33,1,4,2,'#413735'); P(37,-2,3,3,'#393436');
                 }
             }
         }
