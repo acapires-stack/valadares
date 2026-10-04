@@ -1729,7 +1729,7 @@
         .lang-btn:hover { opacity: 0.9; }
         .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
-    <link rel="stylesheet" href="/ui-polish.css?v=20261003a">
+    <link rel="stylesheet" href="/ui-polish.css?v=20261004a">
     <link rel="stylesheet" href="/adventure-guide.css?v=20261003a">
 </head>
 <body>
@@ -12284,7 +12284,7 @@ function renderInventoryIfChanged(){
 // Chat/Combate preenchem dinamicamente o espaço abaixo do canvas — alvo é
 // caber inteiro na viewport sem scroll. Mede o overhead real (topo até o
 // wrapper + footer keybindings/margem inferior) em vez de chutar paddings.
-// Mínimo 160px pra não engolir o chat em telas curtas.
+// Mínimo 72px; o chat cede espaço para o jogo em telas mais curtas.
 function syncChatHeight(){
     const log = document.getElementById('log');
     const chat = document.getElementById('chatMessages');
@@ -12309,9 +12309,9 @@ function syncChatHeight(){
     // ~80px pra footer keybindings + folga inferior.
     const wrapperRect = wrapper.getBoundingClientRect();
     const topGap    = Math.max(0, wrapperRect.top);
-    const bottomGap = 48;   // footer keybindings (~25px) + folga pra evitar scroll
+    const bottomGap = 52;   // footer, bordas e folga pra evitar scroll da página
     const available = window.innerHeight - topGap - bottomGap;
-    const target = Math.max(160, available - canvasH - TABS_H - INPUT_H);
+    const target = Math.max(72, available - canvasH - TABS_H - INPUT_H);
     log.style.height = target + 'px';
     chat.style.height = target + 'px';
 }

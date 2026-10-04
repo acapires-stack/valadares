@@ -15,7 +15,7 @@ body { justify-content: flex-start; padding: 8px 12px 12px; color: var(--ui-parc
 }
 #displayControls button:hover, #displayControls button[aria-expanded="true"],
 #displayControls button[aria-pressed="false"] { background: #41301a; color: #ffdfa0; }
-#gameWrapper { max-width: 100%; gap: 7px; padding: 5px; align-items: stretch; }
+#gameWrapper { max-width: 100%; gap: 7px; padding: 5px; align-items: flex-start; }
 body.layout-focus #gameContainer {
     width: min(calc((100dvh - var(--ui-world-reserve)) * 15 / 11), calc(100vw - 225px), 1200px);
     min-width: 0;
@@ -23,7 +23,22 @@ body.layout-focus #gameContainer {
 #gameContainer canvas#canvas { width: 100%; height: auto; aspect-ratio: 15 / 11; }
 #gameContainer { flex: 0 1 auto; }
 .sidebar { width: 174px; flex: none; font-size: 12px; line-height: 1.35; }
-#leftSidebar { max-height: calc(100dvh - 135px); overflow-y: auto; }
+#leftSidebar { max-height: none; overflow: visible; }
+/* A lista encolhe dentro da coluna; a quantidade de itens não define a altura do jogo. */
+#inventory { min-height: 0; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: #8c6b32 #0a0805; }
+/* Mantém os atributos à vista nas janelas com barras do navegador abertas. */
+body:not(.touch) #leftSidebar { padding: 8px 11px; }
+body:not(.touch) #leftSidebar .s-section { margin-bottom: 6px; }
+body:not(.touch) #leftSidebar .s-section + .s-section { padding-top: 6px; }
+body:not(.touch) #leftSidebar .s-label { margin-bottom: 3px; }
+body:not(.touch) #leftSidebar #minimap { width: 116px; height: 116px; }
+@media (max-height: 800px) {
+    body:not(.touch) #leftSidebar { line-height: 1.25; }
+    body:not(.touch) #leftSidebar .s-section { margin-bottom: 2px; }
+    body:not(.touch) #leftSidebar .s-section + .s-section { padding-top: 4px; }
+    body:not(.touch) #leftSidebar .s-label { margin-bottom: 2px; }
+    body:not(.touch) #leftSidebar #minimap { width: 96px; height: 96px; }
+}
 .s-label { color: #c2a46a; font-size: 11px; letter-spacing: 1px; }
 .s-value, .skill-name, #spellList, #inventory, #equipment,
 #targetWidget, #players-online, #pvpWidget, #bossesWidget { font-size: 12px !important; }
