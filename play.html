@@ -4042,6 +4042,7 @@ function atDummy(){
 // Corpos dos props da PZ, sem sombra/brilho/hint/barra: o render 2D chama daqui e o
 // ctx-gravador do 3D também (mesma regra do drawNpcBody) — assim os dois não divergem.
 function drawChestBody(c, cpx, cpy){
+    if (window.ValadaresVillageArt2D?.drawChest(ctx, c, cpx, cpy)) return;
     ctx.fillStyle = '#6a4018'; ctx.fillRect(cpx+8, cpy+18, 32, 22);
     ctx.fillStyle = '#8a5520'; ctx.fillRect(cpx+8, cpy+12, 32, 10);
     ctx.fillStyle = '#3a2818';
@@ -4053,6 +4054,7 @@ function drawChestBody(c, cpx, cpy){
     ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(cpx+23, cpy+25, 2, 2);
 }
 function drawDummyBody(dpx, dpy, shake){
+    if (window.ValadaresVillageArt2D?.drawDummy(ctx, dpx, dpy, shake)) return;
     // poste
     ctx.fillStyle = '#4a2818';
     ctx.fillRect(dpx+22, dpy+24, 4, 20);
@@ -4071,6 +4073,7 @@ function drawDummyBody(dpx, dpy, shake){
 // A runa pulsante do altar NÃO entra aqui: é gradiente radial com alpha animado, que
 // bakeado num voxel viraria borrão. O 3D acende a runa com luz de verdade.
 function drawAltarBody(apx, apy){
+    if (window.ValadaresVillageArt2D?.drawAltar(ctx, apx, apy)) return true;
     // base de pedra
     ctx.fillStyle = '#4a4a55';
     ctx.fillRect(apx+10, apy+30, 28, 14);
@@ -4086,6 +4089,7 @@ function drawAltarBody(apx, apy){
     ctx.fillRect(apx+TS/2-2, apy+16, 4, 4);
 }
 function drawCraftBody(cpx, cpy){
+    if (window.ValadaresVillageArt2D?.drawCraft(ctx, cpx, cpy)) return;
     // base
     ctx.fillStyle = '#5a3818';
     ctx.fillRect(cpx+6, cpy+22, 36, 18);
@@ -16776,7 +16780,7 @@ function loop(ts){
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(apx+TS/2, apy+TS-4, 18, 5, 0, 0, Math.PI*2); ctx.fill();
-        drawAltarBody(apx, apy);
+        const detailedAltar = drawAltarBody(apx, apy);
         // runa brilhante pulsante — vai POR CIMA do corpo, e o núcleo é repintado depois
         // dela (a ordem original: o ponto branco fica na frente do glow, não atrás)
         const pulse = Math.sin(waterT*4) * 0.4 + 0.6;
@@ -16786,13 +16790,14 @@ function loop(ts){
         rg.addColorStop(0, runeColor);
         rg.addColorStop(0.6, runeColor + 'aa');
         rg.addColorStop(1, runeColor + '00');
-        ctx.globalAlpha = pulse;
+        ctx.globalAlpha = pulse * (detailedAltar ? 0.24 : 1);
         ctx.fillStyle = rg;
         ctx.beginPath(); ctx.arc(apx+TS/2, apy+18, 14, 0, Math.PI*2); ctx.fill();
         ctx.globalAlpha = 1;
         // núcleo
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(apx+TS/2-2, apy+16, 4, 4);
+        if (detailedAltar) ctx.fillRect(apx+TS/2-1, apy+16, 1, 2);
+        else ctx.fillRect(apx+TS/2-2, apy+16, 4, 4);
         // brilho ao aproximar
         if (atAltar()){
             ctx.strokeStyle = 'rgba(170,200,255,0.7)';
@@ -17289,6 +17294,7 @@ function loop(ts){
 <script src="/monster-art.js?v=20261003b"></script>
 <script src="/monster-art-creatures.js?v=20261003a"></script>
 <script src="/monster-art-depths.js?v=20261003a"></script>
+<script src="/village-art.js?v=20261004a"></script>
 <script src="/render2d-polish.js?v=20261003a"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261003a"></script>
