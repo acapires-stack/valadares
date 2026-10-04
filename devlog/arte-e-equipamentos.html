@@ -3,20 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Devlog Valadares — Bastidores do desenvolvimento</title>
-<meta name="description" content="Notas de desenvolvimento, lançamentos, sprints e bastidores do Valadares — RPG tile-based online.">
-<link rel="canonical" href="https://valadares.app.br/devlog">
-<meta property="og:title" content="Devlog Valadares — Bastidores do desenvolvimento">
-<meta property="og:description" content="Notas de desenvolvimento, lançamentos, sprints e bastidores do Valadares — RPG tile-based online.">
+<title>Arte 2D, forja e encantamentos individuais — Devlog Valadares</title>
+<meta name="description" content="A vila, os itens e as criaturas ganharam arte 2D; forja até +5, encantamentos individuais, essências e retornos das Profundezas ampliam a jornada.">
+<link rel="canonical" href="https://valadares.app.br/devlog/arte-e-equipamentos">
+<meta property="og:title" content="Arte 2D, forja e encantamentos individuais — Devlog Valadares">
+<meta property="og:description" content="A vila, os itens e as criaturas ganharam arte 2D; forja até +5, encantamentos individuais, essências e retornos das Profundezas ampliam a jornada.">
 <meta property="og:type" content="article">
-<meta property="og:url" content="https://valadares.app.br/devlog">
+<meta property="og:url" content="https://valadares.app.br/devlog/arte-e-equipamentos">
 <meta property="og:image" content="https://valadares.app.br/og.jpg">
 <meta property="og:site_name" content="Valadares">
 <meta property="og:locale" content="pt_BR">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Devlog Valadares — Bastidores do desenvolvimento">
-<meta name="twitter:description" content="Notas de desenvolvimento, lançamentos, sprints e bastidores do Valadares — RPG tile-based online.">
+<meta name="twitter:title" content="Arte 2D, forja e encantamentos individuais — Devlog Valadares">
+<meta name="twitter:description" content="A vila, os itens e as criaturas ganharam arte 2D; forja até +5, encantamentos individuais, essências e retornos das Profundezas ampliam a jornada.">
 <meta name="twitter:image" content="https://valadares.app.br/og.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Arte 2D, forja e encantamentos individuais",
+  "description": "A vila, os itens e as criaturas ganharam arte 2D; forja até +5, encantamentos individuais, essências e retornos das Profundezas ampliam a jornada.",
+  "datePublished": "2026-10-04",
+  "author": { "@type": "Organization", "name": "Valadares" },
+  "publisher": { "@type": "Organization", "name": "Valadares", "url": "https://valadares.app.br/" },
+  "image": "https://valadares.app.br/og.jpg",
+  "url": "https://valadares.app.br/devlog/arte-e-equipamentos"
+}
+</script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -85,70 +98,24 @@ footer a { margin: 0 12px; }
   </div>
 </nav>
 <main>
-<h1 class="page-title">DEVLOG</h1>
-<p class="page-sub">Notas dos bastidores · sprints · marcos · lições aprendidas</p>
-<ul class="post-list">
-<li>
-  <a href="/devlog/arte-e-equipamentos" class="post-card">
-    <div class="post-card-meta">
-      <span>4 Out 2026</span>
+<article>
+  <header>
+    <h1>Arte 2D, forja e encantamentos individuais</h1>
+    <div class="meta">
+      <span>📅 4 Out 2026</span>
       <span class="tag">arte 2D</span> <span class="tag">equipamentos</span> <span class="tag">encantamentos</span> <span class="tag">Profundezas</span>
     </div>
-    <div class="post-card-title">Arte 2D, forja e encantamentos individuais</div>
-    <div class="post-card-summary">A vila, os itens e as criaturas ganharam arte 2D; forja até +5, encantamentos individuais, essências e retornos das Profundezas ampliam a jornada.</div>
-  </a>
-</li>
-<li>
-  <a href="/devlog/endgame-e-arena" class="post-card">
-    <div class="post-card-meta">
-      <span>4 Jun 2026</span>
-      <span class="tag">endgame</span> <span class="tag">pvp</span> <span class="tag">dungeon</span> <span class="tag">design</span> <span class="tag">anti-cheat</span>
-    </div>
-    <div class="post-card-title">Prometi uma dungeon. Saiu o endgame inteiro.</div>
-    <div class="post-card-summary">As Profundezas, Casa de Leilão, Tinturaria, Pets, árvore de talentos de verdade, combate autoritativo e Arena PvP 1v1. Duas semanas em que o jogo deixou de ser &quot;jogável&quot; pra ter pra onde ir depois do primeiro boss.</div>
-  </a>
-</li>
-<li>
-  <a href="/devlog/maratona-seguranca" class="post-card">
-    <div class="post-card-meta">
-      <span>29 Mai 2026</span>
-      <span class="tag">segurança</span> <span class="tag">hardening</span> <span class="tag">server</span>
-    </div>
-    <div class="post-card-title">Maratona de segurança — 17 vulnerabilidades fechadas em duas sessões</div>
-    <div class="post-card-summary">Auditoria pós-lançamento encontrou 5 CRITICAL, e isso virou uma maratona de hardening. No final, mais 12 issues fechadas — incluindo um handler que aceitava HP do cliente direto.</div>
-  </a>
-</li>
-<li>
-  <a href="/devlog/mobile-overhaul" class="post-card">
-    <div class="post-card-meta">
-      <span>29 Mai 2026</span>
-      <span class="tag">mobile</span> <span class="tag">UX</span> <span class="tag">design</span>
-    </div>
-    <div class="post-card-title">Mobile overhaul — quando a esposa achou ruim no celular</div>
-    <div class="post-card-summary">Top-bar fixa, hotbar inferior com 5 botões, onboarding mobile específico e orientation lock. O melhor feedback de UX vem de quem nunca jogou nada parecido.</div>
-  </a>
-</li>
-<li>
-  <a href="/devlog/lancamento" class="post-card">
-    <div class="post-card-meta">
-      <span>28 Mai 2026</span>
-      <span class="tag">lançamento</span> <span class="tag">milestone</span>
-    </div>
-    <div class="post-card-title">Valadares está no ar — RPG tile-based no navegador</div>
-    <div class="post-card-summary">Depois de uma sprint maluca de produção, o Valadares ganhou domínio próprio, cliente desktop e monetização. Esse é o primeiro post do devlog — vou usar esse espaço pra contar os bastidores.</div>
-  </a>
-</li>
-<li>
-  <a href="/devlog/sprint-producao" class="post-card">
-    <div class="post-card-meta">
-      <span>28 Mai 2026</span>
-      <span class="tag">sprint</span> <span class="tag">produção</span> <span class="tag">infra</span>
-    </div>
-    <div class="post-card-title">Sprint de produção — do single-player ao MMO em 4 dias</div>
-    <div class="post-card-summary">Como Valadares saiu do &quot;rodando localmente&quot; pra ter domínio próprio, server autoritativo, monetização real, cliente desktop e SEO em 4 dias corridos. Spoiler — o gargalo nunca é código.</div>
-  </a>
-</li>
-</ul>
+  </header>
+  <p>Valadares ganhou uma nova camada visual e mais escolhas para quem volta de uma aventura com a mochila cheia. A vila, os itens e os monstros agora têm arte 2D própria. As criaturas das Profundezas e os chefes também receberam desenhos dedicados, mantendo o jogo reconhecível enquanto cada encontro fica mais fácil de distinguir.</p>
+<h2>Forja e encantamentos</h2>
+<p>Na bancada da vila, os equipamentos podem ser forjados até <strong>+5</strong>, inclusive os eternos. A aba <strong>ENCANTAR</strong> permite dar a cada peça até <strong>três bônus individuais</strong>. Monstros podem deixar essências arcanas; chefes sempre deixam. Cada tentativa usa essências e ouro mostrados na interface.</p>
+<p>Você pode trocar um bônus escolhido sem perder os outros dois nem o nível de forja da peça. O novo resultado pode ser menor, então vale conferir a peça antes de tentar novamente. A interface mostra os custos e os bônus de cada equipamento.</p>
+<h2>Mais caminhos pelas Profundezas</h2>
+<p>As Profundezas continuam além do andar 35. A cada cinco andares há outro andar de chefe. A partir do <strong>25</strong>, esses andares também têm uma escada de retorno direto à cidade: 25, 30, 35 e assim por diante. Você pode voltar para se preparar e continuar a jornada.</p>
+<p>O painel de atributos também passou a mostrar a regeneração de HP e mana. Assim fica mais claro o efeito combinado de equipamento, talentos, pet e bônus de área durante a jornada.</p>
+<p><a href="https://valadares.app.br/jogar">Jogue Valadares grátis no navegador</a>.</p>
+</article>
+<a href="/devlog" class="back-link">← Voltar ao Devlog</a>
 </main>
 <footer>
   <div>
