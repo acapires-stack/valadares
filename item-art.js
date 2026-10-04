@@ -359,19 +359,35 @@
         'ESPADA', 'ESCUDO_MAD', 'ESCUDO_FERRO', 'POTION', 'POTION_MP',
         ...Object.keys(NEW_ICONS)
     ]);
+    const extraIcons = new Map(), extraWeapons = new Map(), extraShields = new Map();
+
+    // Extensões acrescentam o catálogo restante sem substituir a arte já aprovada.
+    function register(groups = {}) {
+        for (const [name, target, protectedKeys] of [
+            ['icons', extraIcons, supportedIcons],
+            ['weapons', extraWeapons, ['ESPADA', ...NEW_WEAPONS]],
+            ['shields', extraShields, ['ESCUDO_MAD', 'ESCUDO_FERRO', 'ESCUDO_GUARDIAO']]
+        ]) {
+            for (const [key, painter] of Object.entries(groups[name] || {})) {
+                if (/^[A-Z][A-Z0-9_]*$/.test(key) && typeof painter === 'function' &&
+                    !protectedKeys.includes(key) && !target.has(key)) target.set(key, painter);
+            }
+        }
+    }
 
     function drawIcon(ctx, def, key, S) {
         const base = baseKey(key);
         if (!ctx || !Number.isFinite(S) || S <= 0 ||
-            !supportedIcons.includes(base)) return false;
+            (!supportedIcons.includes(base) && !extraIcons.has(base))) return false;
         ctx.save();
         try {
             ctx.imageSmoothingEnabled = false;
-            const P = iconPixel(ctx, S, NEW_ICONS[base] ? 32 : 24);
+            const P = iconPixel(ctx, S, NEW_ICONS[base] || extraIcons.has(base) ? 32 : 24);
             if (base === 'ESPADA') swordIcon(P);
             else if (base === 'ESCUDO_MAD' || base === 'ESCUDO_FERRO') shieldIcon(P, base === 'ESCUDO_FERRO');
             else if (base === 'POTION' || base === 'POTION_MP') potionIcon(P, base === 'POTION_MP');
-            else NEW_ICONS[base](P);
+            else if (NEW_ICONS[base]) NEW_ICONS[base](P);
+            else extraIcons.get(base)(P, def);
         } finally { ctx.restore(); }
         return true;
     }
@@ -469,7 +485,7 @@
 
     function drawWeapon(ctx, px, py, key, opts) {
         const base = baseKey(key);
-        if (!ctx || (base !== 'ESPADA' && !NEW_WEAPONS.includes(base)) ||
+        if (!ctx || (base !== 'ESPADA' && !NEW_WEAPONS.includes(base) && !extraWeapons.has(base)) ||
             !Number.isFinite(px) || !Number.isFinite(py)) return false;
         const m = motion(opts);
         if (base !== 'ESPADA') {
@@ -479,7 +495,8 @@
             try {
                 ctx.imageSmoothingEnabled = false;
                 const P = (a, b, w, h, c) => pixel(ctx, x + (m.side < 0 ? -a - w : a), y + b, w, h, c);
-                newWeapon(P, base);
+                if (extraWeapons.has(base)) extraWeapons.get(base)(P, opts || {});
+                else newWeapon(P, base);
             } finally { ctx.restore(); }
             return true;
         }
@@ -510,16 +527,20 @@
 
     function drawShield(ctx, px, py, key, opts) {
         const base = baseKey(key);
-        if (!ctx || (base !== 'ESCUDO_MAD' && base !== 'ESCUDO_FERRO' && base !== 'ESCUDO_GUARDIAO') ||
+        if (!ctx || (base !== 'ESCUDO_MAD' && base !== 'ESCUDO_FERRO' && base !== 'ESCUDO_GUARDIAO' && !extraShields.has(base)) ||
             !Number.isFinite(px) || !Number.isFinite(py)) return false;
         const m = motion(opts);
-        if (base === 'ESCUDO_GUARDIAO') {
+        if (base === 'ESCUDO_GUARDIAO' || extraShields.has(base)) {
             const x = Math.round(px + 4 - (m.side < 0 ? 1 : 0));
             const y = Math.round(py + 16 + m.bob);
             ctx.save();
             try {
                 ctx.imageSmoothingEnabled = false;
                 const P = (a, b, w, h, c) => pixel(ctx, x + a, y + b, w, h, c);
+                if (extraShields.has(base)) {
+                    extraShields.get(base)(P, opts || {});
+                    return true;
+                }
                 facet(P, [[7, 0], [14, 2], [14, 11], [11, 16], [7, 19], [3, 16], [0, 11], [0, 2]], OUT);
                 facet(P, [[7, 2], [12, 3], [12, 11], [10, 15], [7, 17], [4, 15], [2, 11], [2, 3]], GOLD);
                 facet(P, [[7, 4], [11, 5], [11, 11], [9, 14], [7, 15], [5, 14], [3, 11], [3, 5]], BLUE_DARK);
@@ -560,5 +581,11 @@
         return true;
     }
 
-    window.ValadaresItemArt2D = Object.freeze({ drawIcon, drawWeapon, drawShield, supportedIcons });
+    window.ValadaresItemArt2D = Object.freeze({
+        drawIcon, drawWeapon, drawShield, register,
+        helpers: Object.freeze({ facet, stroke, disc }),
+        get supportedIcons() { return Object.freeze([...supportedIcons, ...extraIcons.keys()]); },
+        get supportedWeapons() { return Object.freeze(['ESPADA', ...NEW_WEAPONS, ...extraWeapons.keys()]); },
+        get supportedShields() { return Object.freeze(['ESCUDO_MAD', 'ESCUDO_FERRO', 'ESCUDO_GUARDIAO', ...extraShields.keys()]); }
+    });
 }());
