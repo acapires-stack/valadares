@@ -8,6 +8,8 @@ const path = require('path');
 const crypto = require('crypto');
 const equipmentRules = require('../equipment-rules');
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
+// Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
+const CASINO_ENABLED = false;
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 // Token de admin pro painel web (env var). Sem isso, /api/admin/* rejeita 401.
@@ -7657,6 +7659,10 @@ wss.on('connection', (ws, request) => {
         // server valida 100-10000g, debita aposta, rola 3 símbolos e credita
         // payout via goldDelta. House edge ~9% no longo prazo.
         if (msg.t === 'casinoSpin') {
+            if (!CASINO_ENABLED) {
+                if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'casinoResult', error:'disabled' }));
+                return;
+            }
             const CASINO_NPC_POS = { x: 47, y: 50 };   // sync com NPCS.crupie em play.html
             const CASINO_WEIGHTS = [
                 { key:'CHERRY',  weight:35, mult3:3 },

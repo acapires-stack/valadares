@@ -2893,6 +2893,7 @@ const I18N = {
     'casino.not_at_npc': 'Aproxime-se do Crupiê.',
     'casino.no_gold': 'Ouro insuficiente para essa aposta.',
     'casino.spin_failed': 'Não foi possível concluir o giro.',
+    'casino.disabled': 'O cassino está desativado por enquanto.',
     'auction.browse_empty_html': 'Nenhuma listagem ativa no momento.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar a primeira.',
     'auction.mine_empty_html': 'Você não tem listagens ativas.<br><br>Vá pra aba <b style="color:#c8a050">VENDER</b> pra criar uma.',
     'auction.by': 'por',
@@ -3601,6 +3602,7 @@ const I18N = {
     'casino.not_at_npc': 'Get closer to the Croupier.',
     'casino.no_gold': 'Not enough gold for that bet.',
     'casino.spin_failed': 'Could not complete the spin.',
+    'casino.disabled': 'The casino is temporarily disabled.',
     'auction.browse_empty_html': 'No active listings right now.<br><br>Go to the <b style="color:#c8a050">SELL</b> tab to create the first one.',
     'auction.mine_empty_html': 'You have no active listings.<br><br>Go to the <b style="color:#c8a050">SELL</b> tab to create one.',
     'auction.by': 'by',
@@ -4140,6 +4142,8 @@ function drawCraftBody(cpx, cpy){
     ctx.fillRect(cpx+24, cpy+12, 8, 4);
 }
 // ─── NPCs (PZ + mundo) ─────────────────────────────────────────────────────
+// Suspensão temporária: manter alinhado ao bloqueio autoritativo do servidor.
+const CASINO_ENABLED = false;
 const NPCS = [
     // PZ — layout simétrico nas bordas do quadrado 9×9 (PZ raio 4 ao redor de 50,50).
     // Centro: Domador (50,47) topo · Altar (50,49) · Treino (49,52) · Craft (51,52). Cada NPC tem ≥2 tiles
@@ -4164,7 +4168,7 @@ const NPCS = [
     { id:'vohrim',    name:'Embaixador Vohrim', pos:{x:15,y:50}, body:'#2a1a3a', hat:'#5a3030', action:'chain', sanctuary:true, chain:'vohrim' },
     // Hidden — só aparece quando flag específica vira true (chain do Vendedor)
     { id:'vendedor',  name:'Vend. de Almas',   pos:{x:75,y:20}, body:'#1a1a1a', hat:'#cc1010', action:'chain', sanctuary:true, chain:'vendedor', hiddenUntil:'flag_vendedor_revealed' },
-];
+].filter(npc => CASINO_ENABLED || npc.action !== 'casino');
 // i18n Fase 3 — nomes de NPC em EN (chave = id). npcName() prefere EN.
 const NPC_EN = {
     mercador:'Merchant', leiloeiro:'Auctioneer', crupie:'Croupier', banqueiro:'Banker',
@@ -8442,7 +8446,7 @@ function handleMP(msg){
         const out = document.getElementById('casinoResult');
         if (msg.error){
             document.querySelectorAll('#casinoReels .reel').forEach(r => { r.textContent = '—'; });
-            const errors = { not_at_npc: tr('casino.not_at_npc'), no_gold: tr('casino.no_gold') };
+            const errors = { not_at_npc: tr('casino.not_at_npc'), no_gold: tr('casino.no_gold'), disabled: tr('casino.disabled') };
             if (out) out.textContent = errors[msg.error] || tr('casino.spin_failed');
             return;
         }
@@ -9198,6 +9202,7 @@ function resetCasinoOnDisconnect(){
     if (out) out.textContent = tr('common.no_connection');
 }
 function openCasino(){
+    if (!CASINO_ENABLED) { log(tr('casino.disabled')); return; }
     closeAllModals();
     document.getElementById('casinoModal').style.display = 'flex';
     document.getElementById('casinoResult').textContent = casinoSpinPending ? tr('casino.spinning') : '';
@@ -9207,6 +9212,7 @@ function closeCasino(){
     document.getElementById('casinoModal').style.display = 'none';
 }
 function casinoSpin(amount){
+    if (!CASINO_ENABLED) { log(tr('casino.disabled')); return; }
     if (casinoSpinPending) return;
     if (Date.now() - casinoLastSpinAt < 800) return;
     if (!ws || ws.readyState !== 1 || !_wsAuthed){
@@ -11177,6 +11183,7 @@ function updateSidebar(){
     if (mtbG) mtbG.textContent = player.gold;
     // Inventário e equipamento só re-renderizam quando MUDAM (evita perder o click no rebuild)
     renderInventoryIfChanged();
+    window.ValadaresEnchantUI?.refreshIfOpen();
     updateMobileHotbar();
 }
 
@@ -12314,8 +12321,9 @@ function renderInventoryIfChanged(){
     const eqSig = JSON.stringify([player.equipped, player.inv.FLECHA || 0,
         player.inv.FLECHA_PERF || 0, player.mp < WAND_MANA_COST, LANG]);
     if (sig === invSignature && eqSig === equipSignature) return;
-    const rebuildInventory = invSignature === null || keysSig !== invKeysSignature;
-    const rebuildEquipment = invSignature === null || eqSig !== equipSignature;
+    const firstInventoryRender = invSignature === null;
+    const rebuildInventory = firstInventoryRender || keysSig !== invKeysSignature;
+    const rebuildEquipment = firstInventoryRender || eqSig !== equipSignature;
 
     // Paper doll layout (grid 3x4):
     //   .   HEAD    .
@@ -12373,7 +12381,6 @@ function renderInventoryIfChanged(){
         });
         invSignature = sig;
         equipSignature = eqSig;
-        if (rebuildEquipment) syncInvHeight();
         return;
     }
     const prevInvScroll = invEl.scrollTop;   // preserva o scroll: re-render (loot/poção) não joga a lista pro topo
@@ -12410,7 +12417,9 @@ function renderInventoryIfChanged(){
     invSignature = sig;
     invKeysSignature = keysSig;
     equipSignature = eqSig;
-    syncInvHeight();
+    // A coluna já tem altura limitada e a lista rola dentro dela. Recalcular
+    // as sidebars a cada novo tipo de loot libera a altura por um frame.
+    if (firstInventoryRender) syncInvHeight();
     invEl.scrollTop = prevInvScroll;   // restaura após rebuild + ajuste de altura (browser faz clamp se a lista encolheu)
 }
 

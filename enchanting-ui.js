@@ -3,7 +3,8 @@
     const R=ValadaresEquipment;
     I18N.pt['enchant.tab']='ENCANTAR';
     I18N.en['enchant.tab']='ENCHANT';
-    let selected='',pending=null,message='',timer=null,loadedOwner='';
+    let selected='',pending=null,message='',timer=null,loadedOwner='',lastRenderState='';
+    function renderState(){return JSON.stringify([player.name,player.inv,player.equipped,player.gold,selected,pending,message,LANG,window.equipmentServerVersion,window.enchantingEnabled,window.enchantToken]);}
     function pendingKey(){return 'valadares:enchantPending:'+String(player.name||'').toLowerCase();}
     function restorePending(){
         const owner=String(player.name||'').toLowerCase();
@@ -29,9 +30,15 @@
                 if(btn&&!btn.disabled)attempt(Number(btn.dataset.enchantSlot));
                 if(e.target.closest('[data-enchant-retry]')&&pending&&!pending.waiting)sendPending();
             });
+            el.addEventListener('blur',e=>{
+                if(e.target.id==='enchantItem')requestAnimationFrame(()=>refreshIfOpen());
+            },true);
         }
+        const scrollTop=el.scrollTop,poolOpen=el.querySelector('.ench-pool')?.open;
+        const selectFocused=document.activeElement===el.querySelector('#enchantItem');
         const keys=owned();
         if(!keys.includes(selected))selected=keys.includes(player.equipped.weapon)?player.equipped.weapon:(keys[0]||'');
+        lastRenderState=renderState();
         const t=R.parse(selected),essence=player.inv[R.MATERIAL]||0;
         const worn=Object.values(player.equipped||{}).includes(selected);
         document.getElementById('craftGoldLabel').textContent=player.gold+' g';
@@ -41,7 +48,7 @@
         else if(window.enchantingEnabled===false)html+='<p class="ench-notice">'+txt('Novos encantamentos estão em manutenção. Suas peças e seus bônus continuam funcionando.','New enchantments are under maintenance. Your pieces and bonuses still work.')+'</p>';
         if(message)html+='<p class="ench-notice" role="status">'+escapeHtml(message)+'</p>';
         if(pending)html+='<p class="ench-notice">'+txt('Aguardando confirmação da tentativa…','Waiting for confirmation…')+'</p>'+(pending.waiting?'':'<button class="ench-retry" data-enchant-retry>'+txt('Conferir tentativa pendente','Check pending attempt')+'</button>');
-        if(!selected){el.innerHTML=html+'<p class="ench-empty">'+txt('Encontre uma arma, armadura, escudo, capacete, bota ou amuleto para começar.','Find a weapon, armor, shield, helmet, boots or necklace to begin.')+'</p>';return;}
+        if(!selected){el.innerHTML=html+'<p class="ench-empty">'+txt('Encontre uma arma, armadura, escudo, capacete, bota ou amuleto para começar.','Find a weapon, armor, shield, helmet, boots or necklace to begin.')+'</p>';el.scrollTop=scrollTop;return;}
         html+='<label class="ench-label" for="enchantItem">'+txt('Escolha a peça','Choose a piece')+'</label><select id="enchantItem" '+(pending?'disabled':'')+'>';
         for(const k of keys){
             const p=R.parse(k),n=itmName(k)+(p.enchanted?' · #'+p.id.slice(-4).toUpperCase():'');
@@ -67,6 +74,9 @@
             return escapeHtml(R.describe({code,value},LANG));
         }).join(' · ')+'</small></details>';
         el.innerHTML=html;
+        const poolDetails=el.querySelector('.ench-pool');if(poolDetails&&poolOpen)poolDetails.open=true;
+        el.scrollTop=scrollTop;
+        if(selectFocused)el.querySelector('#enchantItem').focus({preventScroll:true});
         el.querySelector('#enchantItem').addEventListener('change',e=>{selected=e.target.value;message='';render()});
     }
     function sendPending(){
@@ -114,9 +124,14 @@
             };
             message=errors[r.error]||txt('Não foi possível encantar. Confira a peça, os materiais e sua posição.','Unable to enchant. Check your item, materials and position.');
         }
-        refreshIfOpen();
+        refreshIfOpen(true);
     }
-    function refreshIfOpen(){const el=document.getElementById('enchantPanel');if(el&&el.style.display!=='none'&&document.getElementById('craftModal').style.display==='flex')render();}
-    function reset(){clearTimeout(timer);pending=null;selected='';message='';loadedOwner='';}
+    function refreshIfOpen(force=false){
+        const el=document.getElementById('enchantPanel');
+        if(el&&el.style.display!=='none'&&document.getElementById('craftModal').style.display==='flex'
+            &&(force||renderState()!==lastRenderState)
+            &&(force||document.activeElement!==el.querySelector('#enchantItem')))render();
+    }
+    function reset(){clearTimeout(timer);pending=null;selected='';message='';loadedOwner='';lastRenderState='';}
     window.ValadaresEnchantUI={render,handleResult,refreshIfOpen,reset,attempt};
 })();
