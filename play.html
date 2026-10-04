@@ -1720,7 +1720,8 @@
         .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
     <link rel="stylesheet" href="/ui-polish.css?v=20261004c">
-    <link rel="stylesheet" href="/adventure-guide.css?v=20261003a">
+    <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
+    <link rel="stylesheet" href="/adventure-feedback.css?v=20261004a">
 </head>
 <body>
 
@@ -7642,6 +7643,7 @@ function handleMP(msg){
         sendJoinNow();
         // A UI lê somente o personagem já reconciliado com o save da conta.
         if (window.valadaresUi) window.valadaresUi.onAuth();
+        window.ValadaresAdventureFeedback?.reset?.();
         if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onReady();
         return;
     }
@@ -7782,6 +7784,7 @@ function handleMP(msg){
         // Drops pegos por alguém (ou despawn por TTL)
         const ids = Array.isArray(msg.ids) ? msg.ids : (msg.id ? [msg.id] : []);
         if (ids.length){
+            window.ValadaresAdventureFeedback?.captureRemoved?.(ids, groundItems);
             const setIds = new Set(ids);
             for (let i = groundItems.length - 1; i >= 0; i--){
                 if (setIds.has(groundItems[i].id)) groundItems.splice(i, 1);
@@ -7955,7 +7958,8 @@ function handleMP(msg){
         // N3 fase 2: pickup do chão — feedback (som + log).
         // Server já enviou inv/gold atualizados acima; groundRemove veio separado e limpou local.
         if (msg.pickup && Array.isArray(msg.pickup.ids) && msg.pickup.ids.length){
-            if (typeof sndPickup === 'function') sndPickup();
+            if (window.ValadaresAdventureFeedback?.loot) window.ValadaresAdventureFeedback.loot(msg.pickup);
+            else if (typeof sndPickup === 'function') sndPickup();
             if (msg.pickup.gold > 0){
                 log(tr('log.gold_picked', {g: msg.pickup.gold, total: player.gold}));
             }
@@ -8072,6 +8076,7 @@ function handleMP(msg){
         // Quest reward feedback (gold/xp/items/permaBuffs/flag) via float + log
         if (msg.questResult && msg.questResult.ok){
             const d = msg.questResult.delta || {};
+            window.valadaresAdventureGuide?.onQuestResult?.(msg.questResult);
             if (d.gold)  log(`<span class="log-up">+${d.gold}g</span>`);
             if (d.items) for (const [k, n] of Object.entries(d.items)){
                 const it = ITEMS[k];
@@ -8555,7 +8560,12 @@ function handleMP(msg){
         if (m){ m.hp = msg.hp; m.maxHp = msg.maxHp; }
     } else if (msg.t === 'mobFloat'){
         const m = monsters.find(x => x.id === msg.mobId);
-        if (m) addFloat(m.x, m.y, msg.text, msg.color || '#ff8060', !!msg.crit);
+        if (m) {
+            addFloat(m.x, m.y, msg.text, msg.color || '#ff8060', !!msg.crit);
+            if (/^-\d/.test(String(msg.text))) window.ValadaresAdventureFeedback?.hit?.({
+                x: m.renderX ?? m.x, y: m.renderY ?? m.y, kind: 'dealt', crit: !!msg.crit, confirmed: true
+            });
+        }
     } else if (msg.t === 'mobDead'){
         const idx = monsters.findIndex(x => x.id === msg.mobId);
         if (idx >= 0) monsters.splice(idx, 1);
@@ -8617,6 +8627,10 @@ function handleMP(msg){
             player.hp = Math.max(0, player.hp - actual);
         }
         const crit = !!msg.crit;   // crit do mob (server-side agora)
+        window.ValadaresAdventureFeedback?.hit?.({
+            x: player.renderX ?? player.x, y: player.renderY ?? player.y,
+            kind: 'taken', actual, crit, confirmed: typeof msg.actual === 'number'
+        });
         player.hurtTimer = crit ? 450 : 300;
         sndDmg();
         addFloat(player.x, player.y, `${crit ? '★ ' : ''}-${actual}`, crit ? '#ff6020' : '#ff3030', true, crit ? -10 : 0);
@@ -15895,6 +15909,7 @@ function logout(){
     document.body.classList.remove('game-active', 'panel-equipment', 'panel-inventory', 'menu-open');
     if (window.valadaresUi) window.valadaresUi.onLogout();
     if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onLogout();
+    window.ValadaresAdventureFeedback?.reset?.();
     document.getElementById('charInput').value = '';
     document.getElementById('pwdInput').value = '';
     document.getElementById('loginError').textContent = '';
@@ -16003,6 +16018,17 @@ window.addEventListener('beforeunload', () => { if (started) saveState(); });
 let _saveStateIntervalId = null;
 let _playerSyncIntervalId = null;
 function startGame(multiplayer, name){
+    window.ValadaresAdventureFeedback?.reset?.();
+    window.ValadaresAdventureFeedback?.configure?.({
+        getItem: key => {
+            const base = getUpgradeTier(key).base;
+            if (!ITEMS[base] && !ITEMS[key]) return null;
+            const meta = itemDisplayMeta(key);
+            return { name: meta.name + (meta.plus ? ' +' + meta.plus : ''),
+                rarity: meta.rarCls === 'rar-myth' ? 'myth' : meta.rarCls === 'rar-leg' ? 'legendary' : 'common' };
+        },
+        icon: getItemIconURL, playSfx, getLanguage: () => LANG, getFloor: () => player.floor || 0
+    });
     player.name = (name || 'Aventureiro').substring(0,14);
     document.getElementById('login').style.display = 'none';
     document.getElementById('charName').textContent = player.name;
@@ -16658,7 +16684,9 @@ function loop(ts){
             // praça). No andar da masmorra, desenha sempre o tile do grid.
             if ((player.floor || 0) === 0 && inSafeZone(mx, my)){
                 const art = polishedArt2D();
-                if (art) art.drawPlazaTile(ctx, sx, sy, mx, my);
+                if (art) art.drawPlazaTile(ctx, sx, sy, mx, my, { edgeMask:
+                    (my === SAFE_CY-SAFE_RADIUS ? 1 : 0) | (my === SAFE_CY+SAFE_RADIUS ? 2 : 0) |
+                    (mx === SAFE_CX-SAFE_RADIUS ? 4 : 0) | (mx === SAFE_CX+SAFE_RADIUS ? 8 : 0) });
                 else {
                     const tiles = getStoneTiles();
                     const idx = (mx * 13 + my * 23) & 3;
@@ -17112,6 +17140,7 @@ function loop(ts){
     drawAuras(cam);
     drawParticles(cam);
     drawAmbientParticles(cam);
+    window.ValadaresAdventureFeedback?.draw?.(ctx, { x: cam.x, y: cam.y, tileSize: TS });
 
     // Ciclo dia/noite + iluminação dinâmica
     gameTime += dt;
@@ -17295,8 +17324,9 @@ function loop(ts){
 <script src="/monster-art-creatures.js?v=20261003a"></script>
 <script src="/monster-art-depths.js?v=20261003a"></script>
 <script src="/village-art.js?v=20261004a"></script>
-<script src="/render2d-polish.js?v=20261003a"></script>
+<script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
-<script src="/adventure-guide.js?v=20261003a"></script>
+<script src="/adventure-guide.js?v=20261004b"></script>
+<script src="/adventure-feedback.js?v=20261004a"></script>
 </body>
 </html>

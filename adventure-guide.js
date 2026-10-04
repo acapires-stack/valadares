@@ -9,7 +9,11 @@
         '<section id="adventureGuidePanel" aria-label="Primeira aventura" hidden>' +
         '<div class="ag-head"><strong id="agTitle"></strong><button id="agClose" type="button" aria-label="Recolher guia">×</button></div>' +
         '<div id="agStep" class="ag-step"></div><p id="agText"></p><div id="agDetail" class="ag-detail"></div>' +
-        '<div class="ag-actions"><button id="agAction" type="button"></button><button id="agSafety" type="button" hidden></button><button id="agMissions" type="button"></button></div></section>';
+        '<div class="ag-actions"><button id="agAction" type="button"></button><button id="agSafety" type="button" hidden></button><button id="agMissions" type="button"></button></div></section>' +
+        '<section id="agMoment" class="ag-moment" aria-live="polite" hidden>' +
+        '<div class="ag-moment-head"><span id="agMomentIcon" class="ag-medallion" aria-hidden="true"></span><div><strong id="agMomentTitle"></strong><span id="agMomentEyebrow"></span></div><button id="agMomentClose" type="button">×</button></div>' +
+        '<p id="agMomentText"></p><div id="agMomentDetail" class="ag-moment-detail"></div>' +
+        '<div class="ag-moment-actions"><button id="agMomentAction" type="button"></button></div></section>';
     host.appendChild(root);
     const openButton = root.querySelector('#adventureGuideOpen');
     const panel = root.querySelector('#adventureGuidePanel');
@@ -20,8 +24,17 @@
     const action = root.querySelector('#agAction');
     const safety = root.querySelector('#agSafety');
     const missions = root.querySelector('#agMissions');
+    const moment = root.querySelector('#agMoment');
+    const momentIcon = root.querySelector('#agMomentIcon');
+    const momentTitle = root.querySelector('#agMomentTitle');
+    const momentEyebrow = root.querySelector('#agMomentEyebrow');
+    const momentText = root.querySelector('#agMomentText');
+    const momentDetail = root.querySelector('#agMomentDetail');
+    const momentAction = root.querySelector('#agMomentAction');
+    const momentClose = root.querySelector('#agMomentClose');
     let ready = false, name = '', expanded = false, syncing = false, syncTimer = 0, observedActive = false;
     let pendingTurnIn = false, turnInTimer = 0, showSafety = false;
+    let momentKind = '', momentSignature = '', momentReward = null;
     const copy = {
         pt: {
             title:'Primeira aventura', reopen:'📜 Guia', close:'Recolher guia', missions:'Missões',
@@ -39,6 +52,12 @@
             offline:'Conecte-se ao servidor para continuar.', danger:'Vida baixa: volte à zona segura agora.',
             safeRoute:'Centro da zona segura: (50, 50)', safety:'Como recuperar',
             safetyInfo:'Na zona segura, pare de lutar e aguarde a vida se recuperar. Se tiver comida ou poção de vida no inventário, você também pode usá-la.',
+            achievementTitle:'Primeira conquista', achievementEyebrow:'CAÇADA INFESTANTE · CONCLUÍDA',
+            achievementText:'A vila reconhece sua primeira vitória.', achievementNext:'Próximo objetivo: Defenda o pátio. Abra Missões na Atendente.',
+            resumeTitle:'Sua aventura continua', resumeEyebrow:'ONDE VOCÊ PAROU', resumeNext:'Próxima missão',
+            resumeDeliver:'Próxima ação: entregue à Atendente em (47, 53)',
+            resumeContinue:'Próxima ação: continue o objetivo e acompanhe Missões',
+            resumeChoose:'Próxima ação: abra Missões na Atendente em (47, 53)', floor:'Andar',
             directions:{left:'oeste ←', right:'leste →', up:'norte ↑', down:'sul ↓'}
         },
         en: {
@@ -57,6 +76,12 @@
             offline:'Connect to the server to continue.', danger:'Low health: return to the safe zone now.',
             safeRoute:'Safe zone center: (50, 50)', safety:'How to recover',
             safetyInfo:'In the safe zone, stop fighting and wait for health to recover. If you have food or a health potion in your inventory, you can use it too.',
+            achievementTitle:'First achievement', achievementEyebrow:'INFESTATION HUNT · COMPLETE',
+            achievementText:'The village recognizes your first victory.', achievementNext:'Next objective: Defend the Yard. Open Quests at the Attendant.',
+            resumeTitle:'Your adventure continues', resumeEyebrow:'WHERE YOU LEFT OFF', resumeNext:'Next quest',
+            resumeDeliver:'Next step: turn in at the Attendant (47, 53)',
+            resumeContinue:'Next step: continue the objective and check Quests',
+            resumeChoose:'Next step: open Quests at the Attendant (47, 53)', floor:'Floor',
             directions:{left:'west ←', right:'east →', up:'north ↑', down:'south ↓'}
         }
     };
@@ -64,10 +89,108 @@
     const prefKey = () => 'valadares:adventureGuide:' + name;
     const pref = () => { try { return localStorage.getItem(prefKey()); } catch { return null; } };
     const setPref = v => { try { localStorage.setItem(prefKey(), v); } catch {} };
+    const stateKey = suffix => 'valadares:adventureGuide:' + encodeURIComponent(name) + ':' + suffix;
+    const readState = suffix => { try { return localStorage.getItem(stateKey(suffix)); } catch { return null; } };
+    const writeState = (suffix, value) => { try { localStorage.setItem(stateKey(suffix), value); } catch {} };
     const online = () => typeof _wsAuthed !== 'undefined' && _wsAuthed && typeof ws !== 'undefined' && ws?.readyState === 1;
     const hasQuest = () => !!player.quests?.active?.q_ratos;
     const done = () => !!player.quests?.completed?.includes('q_ratos');
     const nearAttendant = () => (player.floor || 0) === 0 && typeof atQuestNpc === 'function' && atQuestNpc();
+
+    function activeQuest() {
+        const active = player.quests?.active || {};
+        if (typeof QUESTS === 'undefined') return null;
+        return QUESTS.find(q => Object.prototype.hasOwnProperty.call(active, q.id)) || null;
+    }
+    function resumeData() {
+        const w = words();
+        const q = activeQuest();
+        const floor = Number.isFinite(player.floor) ? player.floor : 0;
+        const location = Number.isFinite(player.x) && Number.isFinite(player.y)
+            ? (floor > 0 ? `${w.floor} ${floor} · ` : '') + `(${Math.round(player.x)}, ${Math.round(player.y)})` : '';
+        if (q) {
+            const progress = typeof questProgress === 'function' ? questProgress(q.id) : 0;
+            const count = q.goal.count;
+            const complete = progress >= count;
+            const questName = typeof qName === 'function' ? qName(q) : q.name;
+            const objective = typeof qDesc === 'function' ? qDesc(q) : q.desc || '';
+            return {
+                signature: `${q.id}:${progress}/${count}:${complete ? 1 : 0}`,
+                text: `${questName} · ${progress}/${count}`,
+                detail: (complete ? '' : objective ? objective + ' · ' : '')
+                    + (complete ? w.resumeDeliver : w.resumeContinue) + (location ? ` · ${location}` : '')
+            };
+        }
+        if (done()) {
+            const nextQuest = typeof QUESTS === 'undefined' ? null : QUESTS.find(q => !player.quests?.completed?.includes(q.id));
+            if (!nextQuest) return null;
+            const questName = typeof qName === 'function' ? qName(nextQuest) : nextQuest.name;
+            return { signature: `next:${nextQuest.id}`, text: `${w.resumeNext}: ${questName}`,
+                detail: w.resumeChoose + (location ? ` · ${location}` : '') };
+        }
+        return null;
+    }
+    function showMoment(kind, data) {
+        momentKind = kind;
+        momentSignature = data.signature || '';
+        expanded = false;
+        const w = words();
+        momentIcon.textContent = kind === 'achievement' ? '❧' : '✦';
+        momentTitle.textContent = kind === 'achievement' ? w.achievementTitle : w.resumeTitle;
+        momentEyebrow.textContent = kind === 'achievement' ? w.achievementEyebrow : w.resumeEyebrow;
+        momentText.textContent = data.text;
+        momentDetail.textContent = data.detail;
+        momentAction.textContent = w.missions;
+        momentClose.setAttribute('aria-label', w.close);
+        render();
+    }
+    function closeMoment() {
+        if (momentKind === 'resume' && momentSignature) writeState('resumeDismissed', momentSignature);
+        momentKind = '';
+        render();
+    }
+    function refreshMoment() {
+        if (!momentKind) return;
+        const w = words();
+        const put = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+        const achievement = momentKind === 'achievement';
+        put(momentTitle, achievement ? w.achievementTitle : w.resumeTitle);
+        put(momentEyebrow, achievement ? w.achievementEyebrow : w.resumeEyebrow);
+        put(momentAction, w.missions);
+        momentClose.setAttribute('aria-label', w.close);
+        if (!achievement) {
+            const current = resumeData();
+            if (!current) { momentKind = ''; return; }
+            momentSignature = current.signature;
+            put(momentText, current.text);
+            put(momentDetail, current.detail);
+            return;
+        }
+        const rewards = [];
+        if (momentReward?.gold > 0) rewards.push(`+${momentReward.gold}g`);
+        for (const [skill, value] of Object.entries(momentReward?.xp || {})) {
+            rewards.push(`+${value} XP ${skill === 'Punho' && w === copy.en ? 'Fist' : skill}`);
+        }
+        put(momentText, w.achievementText);
+        put(momentDetail, (rewards.length ? rewards.join(' · ') + ' · ' : '')
+            + (player.quests?.completed?.includes('q_cobras') ? w.explore : w.achievementNext));
+    }
+    function onQuestResult(result) {
+        if (!ready || !name || !result?.ok || result.kind !== 'simple' || result.questId !== 'q_ratos'
+            || !done() || readState('firstQuestCelebrated')) return;
+        // delta é o crédito aplicado pelo servidor, nunca uma previsão da tabela local.
+        const delta = result.delta || {};
+        momentReward = { gold: Number.isFinite(delta.gold) && delta.gold > 0 ? delta.gold : 0, xp: {} };
+        if (delta.xp && typeof delta.xp === 'object') for (const [skill, value] of Object.entries(delta.xp)) {
+            if (Number.isFinite(value) && value > 0) momentReward.xp[skill] = value;
+        }
+        writeState('firstQuestCelebrated', '1');
+        const w = words();
+        showMoment('achievement', {
+            text: w.achievementText,
+            detail: ''
+        });
+    }
 
     function direction(x, y) {
         const d = words().directions;
@@ -112,6 +235,7 @@
         if (typeof player === 'undefined' || !player.name) return;
         const changed = name !== player.name;
         if (changed) {
+            momentKind = ''; momentSignature = ''; momentReward = null;
             clearTimeout(syncTimer);
             clearTimeout(turnInTimer);
             syncing = false;
@@ -129,12 +253,20 @@
             syncAcceptance();
         }
         ready = true;
+        if (changed) {
+            const data = resumeData();
+            if (data && readState('resumeDismissed') !== data.signature) {
+                showMoment('resume', data);
+                return;
+            }
+        }
         render();
     }
     function onLogout() {
         clearTimeout(syncTimer);
         clearTimeout(turnInTimer);
         ready = false; name = ''; expanded = false; syncing = false; pendingTurnIn = false; showSafety = false; observedActive = false;
+        momentKind = ''; momentSignature = ''; momentReward = null;
         render();
     }
     function render() {
@@ -148,8 +280,10 @@
             return;
         }
         const tutorialOpen = !!document.getElementById('mobileTutOverlay')?.classList.contains('active');
-        openButton.hidden = expanded || tutorialOpen;
-        panel.hidden = !expanded || tutorialOpen;
+        refreshMoment();
+        moment.hidden = !momentKind || tutorialOpen;
+        openButton.hidden = expanded || tutorialOpen || !!momentKind;
+        panel.hidden = !expanded || tutorialOpen || !!momentKind;
         const lowHealth = !done() && hasQuest() && (player.floor || 0) === 0
             && typeof playerInSafeZone === 'function' && !playerInSafeZone()
             && player.maxHp > 0 && player.hp / player.maxHp < 0.4;
@@ -214,6 +348,14 @@
     root.querySelector('#agClose').addEventListener('click', () => setExpanded(false));
     safety.addEventListener('click', () => { showSafety = !showSafety; render(); });
     missions.addEventListener('click', () => { if (typeof openQuests === 'function') openQuests(); });
+    momentClose.addEventListener('click', closeMoment);
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && momentKind && !moment.hidden) closeMoment();
+    });
+    momentAction.addEventListener('click', () => {
+        closeMoment();
+        if (typeof openQuests === 'function') openQuests();
+    });
     action.addEventListener('click', () => {
         if (!online() || !nearAttendant() || done()) return;
         if (action.dataset.mode === 'accept' && !hasQuest() && typeof acceptQuest === 'function' && acceptQuest('q_ratos')) {
@@ -228,7 +370,8 @@
             render();
         }
     });
-    window.valadaresAdventureGuide = { onReady, onLogout, isGuiding: () => ready && expanded && !done() };
+    window.valadaresAdventureGuide = { onReady, onLogout, onQuestResult,
+        isGuiding: () => ready && ((expanded && !done()) || !!momentKind) };
     setInterval(() => { if (ready) render(); }, 900);
     // Autenticação pode terminar antes de este recurso opcional carregar.
     if (typeof _wsAuthed !== 'undefined' && _wsAuthed && typeof started !== 'undefined' && started) onReady();

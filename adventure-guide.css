@@ -1,4 +1,4 @@
-#adventureGuide[hidden], #adventureGuidePanel[hidden], #adventureGuideOpen[hidden] { display: none !important; }
+#adventureGuide[hidden], #adventureGuidePanel[hidden], #adventureGuideOpen[hidden], #agMoment[hidden] { display: none !important; }
 #adventureGuide {
     position: absolute; top: 39px; right: 8px; z-index: 36;
     width: min(236px, 38%); pointer-events: none;
@@ -19,7 +19,44 @@
 #adventureGuide .ag-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 #adventureGuide .ag-actions button { padding: 4px 7px; font-size: 11px; }
 #adventureGuide .ag-actions button:disabled { opacity: .5; cursor: default; }
+#adventureGuide .ag-moment {
+    pointer-events: auto; position: absolute; top: 0; right: 0;
+    width: min(312px, calc(100vw - 16px)); box-sizing: border-box;
+    max-height: min(246px, 62vh); overflow: auto;
+    padding: 11px 13px; border: 1px solid #b99961; border-radius: 9px;
+    color: #f1e5ca; background: linear-gradient(135deg, #38291b 0%, #201a18 66%, #171717 100%);
+    box-shadow: 0 8px 24px #000b, inset 0 1px #f5dba12e;
+    animation: ag-arrive .28s ease-out;
+}
+#adventureGuide .ag-moment-head { display: flex; align-items: center; gap: 9px; }
+#adventureGuide .ag-moment-head > div { min-width: 0; flex: 1; }
+#adventureGuide .ag-moment-head strong { display: block; color: #ffe3a0; font: 700 16px/1.15 Georgia, serif; }
+#adventureGuide .ag-moment-head span:not(.ag-medallion) { display: block; margin-top: 3px; color: #c6aa77; font-size: 9px; font-weight: 700; letter-spacing: .09em; }
+#adventureGuide .ag-medallion {
+    display: grid; flex: none; place-items: center; width: 39px; height: 39px;
+    border: 1px solid #dbbb70; border-radius: 50%; color: #f8de92;
+    background: radial-gradient(circle at 35% 25%, #a27b36, #523718 65%, #2c2419);
+    box-shadow: 0 0 0 3px #bd9a4930, inset 0 1px 2px #fff5;
+    font: 27px/1 Georgia, serif;
+}
+#adventureGuide .ag-moment-head button { align-self: flex-start; border: 0; background: transparent; padding: 0 2px; font-size: 20px; line-height: 19px; }
+#adventureGuide .ag-moment p { margin: 10px 0 6px; font-size: 12px; }
+#adventureGuide .ag-moment-detail { color: #c5d6ab; font-size: 11px; line-height: 1.45; }
+#adventureGuide .ag-moment-actions { margin-top: 10px; }
+#adventureGuide .ag-moment-actions button { padding: 5px 10px; color: #241908; border-color: #ddb776; background: #e5bb73; font-weight: 700; }
+#adventureGuide .ag-moment-actions button:hover { background: #f4d391; }
+@keyframes ag-arrive { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) {
     #adventureGuide { top: 35px; right: 5px; width: min(210px, 42%); font-size: 11px; }
     #adventureGuidePanel { padding: 6px 7px; }
+}
+@media (max-width: 900px) and (max-height: 480px) {
+    #adventureGuide .ag-moment { max-height: min(184px, 48vh); padding: 7px 9px; }
+    #adventureGuide .ag-moment-head strong { font-size: 14px; }
+    #adventureGuide .ag-medallion { width: 31px; height: 31px; font-size: 21px; }
+    #adventureGuide .ag-moment p { margin: 6px 0 3px; }
+    #adventureGuide .ag-moment-actions { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #adventureGuide .ag-moment { animation: none; }
 }

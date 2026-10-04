@@ -3,7 +3,7 @@
 (function (root) {
     'use strict';
     const SIZE = 48;
-    const TYPES = { GRASS: 0, DIRT: 1, TREE: 2, STONE: 4 };
+    const TYPES = { GRASS: 0, DIRT: 1, TREE: 2, WATER: 3, STONE: 4 };
     const cache = new Map();
     const plazaCache = new Map();
     function hash(x, y, salt) {
@@ -21,11 +21,11 @@
         c.fillRect(x, y, w, h);
     }
     function grass(c, variant) {
-        rect(c, '#60744d', 0, 0, SIZE, SIZE);
+        rect(c, '#60774e', 0, 0, SIZE, SIZE);
         // Broad tones and sparse clumps; avoid a repeated field of tiny dots.
         const patches = variant & 1 ? [[3,11,17,12],[27,29,16,11]] : [[8,25,19,12],[29,5,14,14]];
         for (const [x,y,w,h] of patches) rect(c, '#637750', x,y,w,h);
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3; i++) {
             const x = 5 + hash(variant, i, 130) % 36;
             const y = 5 + hash(i, variant, 240) % 35;
             rect(c, '#718958', x, y, 2, 5);
@@ -34,6 +34,10 @@
         if (variant === 2 || variant === 6) {
             rect(c, '#aaae77', 35, 17, 2, 2);
             rect(c, '#8d9862', 33, 18, 2, 2);
+        }
+        if (variant === 1 || variant === 5) {
+            rect(c, '#788d5b', 10, 30, 6, 2);
+            rect(c, '#4f7049', 15, 33, 4, 2);
         }
     }
     function dirt(c, variant) {
@@ -83,61 +87,108 @@
             rect(c, '#718f5b', 23, 8, 6, 3);
         }
         rect(c, '#324b35', 24, 26, 10, 5);
+        // A few broad canopy shifts keep a grove organic without noisy leaves.
+        if (variant % 3 === 0) {
+            rect(c, '#6d8959', 6, 15, 11, 5);
+            rect(c, '#2c4734', 31, 27, 11, 5);
+        } else if (variant % 3 === 1) {
+            rect(c, '#71905d', 25, 11, 11, 5);
+            rect(c, '#3b5940', 5, 27, 13, 4);
+        } else {
+            rect(c, '#73905d', 11, 21, 10, 4);
+            rect(c, '#314b36', 32, 18, 9, 8);
+        }
     }
     function stone(c, variant) {
-        rect(c, '#838479', 0, 0, SIZE, SIZE);
-        rect(c, '#888b7e', 2, 3, 23, 18);
-        rect(c, '#777b72', 27, 3, 18, 18);
-        rect(c, '#929388', 2, 24, 17, 20);
-        rect(c, '#7c8176', 21, 24, 24, 20);
-        rect(c, '#a0a095', 4, 4, 15, 2);
-        rect(c, '#6e756c', 28, 19, 17, 2);
-        if (variant & 1) rect(c, '#748071', 7, 32, 5, 2);
+        rect(c, '#787b70', 0, 0, SIZE, SIZE);
+        const blocks = [
+            [1,1,28,21],[31,1,16,21],
+            [1,24,17,23],[20,24,27,23]
+        ];
+        const colors = ['#909185','#7c8277','#929387','#85897e'];
+        for (let i = 0; i < blocks.length; i++) {
+            const [x,y,w,h] = blocks[i];
+            rect(c, colors[(i + (variant & 1)) & 3], x,y,w,h);
+            rect(c, 'rgba(223,218,190,0.20)', x,y,w-2,2);
+            rect(c, 'rgba(45,52,45,0.16)', x+w-2,y+2,2,h-2);
+        }
+        if (variant & 2) rect(c, '#6f806e', 9,37,6,2);
     }
-    function tileImage(type, tx, ty) {
+    function water(c, variant, shoreMask) {
+        rect(c, '#315d68', 0, 0, SIZE, SIZE);
+        rect(c, variant & 1 ? '#376975' : '#356671', 5, 8, 28, 13);
+        rect(c, '#2b5663', 17, 29, 30, 11);
+        rect(c, 'rgba(151,190,176,0.34)', 8 + variant % 5, 12, 15, 2);
+        rect(c, 'rgba(151,190,176,0.24)', 28, 35 - variant % 4, 12, 2);
+        if (variant & 2) rect(c, 'rgba(176,204,181,0.24)', 5, 39, 8, 1);
+        // The bank belongs to the water tile; the land stays intact and collision is unchanged.
+        const bank = '#8a896b', wet = '#55786c';
+        for (let side = 0; side < 4; side++) {
+            if (!(shoreMask & (1 << side))) continue;
+            for (let a = 0; a < SIZE; a += 8) {
+                const depth = 3 + hash(variant, a + side * 53, 612) % 3;
+                if (side === 0) { rect(c, bank, a, 0, 8, depth); rect(c, wet, a, depth, 8, 1); }
+                if (side === 1) { rect(c, bank, a, SIZE-depth, 8, depth); rect(c, wet, a, SIZE-depth-1, 8, 1); }
+                if (side === 2) { rect(c, bank, 0, a, depth, 8); rect(c, wet, depth, a, 1, 8); }
+                if (side === 3) { rect(c, bank, SIZE-depth, a, depth, 8); rect(c, wet, SIZE-depth-1, a, 1, 8); }
+            }
+        }
+    }
+    function neighbor(map, x, y) {
+        return map && map[y] ? map[y][x] : undefined;
+    }
+    function edgeMask(type, tx, ty, map) {
+        if (!map || (type !== TYPES.WATER && type !== TYPES.DIRT)) return 0;
+        const target = type === TYPES.DIRT ? TYPES.GRASS : TYPES.WATER;
+        let mask = 0;
+        const directions = [[0,-1],[0,1],[-1,0],[1,0]];
+        for (let side = 0; side < 4; side++) {
+            const [dx,dy] = directions[side];
+            const other = neighbor(map, tx+dx, ty+dy);
+            if (other !== undefined && (type === TYPES.DIRT ? other === target : other !== target))
+                mask |= 1 << side;
+        }
+        return mask;
+    }
+    function dirtGrassEdge(c, variant, mask) {
+        for (let side = 0; side < 4; side++) {
+            if (!(mask & (1 << side))) continue;
+            for (let a = 0; a < SIZE; a += 8) {
+                const deep = 2 + hash(variant, a + side * 41, 67) % 4;
+                if (side === 0) rect(c, '#62774f', a, 0, 8, deep);
+                if (side === 1) rect(c, '#62774f', a, SIZE-deep, 8, deep);
+                if (side === 2) rect(c, '#62774f', 0, a, deep, 8);
+                if (side === 3) rect(c, '#62774f', SIZE-deep, a, deep, 8);
+            }
+        }
+    }
+    function tileImage(type, tx, ty, map) {
         const variant = hash(tx, ty, 51) & 7;
-        const key = type + ':' + variant;
+        const mask = edgeMask(type, tx, ty, map);
+        const key = type + ':' + variant + ':' + mask;
         let img = cache.get(key);
         if (!img) {
             img = canvas();
             const c = img.getContext('2d');
             if (type === TYPES.GRASS) grass(c, variant);
-            else if (type === TYPES.DIRT) dirt(c, variant);
+            else if (type === TYPES.DIRT) { dirt(c, variant); dirtGrassEdge(c, variant, mask); }
             else if (type === TYPES.TREE) tree(c, variant);
+            else if (type === TYPES.WATER) water(c, variant, mask);
             else stone(c, variant);
             cache.set(key, img);
         }
         return img;
     }
-    function neighbor(map, x, y) {
-        return map && map[y] && map[y][x];
-    }
-    function dirtGrassEdge(c, px, py, tx, ty, map) {
-        // Dirt owns the boundary: irregular grass tongues do not alter collision.
-        const dirs = [
-            [0,-1,'N'],[0,1,'S'],[-1,0,'W'],[1,0,'E']
-        ];
-        for (const [dx,dy,side] of dirs) {
-            if (neighbor(map, tx+dx, ty+dy) !== TYPES.GRASS) continue;
-            for (let a = 0; a < SIZE; a += 6) {
-                const h = hash(tx * SIZE + (side === 'N' || side === 'S' ? a : 0),
-                    ty * SIZE + (side === 'E' || side === 'W' ? a : 0), 67 + dx * 7 + dy * 13);
-                const deep = 2 + h % 5;
-                if (side === 'N') rect(c, '#62774f', px+a, py, 6, deep);
-                if (side === 'S') rect(c, '#62774f', px+a, py+SIZE-deep, 6, deep);
-                if (side === 'W') rect(c, '#62774f', px, py+a, deep, 6);
-                if (side === 'E') rect(c, '#62774f', px+SIZE-deep, py+a, deep, 6);
-            }
-        }
-    }
     function drawTile(c, type, px, py, tx, ty, opts) {
         if (type !== TYPES.GRASS && type !== TYPES.DIRT &&
-            type !== TYPES.TREE && type !== TYPES.STONE) return false;
-        c.drawImage(tileImage(type, tx, ty), px, py);
-        if (type === TYPES.DIRT && opts && opts.map) dirtGrassEdge(c, px, py, tx, ty, opts.map);
+            type !== TYPES.TREE && type !== TYPES.WATER && type !== TYPES.STONE) return false;
+        c.drawImage(tileImage(type, tx, ty, opts && opts.map), px, py);
         return true;
     }
     function plazaImage(tx, ty) {
+        // Eight tiles repeat only after the 32x12 world-space stone bond aligns.
+        tx = ((tx % 8) + 8) % 8;
+        ty = ((ty % 8) + 8) % 8;
         const key = tx + ',' + ty;
         let img = plazaCache.get(key);
         if (img) return img;
@@ -164,8 +215,18 @@
         plazaCache.set(key, img);
         return img;
     }
-    function drawPlazaTile(c, px, py, tx, ty) {
+    function drawPlazaTile(c, px, py, tx, ty, opts) {
         c.drawImage(plazaImage(tx, ty), px, py);
+        const mask = opts && opts.edgeMask || 0; // N=1, S=2, W=4, E=8
+        if (mask) {
+            c.save();
+            const band = '#b0a68b', light = '#cbc0a0', inside = '#6f756e';
+            if (mask & 1) { rect(c, band, px, py, SIZE, 5); rect(c, light, px, py, SIZE, 2); rect(c, inside, px, py+5, SIZE, 1); }
+            if (mask & 2) { rect(c, band, px, py+SIZE-5, SIZE, 5); rect(c, light, px, py+SIZE-5, SIZE, 2); rect(c, inside, px, py+SIZE-6, SIZE, 1); }
+            if (mask & 4) { rect(c, band, px, py, 5, SIZE); rect(c, light, px, py, 2, SIZE); rect(c, inside, px+5, py, 1, SIZE); }
+            if (mask & 8) { rect(c, band, px+SIZE-5, py, 5, SIZE); rect(c, light, px+SIZE-5, py, 2, SIZE); rect(c, inside, px+SIZE-6, py, 1, SIZE); }
+            c.restore();
+        }
         return true;
     }
     const JOBS = {
@@ -242,5 +303,8 @@
         }
         return true;
     }
-    root.ValadaresArt2D = Object.freeze({ drawTile, drawPlazaTile, drawNpcBody });
+    function cacheStats() {
+        return { tiles: cache.size, plaza: plazaCache.size, maxTiles: 280, maxPlaza: 64 };
+    }
+    root.ValadaresArt2D = Object.freeze({ drawTile, drawPlazaTile, drawNpcBody, cacheStats });
 })(window);
