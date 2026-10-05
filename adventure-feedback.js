@@ -66,7 +66,8 @@
         try {
             const meta = typeof deps.getItem === 'function' && deps.getItem(type);
             if (!meta || typeof meta.name !== 'string') return null;
-            return { name: meta.name.slice(0, 80), rarity: meta.rarity === 'myth' ? 'myth' : meta.rarity === 'legendary' ? 'legendary' : 'common' };
+            return { name: meta.name.slice(0, 80), kind: meta.kind,
+                rarity: meta.rarity === 'myth' ? 'myth' : meta.rarity === 'legendary' ? 'legendary' : 'common' };
         } catch { return null; }
     }
     function loot(pickup){
@@ -84,9 +85,29 @@
             merged.set(drop.type, row);
         }
         const gold = Number.isFinite(pickup.gold) ? Math.max(0, Math.floor(pickup.gold)) : 0;
-        if (!gold && !merged.size) return;
-        if (!pending) pending = { items: new Map(), gold: 0 };
+        queueLoot(merged, gold, false);
+        return [...merged.values()];
+    }
+    // O boss credita direto no inventário. Este payload já foi confirmado pelo servidor;
+    // não passa por groundRemove/pickup e não altera o inventário local.
+    function bossLoot(reward){
+        if (!reward || typeof reward !== 'object') return;
+        const merged = new Map();
+        for (const [type, rawQty] of Object.entries(reward.items || {}).slice(0, 80)){
+            if (typeof type !== 'string' || !Number.isFinite(rawQty) || rawQty <= 0) continue;
+            const meta = getMeta(type);
+            if (!meta || ['food', 'potion', 'ammo'].includes(meta.kind)) continue;
+            merged.set(type, { type, qty: Math.floor(rawQty), ...meta });
+        }
+        const gold = Number.isFinite(reward.gold) ? Math.max(0, Math.floor(reward.gold)) : 0;
+        if (!gold && !merged.size && !Object.keys(reward.items || {}).length) return;
+        queueLoot(merged, gold, !merged.size);
+    }
+    function queueLoot(merged, gold, noSpecial){
+        if (!gold && !merged.size && !noSpecial) return;
+        if (!pending) pending = { items: new Map(), gold: 0, noSpecial: false };
         pending.gold += gold;
+        pending.noSpecial ||= noSpecial;
         for (const row of merged.values()){
             const old = pending.items.get(row.type);
             if (old) old.qty += row.qty;
@@ -101,10 +122,16 @@
         if (!batch || hiddenByGuide()) return;
         const host = container();
         if (!host) return;
-        const ranked = [...batch.items.values()].sort((a,b) => rank(b.rarity) - rank(a.rarity));
+        const ranked = [...batch.items.values()].sort((a,b) => rank(b) - rank(a));
         const rare = ranked.some(row => row.rarity !== 'common');
         const card = document.createElement('div');
         card.className = 'adventure-loot-card' + (rare ? ' adventure-loot-card-rare' : '');
+        if (!ranked.length && batch.noSpecial){
+            const line = document.createElement('div');
+            line.className = 'adventure-loot-more';
+            line.textContent = deps.getLanguage && deps.getLanguage() === 'en' ? 'No special item' : 'Sem item especial';
+            card.appendChild(line);
+        }
         for (const row of ranked.slice(0, 2)){
             const line = document.createElement('div');
             line.className = 'adventure-loot-line adventure-rarity-' + row.rarity;
@@ -147,7 +174,11 @@
         setTimeout(() => { const i = cards.indexOf(card); if (i >= 0) cards.splice(i, 1); card.remove(); }, CARD_MS);
         playPickupSound(rare);
     }
-    function rank(rarity){ return rarity === 'myth' ? 2 : rarity === 'legendary' ? 1 : 0; }
+    function rank(row){
+        const rarity = row.rarity === 'myth' ? 200 : row.rarity === 'legendary' ? 100 : 0;
+        const kind = ['weapon', 'wand', 'offhand', 'armor', 'head', 'feet', 'neck', 'cosmetic'].includes(row.kind) ? 20 : 0;
+        return rarity + kind;
+    }
     function hit(event){
         if (!event || event.confirmed !== true || motion.matches || hiddenByGuide()) return;
         if (!Number.isFinite(event.x) || !Number.isFinite(event.y)) return;
@@ -190,5 +221,5 @@
         for (const card of cards) card.remove();
         cards.length = 0;
     }
-    window.ValadaresAdventureFeedback = { configure, captureRemoved: rememberRemoved, loot, hit, draw, reset };
+    window.ValadaresAdventureFeedback = { configure, captureRemoved: rememberRemoved, loot, bossLoot, hit, draw, reset };
 })();

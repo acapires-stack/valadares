@@ -2735,9 +2735,11 @@ const I18N = {
     'log.boss_loot_no_special': 'nenhum item especial',
     'log.equip_rejected': '<span class="log-sys">Servidor rejeitou a operação de equip.</span>',
     'log.gold_picked': '<span class="log-xp">+{g} ouro ({total})</span>',
+    'log.items_picked': '<span class="log-xp">Pegou {items}</span>',
     'log.gold_rain': '<span class="log-up">💰 Chuva de Ouro: +{g}g</span>',
     'log.gold_credited': '<span class="log-up">💰 +{g} de ouro creditados ({reason})!</span>',
     'log.ate': '<span class="log-xp">Comeu {name} (+{n} HP)</span>',
+    'log.drank_hp': '<span class="log-xp">Bebeu {name} (+{n} HP)</span>',
     'log.drank': '<span class="log-xp">Bebeu {name} (+{n} MP)</span>',
     'log.forged': '<span class="log-up">✨ Forjou {item}! (custo {cost}g)</span>',
     'log.forge_failed': '<span class="log-die">💥 Forja falhou! 1× {item} destruído. -{cost}g</span>',
@@ -3446,9 +3448,11 @@ const I18N = {
     'log.boss_loot_no_special': 'no special item',
     'log.equip_rejected': '<span class="log-sys">Server rejected the equip operation.</span>',
     'log.gold_picked': '<span class="log-xp">+{g} gold ({total})</span>',
+    'log.items_picked': '<span class="log-xp">Picked up {items}</span>',
     'log.gold_rain': '<span class="log-up">💰 Gold Rain: +{g}g</span>',
     'log.gold_credited': '<span class="log-up">💰 +{g} gold credited ({reason})!</span>',
     'log.ate': '<span class="log-xp">Ate {name} (+{n} HP)</span>',
+    'log.drank_hp': '<span class="log-xp">Drank {name} (+{n} HP)</span>',
     'log.drank': '<span class="log-xp">Drank {name} (+{n} MP)</span>',
     'log.forged': '<span class="log-up">✨ Forged {item}! (cost {cost}g)</span>',
     'log.forge_failed': '<span class="log-die">💥 Forge failed! 1× {item} destroyed. -{cost}g</span>',
@@ -7988,6 +7992,7 @@ function handleMP(msg){
         // M4: loot de boss distribuído por dano (direto no inv) — feedback bonito
         if (msg.bossLoot){
             const bl = msg.bossLoot;
+            window.ValadaresAdventureFeedback?.bossLoot?.(bl);
             const parts = [];
             const highlights = [];
             if (bl.gold > 0) parts.push(`${bl.gold.toLocaleString('pt-BR')}g`);
@@ -8034,10 +8039,13 @@ function handleMP(msg){
         // N3 fase 2: pickup do chão — feedback (som + log).
         // Server já enviou inv/gold atualizados acima; groundRemove veio separado e limpou local.
         if (msg.pickup && Array.isArray(msg.pickup.ids) && msg.pickup.ids.length){
-            if (window.ValadaresAdventureFeedback?.loot) window.ValadaresAdventureFeedback.loot(msg.pickup);
+            if (window.ValadaresAdventureFeedback?.loot){
+                const picked = window.ValadaresAdventureFeedback.loot(msg.pickup) || [];
+                if (picked.length) log(tr('log.items_picked', {items: picked.map(row => `${row.qty}× ${escapeHtml(row.name)}`).join(', ')}), 'loot');
+            }
             else if (typeof sndPickup === 'function') sndPickup();
             if (msg.pickup.gold > 0){
-                log(tr('log.gold_picked', {g: msg.pickup.gold, total: player.gold}));
+                log(tr('log.gold_picked', {g: msg.pickup.gold, total: player.gold}), 'loot');
             }
         }
         // N3 fase 2: chests autoritativos
@@ -8085,13 +8093,13 @@ function handleMP(msg){
             if (healed > 0){
                 player.hp = Math.min(player.maxHp, player.hp + healed);
                 addFloat(player.x, player.y, `+${healed}`, '#66cc66', false, 0);
-                log(tr('log.ate', {name, n: healed}));
+                log(tr(def?.kind === 'potion' ? 'log.drank_hp' : 'log.ate', {name, n: healed}), 'sys');
             }
             const manaHealed = msg.consume.manaHealed | 0;
             if (manaHealed > 0){
                 player.mp = Math.min(player.maxMp, player.mp + manaHealed);
                 addFloat(player.x, player.y, `+${manaHealed} MP`, '#5599ff', false, -14);
-                log(tr('log.drank', {name, n: manaHealed}));
+                log(tr('log.drank', {name, n: manaHealed}), 'sys');
             }
         }
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
@@ -12761,7 +12769,7 @@ let logFilter = 'all';
 function categorize(html){
     if (html.includes('log-dmg'))  return 'dmg';
     if (html.includes('log-kill') || html.includes('log-die')) return 'kill';
-    if (html.includes('log-xp'))   return 'loot';   // drops/pickup/comer
+    // XP e consumo compartilham a cor verde; saque é marcado no ponto do evento confirmado.
     if (html.includes('log-up'))   return 'up';
     return 'sys';
 }
@@ -16113,9 +16121,9 @@ document.addEventListener('DOMContentLoaded', () => {
         pwd.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(true); });
     }
     // Tabs do chat panel — alterna entre log de combate e chat
-    document.querySelectorAll('.chat-tab').forEach(tab => {
+    document.querySelectorAll('#chatPanel .chat-tab[data-tab]').forEach(tab => {
         tab.addEventListener('click', () => {
-            document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#chatPanel .chat-tab[data-tab]').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             tab.classList.remove('has-unread');
             const which = tab.dataset.tab;
@@ -16127,9 +16135,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // #chatPanel em ~37px e empurrava o layout do jogo ao alternar abas (bug reportado).
             // #1: recalcula a altura do log/chat com a barra da aba ATUAL (os filtros da aba
             // COMBATE mudam a altura da barra de abas) — senão o painel estoura pra fora da tela.
-            if (typeof syncInvHeight === 'function') syncInvHeight();
+            if (typeof syncChatHeight === 'function') syncChatHeight();
             if (!isChat) scrollLogToEnd();
-            if (isChat) document.getElementById('chatInput')?.focus();
+            if (isChat && !document.body.classList.contains('touch')) document.getElementById('chatInput')?.focus({ preventScroll: true });
         });
     });
     // Input do chat — Enter envia + devolve foco ao jogo (WASD volta a mover).
@@ -16210,7 +16218,7 @@ function startGame(multiplayer, name){
             const base = getUpgradeTier(key).base;
             if (!ITEMS[base] && !ITEMS[key]) return null;
             const meta = itemDisplayMeta(key);
-            return { name: meta.name + (meta.plus ? ' +' + meta.plus : ''),
+            return { name: meta.name + (meta.plus ? ' +' + meta.plus : ''), kind: ITEMS[base]?.kind || ITEMS[key]?.kind,
                 rarity: meta.rarCls === 'rar-myth' ? 'myth' : meta.rarCls === 'rar-leg' ? 'legendary' : 'common' };
         },
         icon: getItemIconURL, playSfx, getLanguage: () => LANG, getFloor: () => player.floor || 0
@@ -17506,7 +17514,7 @@ function loop(ts){
 <script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261004b"></script>
-<script src="/adventure-feedback.js?v=20261004a"></script>
+<script src="/adventure-feedback.js?v=20261005a"></script>
 <script src="/enchanting-ui.js?v=1"></script>
 </body>
 </html>
