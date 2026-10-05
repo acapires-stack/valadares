@@ -31,6 +31,63 @@
 .adventure-rarity-myth { color: #dfb6ff; }
 .adventure-loot-gold { color: #c4a667; font-size: 10px; text-align: right; }
 .adventure-loot-more { color: #a8a099; font-size: 10px; }
+.adventure-boss-trigger {
+    pointer-events: auto;
+    padding: 4px 7px;
+    border: 1px solid rgba(190, 151, 79, .65);
+    border-radius: 4px;
+    background: rgba(19, 17, 15, .88);
+    color: #f2dca8;
+    font: inherit;
+    cursor: pointer;
+}
+.adventure-boss-trigger:hover, .adventure-boss-trigger:focus-visible { border-color: #f2dca8; outline: 2px solid rgba(242, 220, 168, .45); }
+.adventure-boss-dialog {
+    box-sizing: border-box;
+    width: min(540px, calc(100vw - 24px));
+    max-height: min(76vh, 680px);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #ba9257;
+    border-radius: 8px;
+    background: #1c1916;
+    color: #f0e5cf;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .7);
+    font: 13px/1.45 system-ui, sans-serif;
+}
+.adventure-boss-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+.adventure-boss-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 15px;
+    border-bottom: 1px solid #66533c;
+    background: #272019;
+}
+.adventure-boss-title { margin: 0; font-size: 16px; line-height: 1.3; color: #f6dda4; }
+.adventure-boss-close {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #a58b62;
+    border-radius: 4px;
+    background: #32291f;
+    color: #f7e6c6;
+    font: 22px/1 system-ui, sans-serif;
+    cursor: pointer;
+}
+.adventure-boss-close:focus-visible { outline: 2px solid #f6dda4; }
+.adventure-boss-list { max-height: calc(min(76vh, 680px) - 54px); overflow-y: auto; padding: 4px 15px 12px; }
+.adventure-boss-entry { padding: 11px 0; border-bottom: 1px solid #514437; }
+.adventure-boss-entry:last-child { border-bottom: 0; }
+.adventure-boss-name { margin: 0 0 5px; font-size: 14px; color: #f2ce82; }
+.adventure-boss-entry > div { margin-top: 3px; overflow-wrap: anywhere; }
+.adventure-boss-context, .adventure-boss-muted { color: #c3b8a4; }
+.adventure-boss-damage { color: #dfd3bb; }
+.adventure-boss-gold { color: #efd187; }
+.adventure-boss-ground-title, .adventure-boss-ground { color: #ffbd91; }
 @keyframes adventure-loot-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) {
     #gameContainer:has(#agMoment:not([hidden])) .adventure-feedback { visibility: hidden; }
@@ -38,5 +95,7 @@
 @media (max-width: 760px) {
     .adventure-feedback { top: 37px; left: 5px; max-width: 42%; font-size: 10px; }
     .adventure-loot-card { padding: 4px 5px; }
+    .adventure-boss-dialog { max-height: 84vh; font-size: 12px; }
+    .adventure-boss-list { max-height: calc(84vh - 54px); }
 }
 @media (prefers-reduced-motion: reduce) { .adventure-loot-card { animation: none; } }

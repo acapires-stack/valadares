@@ -1448,11 +1448,16 @@ function rollLoot(mobType, luck, floor){
     // Masmorra escalável: o loot PAGA a profundidade (senão descer não compensa o
     // risco). GOLD ×(1 + 0.15·(andar−1)) na quantidade; ITEM ganha chance relativa
     // +5%/andar (soma com o Sortudo, mesmo cap 0.95 absoluto). Cresce de propósito
-    // MAIS DEVAGAR que o HP do mob (+60%/andar) → gold/hora sobe sublinear, sem
-    // inflacionar a economia (o gold vendido na loja MP segue relevante).
+    // MAIS DEVAGAR que o HP do mob (+60%/andar), exceto o boss das bandas:
+    // nele o ouro acompanha a escala de HP após o andar 5.
     // isDungeonFloor (não `>= 1`): arena 9000+ nunca escalaria loot.
     const f = isDungeonFloor(floor || 0) ? (floor || 0) : 0;
-    const gMult = f >= 1 ? (1 + DUNGEON_LOOT_SCALE * (f - 1)) : 1;
+    const scaledDungeonBoss = mobType === DUNGEON_BOSS_TYPE && isBossFloor(f);
+    const bossHpMult = scaledDungeonBoss
+        ? (1 + DUNGEON_BOSS_SCALE * Math.max(0, f - DUNGEON_BOSS_EVERY)) : 1;
+    const gMult = scaledDungeonBoss
+        ? (1 + DUNGEON_LOOT_SCALE * (DUNGEON_BOSS_EVERY - 1)) * bossHpMult
+        : (f >= 1 ? (1 + DUNGEON_LOOT_SCALE * (f - 1)) : 1);
     const iLk   = f >= 1 ? DUNGEON_ITEM_LUCK_SCALE * (f - 1) : 0;
     const out = [];
     for (const [type, chance, qMin, qMax] of table){
@@ -1464,7 +1469,8 @@ function rollLoot(mobType, luck, floor){
         }
     }
     // Essence has its own chance; bosses guarantee a depth-scaled stack.
-    if (MTYPE[mobType]?.unique) out.push({ type:equipmentRules.MATERIAL, qty:Math.min(8, 3 + Math.floor(f / 10)) });
+    if (MTYPE[mobType]?.unique) out.push({ type:equipmentRules.MATERIAL,
+        qty:scaledDungeonBoss ? Math.ceil(3 * Math.sqrt(bossHpMult)) : Math.min(8, 3 + Math.floor(f / 10)) });
     else if (Math.random() < (f >= 1 ? 0.18 : 0.10)) out.push({ type:equipmentRules.MATERIAL, qty:1 });
     return out;
 }
@@ -4501,6 +4507,17 @@ function dropMobLoot(m, loot, killer){
     return spawned;
 }
 
+// Registra o dano real e o início da luta sem persistir histórico de combate.
+function recordMobRewardDamage(m, playerId, amount){
+    if (playerId == null || !Number.isFinite(amount) || amount <= 0) return;
+    m.damageBy = m.damageBy || {};
+    if (m.unique && m.rewardFightStartedAt == null &&
+        !Object.values(m.damageBy).some(d => Number.isFinite(d) && d > 0)){
+        m.rewardFightStartedAt = Date.now();
+    }
+    m.damageBy[playerId] = (m.damageBy[playerId] || 0) + amount;
+}
+
 // Só dano de jogadores presentes no andar do boss participa de recompensas.
 function bossLootContributors(m, fallbackKiller){
     const floor = m.floor || 0;
@@ -4509,12 +4526,12 @@ function bossLootContributors(m, fallbackKiller){
         const pp = players.get(Number(pid));
         if (pp && !pp.disconnected && pp.ws?.readyState === 1 &&
             (pp.floor || 0) === floor && Number.isFinite(dmg) && dmg > 0){
-            contributors.push({ p:pp, dmg });
+            contributors.push({ p:pp, dmg, fallback:false });
         }
     }
     if (!contributors.length && fallbackKiller && !fallbackKiller.disconnected &&
         fallbackKiller.ws?.readyState === 1 && (fallbackKiller.floor || 0) === floor){
-        contributors.push({ p:fallbackKiller, dmg:1 });
+        contributors.push({ p:fallbackKiller, dmg:1, fallback:true });
     }
     return contributors;
 }
@@ -4538,46 +4555,94 @@ function bossRewardBonus(contributors, key){
 // não cai no chão. fallbackKiller leva tudo se ninguém foi rastreado.
 function distributeBossLoot(m, loot, contributors){
     if (!contributors.length) return;
+    const resolvedAt = Date.now();
+    const encounterId = `${m.id}:${resolvedAt}`;
+    const durationMs = Number.isFinite(m.rewardFightStartedAt) && m.rewardFightStartedAt <= resolvedAt
+        ? resolvedAt - m.rewardFightStartedAt : null;
+    const damageTotal = contributors.reduce((sum,c) => sum + (c.fallback ? 0 : c.dmg), 0);
     // Escala os pesos para evitar overflow de soma sem alterar a proporção.
     const maxDmg = Math.max(...contributors.map(c => c.dmg));
-    const contribs = contributors.map(c => ({ p:c.p, dmg:c.dmg / maxDmg }));
+    const contribs = contributors.map(c => ({ p:c.p, dmg:c.dmg / maxDmg, actual:c.dmg, fallback:c.fallback }));
     const totalDmg = contribs.reduce((s, c) => s + c.dmg, 0);
-    const got = new Map();   // pid -> { p, gold, items:{} }
-    const slot = (pp) => { let g = got.get(pp.id); if (!g){ g = { p: pp, gold: 0, items: {} }; got.set(pp.id, g); } return g; };
+    const got = new Map();   // pid -> { p, gold, guaranteedGold, items:{} }
+    const slot = (pp) => { let g = got.get(pp.id); if (!g){ g = { p: pp, gold: 0, guaranteedGold:0, items: {} }; got.set(pp.id, g); } return g; };
+    for (const c of contribs) slot(c.p); // inclui quem teve dano válido, mesmo sem item/ouro nesta rolagem
+    const rolled = { gold:0, items:{} };
     let goldTotal = 0;
     for (const it of loot){
         if (!it || !it.type) continue;
         if (it.type === 'GOLD'){
             goldTotal += it.qty || 0;
         } else {
+            rolled.items[it.type] = (rolled.items[it.type] || 0) + (it.qty | 0 || 1);
             let r = Math.random() * totalDmg, winner = contribs[0];
             for (const c of contribs){ r -= c.dmg; if (r <= 0){ winner = c; break; } }
             const g = slot(winner.p);
             g.items[it.type] = (g.items[it.type] || 0) + (it.qty | 0 || 1);
         }
     }
+    rolled.gold = goldTotal;
+    const minimumRequired = Number.isFinite(m.maxHp) && m.maxHp > 0
+        ? Math.ceil(m.maxHp * 0.02) : null;
+    const qualified = minimumRequired == null ? []
+        : contribs.filter(c => !c.fallback && c.actual >= minimumRequired);
+    // 20% do próprio saque vira parcela igual entre qualificados. Boss de ouro
+    // baixo pode exigir >20% para garantir 1 moeda por pessoa; nunca cria ouro.
+    const minimumPool = qualified.length
+        ? Math.min(goldTotal, Math.max(Math.floor(goldTotal * 0.20), qualified.length)) : 0;
+    if (qualified.length && minimumPool > 0){
+        const each = Math.floor(minimumPool / qualified.length);
+        for (const c of qualified){
+            slot(c.p).gold += each;
+            slot(c.p).guaranteedGold += each;
+        }
+        const extra = minimumPool - each * qualified.length;
+        if (extra > 0){
+            const top = qualified.reduce((a,b) => b.dmg > a.dmg ? b : a, qualified[0]);
+            slot(top.p).gold += extra;
+            slot(top.p).guaranteedGold += extra;
+        }
+    }
+    const proportionalPool = goldTotal - minimumPool;
     let distributedGold = 0;
     for (const c of contribs){
-        const share = Math.floor(goldTotal * (c.dmg / totalDmg));
+        const share = Math.floor(proportionalPool * (c.dmg / totalDmg));
         if (share > 0){ slot(c.p).gold += share; distributedGold += share; }
     }
-    const rest = goldTotal - distributedGold;   // arredondamento → maior peso
+    const rest = proportionalPool - distributedGold;   // arredondamento → maior peso
     if (rest > 0){ const top = contribs.reduce((a,b) => b.dmg > a.dmg ? b : a, contribs[0]); slot(top.p).gold += rest; }
-    for (const g of got.values()){
+    for (const c of contribs){
+        const g = got.get(c.p.id);
         const pp = g.p;
         if (g.gold > 0){ pp.gold = (pp.gold || 0) + g.gold; syncGoldRank(pp.name, pp.gold); }
+        const carriedItems = {};
+        const groundItems = {};
+        const groundRewardDrops = [];
         for (const type in g.items){
-            if (canAddKeys(pp.inv,[type],SAVE_CAPS.invKeys)) incInv(pp, type, g.items[type]);
+            if (canAddKeys(pp.inv,[type],SAVE_CAPS.invKeys)){
+                incInv(pp, type, g.items[type]);
+                carriedItems[type] = g.items[type];
+            }
             else {
                 const until = Date.now() + LOOT_LOCK_MS;
                 const d = spawnGroundDrop(m.x,m.y,type,g.items[type],m.floor,pp.id,pp.name,until);
                 broadcast(null,{t:'groundSpawn',drops:[{id:d.id,x:d.x,y:d.y,type:d.type,qty:d.qty,owner:pp.id,ownerName:pp.name,ownerUntil:until}]},m.floor);
-                delete g.items[type];
+                groundItems[type] = g.items[type];
+                groundRewardDrops.push({id:d.id,type:d.type,qty:d.qty,x:d.x,y:d.y,ownerUntil:until});
             }
         }
         sendInvUpdate(pp, {
             goldDelta: g.gold > 0 ? { amount: g.gold, reason:'boss_loot' } : undefined,
-            bossLoot: { boss: m.type, gold: g.gold, items: g.items },
+            bossLoot: {
+                boss:m.type, floor:m.floor || 0, encounterId, durationMs,
+                gold:g.gold, items:carriedItems,
+                damage:{ dealt:c.fallback ? 0 : c.actual, total:damageTotal,
+                    share:c.dmg / totalDmg, fallback:!!c.fallback,
+                    minimumRequired, eligibleForMinimum:qualified.includes(c) },
+                reward:{ guaranteedGold:g.guaranteedGold, rolled, awarded:{ gold:g.gold, items:{...g.items} },
+                    carried:{ gold:g.gold, items:carriedItems },
+                    ground:{ items:groundItems, drops:groundRewardDrops } },
+            },
         });
     }
 }
@@ -4775,7 +4840,7 @@ function tickMobDots(){
             const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
             // Anti-ninja: dano de DoT conta pro dono do loot (todos os mobs agora)
-            if (d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dealtDamage; }
+            recordMobRewardDamage(m, d.byId, dealtDamage);
             floats.push({ mobId: m.id, text: `-${dmg}`, color: DOT_COLORS[d.type] || '#aaa' });
             d.ticksLeft--;
             if (d.ticksLeft <= 0) m.dots.splice(i, 1);
@@ -8185,7 +8250,7 @@ wss.on('connection', (ws, request) => {
             // Anti-ninja: rastreia dano por player em TODOS os mobs — o dono do loot
             // (boss = direto no inv; mob comum = bag no chão) é quem deu mais dano.
             // damageBy some quando o mob é deletado na morte (sem leak).
-            m.damageBy = m.damageBy || {}; m.damageBy[id] = (m.damageBy[id] || 0) + dealtDamage;
+            recordMobRewardDamage(m, id, dealtDamage);
             // T1/T3: XP de skill por hit (não só por kill).
             // - Melee (range≤1, sem ammo, sem spear): +1 na skill da arma
             // - Distância (range>1 OU ammo OU throwSpear): +1 em Distância

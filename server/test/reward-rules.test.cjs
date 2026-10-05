@@ -18,7 +18,7 @@ const directEnd = source.indexOf(directEndMarker, directStart);
 assert.ok(directStart >= 0 && directEnd > directStart, 'direct attack death block changed');
 const directDeathSource = `function directDeath(m, p, id){\n${source.slice(directStart, directEnd + '\n            }'.length)}\n}`;
 const functions = [
-    'rollLoot', 'bossLootContributors', 'bossRewardBonus', 'distributeBossLoot',
+    'rollLoot', 'recordMobRewardDamage', 'bossLootContributors', 'bossRewardBonus', 'distributeBossLoot',
     'grantMobLoot', 'handleMobDeath', 'tickMobDots', 'sharePartyKill',
 ].map(functionSource).join('\n') + '\n' + directDeathSource;
 
@@ -76,7 +76,7 @@ function fixture(options = {}){
     return {context, players, monsters, ground, updates, broadcasts, xp};
 }
 function boss(damageBy = {1:90,2:10}){
-    return {id:77,type:'TEST_BOSS',unique:true,floor:5,x:10,y:10,hp:0,maxHp:100,damageBy};
+    return {id:77,type:'TEST_BOSS',unique:true,floor:5,x:10,y:10,hp:0,maxHp:5000,damageBy};
 }
 function runDeath(f, kind, killerId=1){
     const m = boss(kind === 'dot' ? {1:90,2:9} : {1:90,2:10});
@@ -102,6 +102,33 @@ test('chance 100% stays guaranteed; rare chance retains its cap',()=>{
     assert.equal(f.context.rollLoot('TEST_BOSS',0,5).some(i=>i.type==='RARE'),false);
 });
 
+test('depth boss gold follows HP after floor 5 and Arcana grows conservatively',()=>{
+    const f=fixture({random:0});
+    Object.assign(f.context,{
+        DUNGEON_BOSS_TYPE:'SENHOR_PROFUNDEZAS', DUNGEON_BOSS_EVERY:5,
+        DUNGEON_BOSS_SCALE:0.30,DUNGEON_LOOT_SCALE:0.15,DUNGEON_ITEM_LUCK_SCALE:0.05,
+        isDungeonFloor:n=>n>=1&&n<=999,
+        isBossFloor:n=>n>=5&&n<=999&&n%5===0,
+    });
+    f.context.LOOT.SENHOR_PROFUNDEZAS=[['GOLD',1,600,1600]];
+    f.context.MTYPE.SENHOR_PROFUNDEZAS={unique:true};
+    f.context.LOOT.SOMBRA=[['GOLD',1,30,30]];
+    for(const [floor,gold,arcana] of [[5,960,3],[10,2400,5],[15,3840,6],[20,5280,8]]){
+        const loot=f.context.rollLoot('SENHOR_PROFUNDEZAS',0,floor);
+        assert.equal(loot.find(i=>i.type==='GOLD').qty,gold);
+        assert.equal(loot.find(i=>i.type==='ESSENCE').qty,arcana);
+    }
+    f.context.Math.random=()=>0.999999;
+    for(const [floor,gold] of [[5,2560],[10,6400],[15,10240],[20,14080]]){
+        assert.equal(f.context.rollLoot('SENHOR_PROFUNDEZAS',0,floor).find(i=>i.type==='GOLD').qty,gold);
+    }
+    f.context.Math.random=()=>0;
+    for(const floor of [0,9001]){
+        assert.equal(f.context.rollLoot('SENHOR_PROFUNDEZAS',0,floor).find(i=>i.type==='GOLD').qty,600);
+    }
+    assert.equal(f.context.rollLoot('SOMBRA',0,10).find(i=>i.type==='GOLD').qty,70);
+});
+
 for (const kind of ['direct','dot']) for (const party of [false,true]){
     test(`${kind} boss rewards stay 90/10 ${party?'with':'without'} party`,()=>{
         const f=fixture({party:party?{members:['P1','P2']}:null,random:0.5});
@@ -112,7 +139,20 @@ for (const kind of ['direct','dot']) for (const party of [false,true]){
         assert.equal(a.gold+b.gold,100);
         assert.equal(a.inv.GUARANTEED,1);
         assert.equal(b.inv.GUARANTEED,undefined);
-        assert.ok(f.updates.some(u=>u.msg.bossLoot?.gold===90));
+        const notices=f.updates.filter(u=>u.msg.bossLoot).map(u=>u.msg.bossLoot);
+        assert.equal(notices.length,2);
+        assert.equal(notices[0].encounterId,notices[1].encounterId);
+        assert.equal(notices[0].floor,5);
+        assert.equal(notices[0].durationMs,null); // fixture has historical damage with no start timestamp
+        assert.deepEqual(notices.map(n=>n.damage.dealt),[90,10]);
+        assert.ok(Math.abs(notices[0].damage.share-0.9)<1e-12);
+        assert.equal(notices[0].damage.total,100);
+        assert.equal(notices[0].reward.rolled.gold,100);
+        assert.equal(notices.reduce((s,n)=>s+n.reward.awarded.gold,0),100);
+        assert.equal(notices[0].reward.rolled.items.GUARANTEED,1);
+        assert.equal(notices[0].reward.rolled.items.ESSENCE,3);
+        assert.equal(notices[0].gold,notices[0].reward.carried.gold);
+        assert.equal(notices[0].items.GUARANTEED,notices[0].reward.carried.items.GUARANTEED);
     });
 }
 
@@ -154,11 +194,38 @@ test('gold rounding conserves every rolled coin',()=>{
     assert.ok(b.gold>=1 && b.gold<=3);
 });
 
+test('20% minimum rewards only real contributors reaching 2% HP, with no new gold',()=>{
+    const f=fixture({random:0.5});
+    for(const id of [1,2,3]) f.players.set(id,player(id));
+    const m=boss({1:9601,2:199,3:200});m.maxHp=10000;
+    f.context.distributeBossLoot(m,[{type:'GOLD',qty:1000}],f.context.bossLootContributors(m,f.players.get(1)));
+    assert.equal(Array.from(f.players.values()).reduce((s,p)=>s+p.gold,0),1000);
+    const notices=f.updates.filter(u=>u.msg.bossLoot).map(u=>u.msg.bossLoot);
+    assert.deepEqual(notices.map(n=>n.reward.guaranteedGold),[100,0,100]);
+    assert.deepEqual(notices.map(n=>n.damage.eligibleForMinimum),[true,false,true]);
+    assert.ok(notices.every(n=>n.damage.minimumRequired===200));
+    assert.ok(f.players.get(2).gold>0); // abaixo de 2% ainda recebe sua parte proporcional
+    assert.ok(f.players.get(1).gold>f.players.get(3).gold);
+});
+
+test('low-gold world boss still grants one coin to 50 qualified players when pool permits',()=>{
+    const f=fixture({random:0.5});
+    const damageBy={};
+    for(let id=1;id<=50;id++){f.players.set(id,player(id));damageBy[id]=9;}
+    const m=boss(damageBy);m.maxHp=450;
+    f.context.distributeBossLoot(m,[{type:'GOLD',qty:60}],f.context.bossLootContributors(m,f.players.get(1)));
+    const notices=f.updates.filter(u=>u.msg.bossLoot).map(u=>u.msg.bossLoot);
+    assert.equal(notices.length,50);
+    assert.ok(notices.every(n=>n.reward.guaranteedGold>=1));
+    assert.equal(Array.from(f.players.values()).reduce((s,p)=>s+p.gold,0),60);
+});
+
 test('overkill is credited only for HP actually removed, on hit and DoT',()=>{
-    const directLine=source.match(/m\.damageBy = m\.damageBy \|\| \{\}; m\.damageBy\[id\] = \(m\.damageBy\[id\] \|\| 0\) \+ [^;]+;/);
+    const directLine=source.match(/recordMobRewardDamage\(m, id, dealtDamage\);/);
     assert.ok(directLine);
     const hit={damageBy:{1:1}};
-    vm.runInNewContext(directLine[0],{m:hit,id:2,dealtDamage:1,dmg:100});
+    const f0=fixture();
+    f0.context.recordMobRewardDamage(hit,2,1);
     assert.equal(hit.damageBy[2],1);
 
     const f=fixture({random:0.5});
@@ -170,6 +237,23 @@ test('overkill is credited only for HP actually removed, on hit and DoT',()=>{
     f.context.tickMobDots();
     assert.equal(m.damageBy[2],1);
     assert.equal(a.gold,50); assert.equal(b.gold,50);
+});
+
+test('first real hit establishes duration, but preexisting damage does not invent history',()=>{
+    const f=fixture({random:0.5});
+    const a=player(1); f.players.set(1,a);
+    const fresh=boss({});
+    f.context.recordMobRewardDamage(fresh,1,5);
+    assert.ok(Number.isFinite(fresh.rewardFightStartedAt));
+    f.context.grantMobLoot(fresh,a);
+    const current=f.updates.find(u=>u.msg.bossLoot).msg.bossLoot;
+    assert.ok(current.durationMs>=0 && current.durationMs<1000);
+
+    const historical=boss({1:5});
+    f.context.recordMobRewardDamage(historical,1,1);
+    assert.equal(historical.rewardFightStartedAt,undefined);
+    f.context.grantMobLoot(historical,a);
+    assert.equal(f.updates.at(-1).msg.bossLoot.durationMs,null);
 });
 
 test('only online same-floor finite positive damagers qualify; fallback requires valid killer',()=>{
@@ -186,6 +270,27 @@ test('only online same-floor finite positive damagers qualify; fallback requires
     assert.equal(f.players.get(1).gold,200);
 });
 
+test('eligible contributor with no award still gets one summary; fallback marks unknown real damage',()=>{
+    const f=fixture({random:0.5});
+    const a=player(1), b=player(2);
+    f.players.set(1,a);f.players.set(2,b);
+    f.context.grantMobLoot(boss({1:100000,2:0.001}),a);
+    const small=f.updates.find(u=>u.id===2 && u.msg.bossLoot).msg.bossLoot;
+    assert.equal(small.damage.dealt,0.001);
+    assert.equal(small.damage.fallback,false);
+    assert.equal(small.reward.awarded.gold,0);
+    assert.equal(Object.keys(small.reward.awarded.items).length,0);
+
+    const fallback=fixture({random:0.5});
+    const only=player(1);fallback.players.set(1,only);
+    fallback.context.grantMobLoot(boss({}),only);
+    const notice=fallback.updates.find(u=>u.msg.bossLoot).msg.bossLoot;
+    assert.equal(notice.damage.dealt,0);
+    assert.equal(notice.damage.total,0);
+    assert.equal(notice.damage.share,1);
+    assert.equal(notice.damage.fallback,true);
+});
+
 test('full inventory drops owned item and keeps gold plus bossLoot contract',()=>{
     const f=fixture({fullInventory:true,random:0.99});
     const a=player(1); f.players.set(1,a);
@@ -198,6 +303,15 @@ test('full inventory drops owned item and keeps gold plus bossLoot contract',()=
     assert.equal(notice.msg.bossLoot.gold,100);
     assert.equal(notice.msg.bossLoot.items.GUARANTEED,undefined);
     assert.equal(notice.msg.goldDelta.amount,100);
+    const reward=notice.msg.bossLoot.reward;
+    assert.equal(reward.awarded.items.GUARANTEED,1);
+    assert.equal(reward.carried.items.GUARANTEED,undefined);
+    assert.equal(reward.ground.items.GUARANTEED,1);
+    assert.equal(reward.ground.drops.length,2);
+    assert.deepEqual(Array.from(reward.ground.drops,d=>d.id),f.ground.map(d=>d.id));
+    for(const type of Object.keys(reward.awarded.items)){
+        assert.equal((reward.carried.items[type]||0)+(reward.ground.items[type]||0),reward.awarded.items[type]);
+    }
 });
 
 test('party XP requires same floor as kill in addition to radius',()=>{

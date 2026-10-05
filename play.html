@@ -1277,6 +1277,15 @@
         }
         #craftModal.forge-active #forjaPanel { flex: 1 1 auto; min-height: 0; max-height: none; }
         #forgeFeedback { flex: none; margin-bottom: 8px; }
+        .forge-tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+        .forge-tools input[type="search"] { flex: 1 1 150px; min-width: 0; padding: 7px 9px; background: #080705; border: 1px solid #5a4818; color: #e8cc7a; font-size: 11px; }
+        .forge-tools label { color: #d3bb83; font-size: 11px; display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+        .forge-tools small { color: #998866; font-size: 10px; white-space: nowrap; }
+        .forge-compare { grid-column: 1 / -1; border-top: 1px solid #33270f; padding-top: 7px; font-size: 11px; }
+        .forge-compare-head, .forge-compare-row { display: grid; grid-template-columns: minmax(95px, 1fr) minmax(42px, auto) minmax(78px, auto); gap: 8px; align-items: baseline; }
+        .forge-compare-head { color: #a99a77; margin-bottom: 4px; }
+        .forge-compare-row { color: #c9b894; line-height: 1.5; }
+        .forge-compare-row span:last-child { color: #9fd994; }
         .craft-row {
             background: #050405; border: 1px solid #1f180a;
             padding: 8px 10px; border-radius: 1px;
@@ -2506,6 +2515,11 @@
             <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')" data-i18n="craft.tab_forge">🔥 FORJA</button>
             <button class="train-tab" data-craft-tab="enchant" onclick="switchCraftTab('enchant')">✧ <span data-i18n="enchant.tab">ENCANTAR</span></button>
         </div>
+        <div id="forgeTools" class="forge-tools" style="display:none">
+            <input id="forgeSearch" type="search" autocomplete="off" data-i18n-ph="forge.search_ph" placeholder="Buscar equipamento">
+            <label><input id="forgeReadyOnly" type="checkbox"> <span data-i18n="forge.filter_ready">Posso forjar agora</span></label>
+            <small id="forgeCount"></small>
+        </div>
         <p id="forgeFeedback" class="ench-notice" role="status" aria-live="polite" aria-atomic="true" hidden></p>
         <div id="craftList" class="craft-list"></div>
         <div id="forjaPanel" class="craft-list" style="display:none"></div>
@@ -2891,9 +2905,9 @@ const I18N = {
     'craft.need_mats': 'faltam materiais',
     'craft.need_gold': 'falta ouro',
     'craft.hint_recipes': 'click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
-    'craft.hint_forge': '3 items iguais + ouro tentam subir o nível &nbsp;|&nbsp; <b style="color:#ff8060">falha destrói 1 dos 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
-    'forge.no_candidates_html': 'Nenhum equipamento para aprimorar.<br><br>Armas, cajados, armaduras, escudos, elmos, botas e colares aparecem aqui. São necessárias <b>3 cópias iguais, do mesmo nível, na mochila</b>.',
-    'forge.header_legend': '3 cópias iguais na mochila + ouro &nbsp;·&nbsp; <span style="color:#ff8060">falha perde 1 item e o ouro</span> &nbsp;·&nbsp; sucesso entrega 1 item aprimorado',
+    'craft.hint_forge': '3 cópias comuns, ou peça encantada + 2 cópias sem encanto, e ouro &nbsp;|&nbsp; <b style="color:#ff8060">falha perde 1 cópia e o ouro</b> &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
+    'forge.no_candidates_html': 'Nenhum equipamento para aprimorar.<br><br>Armas, cajados, armaduras, escudos, elmos, botas e colares aparecem aqui. É preciso ter <b>3 cópias comuns</b> ou uma peça encantada com <b>2 cópias sem encanto do mesmo nível</b>.',
+    'forge.header_legend': '3 cópias comuns ou encantado + 2 cópias sem encanto, do mesmo nível, e ouro &nbsp;·&nbsp; <span style="color:#ff8060">falha perde 1 cópia e o ouro</span> &nbsp;·&nbsp; atributos abaixo valem só se der certo',
     'forge.available': '{n}× disponíveis',
     'forge.backpack': '{n}/3 na mochila',
     'forge.equipped': 'equipado',
@@ -2908,6 +2922,25 @@ const I18N = {
     'forge.banner_fail': '💥 Falhou! 1× {item} destruído (−{cost}g)',
     'forge.banner_cancelled': 'A tentativa foi cancelada; nenhum material foi consumido. Confira a mochila, o ouro e o espaço livre.',
     'forge.banner_pending': 'Aguardando o resultado da forja. Se a conexão cair, reconecte para conferir seus itens.',
+    'forge.search_ph': 'Buscar equipamento',
+    'forge.filter_ready': 'Posso forjar agora',
+    'forge.filter_count': '{shown} de {total} equipamentos',
+    'forge.filtered_empty': 'Nenhum equipamento corresponde à busca ou ao filtro.',
+    'forge.compare_current': 'Atual',
+    'forge.compare_success': 'Se der certo',
+    'forge.compare_no_change': 'Sem mudança nos atributos básicos.',
+    'forge.reason_capacity': 'Sem espaço na mochila para o resultado',
+    'forge.reason_offline': 'Aguardando conexão com o servidor',
+    'forge.reason_pending': 'Aguardando a tentativa atual',
+    'forge.reason_target_missing': 'Peça encantada não está na mochila nem equipada',
+    'forge.stat_attack': 'Ataque',
+    'forge.stat_defense': 'Defesa',
+    'forge.stat_attack_speed': 'Vel. ataque',
+    'forge.stat_movement': 'Movimento',
+    'forge.stat_regen': 'Regen HP',
+    'forge.stat_poison': 'Veneno',
+    'forge.stat_bleed': 'Sangramento',
+    'forge.stat_burn': 'Fogo',
     /* casino / auction / gold shop / party */
     'common.no_connection': 'Sem conexão',
     'common.loading': 'Carregando…',
@@ -3613,9 +3646,9 @@ const I18N = {
     'craft.need_mats': 'need materials',
     'craft.need_gold': 'need gold',
     'craft.hint_recipes': 'click <b>craft</b> &nbsp;|&nbsp; gold costs scale with item power &nbsp;|&nbsp; <kbd>ESC</kbd> close',
-    'craft.hint_forge': '3 identical items + gold try to raise the level &nbsp;|&nbsp; <b style="color:#ff8060">failure destroys 1 of the 3</b> &nbsp;|&nbsp; <kbd>ESC</kbd> close',
-    'forge.no_candidates_html': 'No equipment to upgrade.<br><br>Weapons, staves, armor, shields, helmets, boots and amulets appear here. You need <b>3 identical copies at the same level in your backpack</b>.',
-    'forge.header_legend': '3 identical copies in your backpack + gold &nbsp;·&nbsp; <span style="color:#ff8060">failure loses 1 item and the gold</span> &nbsp;·&nbsp; success gives 1 upgraded item',
+    'craft.hint_forge': '3 plain copies, or an enchanted piece + 2 plain copies, and gold &nbsp;|&nbsp; <b style="color:#ff8060">failure loses 1 copy and the gold</b> &nbsp;|&nbsp; <kbd>ESC</kbd> close',
+    'forge.no_candidates_html': 'No equipment to upgrade.<br><br>Weapons, staves, armor, shields, helmets, boots and amulets appear here. You need <b>3 plain copies</b>, or an enchanted piece with <b>2 plain copies at the same level</b>.',
+    'forge.header_legend': '3 plain copies or enchanted piece + 2 plain copies at the same level, plus gold &nbsp;·&nbsp; <span style="color:#ff8060">failure loses 1 copy and the gold</span> &nbsp;·&nbsp; stats below apply only if successful',
     'forge.available': '{n}× available',
     'forge.backpack': '{n}/3 in backpack',
     'forge.equipped': 'equipped',
@@ -3630,6 +3663,25 @@ const I18N = {
     'forge.banner_fail': '💥 Failed! 1× {item} destroyed (−{cost}g)',
     'forge.banner_cancelled': 'The forge attempt was cancelled; no materials were consumed. Check your backpack, gold and free space.',
     'forge.banner_pending': 'Waiting for the forge result. If the connection drops, reconnect to check your items.',
+    'forge.search_ph': 'Search equipment',
+    'forge.filter_ready': 'Can forge now',
+    'forge.filter_count': '{shown} of {total} equipment',
+    'forge.filtered_empty': 'No equipment matches the search or filter.',
+    'forge.compare_current': 'Current',
+    'forge.compare_success': 'If successful',
+    'forge.compare_no_change': 'No change to base stats.',
+    'forge.reason_capacity': 'No backpack space for the result',
+    'forge.reason_offline': 'Waiting for server connection',
+    'forge.reason_pending': 'Waiting for the current attempt',
+    'forge.reason_target_missing': 'Enchanted item is neither in backpack nor equipped',
+    'forge.stat_attack': 'Attack',
+    'forge.stat_defense': 'Defense',
+    'forge.stat_attack_speed': 'Attack speed',
+    'forge.stat_movement': 'Movement',
+    'forge.stat_regen': 'HP regen',
+    'forge.stat_poison': 'Poison',
+    'forge.stat_bleed': 'Bleed',
+    'forge.stat_burn': 'Fire',
     /* casino / auction / gold shop / party */
     'common.no_connection': 'No connection',
     'common.loading': 'Loading…',
@@ -4045,6 +4097,7 @@ function setLang(l){
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
   renderForgeFeedback();
+  if (document.getElementById('craftModal')?.classList.contains('forge-active')) renderForja();
   syncInvHeight();
 }
 // Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
@@ -6847,6 +6900,7 @@ function closeCraft(){ document.getElementById('craftModal').style.display = 'no
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
+    window.ValadaresAdventureFeedback?.closeSummary?.();
     if (document.getElementById('casinoModal')?.style.display === 'flex') stopCasinoAnimation();
     ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal','arenaModal','dungeonEnterModal'].forEach(id => {
         const el = document.getElementById(id);
@@ -8028,7 +8082,7 @@ function handleMP(msg){
         // M4: loot de boss distribuído por dano (direto no inv) — feedback bonito
         if (msg.bossLoot){
             const bl = msg.bossLoot;
-            window.ValadaresAdventureFeedback?.bossLoot?.(bl);
+            const freshBossReward = window.ValadaresAdventureFeedback?.bossLoot?.(bl);
             const parts = [];
             const highlights = [];
             if (bl.gold > 0) parts.push(`${bl.gold.toLocaleString('pt-BR')}g`);
@@ -8040,7 +8094,7 @@ function handleMP(msg){
                 // Só consumíveis rotineiros somem do resumo; o registro completo permanece em Tudo.
                 if (!['food', 'potion', 'ammo'].includes(ITEMS[type]?.kind)) highlights.push(label);
             }
-            if (parts.length){
+            if (parts.length && freshBossReward !== false){
                 const bossName = mobName(bl.boss) || 'boss';
                 const hasSpecialItem = highlights.length > (bl.gold > 0 ? 1 : 0);
                 if (!hasSpecialItem) highlights.push(tr('log.boss_loot_no_special'));
@@ -8052,8 +8106,8 @@ function handleMP(msg){
                 const _sum = [bl.gold > 0 ? `${bl.gold.toLocaleString('pt-BR')}g` : null,
                               _nItems > 0 ? `${_nItems} ${_nItems === 1 ? tr('lbl.item') : tr('lbl.items')}` : null].filter(Boolean).join(' + ');
                 if (typeof showServerToast === 'function') showServerToast('event', tr('toast.boss_loot', {boss: bossName, sum: _sum}), null, 5000);
-                playGameSound('bossReward');
             }
+            if (freshBossReward !== false) playGameSound('bossReward');
         }
         // N3 fase 2: equipped também é autoritativo
         if (msg.equipped && typeof msg.equipped === 'object'){
@@ -10498,6 +10552,7 @@ window.attemptForge = attemptForge;
 function switchCraftTab(which){
     document.querySelectorAll('[data-craft-tab]').forEach(t=>t.classList.toggle('active',t.dataset.craftTab===which));
     document.getElementById('craftModal').classList.toggle('forge-active', which === 'forja');
+    document.getElementById('forgeTools').style.display = which === 'forja' ? 'flex' : 'none';
     for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel']])document.getElementById(id).style.display=tab===which?'':'none';
     const hint=document.getElementById('craftHint');
     hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
@@ -10507,26 +10562,60 @@ function switchCraftTab(which){
 }
 window.switchCraftTab = switchCraftTab;
 
-// Descreve todos os bônus que o item GANHA ao subir do nível atual pro target.
-// Compara o def atual com o que seria o def do target (precisa simular o item).
-function describeUpgradeBonuses(itemKey, target){
-    const def=ITEMS[itemKey],tier=getUpgradeTier(itemKey);
-    const next=ITEMS[ensureUpgradeItem(tier.base,target)];
-    if(!def||!next)return '';
-    const parts = [];
-    const add=(label,from,to,color,percent=false)=>{
-        if(from===to)return;
-        const fmt=n=>percent?Math.round(n*100)+'%':n;
-        parts.push('<span style="color:'+color+'">'+label+' '+fmt(from)+' → '+fmt(to)+'</span>');
+// A projeção é somente visual. A decisão e a chance de sucesso continuam no servidor.
+function forgeEligibility(itemKey, worn){
+    const tier = getUpgradeTier(itemKey), target = tier.plus + 1;
+    const max = target > UPGRADE_MAX;
+    const needed = tier.enchanted ? 2 : 3;
+    const have = player.inv[tier.stem] || 0;
+    const targetEquipped = tier.enchanted && worn.has(itemKey);
+    const targetOwned = !tier.enchanted || targetEquipped || (player.inv[itemKey] || 0) > 0;
+    const cost = max ? 0 : forgeCostFor(tier.base,target);
+    let capacityOk = true;
+    if (!max && have >= needed && targetOwned){
+        const projected = {...player.inv};
+        projected[tier.stem] -= needed;
+        if (projected[tier.stem] <= 0) delete projected[tier.stem];
+        if (tier.enchanted && !targetEquipped){
+            projected[itemKey]--;
+            if (projected[itemKey] <= 0) delete projected[itemKey];
+        }
+        if (!targetEquipped){
+            const resultKey = ValadaresEquipment.upgrade(itemKey,target);
+            projected[resultKey] = (projected[resultKey] || 0) + 1;
+        }
+        capacityOk = Object.keys(projected).length <= 250; // SAVE_CAPS.invKeys do servidor
+    }
+    const connected = !!(ws && ws.readyState === 1 && _wsAuthed && atCraft());
+    const canForge = !max && targetOwned && have >= needed && player.gold >= cost && capacityOk && connected;
+    const reason = max ? tr('forge.max_level',{n:UPGRADE_MAX})
+        : !targetOwned ? tr('forge.reason_target_missing')
+        : have < needed ? tr('forge.missing',{n:needed-have})
+        : player.gold < cost ? tr('craft.need_gold')
+        : !capacityOk ? tr('forge.reason_capacity')
+        : !connected ? tr('forge.reason_offline')
+        : _forgePending ? tr('forge.reason_pending') : '';
+    return {tier,target,max,needed,have,cost,canForge,reason};
+}
+function forgeComparison(itemKey, target){
+    const current = ITEMS[itemKey], tier = getUpgradeTier(itemKey);
+    const possible = ITEMS[ensureUpgradeItem(tier.base,target)];
+    if (!current || !possible) return '';
+    const rows = [];
+    const add = (label, before, after, percent=false) => {
+        if (!before && !after) return;
+        const fmt = n => percent ? Math.round(n*100)+'%' : String(n);
+        rows.push('<div class="forge-compare-row"><span>'+tr(label)+'</span><span>'+fmt(before)+'</span><span>'+fmt(after)+'</span></div>');
     };
-    if(typeof def.base==='number')add('atk',def.base,next.base,'#ff8030');
-    add('def',def.def||0,next.def||0,'#cce0a0');
-    add(LANG==='en'?'Attack speed':'Vel. ataque',def.atkSpd||0,next.atkSpd||0,'#a0c8ff',true);
-    add(LANG==='en'?'Movement':'Movimento',def.moveSpd||0,next.moveSpd||0,'#a0c8ff',true);
-    add('Regen HP',def.hpRegen||0,next.hpRegen||0,'#74d176');
-    for(const [key,pt,en,color] of [['poison','Veneno','Poison','#74d176'],['bleed','Sangramento','Bleed','#ed8888'],['burn','Fogo','Fire','#ff8030']])
-        add(LANG==='en'?en:pt,def[key]?.chance||0,next[key]?.chance||0,color,true);
-    return parts.join(' &nbsp; ');
+    add('forge.stat_attack', current.base||0, possible.base||0);
+    add('forge.stat_defense', current.def||0, possible.def||0);
+    add('forge.stat_attack_speed', current.atkSpd||0, possible.atkSpd||0, true);
+    add('forge.stat_movement', current.moveSpd||0, possible.moveSpd||0, true);
+    add('forge.stat_regen', current.hpRegen||0, possible.hpRegen||0);
+    for (const [key,label] of [['poison','forge.stat_poison'],['bleed','forge.stat_bleed'],['burn','forge.stat_burn']])
+        add(label,current[key]?.chance||0,possible[key]?.chance||0,true);
+    return '<div class="forge-compare"><div class="forge-compare-head"><span></span><span>'+tr('forge.compare_current')+'</span><span>'+tr('forge.compare_success')+'</span></div>'+
+        (rows.join('') || '<div class="forge-compare-row">'+tr('forge.compare_no_change')+'</div>')+'</div>';
 }
 
 let _forgePending = false;
@@ -10541,31 +10630,62 @@ function renderForgeFeedback(){
         ? tr(_forgeResult.key, {..._forgeResult.vars, item: itmName(_forgeResult.vars.itemKey)}) : '';
 }
 function renderForja(){
-    const el=document.getElementById('forjaPanel');if(!el)return;
+    const el = document.getElementById('forjaPanel'); if (!el) return;
     const scrollTop = el.scrollTop;
-    const wasAtBottom = el.scrollHeight > el.clientHeight + 4 && el.scrollHeight - el.clientHeight - scrollTop < 4;
-    const en=LANG==='en';document.getElementById('craftGoldLabel').textContent=player.gold+' g';
-    const worn=new Set(Object.values(player.equipped||{}).filter(Boolean)),owned=new Map(Object.entries(player.inv).filter(([,q])=>q>0));
-    for(const k of worn)if(!owned.has(k))owned.set(k,0);
-    const rows=[...owned].filter(([k])=>ITEMS[k]&&isUpgradableKind(ITEMS[k].kind)).sort((a,b)=>itmName(a[0]).localeCompare(itmName(b[0])));
-    let html='<div class="ench-intro"><span class="ench-kicker">'+(en?'FORGE · UP TO +5':'FORJA · ATÉ +5')+'</span><h3>'+(en?'Strengthen the piece you chose':'Fortaleça a peça que você escolheu')+'</h3><p>'+tr('forge.header_legend')+'</p></div>';
-    if(!rows.length)html+='<p class="ench-empty">'+tr('forge.no_candidates_html')+'</p>';
-    for(const[k,q]of rows){
-        const t=getUpgradeTier(k),max=t.plus>=5,target=Math.min(5,t.plus+1),cost=max?0:forgeCostFor(t.base,target);
-        const n=t.enchanted?2:3,have=t.enchanted?(player.inv[t.stem]||0):q;
-        const ready=!_forgePending&&!max&&have>=n&&player.gold>=cost;
-        const reason=max?tr('forge.max_level',{n:5}):have<n?tr('forge.missing',{n:n-have}):player.gold<cost?tr('craft.need_gold'):'';
-        const material=t.enchanted?(en?'Requires two unenchanted copies of the same forge level. Failure consumes one copy; this piece and its enchantments remain.':'Requer duas cópias sem encantamento do mesmo nível de forja. Na falha, perde uma cópia; esta peça e seus encantamentos permanecem.'):(en?'Three equal copies from the backpack.':'Três cópias iguais da mochila.');
-        html+='<div class="craft-row"><div class="craft-out"><span class="inv-icon" style="background-image:url('+getItemIconURL(k,18)+')"></span><strong style="margin-left:7px;color:#dfc17e">'+escapeHtml(itmName(k))+'</strong><small style="margin-left:7px;color:#aa9e8b">'+(t.id?'#'+t.id.slice(-4).toUpperCase()+' · ':'')+(worn.has(k)?tr('forge.equipped'):'')+'</small></div>';
-        html+='<div class="craft-in" style="line-height:1.6">'+(max?reason:describeUpgradeBonuses(k,target))+'</div>';
-        if(t.enchanted)html+='<div class="inv-enchant-line">'+t.affixes.map(a=>escapeHtml(ValadaresEquipment.describe(a,LANG))).join(' · ')+'</div>';
-        if(!max)html+='<div class="craft-in" style="font-size:11px;line-height:1.6;color:#aa9e8b">'+material+'<br>'+have+'/'+n+' · '+cost+' g · '+tr('forge.fail_pct',{pct:Math.round(UPGRADE_FAIL[target]*100)})+'</div>';
-        html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px"><small style="color:#ac9b82">'+(max?'':escapeHtml(reason))+'</small><button class="craft-btn" data-forge-key="'+escapeHtml(k)+'" '+(ready?'':'disabled')+'>'+(max?'+5':tr('forge.btn',{n:target}))+'</button></div></div>';
+    const wasAtBottom = el.scrollHeight > el.clientHeight + 4 && el.scrollHeight - el.clientHeight - scrollTop < 24;
+    const en = LANG === 'en';
+    document.getElementById('craftGoldLabel').textContent = player.gold + ' g';
+    const worn = new Set(Object.values(player.equipped || {}).filter(Boolean));
+    const owned = new Map(Object.entries(player.inv).filter(([,q]) => q > 0));
+    for (const k of worn) if (!owned.has(k)) owned.set(k,0);
+    const allRows = [...owned].filter(([k]) => {
+        if (!ITEMS[k] || !isUpgradableKind(ITEMS[k].kind)) return false;
+        const tier = getUpgradeTier(k);
+        return tier.valid && (!tier.enchanted || ValadaresEquipment.validFor(k,ITEMS[k].kind));
+    }).sort((a,b) => itmName(a[0]).localeCompare(itmName(b[0])));
+    const tools = document.getElementById('forgeTools');
+    const search = document.getElementById('forgeSearch');
+    const readyOnly = document.getElementById('forgeReadyOnly');
+    const normalize = text => String(text).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
+    const query = normalize(search.value.trim());
+    const rows = allRows.map(([key,qty]) => ({key,qty,status:forgeEligibility(key,worn)}))
+        .filter(row => (!query || normalize(itmName(row.key)).includes(query)) && (!readyOnly.checked || row.status.canForge));
+    document.getElementById('forgeCount').textContent = tr('forge.filter_count',{shown:rows.length,total:allRows.length});
+    let html = '<div class="ench-intro"><span class="ench-kicker">'+(en?'FORGE · UP TO +5':'FORJA · ATÉ +5')+'</span><h3>'+
+        (en?'Strengthen the piece you chose':'Fortaleça a peça que você escolheu')+'</h3><p>'+tr('forge.header_legend')+'</p></div>';
+    if (!allRows.length) html += '<p class="ench-empty">'+tr('forge.no_candidates_html')+'</p>';
+    else if (!rows.length) html += '<p class="ench-empty">'+tr('forge.filtered_empty')+'</p>';
+    for (const {key:k,status} of rows){
+        const {tier:t,target,max,needed,have,cost,canForge,reason} = status;
+        const ready = canForge && !_forgePending;
+        const material = t.enchanted
+            ? (en?'Requires two unenchanted copies of the same forge level. Failure consumes one copy; this piece and its enchantments remain.'
+                 :'Requer duas cópias sem encantamento do mesmo nível de forja. Na falha, perde uma cópia; esta peça e seus encantamentos permanecem.')
+            : (en?'Three equal copies from the backpack.':'Três cópias iguais da mochila.');
+        html += '<div class="craft-row"><div class="craft-out"><span class="inv-icon" style="background-image:url('+getItemIconURL(k,18)+')"></span>'+
+            '<strong style="margin-left:7px;color:#dfc17e">'+escapeHtml(itmName(k))+'</strong><small style="margin-left:7px;color:#aa9e8b">'+
+            (t.id?'#'+t.id.slice(-4).toUpperCase()+' · ':'')+(worn.has(k)?tr('forge.equipped'):'')+'</small></div>';
+        if (!max) html += forgeComparison(k,target);
+        if (t.enchanted) html += '<div class="inv-enchant-line">'+t.affixes.map(a=>escapeHtml(ValadaresEquipment.describe(a,LANG))).join(' · ')+'</div>';
+        if (!max) html += '<div class="craft-in" style="font-size:11px;line-height:1.6;color:#aa9e8b">'+material+'<br>'+have+'/'+needed+' · '+cost+' g · '+
+            tr('forge.fail_pct',{pct:Math.round(UPGRADE_FAIL[target]*100)})+'</div>';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px"><small style="color:#ac9b82">'+
+            escapeHtml(reason)+'</small><button class="craft-btn" data-forge-key="'+escapeHtml(k)+'" '+(ready?'':'disabled')+'>'+
+            (max?'+5':tr('forge.btn',{n:target}))+'</button></div></div>';
     }
-    el.innerHTML=html;
+    el.innerHTML = html;
     renderForgeFeedback();
     el.scrollTop = wasAtBottom ? el.scrollHeight : scrollTop;
-    if(!el._forgeBound){el._forgeBound=true;el.addEventListener('click',e=>{const b=e.target.closest('[data-forge-key]');if(b&&!b.disabled)attemptForge(b.dataset.forgeKey)});}
+    if (!el._forgeBound){
+        el._forgeBound = true;
+        el.addEventListener('click',e => { const b=e.target.closest('[data-forge-key]'); if (b && !b.disabled) attemptForge(b.dataset.forgeKey); });
+    }
+    if (!tools._forgeBound){
+        tools._forgeBound = true;
+        const resetList = () => { el.scrollTop = 0; renderForja(); };
+        search.addEventListener('input',resetList);
+        readyOnly.addEventListener('change',resetList);
+    }
 }
 function sellPriceFor(itemKey){
     const def = ITEMS[itemKey];
@@ -16109,7 +16229,8 @@ function startGame(multiplayer, name){
             return { name: meta.name + (meta.plus ? ' +' + meta.plus : ''), kind: ITEMS[base]?.kind || ITEMS[key]?.kind,
                 rarity: meta.rarCls === 'rar-myth' ? 'myth' : meta.rarCls === 'rar-leg' ? 'legendary' : 'common' };
         },
-        icon: getItemIconURL, playEvent: playGameSound, getLanguage: () => LANG, getFloor: () => player.floor || 0
+        icon: getItemIconURL, playEvent: playGameSound, getLanguage: () => LANG, getFloor: () => player.floor || 0,
+        bossName: mobName, beforeSummary: () => { closeAllModals(); clearAllKeys(); }
     });
     player.name = (name || 'Aventureiro').substring(0,14);
     document.getElementById('login').style.display = 'none';
