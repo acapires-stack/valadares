@@ -6,7 +6,7 @@
 <script src="/equipment-rules.js?v=1"></script>
 <script src="/game-audio.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
-<link rel="stylesheet" href="/transmutation.css?v=2">
+<link rel="stylesheet" href="/transmutation.css?v=3">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#06060c">
@@ -581,6 +581,7 @@
            .rar-* são utilitárias usadas no inv lateral E no baú (mesma fonte de cor). */
         .rar-leg  { color: #ffd040 !important; }
         .rar-myth { color: #c77dff !important; }
+        .rar-asc  { color: #a8f7ff !important; text-shadow: 0 0 7px #53bde0; }
         .inv-forge-badge {
             position: absolute; right: -4px; bottom: -4px;
             background: #2a1e08; color: #ffcc40;
@@ -1741,7 +1742,7 @@
     </style>
     <link rel="stylesheet" href="/ui-polish.css?v=20261004c">
     <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
-    <link rel="stylesheet" href="/adventure-feedback.css?v=20261004a">
+    <link rel="stylesheet" href="/adventure-feedback.css?v=20261005b">
 </head>
 <body>
 
@@ -4101,7 +4102,7 @@ function setLang(l){
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
   window.ValadaresTransmutationUI?.refreshIfOpen();
-  if (document.getElementById('craftModal')?.classList.contains('transmute-active')) document.getElementById('craftHint').innerHTML = LANG==='en'?'Three distinct pieces · same tier unlocks promotion':'Três peças diferentes · mesma faixa libera evolução';
+  if (document.getElementById('craftModal')?.classList.contains('transmute-active')) document.getElementById('craftHint').innerHTML = LANG==='en'?'Three distinct pieces · same tier unlocks promotion · mythic tier may ascend':'Três peças diferentes · mesma faixa libera evolução · míticas podem ascender';
   renderForgeFeedback();
   if (document.getElementById('craftModal')?.classList.contains('forge-active')) renderForja();
   syncInvHeight();
@@ -4913,6 +4914,14 @@ function drawWeaponSprite(px, py, weapon, opts){
         window.ValadaresItemArt2D.drawWeapon(ctx, px, py, weapon, opts || {})) return;
     const wx = px + 38;
     // Wand (cajado) na mão — haste + orbe brilhante (cor do elemento)
+    if (weapon === 'CAJADO_ASTRAL'){
+        ctx.fillStyle = '#453a72'; ctx.fillRect(wx, py+7, 4, 32);
+        ctx.fillStyle = '#b5efff'; ctx.fillRect(wx-1, py+5, 6, 3);
+        ctx.fillStyle = '#8beaff'; ctx.beginPath(); ctx.arc(wx+2, py+3, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py+1, 2, 2);
+        ctx.fillStyle = '#a477ff'; ctx.fillRect(wx+1, py+13, 2, 3);
+        return;
+    }
     if (def.kind === 'wand'){
         const orb = (typeof ELEMENT_COL !== 'undefined' && ELEMENT_COL[def.element]) || def.color;
         ctx.fillStyle = '#5a3818';
@@ -4952,6 +4961,16 @@ function drawWeaponSprite(px, py, weapon, opts){
         ctx.fillStyle = '#5a3818';
         ctx.fillRect(wx, py+2, 3, 38);
         // ── ÉPICOS 2H ────────────────────────────────────────────────────
+        if (weapon === 'ESPADA_INFINITA'){
+            ctx.fillStyle = '#a8edff'; ctx.fillRect(wx, py+2, 6, 30);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(wx+1, py, 3, 6);
+            ctx.fillStyle = '#537fc2'; ctx.fillRect(wx+5, py+6, 1, 25);
+            ctx.fillStyle = '#916aff'; ctx.fillRect(wx+1, py+12, 2, 2); ctx.fillRect(wx+2, py+21, 2, 2);
+            ctx.fillStyle = '#d8cbff'; ctx.fillRect(wx-5, py+31, 15, 3);
+            ctx.fillStyle = '#7deeff'; ctx.fillRect(wx+1, py+31, 4, 3);
+            ctx.fillStyle = '#2e3a64'; ctx.fillRect(wx, py+34, 4, 6);
+            return;
+        }
         if (weapon === 'ESPADA_HL'){
             // Espada do Highlander — lâmina dourada longa com coração na guarda
             ctx.fillStyle = '#ffe070'; ctx.fillRect(wx, py+2, 5, 30);
@@ -5348,6 +5367,16 @@ function drawCharacter(px, py, dir, equip, nameTag, hpPct, hurtPct, mpPct, bob, 
             ctx.fillStyle = '#1a0a04';
             ctx.fillRect(px+8, py+1, 2, 4);
             ctx.fillRect(px+38, py+1, 2, 4);
+        } else if (eqHeadB ==='COROA_CELESTIAL'){
+            ctx.fillStyle = '#d9f4ff'; ctx.fillRect(px+11, py+2, 26, 4);
+            ctx.fillStyle = '#6f9dc5'; ctx.fillRect(px+11, py+5, 26, 1);
+            ctx.fillStyle = '#d9f4ff';
+            ctx.fillRect(px+11, py-3, 4, 5); ctx.fillRect(px+18, py-6, 4, 8);
+            ctx.fillRect(px+23, py-9, 4, 11); ctx.fillRect(px+29, py-6, 4, 8);
+            ctx.fillRect(px+34, py-3, 3, 5);
+            ctx.fillStyle = '#74eaff'; ctx.fillRect(px+23, py-7, 4, 4);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(px+24, py-7, 1, 1);
+            ctx.fillStyle = '#aa82ff'; ctx.fillRect(px+17, py+2, 2, 2); ctx.fillRect(px+31, py+2, 2, 2);
         } else if (eqHeadB ==='COROA_VALADARES'){
             // ★★ Coroa de Valadares — coroa dourada robusta + gemas multicoloridas
             ctx.fillStyle = '#ffe060';
@@ -5694,6 +5723,9 @@ const ITEMS = new Proxy({
     // ★★ MÍTICAS (drops do Senhor de Valadares)
     ESPADA_ETERNA:  { name:'Espada Eterna ★★',    color:'#ffe060', kind:'weapon', hand:'2h', skill:'Espada', base:30, def:12 },
     COROA_VALADARES:{ name:'Coroa de Valadares ★★', color:'#ffd700', kind:'head',  def:20 },
+    // ★★★ ASCENDENTES: apenas como resultado da Mesa de Transmutação.
+    ESPADA_INFINITA: { name:'Espada do Infinito ★★★', color:'#b9f7ff', kind:'weapon', hand:'2h', skill:'Espada', base:36, def:14 },
+    COROA_CELESTIAL:{ name:'Coroa Celestial ★★★', color:'#c3eeff', kind:'head', def:24 },
     ESSENCIA:       { name:'Essência de Valadares', color:'#ffe5a0', kind:'mat' },
     // armaduras endgame
     ARMADURA_ESCAMA:{ name:'Armadura de Escamas', color:'#cc5040', kind:'armor',   def:9 },
@@ -5714,6 +5746,7 @@ const ITEMS = new Proxy({
     CAJADO_RAIO:      { name:'Cajado de Raio',       color:'#b080ff', kind:'wand', hand:'2h', skill:'Magia', base:13, def:2, ranged:5, element:'energy' },
     CAJADO_RUNICO:    { name:'Cajado Rúnico ★',      color:'#c060ff', kind:'wand', hand:'2h', skill:'Magia', base:20, def:4, ranged:6, element:'energy' },
     CAJADO_ETERNO:    { name:'Cajado Eterno ★★',     color:'#ffd0ff', kind:'wand', hand:'2h', skill:'Magia', base:30, def:6, ranged:6, element:'fire' },
+    CAJADO_ASTRAL:    { name:'Cajado Astral ★★★',    color:'#b8eaff', kind:'wand', hand:'2h', skill:'Magia', base:36, def:7, ranged:6, element:'fire' },
 }, {get(target,key,receiver){
     if (typeof key === 'string' && key.includes('~') && !Object.prototype.hasOwnProperty.call(target,key)) ensureItemKey(key);
     return Reflect.get(target,key,receiver);
@@ -5756,6 +5789,7 @@ const ITEM_EN = {
     ESPADA_DRACO:{name:'Draconic Sword'}, MARTELO_GOLEM:{name:'Golem Hammer'},
     ESPADA_HL:{name:"Highlander's Sword ★"}, ARMADURA_TRONO:{name:'Throne Armor ★'}, COROA_VENDEDOR:{name:"Soul Seller's Crown ★"},
     ESPADA_ETERNA:{name:'Eternal Sword ★★'}, COROA_VALADARES:{name:'Crown of Valadares ★★'}, ESSENCIA:{name:'Essence of Valadares'},
+    ESPADA_INFINITA:{name:'Sword of Infinity ★★★'}, COROA_CELESTIAL:{name:'Celestial Crown ★★★'}, CAJADO_ASTRAL:{name:'Astral Staff ★★★'},
     ARMADURA_ESCAMA:{name:'Scale Armor'}, ESCUDO_PEDRA:{name:'Stone Shield'}, ESCUDO_GUARDIAO:{name:"Guardian's Shield ★"}, ELMO_DRACO:{name:'Draconic Helmet'},
     CORACAO_HL:{name:"Highlander's Heart"}, FLECHA:{name:'Arrow'}, FLECHA_PERF:{name:'Piercing Arrow'},
     VARINHA_APRENDIZ:{name:'Apprentice Wand'}, CAJADO_FOGO:{name:'Fire Staff'}, CAJADO_GELO:{name:'Ice Staff'}, CAJADO_RAIO:{name:'Lightning Staff'},
@@ -6616,7 +6650,7 @@ function itemDisplayMeta(key){
     const starN = (nm.match(/★/g) || []).length;
     return {
         name: nm.replace(/\s*★+\s*$/, '').trim() + (tier.enchanted ? ' ✧' : ''),
-        rarCls: starN >= 2 ? 'rar-myth' : (starN === 1 ? 'rar-leg' : ''),
+        rarCls: starN >= 3 ? 'rar-asc' : starN >= 2 ? 'rar-myth' : (starN === 1 ? 'rar-leg' : ''),
         plus: tier.plus
     };
 }
@@ -10569,7 +10603,7 @@ function switchCraftTab(which){
     document.getElementById('forgeTools').style.display = which === 'forja' ? 'flex' : 'none';
     for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel'],['transmute','transmutationPanel']])document.getElementById(id).style.display=tab===which?'':'none';
     const hint=document.getElementById('craftHint');
-    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):which==='transmute'?(LANG==='en'?'Three distinct pieces · same tier unlocks promotion':'Três peças diferentes · mesma faixa libera evolução'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
+    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):which==='transmute'?(LANG==='en'?'Three distinct pieces · same tier unlocks promotion · mythic tier may ascend':'Três peças diferentes · mesma faixa libera evolução · míticas podem ascender'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
     if(which==='enchant')window.ValadaresEnchantUI?.render();
     else if(which==='transmute')window.ValadaresTransmutationUI?.render();
     else if(which==='forja')renderForja();else renderCraft();
@@ -11636,6 +11670,40 @@ function drawItemSprite(ctx, def, key, S){
         P(11, 0, 2, 1, auraColor); P(11, 23, 2, 1, auraColor);
         P(0, 11, 1, 2, auraColor); P(23, 11, 1, 2, auraColor);
     };
+
+    if (key === 'ESPADA_INFINITA'){
+        // Lâmina ascendente: cristal ciano, núcleo violeta e guarda estrelada.
+        for(let i=0;i<18;i++){
+            P(2+i,19-i,3,2,'#a8ecff');
+            P(2+i,19-i,1,1,'#ffffff');
+            P(4+i,20-i,1,1,'#4172b8');
+        }
+        P(8,13,2,2,'#9268ff'); P(13,8,2,2,'#9268ff'); P(19,1,3,3,'#ffffff');
+        P(0,18,7,2,'#e4d0ff'); P(1,17,2,5,'#9475ce');
+        P(2,19,2,2,'#a7faff'); P(0,21,4,3,'#29375e');
+        drawEpicAura('#a7faff');
+        return;
+    }
+    if (key === 'COROA_CELESTIAL'){
+        // Coroa branca com três torres celestes e gema azul central.
+        P(3,14,18,5,'#b7ddf4'); P(3,14,18,1,'#ffffff'); P(3,18,18,1,'#668fb6');
+        P(4,8,3,6,'#d6f2ff'); P(8,5,3,9,'#b7ddf4');
+        P(11,2,3,12,'#ffffff'); P(15,5,3,9,'#b7ddf4'); P(18,8,3,6,'#d6f2ff');
+        P(10,12,4,4,'#295aaa'); P(11,11,2,3,'#70f4ff');
+        P(5,13,2,2,'#b785ff'); P(17,13,2,2,'#b785ff');
+        drawEpicAura('#a7faff');
+        return;
+    }
+    if (key === 'CAJADO_ASTRAL'){
+        // Haste astral com astrolábio luminoso, diferente dos cajados comuns.
+        for(let i=0;i<16;i++)P(3+i,21-i,2,2,'#5b4d8c');
+        P(4,20,3,3,'#28365f'); P(17,1,5,5,'#76dfff');
+        P(18,0,3,1,'#ffffff'); P(18,6,3,1,'#ffffff');
+        P(16,2,1,3,'#ffffff'); P(22,2,1,3,'#ffffff');
+        P(18,2,3,3,'#ffffff'); P(19,3,1,1,'#b477ff');
+        drawEpicAura('#9ceaff');
+        return;
+    }
 
     // Items específicos com sprite único
     if (key === 'CORACAO_HL'){
@@ -16243,7 +16311,7 @@ function startGame(multiplayer, name){
             if (!ITEMS[base] && !ITEMS[key]) return null;
             const meta = itemDisplayMeta(key);
             return { name: meta.name + (meta.plus ? ' +' + meta.plus : ''), kind: ITEMS[base]?.kind || ITEMS[key]?.kind,
-                rarity: meta.rarCls === 'rar-myth' ? 'myth' : meta.rarCls === 'rar-leg' ? 'legendary' : 'common' };
+                rarity: meta.rarCls === 'rar-asc' ? 'ascendant' : meta.rarCls === 'rar-myth' ? 'myth' : meta.rarCls === 'rar-leg' ? 'legendary' : 'common' };
         },
         icon: getItemIconURL, playEvent: playGameSound, getLanguage: () => LANG, getFloor: () => player.floor || 0,
         bossName: mobName, beforeSummary: () => { closeAllModals(); clearAllKeys(); }
@@ -17541,10 +17609,10 @@ function loop(ts){
 <script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261004b"></script>
-<script src="/adventure-feedback.js?v=20261005a"></script>
+<script src="/adventure-feedback.js?v=20261005b"></script>
 <script src="/training-rules.js?v=1"></script>
 <script src="/enchanting-ui.js?v=1"></script>
-<script src="/transmutation-rules.js?v=2"></script>
-<script src="/transmutation-ui.js?v=2"></script>
+<script src="/transmutation-rules.js?v=3"></script>
+<script src="/transmutation-ui.js?v=3"></script>
 </body>
 </html>

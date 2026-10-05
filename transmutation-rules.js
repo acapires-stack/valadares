@@ -4,8 +4,8 @@
     else root.ValadaresTransmutation = rules;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = 2;
-    // As faixas 1 a 5 são entradas permitidas; a faixa 6 é somente saída.
+    const VERSION = 3;
+    // As faixas 1 a 6 são entradas permitidas; a faixa 7 é somente saída.
     const tiers = [null,
         { cost:120, essenceQty:1, chances:{material:60,plain:25,enchanted:5,superior:10},
             pool:['ADAGA','PORRETE','CLAVA','ESPADA','LANCA','ARCO','ESCUDO_MAD','BOTAS','ELMO','COURO','VARINHA_APRENDIZ'] },
@@ -17,10 +17,12 @@
             pool:['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO'] },
         { cost:12000, essenceQty:10, chances:{material:40,plain:25,enchanted:30,superior:5},
             pool:['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO'] },
+        { cost:30000, essenceQty:15, chances:{material:35,plain:25,enchanted:38,superior:2},
+            pool:['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'] },
     ];
-    const mythicPool=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+    const transcendentPool=['ESPADA_INFINITA','COROA_CELESTIAL','CAJADO_ASTRAL'];
     const tierByKey = new Map();
-    for (let tier=1;tier<=5;tier++) for (const key of tiers[tier].pool) tierByKey.set(key,tier);
+    for (let tier=1;tier<=6;tier++) for (const key of tiers[tier].pool) tierByKey.set(key,tier);
     function tierOf(key) {
         return typeof key === 'string' ? (tierByKey.get(key) || 0) : 0;
     }
@@ -34,13 +36,15 @@
         const ranks=keys.map(tierOf);
         if (ranks.some(t => t === 0)) return invalid('ineligible_item');
         const tier=Math.min(...ranks), sameTier=ranks.every(t=>t===tier), def=tiers[tier];
-        const pool=def.pool.filter(key => !keys.includes(key));
+        // Na faixa 6 há exatamente três míticos. Consomem-se os três e volta
+        // somente UM prêmio normal; excluir ingredientes tornaria o pool vazio.
+        const pool=tier===6 ? [...def.pool] : def.pool.filter(key => !keys.includes(key));
         if (!pool.length) return invalid('empty_pool');
         const chances={...def.chances};
         if (!sameTier){chances.material+=chances.superior;chances.superior=0;}
         return {valid:true,error:null,tier,resultTier:tier+1,sameTier,cost:def.cost,
             essenceQty:def.essenceQty,chances,pool,
-            superiorPool:sameTier ? [...(tiers[tier+1]?.pool || mythicPool)] : []};
+            superiorPool:sameTier ? [...(tiers[tier+1]?.pool || transcendentPool)] : []};
     }
     return Object.freeze({VERSION,tierOf,quote});
 });

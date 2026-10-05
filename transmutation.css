@@ -25,6 +25,8 @@
 #transmutationStatus[data-kind="ok"]{border-left-color:#80c987}
 #transmutationStatus[data-kind="error"]{border-left-color:#ed938d}
 #transmutationStatus[data-kind="superior"]{border:1px solid #c6953b;border-left:4px solid #ffe08a;background:linear-gradient(110deg,#392a12,#241c2c);color:#fff0ca}
+#transmutationStatus[data-kind="ascendant"]{border:1px solid #79d9ee;border-left:4px solid #d5fbff;background:linear-gradient(110deg,#1d3754,#302347);color:#effcff;box-shadow:inset 0 0 18px #77dfff33}
+#transmutationStatus[data-kind="ascendant"] .tm-result-title{color:#c6f7ff;text-shadow:0 0 8px #7de9ff}
 .tm-result{display:flex;align-items:center;gap:12px}
 .tm-result-icon{width:48px;height:48px;object-fit:contain;image-rendering:pixelated;flex-shrink:0}
 .tm-result-title{display:block;color:#ffe19e;font-size:13px;margin-bottom:5px;letter-spacing:1px}
@@ -32,6 +34,9 @@
 #transmutationPanel .tm-superior-chance{border-color:#ad8134;color:#ffe19e;background:#3a2b12;font-weight:700}
 .tm-superior-preview{border-top:1px solid #77582b;margin-top:14px;padding-top:12px;color:#ffe19e}
 .tm-superior-preview small{font:11px/1.5 "Segoe UI",sans-serif;color:#c7b692}
+.tm-ascension-preview{border-color:#81d9ec;color:#c6f7ff}
+.tm-ascension-preview strong{color:#baf3ff}
+#transmutationPanel .tm-mythic-warning{border-left:3px solid #b98bd8;padding:7px 9px;background:#302339;color:#f1dbf7}
 #transmutationPanel .tm-mixed{color:#efbe87}
 #transmutationStatus p{margin:0}
 @media(max-width:600px){#transmutationPanel{padding:8px 9px 16px}#transmutationPanel .tm-grid{grid-template-columns:1fr}#transmutationPanel .tm-pool{columns:1}#craftModal [data-craft-tab]{font-size:10px;padding:6px 3px}}

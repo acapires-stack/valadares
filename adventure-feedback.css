@@ -29,6 +29,7 @@
 .adventure-loot-rarity { flex: 0 0 auto; font-size: 7px; letter-spacing: .2px; opacity: .9; }
 .adventure-rarity-legendary { color: #ffe090; }
 .adventure-rarity-myth { color: #dfb6ff; }
+.adventure-rarity-ascendant { color: #a8f7ff; text-shadow: 0 0 7px #53bde0; }
 .adventure-loot-gold { color: #c4a667; font-size: 10px; text-align: right; }
 .adventure-loot-more { color: #a8a099; font-size: 10px; }
 .adventure-boss-trigger {

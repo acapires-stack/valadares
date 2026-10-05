@@ -62,7 +62,7 @@
             const meta = typeof deps.getItem === 'function' && deps.getItem(type);
             if (!meta || typeof meta.name !== 'string') return null;
             return { name: meta.name.slice(0, 80), kind: meta.kind,
-                rarity: meta.rarity === 'myth' ? 'myth' : meta.rarity === 'legendary' ? 'legendary' : 'common' };
+                rarity: meta.rarity === 'ascendant' ? 'ascendant' : meta.rarity === 'myth' ? 'myth' : meta.rarity === 'legendary' ? 'legendary' : 'common' };
         } catch { return null; }
     }
     function english(){ return typeof deps.getLanguage === 'function' && deps.getLanguage() === 'en'; }
@@ -317,7 +317,7 @@
                 const rarity = document.createElement('small');
                 rarity.className = 'adventure-loot-rarity';
                 const english = deps.getLanguage && deps.getLanguage() === 'en';
-                rarity.textContent = row.rarity === 'myth' ? (english ? 'MYTHIC' : 'MÍTICO') : (english ? 'LEGENDARY' : 'LENDÁRIO');
+                rarity.textContent = row.rarity === 'ascendant' ? (english ? 'ASCENDANT' : 'ASCENDENTE') : row.rarity === 'myth' ? (english ? 'MYTHIC' : 'MÍTICO') : (english ? 'LEGENDARY' : 'LENDÁRIO');
                 line.appendChild(rarity);
             }
             card.appendChild(line);
@@ -341,7 +341,7 @@
         playPickupSound(rare, batch.boss);
     }
     function rank(row){
-        const rarity = row.rarity === 'myth' ? 200 : row.rarity === 'legendary' ? 100 : 0;
+        const rarity = row.rarity === 'ascendant' ? 300 : row.rarity === 'myth' ? 200 : row.rarity === 'legendary' ? 100 : 0;
         const kind = ['weapon', 'wand', 'offhand', 'armor', 'head', 'feet', 'neck', 'cosmetic'].includes(row.kind) ? 20 : 0;
         return rarity + kind;
     }

@@ -762,6 +762,7 @@ const ITEM_META = {
     MARTELO_GOLEM:{ kind:'weapon', hand:'2h', base:13, def:6 },
     ESPADA_HL:    { kind:'weapon', hand:'2h', base:20, def:8 },
     ESPADA_ETERNA:{ kind:'weapon', hand:'2h', base:30, def:12 },
+    ESPADA_INFINITA:{ kind:'weapon', hand:'2h', base:36, def:14 },
     // ranged
     ARCO:      { kind:'weapon', hand:'2h', base:4, def:1, ranged:6 },
     ARCO_CACA: { kind:'weapon', hand:'2h', base:6, def:1, ranged:7 },
@@ -774,6 +775,7 @@ const ITEM_META = {
     CAJADO_RAIO:      { kind:'wand', hand:'2h', base:13, def:2, ranged:5 },
     CAJADO_RUNICO:    { kind:'wand', hand:'2h', base:20, def:4, ranged:6 },
     CAJADO_ETERNO:    { kind:'wand', hand:'2h', base:30, def:6, ranged:6 },
+    CAJADO_ASTRAL:    { kind:'wand', hand:'2h', base:36, def:7, ranged:6 },
     // offhand/armaduras
     ESCUDO_MAD:   { kind:'offhand', def:3 },
     ESCUDO_FERRO: { kind:'offhand', def:6 },
@@ -790,6 +792,7 @@ const ITEM_META = {
     ELMO_DRACO:      { kind:'head', def:4 },
     COROA_VENDEDOR:  { kind:'head', def:7 },
     COROA_VALADARES: { kind:'head', def:20 },
+    COROA_CELESTIAL: { kind:'head', def:24 },
     BOTAS:        { kind:'feet', def:1 },
     BOTAS_RAPIDA: { kind:'feet', def:0, speed:30 },
     BOTAS_VENTO:  { kind:'feet', def:1, speed:50 },
@@ -1572,9 +1575,9 @@ const DUNGEON_BOSS_RESPAWN_MS = 8 * 60 * 1000;
 // retunar o cooldown das Profundezas sem mexer nos bosses do mundo (mesmo valor).
 const WORLD_BOSS_RESPAWN_SLOW_MS = 8 * 60 * 1000;
 // Teto de dano por hit (anti-forja de msg.amount no attackMob). O maior hit
-// LEGÍTIMO possível é ~372: arma mítica forjada (ESPADA_ETERNA base 30 +5 = 37)
-// + skill no cap (floor(200/3)=66) + variância (2) = 105, ×2 crit = 210, × mults
-// máximos (selos+HL+buff ≈ 1,77) ≈ 372. 600 dá folga (nunca capa hit real) mas
+// LEGÍTIMO possível é ~393: arma transcendente forjada (ESPADA_INFINITA base 36 +7 = 43)
+// + skill no cap (floor(200/3)=66) + variância (2) = 111, ×2 crit = 222, × mults
+// máximos (selos+HL+buff ≈ 1,77) ≈ 393. 600 dá folga (nunca capa hit real) mas
 // impede one-shot de boss (ex.: Senhor das Profundezas 5000hp → ≥9 hits) e o
 // roubo de 100% do damageBy num único golpe forjado.
 const MAX_HIT_DMG = 600;
@@ -3260,7 +3263,7 @@ function seasonCombinedScore(r){
 const WEAPON_SKILL = {
     // Espada
     ADAGA:'Espada', ADAGA_DUPLA:'Espada', ESPADA:'Espada', ESPADA_DRACO:'Espada',
-    ESPADA_ETERNA:'Espada', ESPADA_HL:'Espada', ESPADA_LONGA:'Espada', ESPADA_OSSO:'Espada', SABRE:'Espada',
+    ESPADA_ETERNA:'Espada', ESPADA_INFINITA:'Espada', ESPADA_HL:'Espada', ESPADA_LONGA:'Espada', ESPADA_OSSO:'Espada', SABRE:'Espada',
     ESPADA_ACO:'Espada', LAMINA_DRACO_1H:'Espada', ESPADA_GUARDIAO:'Espada',
     // Distância (arcos + lanças arremessáveis)
     ARCO:'Distância', ARCO_CACA:'Distância', BESTA:'Distância',
@@ -3272,7 +3275,7 @@ const WEAPON_SKILL = {
     MACHADO:'Machado', MACHADO_MINO:'Machado',
     // Magia (wands/cajados — ataque mágico à distância, sem munição)
     VARINHA_APRENDIZ:'Magia', CAJADO_FOGO:'Magia', CAJADO_GELO:'Magia', CAJADO_RAIO:'Magia',
-    CAJADO_RUNICO:'Magia', CAJADO_ETERNO:'Magia',
+    CAJADO_RUNICO:'Magia', CAJADO_ETERNO:'Magia', CAJADO_ASTRAL:'Magia',
 };
 function weaponSkillOf(p){
     // Strip sufixo _PLUS_N (forja) — ESPADA_HL_PLUS_2 → ESPADA_HL
