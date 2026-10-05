@@ -4,6 +4,7 @@
 <!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
 <script src="/equipment-rules.js?v=1"></script>
+<script src="/game-audio.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -2386,7 +2387,7 @@
 </div>
 
 <div id="settingsModal" style="display:none">
-    <div class="chest-box" style="min-width:520px;max-width:580px">
+    <div class="chest-box" style="box-sizing:border-box;width:min(580px,calc(100vw - 24px));min-width:0;max-width:580px">
         <div class="chest-title" data-i18n="settings.title">⚙ OPÇÕES</div>
 
         <div class="chest-head" data-i18n="settings.language">IDIOMA / LANGUAGE</div>
@@ -2407,10 +2408,16 @@
             <div class="settings-val" id="setVolEffectsVal">80</div>
         </div>
         <div class="settings-row">
-            <div class="settings-label" data-i18n="settings.vol_ambient">Ambient (bioma)</div>
-            <input id="setVolMusic" type="range" min="0" max="100" value="40" class="settings-slider">
-            <div class="settings-val" id="setVolMusicVal">40</div>
+            <div class="settings-label" data-i18n="settings.vol_ambient">Ambiente</div>
+            <input id="setVolAmbient" type="range" min="0" max="100" value="40" class="settings-slider">
+            <div class="settings-val" id="setVolAmbientVal">40</div>
         </div>
+        <div class="settings-row">
+            <div class="settings-label" data-i18n="settings.vol_music">Música</div>
+            <input id="setVolMusic" type="range" min="0" max="100" value="25" class="settings-slider">
+            <div class="settings-val" id="setVolMusicVal">25</div>
+        </div>
+        <button type="button" class="chest-btn" onclick="previewAudio()" data-i18n="settings.audio_preview">▶ Ouvir exemplo</button>
 
         <div class="chest-head" style="margin-top:14px" data-i18n="settings.accessibility">ACESSIBILIDADE</div>
         <div style="color:#998040;font-size:10px;letter-spacing:0.3px;padding:2px 6px 6px" data-i18n="settings.access_desc">Aumenta toda a interface (texto, ícones, janela). Útil pra quem tem dificuldade de enxergar.</div>
@@ -2580,7 +2587,9 @@ const I18N = {
     'settings.audio': 'ÁUDIO',
     'settings.vol_master': 'Volume geral',
     'settings.vol_effects': 'Efeitos',
-    'settings.vol_ambient': 'Ambient (bioma)',
+    'settings.vol_ambient': 'Ambiente',
+    'settings.vol_music': 'Música',
+    'settings.audio_preview': '▶ Ouvir exemplo',
     'settings.accessibility': 'ACESSIBILIDADE',
     'settings.access_desc': 'Aumenta toda a interface (texto, ícones, janela). Útil pra quem tem dificuldade de enxergar.',
     'settings.zoom_in': '🔍+ Aumentar',
@@ -3300,7 +3309,9 @@ const I18N = {
     'settings.audio': 'AUDIO',
     'settings.vol_master': 'Master volume',
     'settings.vol_effects': 'Effects',
-    'settings.vol_ambient': 'Ambient (biome)',
+    'settings.vol_ambient': 'Ambient',
+    'settings.vol_music': 'Music',
+    'settings.audio_preview': '▶ Hear sample',
     'settings.accessibility': 'ACCESSIBILITY',
     'settings.access_desc': 'Enlarges the whole interface (text, icons, window). Useful if you have trouble seeing.',
     'settings.zoom_in': '🔍+ Zoom in',
@@ -7411,7 +7422,7 @@ function doAttack(m){
         dmgW = Math.max(1, Math.floor(dmgW * elementalMult(m.type, wItem.element, wItem.element)));
         const eCol = ELEMENT_COL[wItem.element] || wItem.color || '#c060ff';
         addFloat(m.x, m.y, `-${dmgW}`, critW ? '#ffaa20' : eCol, true, critW ? -10 : 0);
-        if (critW) sndCrit(); else sndSpell();
+        if (critW) sndCrit(); else playGameSound('wand');
         log(tr('log.dmg_hit', {star: critW?'★ ':'', weapon: itmName(wKey), dmg: dmgW, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
@@ -7473,7 +7484,7 @@ function doAttack(m){
         if (critR) dmgR *= critMultPlayer();
         dmgR = Math.floor(dmgR * buffMult().dmg);
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
-        if (critR) sndCrit(); else sndHit();
+        if (critR) sndCrit(); else playGameSound('ranged');
         log(tr('log.dmg_hit', {star: critR?'★ ':'', weapon: itmName(wKey), dmg: dmgR, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
@@ -8041,7 +8052,7 @@ function handleMP(msg){
                 const _sum = [bl.gold > 0 ? `${bl.gold.toLocaleString('pt-BR')}g` : null,
                               _nItems > 0 ? `${_nItems} ${_nItems === 1 ? tr('lbl.item') : tr('lbl.items')}` : null].filter(Boolean).join(' + ');
                 if (typeof showServerToast === 'function') showServerToast('event', tr('toast.boss_loot', {boss: bossName, sum: _sum}), null, 5000);
-                if (typeof sndLevelUp === 'function') sndLevelUp();
+                playGameSound('bossReward');
             }
         }
         // N3 fase 2: equipped também é autoritativo
@@ -8098,7 +8109,7 @@ function handleMP(msg){
                 // Sem som de level up e sem toast (acontece a cada 30s, ia poluir)
             } else {
                 log(tr('log.gold_credited', {g: msg.goldDelta.amount.toLocaleString('pt-BR'), reason}));
-                if (typeof sndLevelUp === 'function') sndLevelUp();
+                if (!msg.bossLoot && typeof sndLevelUp === 'function') sndLevelUp();
                 addFloat(player.x, player.y, `+${msg.goldDelta.amount}g`, '#ffcc40', true, -20);
                 // Não duplica banner quando o ouro já veio no toast de loot de boss (mesma msg).
                 if (typeof showServerToast === 'function' && !msg.bossLoot) showServerToast('event', tr('toast.gold_credited', {g: msg.goldDelta.amount.toLocaleString('pt-BR')}));
@@ -8142,17 +8153,18 @@ function handleMP(msg){
             if (msg.forge.error){
                 _forgeResult={ok:false,key:'forge.banner_cancelled',vars:{}};
                 log(tr(_forgeResult.key));
+                playGameSound('forgeCancelled');
             } else if (msg.forge.ok){
                 const item = ITEMS[msg.forge.newKey];
                 const itemName = item ? item.name : msg.forge.newKey;
                 log(tr('log.forged', {item: itmName(msg.forge.newKey), cost: msg.forge.cost}));
-                if (typeof sndLevelUp === 'function') sndLevelUp();
+                playGameSound('forgeSuccess');
                 addFloat(player.x, player.y, '★ +' + msg.forge.plus, '#ffcc40', true, -10);
                 checkAchievements();
             } else {
                 const itemName = ITEMS[msg.forge.itemKey]?.name || msg.forge.itemKey;
                 log(tr('log.forge_failed', {item: itmName(msg.forge.itemKey), cost: msg.forge.cost}));
-                if (typeof sndDeath === 'function') sndDeath();
+                playGameSound('forgeFailure');
                 addFloat(player.x, player.y, tr('float.fail'), '#ff3030', true, -10);
             }
             if (!msg.forge.error) _forgeResult = msg.forge.ok
@@ -12923,6 +12935,7 @@ document.addEventListener('keydown', e => {
     if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); closeDungeonEnterModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
+document.addEventListener('pointerdown', ensureAudio, {passive:true});
 document.addEventListener('keyup', e => {
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -12940,6 +12953,10 @@ function clearAllKeys(){
 window.addEventListener('blur', clearAllKeys);
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) clearAllKeys();
+    else if (_audioGestureReady && audioCtx?.state === 'suspended'){
+        try { Promise.resolve(audioCtx.resume()).catch(() => {}); } catch {}
+    }
+    updateAudioScene();
     // T2: server pausa regen quando tabActive=false (preserva anti-AFK)
     if (ws && ws.readyState === 1 && _wsAuthed){
         try { ws.send(JSON.stringify({ t:'tabActive', active: !document.hidden })); } catch {}
@@ -13257,7 +13274,7 @@ function castSpell(spellKey){
     if (sp.aoeRange){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
-        sndSpell();
+        sndSpell(spellKey);
         // Coleta os alvos no raio ANTES de mandar qualquer coisa: o spellCast precisa chegar
         // ao server ANTES dos attackMob, porque é ele que abre a janela de magia que autoriza
         // o range do AoE (server.js: _spellWindow). Mandando attackMob primeiro, eles chegam
@@ -13311,7 +13328,7 @@ function castSpell(spellKey){
     if (sp.tauntRange){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
-        sndSpell();
+        sndSpell(spellKey);
         // Escala com Magia: +1 de range a cada 25 de Magia (5 base → 13 no cap 200).
         const tauntRange = sp.tauntRange + Math.floor(sk.val / 25);
         let count = 0;
@@ -13336,7 +13353,7 @@ function castSpell(spellKey){
     if (sp.buff){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
-        sndSpell();
+        sndSpell(spellKey);
         // Escala com Magia: +1s de duração a cada 10 de Magia (12s base → ~32s no cap 200).
         const buffDur = sp.buff.duration + Math.floor(sk.val / 10) * 1000;
         player.buff = {
@@ -13360,7 +13377,7 @@ function castSpell(spellKey){
     if (sp.groupRange){
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
-        sndSpell();
+        sndSpell(spellKey);
         auraEffects.push({ entity: player, color: sp.glow, life: 0, duration: 800, maxR: sp.groupRange * TS });
         auraEffects.push({ entity: player, color: sp.color, life: 0, duration: 500 });
         addFloat(player.x, player.y, `✦ ${spellName(spellKey)}`, sp.glow, true, -10);
@@ -13380,7 +13397,7 @@ function castSpell(spellKey){
         }
         player.mp -= sp.manaCost;
         spellCooldowns[spellKey] = sp.cooldown;
-        sndSpell();
+        sndSpell(spellKey);
         player.hp += healed;
         addFloat(player.x, player.y, `+${healed}`, sp.glow, true);
         log(tr('log.spell_heal', {name: spellName(spellKey), n: healed}));
@@ -13404,7 +13421,7 @@ function castSpell(spellKey){
     }
     player.mp -= sp.manaCost;
     spellCooldowns[spellKey] = sp.cooldown;
-    sndSpell();
+    sndSpell(spellKey);
     let dmg = wandBase + sp.damage + Math.floor(sk.val / 3) + Math.floor(Math.random()*5) - 2;
     dmg = Math.max(1, dmg);
     const crit = Math.random() < playerCritChance();
@@ -14233,7 +14250,7 @@ function handleTrainingResult(result){
     training.remaining--;
     training.lastTick = performance.now();
     addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${skillDisp(training.skill)}`, '#ffcc40');
-    if (training.remaining <= 0) stopTraining('completo');
+    if (training.remaining <= 0){ playGameSound('trainingDone'); stopTraining('completo'); }
     if (document.getElementById('trainingModal').style.display === 'flex') renderTraining();
     if (document.getElementById('altarModal').style.display === 'flex') renderAltar();
 }
@@ -14611,18 +14628,24 @@ const SESSION_KEY = 'valadares:session';
 // ═══════════════════════════════════════════════════════════════════════════
 const SETTINGS_KEY = 'valadares:settings';
 const settings = {
+    audioVersion: 2,
     volMaster:  70,   // 0-100
     volEffects: 80,   // 0-100
     volAmbient: 40,   // 0-100 — som ambiente por bioma
+    volMusic:   25,   // 0-100 — trilha discreta
 };
+function clampVolume(value, fallback){
+    return Number.isFinite(value) ? Math.max(0,Math.min(100,Math.round(value))) : fallback;
+}
 function loadSettings(){
     try {
         const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-        if (s){
-            if (typeof s.volMaster === 'number')  settings.volMaster  = s.volMaster;
-            if (typeof s.volEffects === 'number') settings.volEffects = s.volEffects;
-            if (typeof s.volAmbient === 'number') settings.volAmbient = s.volAmbient;
-            else if (typeof s.volMusic === 'number') settings.volAmbient = s.volMusic;   // migra slider antigo
+        if (s && typeof s === 'object'){
+            settings.volMaster = clampVolume(s.volMaster,settings.volMaster);
+            settings.volEffects = clampVolume(s.volEffects,settings.volEffects);
+            // volMusic era o nome legado do ambiente; só v2 o usa como música.
+            settings.volAmbient = clampVolume(s.volAmbient ?? (s.audioVersion === 2 ? undefined : s.volMusic),settings.volAmbient);
+            if (s.audioVersion === 2) settings.volMusic = clampVolume(s.volMusic,settings.volMusic);
         }
     } catch {}
 }
@@ -14630,110 +14653,42 @@ function saveSettings(){
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
 }
 loadSettings();
-function effectiveVolume(){
-    return (settings.volMaster / 100) * (settings.volEffects / 100);
-}
-function effectiveAmbientVolume(){
-    return (settings.volMaster / 100) * (settings.volAmbient / 100);
-}
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SOUND ENGINE (#17) — Web Audio sintetizado, sem arquivos externos
-// AudioContext só inicializa na primeira interação do usuário (regra browser)
+// SOUND ENGINE — o módulo compartilha ganho geral, buses e cenas musicais.
+// O contexto nasce no primeiro gesto; chamadas de rede nunca destravam autoplay.
 // ═══════════════════════════════════════════════════════════════════════════
 let audioCtx = null;
-let masterGain = null;
-let reverbNode = null;
-let reverbGain = null;
+let audioEngine = null;
+let masterGain = null; // a gravação da tela usa a mesma saída final
+let _audioGestureReady = false;
+let _lastAmbientCheck = 0;
 function initAudio(){
-    if (audioCtx) return audioCtx;
+    if (audioEngine) return audioCtx;
     try {
         const Ctor = window.AudioContext || window.webkitAudioContext;
-        if (!Ctor) return null;
+        if (!Ctor || !window.ValadaresAudio?.create) return null;
         audioCtx = new Ctor();
-        masterGain = audioCtx.createGain();
-        masterGain.gain.value = effectiveVolume();
-        masterGain.connect(audioCtx.destination);
-        // Reverb leve via convolver com IR sintético
-        reverbNode = audioCtx.createConvolver();
-        reverbNode.buffer = makeImpulseResponse(1.4, 2.2);
-        reverbGain = audioCtx.createGain();
-        reverbGain.gain.value = 0.18;
-        reverbNode.connect(reverbGain).connect(masterGain);
-    } catch (e){ audioCtx = null; }
+        audioEngine = window.ValadaresAudio.create(audioCtx);
+        masterGain = audioEngine.masterGain;
+        refreshAudioVolume();
+        updateAudioScene();
+    } catch (e){ audioCtx = null; audioEngine = null; masterGain = null; }
     return audioCtx;
 }
-// Resume no primeiro clique/tecla (browsers suspendem até gesto)
 function ensureAudio(){
+    _audioGestureReady = true;
     if (!audioCtx) initAudio();
-    if (audioCtx && audioCtx.state === 'suspended'){
-        try { audioCtx.resume(); } catch {}
+    if (audioCtx?.state === 'suspended'){
+        try { Promise.resolve(audioCtx.resume()).catch(() => {}); } catch {}
     }
-}
-function makeImpulseResponse(duration, decay){
-    const rate = audioCtx.sampleRate;
-    const length = Math.floor(rate * duration);
-    const buf = audioCtx.createBuffer(2, length, rate);
-    for (let ch = 0; ch < 2; ch++){
-        const data = buf.getChannelData(ch);
-        for (let i = 0; i < length; i++){
-            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/length, decay);
-        }
-    }
-    return buf;
+    updateAudioScene();
 }
 function refreshAudioVolume(){
-    if (masterGain) masterGain.gain.value = effectiveVolume();
-}
-
-// ─── Áudio Ambient por bioma ───────────────────────────────────────────────
-// Um loop de ruído branco passa por bandpass + low-shelf modulado por bioma.
-// Cross-fade quando bioma muda (~0.6s). Volume independente do SFX.
-let ambientSource = null;
-let ambientFilter = null;
-let ambientLowShelf = null;
-let ambientGain = null;
-let _currentAmbientBiome = null;
-const AMBIENT_PROFILES = {
-    pz:     { freq: 220,  q: 0.8, lowGain: 6,  vol: 0.06 },   // PZ — calor da fogueira
-    snow:   { freq: 1400, q: 0.6, lowGain: -8, vol: 0.16 },   // vento gelado agudo
-    desert: { freq: 700,  q: 0.5, lowGain: -2, vol: 0.12 },   // vento seco
-    cave:   { freq: 280,  q: 2.5, lowGain: 4,  vol: 0.14 },   // eco grave com gota
-    grass:  { freq: 900,  q: 0.4, lowGain: -3, vol: 0.05 },   // brisa leve
-    water:  { freq: 320,  q: 1.5, lowGain: 2,  vol: 0.08 },   // água
-};
-function startAmbient(){
-    if (!audioCtx) initAudio();
-    if (!audioCtx || ambientSource) return;
-    // Buffer de pink-ish noise — 4s loop
-    const dur = 4;
-    const len = Math.floor(audioCtx.sampleRate * dur);
-    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-    const data = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < len; i++){
-        // Approx pink noise (Paul Kellet) — mais "natural" que white
-        const w = Math.random() * 2 - 1;
-        last = 0.97 * last + 0.03 * w;
-        data[i] = last * 5;
-    }
-    ambientSource = audioCtx.createBufferSource();
-    ambientSource.buffer = buf;
-    ambientSource.loop = true;
-    ambientFilter = audioCtx.createBiquadFilter();
-    ambientFilter.type = 'bandpass';
-    ambientFilter.frequency.value = 600;
-    ambientFilter.Q.value = 1;
-    ambientLowShelf = audioCtx.createBiquadFilter();
-    ambientLowShelf.type = 'lowshelf';
-    ambientLowShelf.frequency.value = 200;
-    ambientLowShelf.gain.value = 0;
-    ambientGain = audioCtx.createGain();
-    ambientGain.gain.value = 0;
-    ambientSource.connect(ambientFilter).connect(ambientLowShelf).connect(ambientGain).connect(masterGain);
-    ambientSource.start();
+    audioEngine?.setVolumes({master:settings.volMaster,effects:settings.volEffects,
+        ambient:settings.volAmbient,music:settings.volMusic});
 }
 function detectBiome(x, y){
+    if ((player.floor || 0) > 0) return 'cave';
     if (typeof inSafeZone === 'function' && inSafeZone(x, y)) return 'pz';
     if (!map || !map[y]) return 'grass';
     const t = map[y][x];
@@ -14743,187 +14698,30 @@ function detectBiome(x, y){
     if (t === T.WATER) return 'water';
     return 'grass';
 }
-function refreshAmbientVolume(){
-    if (!ambientGain || !_currentAmbientBiome || !audioCtx) return;
-    const c = AMBIENT_PROFILES[_currentAmbientBiome] || AMBIENT_PROFILES.grass;
-    const v = effectiveAmbientVolume() * c.vol;
-    ambientGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.3);
+function updateAudioScene(){
+    if (!audioEngine) return;
+    const active = _audioGestureReady && started && !document.hidden &&
+        document.getElementById('login')?.style.display === 'none';
+    audioEngine.setScene({biome:detectBiome(player.x,player.y),
+        combat:!!(player.target || player.autoAttack || player.hurtTimer > 0),active:!!active});
 }
-function setAmbientBiome(name){
-    if (!ambientGain || !ambientFilter || !audioCtx) return;
-    if (name === _currentAmbientBiome) return;
-    _currentAmbientBiome = name;
-    const c = AMBIENT_PROFILES[name] || AMBIENT_PROFILES.grass;
-    const v = effectiveAmbientVolume() * c.vol;
-    const now = audioCtx.currentTime;
-    ambientFilter.frequency.setTargetAtTime(c.freq, now, 0.6);
-    ambientFilter.Q.setTargetAtTime(c.q, now, 0.6);
-    ambientLowShelf.gain.setTargetAtTime(c.lowGain, now, 0.6);
-    ambientGain.gain.setTargetAtTime(v, now, 0.6);
-}
-// Chamado periodicamente pelo loop principal (não cada frame — a cada ~500ms basta)
-let _lastAmbientCheck = 0;
 function updateAmbient(){
-    const now = Date.now();
-    if (now - _lastAmbientCheck < 500) return;
-    _lastAmbientCheck = now;
-    if (!audioCtx) return;
-    if (!ambientSource) startAmbient();
-    if (!player || typeof player.x !== 'number') return;
-    setAmbientBiome(detectBiome(player.x, player.y));
+    if (!audioEngine || Date.now() - _lastAmbientCheck < 500) return;
+    _lastAmbientCheck = Date.now();
+    updateAudioScene();
 }
-// Helper para tocar um som via callback que recebe (ctx, masterGain, reverbGain, now)
-function playSfx(builder){
-    if (!audioCtx) initAudio();
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended'){ try { audioCtx.resume(); } catch {} }
-    if (effectiveVolume() <= 0.0001) return;
-    try { builder(audioCtx, masterGain, reverbGain, audioCtx.currentTime); } catch (e){}
-}
+function playGameSound(kind, details){ audioEngine?.play(kind,details || {}); }
+function playSfx(builder){ audioEngine?.playSfx(builder); }
+function sndHit(){ playGameSound('melee'); }
+function sndDmg(){ playGameSound('damage'); }
+function sndKill(){ playGameSound('kill'); }
+function sndSpell(spell){ playGameSound('spell',{spell}); }
+function sndPickup(){ playGameSound('pickup'); }
+function sndLevelUp(){ playGameSound('levelup'); }
+function sndDeath(){ playGameSound('death'); }
+function sndCrit(){ playGameSound('critical'); }
 
-// SOM: ataque/swing (corte rápido com filtro)
-function sndHit(){
-    playSfx((c, mg, rg, t) => {
-        const noise = c.createBufferSource();
-        const buf = c.createBuffer(1, 0.18 * c.sampleRate, c.sampleRate);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2 - 1) * (1 - i/d.length);
-        noise.buffer = buf;
-        const bp = c.createBiquadFilter();
-        bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.8;
-        bp.frequency.exponentialRampToValueAtTime(600, t + 0.18);
-        const g = c.createGain();
-        g.gain.setValueAtTime(0.18, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-        noise.connect(bp).connect(g).connect(mg);
-        g.connect(rg);
-        noise.start(t); noise.stop(t + 0.2);
-    });
-}
-// SOM: dano sofrido (thud grave + transiente)
-function sndDmg(){
-    playSfx((c, mg, rg, t) => {
-        const osc = c.createOscillator();
-        osc.type = 'sine'; osc.frequency.setValueAtTime(140, t);
-        osc.frequency.exponentialRampToValueAtTime(55, t + 0.18);
-        const g = c.createGain();
-        g.gain.setValueAtTime(0.34, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-        osc.connect(g).connect(mg);
-        g.connect(rg);
-        osc.start(t); osc.stop(t + 0.3);
-        // transiente noise
-        const noise = c.createBufferSource();
-        const buf = c.createBuffer(1, 0.05 * c.sampleRate, c.sampleRate);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2 - 1);
-        noise.buffer = buf;
-        const lp = c.createBiquadFilter();
-        lp.type = 'lowpass'; lp.frequency.value = 800;
-        const ng = c.createGain();
-        ng.gain.setValueAtTime(0.22, t);
-        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-        noise.connect(lp).connect(ng).connect(mg);
-        noise.start(t); noise.stop(t + 0.07);
-    });
-}
-// SOM: kill (pitch descendente com cauda)
-function sndKill(){
-    playSfx((c, mg, rg, t) => {
-        const osc = c.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(420, t);
-        osc.frequency.exponentialRampToValueAtTime(80, t + 0.4);
-        const g = c.createGain();
-        g.gain.setValueAtTime(0.22, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-        osc.connect(g).connect(mg);
-        g.connect(rg);
-        osc.start(t); osc.stop(t + 0.5);
-    });
-}
-// SOM: magia (chime cintilante)
-function sndSpell(){
-    playSfx((c, mg, rg, t) => {
-        // Acorde com 3 frequências
-        const freqs = [660, 880, 1320];
-        freqs.forEach((f, i) => {
-            const osc = c.createOscillator();
-            osc.type = 'sine'; osc.frequency.value = f;
-            const g = c.createGain();
-            g.gain.setValueAtTime(0, t + i*0.05);
-            g.gain.linearRampToValueAtTime(0.13, t + i*0.05 + 0.02);
-            g.gain.exponentialRampToValueAtTime(0.001, t + i*0.05 + 0.55);
-            osc.connect(g).connect(mg);
-            g.connect(rg);
-            osc.start(t + i*0.05); osc.stop(t + i*0.05 + 0.6);
-        });
-    });
-}
-// SOM: pickup (sino curto)
-function sndPickup(){
-    playSfx((c, mg, rg, t) => {
-        const osc = c.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(900, t);
-        osc.frequency.exponentialRampToValueAtTime(1320, t + 0.12);
-        const g = c.createGain();
-        g.gain.setValueAtTime(0.16, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-        osc.connect(g).connect(mg);
-        osc.start(t); osc.stop(t + 0.2);
-    });
-}
-// SOM: level up (arpejo ascendente)
-function sndLevelUp(){
-    playSfx((c, mg, rg, t) => {
-        const notes = [523, 659, 784, 1047]; // C E G C
-        notes.forEach((f, i) => {
-            const osc = c.createOscillator();
-            osc.type = 'triangle'; osc.frequency.value = f;
-            const g = c.createGain();
-            g.gain.setValueAtTime(0, t + i*0.08);
-            g.gain.linearRampToValueAtTime(0.18, t + i*0.08 + 0.02);
-            g.gain.exponentialRampToValueAtTime(0.001, t + i*0.08 + 0.35);
-            osc.connect(g).connect(mg);
-            g.connect(rg);
-            osc.start(t + i*0.08); osc.stop(t + i*0.08 + 0.4);
-        });
-    });
-}
-// SOM: morte do player (grave descendente longo)
-function sndDeath(){
-    playSfx((c, mg, rg, t) => {
-        const osc = c.createOscillator();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(200, t);
-        osc.frequency.exponentialRampToValueAtTime(40, t + 1.2);
-        const lp = c.createBiquadFilter();
-        lp.type = 'lowpass'; lp.frequency.value = 600;
-        const g = c.createGain();
-        g.gain.setValueAtTime(0.28, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
-        osc.connect(lp).connect(g).connect(mg);
-        g.connect(rg);
-        osc.start(t); osc.stop(t + 1.4);
-    });
-}
-// SOM: crítico (mais alto que hit normal)
-function sndCrit(){
-    playSfx((c, mg, rg, t) => {
-        const osc = c.createOscillator();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(1200, t);
-        osc.frequency.exponentialRampToValueAtTime(600, t + 0.15);
-        const g = c.createGain();
-        g.gain.setValueAtTime(0.18, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-        osc.connect(g).connect(mg);
-        g.connect(rg);
-        osc.start(t); osc.stop(t + 0.2);
-    });
-}
-
+// ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS MODAL handlers
 // ═══════════════════════════════════════════════════════════════════════════
@@ -14941,10 +14739,12 @@ function openSettings(){
     // Sincroniza sliders com state atual
     document.getElementById('setVolMaster').value  = settings.volMaster;
     document.getElementById('setVolEffects').value = settings.volEffects;
-    document.getElementById('setVolMusic').value   = settings.volAmbient;
+    document.getElementById('setVolAmbient').value = settings.volAmbient;
+    document.getElementById('setVolMusic').value   = settings.volMusic;
     document.getElementById('setVolMasterVal').textContent  = settings.volMaster;
     document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
-    document.getElementById('setVolMusicVal').textContent   = settings.volAmbient;
+    document.getElementById('setVolAmbientVal').textContent = settings.volAmbient;
+    document.getElementById('setVolMusicVal').textContent   = settings.volMusic;
     // Lista de teclas
     const grid = document.getElementById('keyGrid');
     grid.innerHTML = KEY_HELP.map(([k, desc]) =>
@@ -15776,29 +15576,40 @@ function closeSettings(){
 }
 window.openSettings = openSettings;
 window.closeSettings = closeSettings;
+function previewAudio(){ ensureAudio(); playGameSound('pickup'); }
+window.previewAudio = previewAudio;
 // Bind sliders
 window.addEventListener('DOMContentLoaded', () => {
     const m = document.getElementById('setVolMaster');
     const e = document.getElementById('setVolEffects');
-    const a = document.getElementById('setVolMusic');
+    const a = document.getElementById('setVolAmbient');
+    const music = document.getElementById('setVolMusic');
     if (m) m.addEventListener('input', () => {
-        settings.volMaster = +m.value;
+        settings.volMaster = clampVolume(+m.value, settings.volMaster);
         document.getElementById('setVolMasterVal').textContent = settings.volMaster;
+        ensureAudio();
         refreshAudioVolume();
-        refreshAmbientVolume();
         saveSettings();
     });
     if (e) e.addEventListener('input', () => {
-        settings.volEffects = +e.value;
+        settings.volEffects = clampVolume(+e.value, settings.volEffects);
         document.getElementById('setVolEffectsVal').textContent = settings.volEffects;
+        ensureAudio();
         refreshAudioVolume();
-        sndPickup();   // preview do volume
         saveSettings();
     });
     if (a) a.addEventListener('input', () => {
-        settings.volAmbient = +a.value;
-        document.getElementById('setVolMusicVal').textContent = settings.volAmbient;
-        refreshAmbientVolume();
+        settings.volAmbient = clampVolume(+a.value, settings.volAmbient);
+        document.getElementById('setVolAmbientVal').textContent = settings.volAmbient;
+        ensureAudio();
+        refreshAudioVolume();
+        saveSettings();
+    });
+    if (music) music.addEventListener('input', () => {
+        settings.volMusic = clampVolume(+music.value, settings.volMusic);
+        document.getElementById('setVolMusicVal').textContent = settings.volMusic;
+        ensureAudio();
+        refreshAudioVolume();
         saveSettings();
     });
 });
@@ -16184,6 +15995,8 @@ function logout(){
     document.getElementById('loginStatus').textContent = tr('login.status_default');
     document.getElementById('charInput').focus();
     started = false;
+    _audioGestureReady = false;
+    updateAudioScene();
     invSignature = null;
 }
 
@@ -16296,7 +16109,7 @@ function startGame(multiplayer, name){
             return { name: meta.name + (meta.plus ? ' +' + meta.plus : ''), kind: ITEMS[base]?.kind || ITEMS[key]?.kind,
                 rarity: meta.rarCls === 'rar-myth' ? 'myth' : meta.rarCls === 'rar-leg' ? 'legendary' : 'common' };
         },
-        icon: getItemIconURL, playSfx, getLanguage: () => LANG, getFloor: () => player.floor || 0
+        icon: getItemIconURL, playEvent: playGameSound, getLanguage: () => LANG, getFloor: () => player.floor || 0
     });
     player.name = (name || 'Aventureiro').substring(0,14);
     document.getElementById('login').style.display = 'none';
@@ -16319,6 +16132,7 @@ function startGame(multiplayer, name){
     if (restored) log(tr('log.progress_restored'));
     log(tr('log.controls_hint'));
     started = true;
+    updateAudioScene();
     // A orientação inicial curta aparece após autenticação. Os tutoriais completos
     // continuam acessíveis em Opções, sem bloquear a entrada no mundo.
     // Limpa intervals antigos antes de criar novos (re-login na mesma aba)

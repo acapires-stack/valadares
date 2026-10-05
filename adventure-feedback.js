@@ -46,21 +46,11 @@
             if (value.until < now || removed.size > MAX_REMOVED) removed.delete(id);
         }
     }
-    function playPickupSound(rare){
-        if (typeof deps.playSfx !== 'function' || Date.now() - lastSoundAt < 260) return;
+    function playPickupSound(rare, boss){
+        // O boss já toca na confirmação do servidor; o cartão não repete o som.
+        if (boss || typeof deps.playEvent !== 'function' || Date.now() - lastSoundAt < 260) return;
         lastSoundAt = Date.now();
-        // playSfx já respeita o volume efetivo, mute e o AudioContext do jogo.
-        deps.playSfx((c, mg, _rg, t) => {
-            const osc = c.createOscillator();
-            const gain = c.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(rare ? 880 : 720, t);
-            osc.frequency.exponentialRampToValueAtTime(rare ? 1175 : 960, t + 0.09);
-            gain.gain.setValueAtTime(rare ? 0.12 : 0.075, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-            osc.connect(gain).connect(mg);
-            osc.start(t); osc.stop(t + 0.17);
-        });
+        deps.playEvent(rare ? 'rareLoot' : 'pickup');
     }
     function getMeta(type){
         try {
@@ -101,13 +91,14 @@
         }
         const gold = Number.isFinite(reward.gold) ? Math.max(0, Math.floor(reward.gold)) : 0;
         if (!gold && !merged.size && !Object.keys(reward.items || {}).length) return;
-        queueLoot(merged, gold, !merged.size);
+        queueLoot(merged, gold, !merged.size, true);
     }
-    function queueLoot(merged, gold, noSpecial){
+    function queueLoot(merged, gold, noSpecial, boss = false){
         if (!gold && !merged.size && !noSpecial) return;
-        if (!pending) pending = { items: new Map(), gold: 0, noSpecial: false };
+        if (!pending) pending = { items: new Map(), gold: 0, noSpecial: false, boss: false };
         pending.gold += gold;
         pending.noSpecial ||= noSpecial;
+        pending.boss ||= boss;
         for (const row of merged.values()){
             const old = pending.items.get(row.type);
             if (old) old.qty += row.qty;
@@ -172,7 +163,7 @@
         cards.push(card);
         while (cards.length > 2) cards.shift().remove();
         setTimeout(() => { const i = cards.indexOf(card); if (i >= 0) cards.splice(i, 1); card.remove(); }, CARD_MS);
-        playPickupSound(rare);
+        playPickupSound(rare, batch.boss);
     }
     function rank(row){
         const rarity = row.rarity === 'myth' ? 200 : row.rarity === 'legendary' ? 100 : 0;
