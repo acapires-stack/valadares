@@ -123,6 +123,10 @@
         const block=!!pending,why=reason(q);
         document.getElementById('craftGoldLabel').textContent=player.gold+' g';
         let html='<h3>✦ '+txt('Mesa de Transmutação','Transmutation Table')+'</h3>';
+        if(pity!==null&&(!q||q.tier!==6)){
+            const progress=RULES.pityInfo(pity);
+            html+='<p class="tm-pity"><strong>'+txt('Sua próxima chance de Ascensão: ','Your next Ascension chance: ')+progress.chance+'%</strong><br>'+progress.failures+' '+txt('tentativas sem Ascendente · garantido em até ','attempts without an Ascendant · guaranteed within ')+progress.remaining+' '+txt('combinações de míticos.','mythic combinations.')+'<br>'+txt('O progresso fica salvo mesmo sem as três peças na mochila.','Progress stays saved even without all three backpack pieces.')+'</p>';
+        }
         html+='<p>'+txt('Troque três equipamentos por um resultado surpresa. Cada combinação consome uma unidade das peças escolhidas e o ouro indicado.','Trade three equipment pieces for a surprise result. Each combination consumes one of each selected piece and the displayed gold.')+'</p>';
         html+='<p class="tm-note">'+txt('Três peças diferentes da mesma faixa liberam a chance de subir uma faixa. Míticas ★★ são aceitas; Ascendentes ★★★ são somente resultado. Usa somente cópias da mochila, sem melhoria ou encantamento. O equipamento que você está vestindo fica protegido.','Three different pieces of the same tier unlock a chance to move up one tier. Mythic ★★ pieces are accepted; Ascendant ★★★ pieces are output only. Uses only unupgraded, unenchanted backpack copies. The equipment you are wearing stays protected.')+'</p>';
         html+='<p class="tm-note">✧ '+ownCount(MATERIAL)+' '+txt('essências arcanas na mochila','arcane essences in backpack')+'</p>';
