@@ -1269,6 +1269,13 @@
         .craft-list::-webkit-scrollbar { width: 6px; }
         .craft-list::-webkit-scrollbar-track { background: #0a0805; }
         .craft-list::-webkit-scrollbar-thumb { background: #3a2d10; }
+        /* Na aba Forja, cabeçalho, resultado e botão de fechar ficam fora da lista rolável. */
+        #craftModal.forge-active .chest-box {
+            display: flex; flex-direction: column;
+            height: min(90vh, 760px); overflow: hidden;
+        }
+        #craftModal.forge-active #forjaPanel { flex: 1 1 auto; min-height: 0; max-height: none; }
+        #forgeFeedback { flex: none; margin-bottom: 8px; }
         .craft-row {
             background: #050405; border: 1px solid #1f180a;
             padding: 8px 10px; border-radius: 1px;
@@ -2492,6 +2499,7 @@
             <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')" data-i18n="craft.tab_forge">🔥 FORJA</button>
             <button class="train-tab" data-craft-tab="enchant" onclick="switchCraftTab('enchant')">✧ <span data-i18n="enchant.tab">ENCANTAR</span></button>
         </div>
+        <p id="forgeFeedback" class="ench-notice" role="status" aria-live="polite" aria-atomic="true" hidden></p>
         <div id="craftList" class="craft-list"></div>
         <div id="forjaPanel" class="craft-list" style="display:none"></div>
         <div id="enchantPanel" class="craft-list" style="display:none"></div>
@@ -2889,6 +2897,8 @@ const I18N = {
     'forge.bonus_burn': '🔥 fogo {pct}%',
     'forge.banner_ok': '✨ Sucesso! {item} +{n}',
     'forge.banner_fail': '💥 Falhou! 1× {item} destruído (−{cost}g)',
+    'forge.banner_cancelled': 'A tentativa foi cancelada; nenhum material foi consumido. Confira a mochila, o ouro e o espaço livre.',
+    'forge.banner_pending': 'Aguardando o resultado da forja. Se a conexão cair, reconecte para conferir seus itens.',
     /* casino / auction / gold shop / party */
     'common.no_connection': 'Sem conexão',
     'common.loading': 'Carregando…',
@@ -3607,6 +3617,8 @@ const I18N = {
     'forge.bonus_burn': '🔥 burn {pct}%',
     'forge.banner_ok': '✨ Success! {item} +{n}',
     'forge.banner_fail': '💥 Failed! 1× {item} destroyed (−{cost}g)',
+    'forge.banner_cancelled': 'The forge attempt was cancelled; no materials were consumed. Check your backpack, gold and free space.',
+    'forge.banner_pending': 'Waiting for the forge result. If the connection drops, reconnect to check your items.',
     /* casino / auction / gold shop / party */
     'common.no_connection': 'No connection',
     'common.loading': 'Loading…',
@@ -4021,6 +4033,7 @@ function setLang(l){
   if (window.valadaresUi) window.valadaresUi.updateLabels();
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
+  renderForgeFeedback();
   syncInvHeight();
 }
 // Aplica o idioma (persistido/detectado) assim que o DOM estiver pronto.
@@ -6817,7 +6830,7 @@ window.withdrawAll = withdrawAll;
 function openCraft(){
     if (!atCraft()){ log(tr('log.near_bench')); return; }
     document.getElementById('craftModal').style.display = 'flex';
-    renderCraft();
+    switchCraftTab(document.querySelector('[data-craft-tab].active')?.dataset.craftTab || 'craft');
 }
 function closeCraft(){ document.getElementById('craftModal').style.display = 'none'; saveState(); }
 
@@ -8117,7 +8130,7 @@ function handleMP(msg){
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
         if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
         if (msg.enchantToken) window.enchantToken = msg.enchantToken;
-        if (msg.reason === 'join') _forgePending = false;
+        if (msg.reason === 'join') { _forgePending = false; renderForgeFeedback(); }
         if (msg.enchant) window.ValadaresEnchantUI?.handleResult(msg.enchant);
         if (msg.enchant || msg.equipped) recomputeStats();
         window.ValadaresEnchantUI?.refreshIfOpen();
@@ -8127,8 +8140,8 @@ function handleMP(msg){
         if (msg.forge){
             _forgePending = false;
             if (msg.forge.error){
-                _forgeResult={ok:false,text:LANG==='en'?'The forge attempt was cancelled; no materials were consumed. Check your backpack, gold and free space.':'A tentativa foi cancelada; nenhum material foi consumido. Confira a mochila, o ouro e o espaço livre.',at:Date.now()};
-                log(_forgeResult.text);
+                _forgeResult={ok:false,key:'forge.banner_cancelled',vars:{}};
+                log(tr(_forgeResult.key));
             } else if (msg.forge.ok){
                 const item = ITEMS[msg.forge.newKey];
                 const itemName = item ? item.name : msg.forge.newKey;
@@ -8143,8 +8156,8 @@ function handleMP(msg){
                 addFloat(player.x, player.y, tr('float.fail'), '#ff3030', true, -10);
             }
             if (!msg.forge.error) _forgeResult = msg.forge.ok
-                ? { ok:true,  text: tr('forge.banner_ok', {item: itmName(msg.forge.newKey), n: msg.forge.plus}), at: Date.now() }
-                : { ok:false, text: tr('forge.banner_fail', {item: itmName(msg.forge.itemKey), cost: msg.forge.cost}), at: Date.now() };
+                ? { ok:true, key:'forge.banner_ok', vars:{itemKey: msg.forge.newKey, n: msg.forge.plus} }
+                : { ok:false, key:'forge.banner_fail', vars:{itemKey: msg.forge.itemKey, cost: msg.forge.cost} };
             if (typeof renderForja === 'function') renderForja();
         }
         // Craft: feedback
@@ -10462,6 +10475,7 @@ function attemptForge(itemKey){
         return;
     }
     if (player.gold < forgeCostFor(tier.base,targetPlus)) return;
+    _forgeResult = null;
     _forgePending = true;
     try { ws.send(JSON.stringify({ t:'invForge', itemKey })); }
     catch { _forgePending = false; }
@@ -10471,11 +10485,13 @@ window.attemptForge = attemptForge;
 
 function switchCraftTab(which){
     document.querySelectorAll('[data-craft-tab]').forEach(t=>t.classList.toggle('active',t.dataset.craftTab===which));
+    document.getElementById('craftModal').classList.toggle('forge-active', which === 'forja');
     for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel']])document.getElementById(id).style.display=tab===which?'':'none';
     const hint=document.getElementById('craftHint');
     hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
     if(which==='enchant')window.ValadaresEnchantUI?.render();
     else if(which==='forja')renderForja();else renderCraft();
+    renderForgeFeedback();
 }
 window.switchCraftTab = switchCraftTab;
 
@@ -10502,16 +10518,25 @@ function describeUpgradeBonuses(itemKey, target){
 }
 
 let _forgePending = false;
-let _forgeResult = null;   // último resultado de forja (banner no painel da bancada) — {ok, text, at}
+let _forgeResult = null;   // último resultado confirmado; permanece até a próxima tentativa
+function renderForgeFeedback(){
+    const el = document.getElementById('forgeFeedback');
+    if (!el) return;
+    const visible = document.getElementById('craftModal').classList.contains('forge-active') && (_forgePending || _forgeResult);
+    el.hidden = !visible;
+    el.dataset.state = _forgePending ? 'pending' : _forgeResult ? (_forgeResult.ok ? 'success' : 'failure') : '';
+    el.textContent = _forgePending ? tr('forge.banner_pending') : _forgeResult
+        ? tr(_forgeResult.key, {..._forgeResult.vars, item: itmName(_forgeResult.vars.itemKey)}) : '';
+}
 function renderForja(){
     const el=document.getElementById('forjaPanel');if(!el)return;
+    const scrollTop = el.scrollTop;
+    const wasAtBottom = el.scrollHeight > el.clientHeight + 4 && el.scrollHeight - el.clientHeight - scrollTop < 4;
     const en=LANG==='en';document.getElementById('craftGoldLabel').textContent=player.gold+' g';
     const worn=new Set(Object.values(player.equipped||{}).filter(Boolean)),owned=new Map(Object.entries(player.inv).filter(([,q])=>q>0));
     for(const k of worn)if(!owned.has(k))owned.set(k,0);
     const rows=[...owned].filter(([k])=>ITEMS[k]&&isUpgradableKind(ITEMS[k].kind)).sort((a,b)=>itmName(a[0]).localeCompare(itmName(b[0])));
     let html='<div class="ench-intro"><span class="ench-kicker">'+(en?'FORGE · UP TO +5':'FORJA · ATÉ +5')+'</span><h3>'+(en?'Strengthen the piece you chose':'Fortaleça a peça que você escolheu')+'</h3><p>'+tr('forge.header_legend')+'</p></div>';
-    if(_forgeResult&&Date.now()-_forgeResult.at<30000)html+='<p class="ench-notice" role="status">'+_forgeResult.text+'</p>';
-    if(_forgePending)html+='<p class="ench-notice" role="status">'+(en?'Waiting for the forge result. If the connection drops, reconnect to check your items.':'Aguardando o resultado da forja. Se a conexão cair, reconecte para conferir seus itens.')+'</p>';
     if(!rows.length)html+='<p class="ench-empty">'+tr('forge.no_candidates_html')+'</p>';
     for(const[k,q]of rows){
         const t=getUpgradeTier(k),max=t.plus>=5,target=Math.min(5,t.plus+1),cost=max?0:forgeCostFor(t.base,target);
@@ -10526,6 +10551,8 @@ function renderForja(){
         html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px"><small style="color:#ac9b82">'+(max?'':escapeHtml(reason))+'</small><button class="craft-btn" data-forge-key="'+escapeHtml(k)+'" '+(ready?'':'disabled')+'>'+(max?'+5':tr('forge.btn',{n:target}))+'</button></div></div>';
     }
     el.innerHTML=html;
+    renderForgeFeedback();
+    el.scrollTop = wasAtBottom ? el.scrollHeight : scrollTop;
     if(!el._forgeBound){el._forgeBound=true;el.addEventListener('click',e=>{const b=e.target.closest('[data-forge-key]');if(b&&!b.disabled)attemptForge(b.dataset.forgeKey)});}
 }
 function sellPriceFor(itemKey){
