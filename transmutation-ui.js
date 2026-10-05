@@ -19,7 +19,7 @@
         return 'valadares:transmutation:v1:'+encodeURIComponent(endpoint)+':'+encodeURIComponent(account.toLowerCase());
     }
     function savePending(){
-        try{if(pending)localStorage.setItem(storageKey,JSON.stringify({opId:pending.opId,keys:pending.keys}));else localStorage.removeItem(storageKey);return true}catch{return false}
+        try{if(pending)localStorage.setItem(storageKey,JSON.stringify({opId:pending.opId,keys:pending.keys,version:pending.version}));else localStorage.removeItem(storageKey);return true}catch{return false}
     }
     function clearTimer(){if(timer)clearTimeout(timer);timer=null}
     function startTimeout(){
@@ -37,7 +37,7 @@
         if(!storageKey)return;
         try{const saved=JSON.parse(localStorage.getItem(storageKey));
             if(saved&&typeof saved.opId==='string'&&Array.isArray(saved.keys)&&saved.keys.length===3&&saved.keys.every(k=>typeof k==='string'&&RULES.tierOf(k)>0)&&RULES.quote(saved.keys).valid){
-                pending={opId:saved.opId,keys:saved.keys,waiting:false};
+                pending={opId:saved.opId,keys:saved.keys,version:Number.isInteger(saved.version)?saved.version:1,waiting:false};
                 result={kind:'warn',message:()=>txt('Há uma operação anterior sem confirmação. Confira seu estado antes de começar outra.','A previous operation has no confirmation. Check its status before starting another.')};
             }
         }catch{}
@@ -57,11 +57,11 @@
     }
     function eligible(){
         const worn=new Set(Object.values(player.equipped||{}).filter(Boolean).map(k=>window.ValadaresEquipment?.parse(k).base||k));
-        return Object.keys(player.inv||{}).filter(k=>ownCount(k)>0&&RULES.tierOf(k)>0&&!worn.has(k)).sort((a,b)=>name(a).localeCompare(name(b),LANG==='en'?'en':'pt'));
+        return Object.keys(player.inv||{}).filter(k=>ownCount(k)>0&&RULES.tierOf(k)>0&&!worn.has(k)).sort((a,b)=>RULES.tierOf(a)-RULES.tierOf(b)||name(a).localeCompare(name(b),LANG==='en'?'en':'pt'));
     }
     function validSelection(keys,choices){return keys.length===3&&new Set(keys).size===3&&keys.every(k=>choices.includes(k)&&ownCount(k)>0)}
     function currentQuote(choices){return validSelection(selected,choices)?RULES.quote(selected):null}
-    function selectedFingerprint(q){return q&&q.valid?JSON.stringify([selected,q.tier,q.cost,q.essenceQty,q.chances,q.pool]):''}
+    function selectedFingerprint(q){return q&&q.valid?JSON.stringify([selected,q.tier,q.cost,q.essenceQty,q.chances,q.pool,q.superiorPool]):''}
     function reason(q){
         if(!online())return txt('Conecte-se ao jogo para continuar.','Connect to the game to continue.');
         if(version!==RULES.VERSION||!token)return txt('Aguardando autorização da bancada.','Waiting for workbench authorization.');
@@ -81,6 +81,12 @@
         else if(pending&&!message)message=txt('Operação pendente. Confira o estado antes de continuar.','Operation pending. Check its status before continuing.');
         el.dataset.kind=result?.kind||'pending';
         let html='<p>'+safe(message)+'</p>';
+        if(result?.receipt&&!pending){
+            const r=result.receipt,superior=r.category==='superior';
+            const title=superior?txt('✦ SUBIU DE FAIXA!','✦ HIGHER TIER!'):r.category==='enchanted'?txt('✧ EQUIPAMENTO COM BÔNUS','✧ BONUS EQUIPMENT'):txt('RESULTADO RECEBIDO','RESULT RECEIVED');
+            const icon=typeof getItemIconURL==='function'?getItemIconURL(r.newKey,48):'';
+            html='<div class="tm-result"><img class="tm-result-icon" src="'+safe(icon)+'" alt=""><div><strong class="tm-result-title">'+title+'</strong><p>'+safe(message)+'</p><small>'+safe((superior?txt('Faixa ','Tier ')+r.tier+' → '+r.resultTier+' · ':'')+txt('Consumidos: ','Consumed: ')+(r.keys||[]).map(k=>'1× '+name(k)).join(' · '))+'</small></div></div>';
+        }
         if(pending&&!pending.waiting){
             html+='<div class="tm-actions"><button type="button" data-tm-action="check">'+txt('Conferir operação','Check operation')+'</button>';
             if(pending.notFound)html+='<button type="button" data-tm-action="resend">'+txt('Reenviar esta mesma operação','Resend this same operation')+'</button>';
@@ -101,23 +107,26 @@
         document.getElementById('craftGoldLabel').textContent=player.gold+' g';
         let html='<h3>✦ '+txt('Mesa de Transmutação','Transmutation Table')+'</h3>';
         html+='<p>'+txt('Troque três equipamentos por um resultado surpresa. Cada combinação consome uma unidade das peças escolhidas e o ouro indicado.','Trade three equipment pieces for a surprise result. Each combination consumes one of each selected piece and the displayed gold.')+'</p>';
-        html+='<p class="tm-note">'+txt('Peças equipadas, melhoradas, encantadas e especiais ficam protegidas. O resultado não é necessariamente mais forte.','Equipped, upgraded, enchanted and special pieces are protected. The result is not necessarily stronger.')+'</p>';
+        html+='<p class="tm-note">'+txt('Três peças diferentes da mesma faixa liberam a chance de subir uma faixa. Peças equipadas, melhoradas, encantadas e míticas não podem ser consumidas.','Three different pieces of the same tier unlock a chance to move up one tier. Equipped, upgraded, enchanted and mythic pieces cannot be consumed.')+'</p>';
         html+='<p class="tm-note">✧ '+ownCount(MATERIAL)+' '+txt('essências arcanas na mochila','arcane essences in backpack')+'</p>';
         html+='<div class="tm-grid">';
         for(let i=0;i<3;i++){
             html+='<label>'+txt('Peça ','Piece ')+(i+1)+'<select data-tm-slot="'+i+'" '+(block?'disabled':'')+'><option value="">'+txt('Selecione','Select')+'</option>';
-            for(const k of choices)if(!selected.includes(k)||selected[i]===k)html+='<option value="'+safe(k)+'" '+(selected[i]===k?'selected':'')+'>'+safe(name(k))+' ('+ownCount(k)+'×)</option>';
+            for(const k of choices)if(!selected.includes(k)||selected[i]===k)html+='<option value="'+safe(k)+'" '+(selected[i]===k?'selected':'')+'>'+txt('Faixa ','Tier ')+RULES.tierOf(k)+' · '+safe(name(k))+' ('+ownCount(k)+'×)</option>';
             html+='</select></label>';
         }
         html+='</div>';
-        if(!choices.length)html+='<p>'+txt('Nenhuma peça comum elegível na mochila. Peças equipadas, melhoradas, encantadas e especiais não entram.','No eligible plain piece in your backpack. Equipped, upgraded, enchanted and special pieces are excluded.')+'</p>';
+        if(!choices.length)html+='<p>'+txt('Nenhuma peça elegível na mochila. São aceitas peças sem melhoria ou encantamento, até a faixa lendária.','No eligible piece in your backpack. Unupgraded, unenchanted pieces up to the legendary tier are accepted.')+'</p>';
         if(q&&q.valid){
             html+='<div class="tm-card"><strong>'+txt('Prévia da tentativa','Attempt preview')+'</strong>';
             html+='<p>'+txt('Faixa da peça mais fraca: ','Tier of the weakest piece: ')+q.tier+' · <span class="tm-cost">'+txt('Custo: ','Cost: ')+q.cost+' g</span></p>';
             html+='<p>'+txt('Serão consumidas: ','To be consumed: ')+selected.map(k=>'1× '+safe(name(k))).join(' · ')+'</p>';
-            html+='<div class="tm-chances"><span>'+q.chances.material+'% '+q.essenceQty+'× '+txt('essência arcana','arcane essence')+'</span><span>'+q.chances.plain+'% '+txt('equipamento comum','plain equipment')+'</span><span>'+q.chances.enchanted+'% '+txt('equipamento com 1 bônus','equipment with 1 bonus')+'</span></div>';
+            html+='<div class="tm-chances"><span>'+q.chances.material+'% '+q.essenceQty+'× '+txt('essência arcana','arcane essence')+'</span><span>'+q.chances.plain+'% '+txt('equipamento da mesma faixa','same-tier equipment')+'</span><span>'+q.chances.enchanted+'% '+txt('mesma faixa com 1 bônus','same tier with 1 bonus')+'</span><span class="tm-superior-chance">'+q.chances.superior+'% '+txt('SUBIR DE FAIXA','HIGHER TIER')+'</span></div>';
             html+='<p>'+txt('Essências são um possível prêmio, não um custo. Cada equipamento tem a mesma chance dentro da sua categoria.','Essences are a possible reward, not a cost. Each equipment item has the same chance within its category.')+'</p>';
-            html+='<p>'+txt('Todos os equipamentos possíveis nos dois últimos resultados:','Every possible equipment item in the latter two outcomes:')+'</p><ul class="tm-pool">'+q.pool.map(k=>'<li>'+safe(name(k))+'</li>').join('')+'</ul>';
+            html+='<p>'+txt('Equipamentos possíveis na faixa atual, com ou sem bônus:','Possible current-tier equipment, with or without a bonus:')+'</p><ul class="tm-pool">'+q.pool.map(k=>'<li>'+safe(name(k))+'</li>').join('')+'</ul>';
+            if(q.chances.superior>0){
+                html+='<div class="tm-superior-preview"><strong>✦ '+q.chances.superior+'% · '+txt('Faixa ','Tier ')+q.tier+' → '+q.resultTier+'</strong><p>'+txt('Possíveis resultados superiores:','Possible higher-tier results:')+'</p><ul class="tm-pool tm-superior-pool">'+q.superiorPool.map(k=>'<li>'+safe(name(k))+'</li>').join('')+'</ul><small>'+txt('Recebe uma peça sem melhoria de forja ou encantamento. Uma faixa superior não garante mais força para a sua build.','Receives one piece without forge upgrades or enchantments. A higher tier does not guarantee more power for your build.')+'</small></div>';
+            }else html+='<p class="tm-mixed">'+txt('Faixas misturadas: chance de subir desativada. Todas as peças serão consumidas usando a faixa mais baixa. Escolha três da mesma faixa para liberar a evolução.','Mixed tiers: higher-tier chance disabled. All pieces will be consumed using the lowest tier. Choose three of the same tier to unlock promotion.')+'</p>';
             html+='</div>';
             const aff=Object.entries(ValadaresEquipment.AFFIXES).filter(([,d])=>q.pool.some(k=>d.kinds.includes(ITEMS[k]?.kind)));
             html+='<details><summary>'+txt('Bônus compatíveis e limites','Compatible bonuses and caps')+'</summary><p>'+txt('O resultado encantado recebe exatamente um bônus aleatório compatível com a peça sorteada. O valor e o bônus não são escolhidos nesta mesa.','An enchanted result gets exactly one random bonus compatible with the rolled item. This table does not let you choose its bonus or value.')+'</p>';
@@ -142,15 +151,15 @@
         catch{checkBusy=false;pending.waiting=false;result={kind:'warn',message:()=>txt('Não foi possível consultar agora. Tente após reconectar.','Could not check now. Try after reconnecting.')};renderStatus()}
     }
     function resendSame(){
-        if(!pending||!pending.notFound||!available()||pending.waiting)return;
+        if(!pending||pending.version!==RULES.VERSION||!pending.notFound||!available()||pending.waiting)return;
         pending.notFound=false;pending.waiting=true;result=null;renderStatus();
-        try{ws.send(JSON.stringify({t:'invTransmute',version:RULES.VERSION,opId:pending.opId,keys:pending.keys}));startTimeout()}
+        try{ws.send(JSON.stringify({t:'invTransmute',version:pending.version,opId:pending.opId,keys:pending.keys}));startTimeout()}
         catch{pending.waiting=false;result={kind:'warn',message:()=>txt('Envio incerto. Confira a operação antes de tentar novamente.','Send state unknown. Check the operation before trying again.')};renderStatus()}
     }
     function attempt(){
         const choices=eligible(),q=currentQuote(choices);
         if(pending||!q?.valid||reason(q)||armed!==selectedFingerprint(q))return;
-        pending={opId:token,keys:[...selected],waiting:false};
+        pending={opId:token,keys:[...selected],version:RULES.VERSION,waiting:false};
         checkedSocket=ws;
         if(!savePending()){pending=null;result={kind:'error',message:()=>txt('Não foi possível guardar a operação neste aparelho. Libere espaço e tente novamente.','Could not save this operation on this device. Free storage and try again.')};renderStatus();return}
         armed='';pending.waiting=true;result=null;render();
@@ -161,17 +170,24 @@
         if(!pending||!r||r.opId!==pending.opId)return;
         clearTimer();checkBusy=false;
         if(r.error==='not_found'){
-            pending.waiting=false;pending.notFound=true;
-            result={kind:'warn',message:()=>txt('Esta operação ainda não consta no servidor. Você pode reenviar exatamente a mesma tentativa.','This operation was not found on the server. You may manually resend the exact same attempt.')};
+            if(pending.version!==RULES.VERSION){
+                pending=null;savePending();armed='';selected=['','',''];
+                result={kind:'warn',message:()=>txt('A tentativa antiga não foi executada. As regras mudaram: confira uma nova prévia antes de confirmar.','The old attempt was not executed. Rules have changed: review a new preview before confirming.')};
+            }else{
+                pending.waiting=false;pending.notFound=true;
+                result={kind:'warn',message:()=>txt('Esta operação ainda não consta no servidor. Você pode reenviar exatamente a mesma tentativa.','This operation was not found on the server. You may manually resend the exact same attempt.')};
+            }
         }else{
             pending=null;savePending();armed='';selected=['','',''];
             if(r.ok){
-                result={kind:'ok',message:()=>{
+                result={kind:r.category==='superior'?'superior':'ok',receipt:r,message:()=>{
                     const received=String(r.qty||1)+'× '+name(r.newKey||MATERIAL);
                     const bonuses=ValadaresEquipment.parse(r.newKey).affixes.map(a=>ValadaresEquipment.describe(a,LANG)).join(' · ');
                     return txt('Transmutação concluída: ','Transmutation complete: ')+received+(bonuses?' — '+bonuses:'')+'. '+txt('Custo: ','Cost: ')+r.cost+' g.';
                 }};
-                if(typeof playGameSound==='function')playGameSound(r.category==='enchanted'?'rareLoot':'pickup');
+                if(typeof playGameSound==='function')playGameSound(r.category==='superior'?'forgeSuccess':r.category==='enchanted'?'rareLoot':'pickup');
+                const tableOpen=document.getElementById('craftModal')?.style.display==='flex'&&document.getElementById('craftModal')?.classList.contains('transmute-active');
+                if(!tableOpen&&typeof showServerToast==='function')showServerToast('event',(r.category==='superior'?txt('✦ Subiu de faixa! ','✦ Higher tier! '):'')+result.message(),null,6500);
             }else{
                 result={kind:'error',message:()=>{
                     const errors={no_items:txt('As peças não estão mais disponíveis.','The pieces are no longer available.'),no_gold:txt('Ouro insuficiente.','Not enough gold.'),no_essence:txt('Essências insuficientes.','Not enough essences.'),not_at_bench:txt('Aproxime-se da bancada.','Move close to the workbench.'),inventory_full:txt('Mochila cheia.','Backpack full.')};

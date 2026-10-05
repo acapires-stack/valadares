@@ -4,37 +4,43 @@
     else root.ValadaresTransmutation = rules;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = 1;
-    // Somente equipamentos-base comuns. Esta lista é o contrato compartilhado
-    // entre a prévia no cliente e a validação autoritativa do servidor.
+    const VERSION = 2;
+    // As faixas 1 a 5 são entradas permitidas; a faixa 6 é somente saída.
     const tiers = [null,
-        { cost:120, essenceQty:1, chances:{material:70,plain:25,enchanted:5},
-            pool:['ADAGA','PORRETE','CLAVA','ESPADA','LANCA','ARCO','ESCUDO_MAD','BOTAS','ELMO','COURO'] },
-        { cost:450, essenceQty:2, chances:{material:65,plain:28,enchanted:7},
-            pool:['MACA','ESPADA_LONGA','MACHADO','MARTELO','MARRETA','MACA_GIGANTE','ARMADURA','ESCUDO_FERRO','ARCO_CACA','BESTA','LANCA_LONGA','BOTAS_RAPIDA'] },
-        { cost:1000, essenceQty:3, chances:{material:60,plain:30,enchanted:10},
-            pool:['ESPADA_OSSO','ESCUDO_OSSO','ARMADURA_OSSO','MACHADO_MINO','ELMO_CHIFRES','BOTAS_COURO'] },
+        { cost:120, essenceQty:1, chances:{material:60,plain:25,enchanted:5,superior:10},
+            pool:['ADAGA','PORRETE','CLAVA','ESPADA','LANCA','ARCO','ESCUDO_MAD','BOTAS','ELMO','COURO','VARINHA_APRENDIZ'] },
+        { cost:450, essenceQty:2, chances:{material:55,plain:25,enchanted:10,superior:10},
+            pool:['MACA','ESPADA_OSSO','SABRE','ADAGA_DUPLA','BORDAO','LANCA_LONGA','ARCO_CACA','ESCUDO_OSSO','ESCUDO_FERRO','ARMADURA','BOTAS_COURO','ELMO_CHIFRES','MACHADO','ESPADA_LONGA','MARTELO'] },
+        { cost:1500, essenceQty:4, chances:{material:50,plain:25,enchanted:15,superior:10},
+            pool:['ESPADA_ACO','BESTA','MARRETA','MACA_GIGANTE','MACHADO_MINO','ARMADURA_OSSO','ESCUDO_PEDRA','BOTAS_RAPIDA'] },
+        { cost:4500, essenceQty:6, chances:{material:45,plain:25,enchanted:20,superior:10},
+            pool:['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO'] },
+        { cost:12000, essenceQty:10, chances:{material:40,plain:25,enchanted:30,superior:5},
+            pool:['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO'] },
     ];
+    const mythicPool=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
     const tierByKey = new Map();
-    for (let tier=1;tier<=3;tier++) for (const key of tiers[tier].pool) tierByKey.set(key,tier);
+    for (let tier=1;tier<=5;tier++) for (const key of tiers[tier].pool) tierByKey.set(key,tier);
     function tierOf(key) {
         return typeof key === 'string' ? (tierByKey.get(key) || 0) : 0;
     }
     function invalid(error) {
-        return {valid:false,error,tier:0,cost:0,essenceQty:0,
-            chances:{material:0,plain:0,enchanted:0},pool:[]};
+        return {valid:false,error,tier:0,resultTier:0,sameTier:false,cost:0,essenceQty:0,
+            chances:{material:0,plain:0,enchanted:0,superior:0},pool:[],superiorPool:[]};
     }
     function quote(keys) {
         if (!Array.isArray(keys) || keys.length !== 3 || keys.some(k => typeof k !== 'string')) return invalid('bad_keys');
         if (new Set(keys).size !== 3) return invalid('duplicate_keys');
         const ranks=keys.map(tierOf);
         if (ranks.some(t => t === 0)) return invalid('ineligible_item');
-        const tier=Math.min(...ranks);
-        const def=tiers[tier];
+        const tier=Math.min(...ranks), sameTier=ranks.every(t=>t===tier), def=tiers[tier];
         const pool=def.pool.filter(key => !keys.includes(key));
         if (!pool.length) return invalid('empty_pool');
-        return {valid:true,error:null,tier,cost:def.cost,essenceQty:def.essenceQty,
-            chances:{...def.chances},pool};
+        const chances={...def.chances};
+        if (!sameTier){chances.material+=chances.superior;chances.superior=0;}
+        return {valid:true,error:null,tier,resultTier:tier+1,sameTier,cost:def.cost,
+            essenceQty:def.essenceQty,chances,pool,
+            superiorPool:sameTier ? [...(tiers[tier+1]?.pool || mythicPool)] : []};
     }
     return Object.freeze({VERSION,tierOf,quote});
 });

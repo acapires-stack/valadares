@@ -8,6 +8,8 @@ const rules = require('../../transmutation-rules');
 const equipmentRules = require('../../equipment-rules');
 
 const source = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
+const metaStart=source.indexOf('const ITEM_META = {'),metaEnd=source.indexOf('\n};',metaStart)+3;
+const itemMeta=vm.runInNewContext(source.slice(metaStart,metaEnd)+'\nITEM_META');
 function literalFunction(name){
     const start = source.indexOf(`function ${name}(`);
     assert.ok(start >= 0, `${name} present`);
@@ -44,46 +46,75 @@ function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,s
         _diskAccountsCount:()=>0,backupAccountsFile(){},getAccount:n=>accounts.get(n),
         transmutationRules:rules,equipmentRules,SAVE_CAPS:{invKeys:cap},
         chebyshev:(ax,ay,bx,by)=>Math.max(Math.abs(ax-bx),Math.abs(ay-by)),
-        itemMetaForKey:key=>rules.tierOf(key) ? {kind:'weapon'} : null,
+        itemMetaForKey:key=>itemMeta[equipmentRules.parse(key).base] || null,
         getUpgradeTier:equipmentRules.parse,enchantedIdExists:()=>false,
         hasInv:(player,key,qty)=>(player.inv[key]||0)>=qty});
     vm.runInContext(serverFunctions,context);
     const invoke=vm.runInContext(`(function(msg,p){${dispatch}})`,context);
     function send(msg){invoke(msg,p); return sent.at(-1);}
-    function attempt(overrides={}){return send({t:'invTransmute',version:1,opId,keys,...overrides});}
+    function attempt(overrides={}){return send({t:'invTransmute',version:2,opId,keys,...overrides});}
     return {p,acc,opId,sent,send,attempt,context,fsFake};
 }
 
 test('shared table, whitelist, odds, weakest tier and browser UMD',()=>{
-    assert.equal(rules.VERSION,1);
-    assert.equal(rules.tierOf('ADAGA'),1);
-    assert.equal(rules.tierOf('ESPADA_LONGA'),2);
-    assert.equal(rules.tierOf('ESPADA_OSSO'),3);
-    for(const key of ['ADAGA_PLUS1','ESPADA_DRACO','ADAGA~abcdef012345','ESSENCIA_ARCANA','made-up'])
+    assert.equal(rules.VERSION,2);
+    for(const [key,tier] of [['ADAGA',1],['VARINHA_APRENDIZ',1],['ESPADA_OSSO',2],
+        ['ESPADA_ACO',3],['ESPADA_DRACO',4],['ESPADA_GUARDIAO',5]])
+        assert.equal(rules.tierOf(key),tier);
+    for(const key of ['ADAGA_PLUS1','ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO',
+        'ADAGA~abcdef012345','ESSENCIA_ARCANA','made-up'])
         assert.equal(rules.tierOf(key),0);
     for(const [keys,tier,cost,essence,chances] of [
-        [['ADAGA','PORRETE','CLAVA'],1,120,1,[70,25,5]],
-        [['MACA','ESPADA_LONGA','MACHADO'],2,450,2,[65,28,7]],
-        [['ESPADA_OSSO','ESCUDO_OSSO','ARMADURA_OSSO'],3,1000,3,[60,30,10]],
-        [['ADAGA','MACA','ESPADA_OSSO'],1,120,1,[70,25,5]],
+        [['ADAGA','PORRETE','CLAVA'],1,120,1,[60,25,5,10]],
+        [['MACA','ESPADA_OSSO','SABRE'],2,450,2,[55,25,10,10]],
+        [['ESPADA_ACO','BESTA','MARRETA'],3,1500,4,[50,25,15,10]],
+        [['ESPADA_DRACO','ELMO_DRACO','CAJADO_FOGO'],4,4500,6,[45,25,20,10]],
+        [['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL'],5,12000,10,[40,25,30,5]],
+        [['ADAGA','MACA','ESPADA_ACO'],1,120,1,[70,25,5,0]],
     ]){
         const q=rules.quote(keys);
         assert.equal(q.valid,true); assert.equal(q.tier,tier); assert.equal(q.cost,cost);
+        assert.equal(q.resultTier,tier+1);
         assert.equal(q.essenceQty,essence);
         assert.deepEqual(Object.values(q.chances),chances);
         assert.equal(Object.values(q.chances).reduce((a,b)=>a+b),100);
         assert.ok(keys.every(k=>!q.pool.includes(k)));
+        assert.equal(q.sameTier,chances[3]>0);
+        assert.equal(q.superiorPool.length>0,q.sameTier);
+        if(q.sameTier && tier<5) assert.ok(q.superiorPool.every(k=>rules.tierOf(k)===tier+1));
     }
+    assert.deepEqual(rules.quote(['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL']).superiorPool,
+        ['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO']);
     assert.equal(rules.quote(['ADAGA','ADAGA','CLAVA']).error,'duplicate_keys');
-    assert.equal(rules.quote(['ADAGA','PORRETE','ESPADA_DRACO']).error,'ineligible_item');
+    assert.equal(rules.quote(['ADAGA','PORRETE','ESPADA_ETERNA']).error,'ineligible_item');
     const browser={};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','..','transmutation-rules.js'),'utf8'),browser);
-    assert.equal(browser.ValadaresTransmutation.VERSION,1);
-    assert.equal(browser.ValadaresTransmutation.quote(['ADAGA','MACA','ESPADA_OSSO']).cost,120);
+    assert.equal(browser.ValadaresTransmutation.VERSION,2);
+    assert.equal(browser.ValadaresTransmutation.quote(['ADAGA','MACA','ESPADA_ACO']).cost,120);
 });
 
-test('real dispatch grants material, plain, enchanted at category boundaries and persists before ACK',()=>{
-    for(const [roll,category,qty] of [[0,'material',1],[0.70,'plain',1],[0.95,'enchanted',1]]){
+test('each approved input belongs to one progressing tier and every superior pool is valid',()=>{
+    const expected=[
+        ['ADAGA','PORRETE','CLAVA','ESPADA','LANCA','ARCO','ESCUDO_MAD','BOTAS','ELMO','COURO','VARINHA_APRENDIZ'],
+        ['MACA','ESPADA_OSSO','SABRE','ADAGA_DUPLA','BORDAO','LANCA_LONGA','ARCO_CACA','ESCUDO_OSSO','ESCUDO_FERRO','ARMADURA','BOTAS_COURO','ELMO_CHIFRES','MACHADO','ESPADA_LONGA','MARTELO'],
+        ['ESPADA_ACO','BESTA','MARRETA','MACA_GIGANTE','MACHADO_MINO','ARMADURA_OSSO','ESCUDO_PEDRA','BOTAS_RAPIDA'],
+        ['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO'],
+        ['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO'],
+    ];
+    assert.equal(new Set(expected.flat()).size,expected.flat().length);
+    for(let tier=1;tier<=5;tier++){
+        const keys=expected[tier-1];
+        for(const key of keys){assert.equal(rules.tierOf(key),tier);assert.ok(itemMeta[key]);}
+        const q=rules.quote(keys.slice(0,3));
+        assert.deepEqual([...q.pool,...keys.slice(0,3)].sort(),keys.slice().sort());
+        const next=tier<5 ? expected[tier] : ['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+        assert.deepEqual(q.superiorPool,next);
+        assert.ok(next.every(key=>itemMeta[key]));
+    }
+});
+
+test('real dispatch grants all four categories at exact boundaries and persists before ACK',()=>{
+    for(const [roll,category,qty] of [[0,'material',1],[0.60,'plain',1],[0.85,'enchanted',1],[0.90,'superior',1]]){
         const f=fixture({rolls:[roll,0]});
         const msg=f.attempt();
         assert.equal(msg.t,'invUpdate');
@@ -96,18 +127,40 @@ test('real dispatch grants material, plain, enchanted at category boundaries and
         assert.equal(f.p.inv.ADAGA,undefined);
         if(category==='material') assert.equal(f.p.inv.ESSENCIA_ARCANA,1);
         else if(category==='plain') assert.equal(msg.transmutation.newKey,rules.quote(['ADAGA','PORRETE','CLAVA']).pool[0]);
-        else {
+        else if(category==='enchanted') {
             const parsed=equipmentRules.parse(msg.transmutation.newKey);
             assert.equal(parsed.enchanted,true); assert.equal(parsed.affixes.length,1);
+        } else {
+            assert.equal(msg.transmutation.resultTier,2);
+            assert.equal(msg.transmutation.newKey,rules.quote(['ADAGA','PORRETE','CLAVA']).superiorPool[0]);
+            assert.equal(equipmentRules.parse(msg.transmutation.newKey).enchanted,false);
+        }
+    }
+});
+
+test('all five tiers honor four category thresholds in the server handler',()=>{
+    const inputSets=[['ADAGA','PORRETE','CLAVA'],['MACA','ESPADA_OSSO','SABRE'],
+        ['ESPADA_ACO','BESTA','MARRETA'],['ESPADA_DRACO','ELMO_DRACO','CAJADO_FOGO'],
+        ['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL']];
+    for(const keys of inputSets){
+        const q=rules.quote(keys);
+        const {material,plain,enchanted}=q.chances;
+        for(const [percent,expected] of [[0,'material'],[material,'plain'],
+            [material+plain,'enchanted'],[material+plain+enchanted,'superior']]){
+            const f=fixture({keys,gold:20000,rolls:[percent/100,0]});
+            const receipt=f.attempt().transmutation;
+            assert.equal(receipt.ok,true,`${q.tier} ${expected}`);
+            assert.equal(receipt.category,expected,`${q.tier} ${percent}`);
+            if(expected==='superior') assert.equal(receipt.resultTier,q.resultTier);
         }
     }
 });
 
 test('server applies weakest-input tier cost and material yield; consumed slots free capacity',()=>{
     for(const [keys,cost,qty] of [
-        [['ADAGA','MACA','ESPADA_OSSO'],120,1],
-        [['MACA','ESPADA_LONGA','MACHADO'],450,2],
-        [['ESPADA_OSSO','ESCUDO_OSSO','ARMADURA_OSSO'],1000,3],
+        [['ADAGA','MACA','ESPADA_ACO'],120,1],
+        [['MACA','ESPADA_OSSO','SABRE'],450,2],
+        [['ESPADA_ACO','BESTA','MARRETA'],1500,4],
     ]){
         const f=fixture({keys,rolls:[0],cap:1});
         const result=f.attempt().transmutation;
@@ -117,6 +170,45 @@ test('server applies weakest-input tier cost and material yield; consumed slots 
         assert.equal(f.p.gold,2000-cost);
         assert.equal(Object.keys(f.p.inv).length,1);
     }
+});
+
+test('mixed tiers transfer superior probability to material, while tier five promotes to base mythic',()=>{
+    const mixedKeys=['ADAGA','MACA','ESPADA_ACO'];
+    const mixed=fixture({keys:mixedKeys,rolls:[0.99,0]});
+    const mixedResult=mixed.attempt().transmutation;
+    assert.equal(rules.quote(mixedKeys).chances.superior,0);
+    assert.equal(mixedResult.category,'enchanted');
+    assert.equal(rules.tierOf(equipmentRules.parse(mixedResult.newKey).base),1);
+
+    const keys=['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL'];
+    const q=rules.quote(keys);
+    for(let i=0;i<q.superiorPool.length;i++){
+        const f=fixture({keys,gold:20000,rolls:[0.999,(i+0.5)/q.superiorPool.length]});
+        const result=f.attempt().transmutation;
+        assert.equal(result.ok,true);
+        assert.equal(result.category,'superior');
+        assert.equal(result.resultTier,6);
+        assert.equal(result.newKey,q.superiorPool[i]);
+        assert.equal(equipmentRules.parse(result.newKey).enchanted,false);
+        assert.equal(rules.tierOf(result.newKey),0);
+        assert.equal(f.p.gold,8000);
+    }
+});
+
+test('version-one receipt remains queryable, while an unexecuted version-one request cannot roll',()=>{
+    const f=fixture();
+    const historical={ok:true,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA'],cost:120,
+        tier:1,category:'material',newKey:'ESSENCIA_ARCANA',qty:1};
+    f.p.transmutationOps=[{opId:f.opId,request:{version:1,keys:historical.keys},result:historical}];
+    f.p.transmutationToken=crypto.randomUUID();
+    assert.deepEqual(f.send({t:'transmuteStatus',opId:f.opId}).transmutation,historical);
+    assert.deepEqual(f.attempt({version:1}).transmutation,historical);
+    assert.equal(f.p.gold,2000);
+    const fresh=fixture();
+    fresh.context.Math.random=()=>{throw Error('legacy request must not roll');};
+    assert.equal(fresh.attempt({version:1}).transmutation.error,'update_required');
+    assert.equal(fresh.p.gold,2000);
+    assert.equal(fresh.p.transmutationToken,fresh.opId);
 });
 
 test('duplicates, conflicting payload, stale token and read-only status never charge twice',()=>{
@@ -135,7 +227,7 @@ test('duplicates, conflicting payload, stale token and read-only status never ch
     next.p.inv=f.acc.save.inv; next.p.gold=f.acc.save.gold;
     next.p.transmutationOps=f.acc.save.transmutationOps;
     next.p.transmutationToken=f.acc.save.transmutationToken;
-    assert.deepEqual(next.send({t:'invTransmute',version:1,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,first);
+    assert.deepEqual(next.send({t:'invTransmute',version:2,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,first);
     assert.equal(next.p.gold,gold);
 });
 
@@ -156,9 +248,9 @@ test('invalid inputs, location, funds, equipped base, capacity and equipment ver
         else {assert.equal(result.error,error); assert.equal(f.p.gold,before); assert.equal(f.p.transmutationToken,f.opId);}
     }
     const f=fixture();
-    assert.equal(f.attempt({version:2}).transmutation.error,'update_required');
+    assert.equal(f.attempt({version:1}).transmutation.error,'update_required');
     assert.equal(f.attempt({keys:['ADAGA','ADAGA','CLAVA']}).transmutation.error,'duplicate_keys');
-    assert.equal(f.attempt({keys:['ADAGA','PORRETE','ESPADA_DRACO']}).transmutation.error,'ineligible_item');
+    assert.equal(f.attempt({keys:['ADAGA','PORRETE','ESPADA_ETERNA']}).transmutation.error,'ineligible_item');
 });
 
 test('real save mutation is rolled back after a failed atomic write',()=>{
@@ -177,7 +269,7 @@ test('real save mutation is rolled back after a failed atomic write',()=>{
 });
 
 test('capacity and client compatibility are checked before rolling, without conditional free rerolls',()=>{
-    for(const rolls of [[0],[0.70],[0.99]]){
+    for(const rolls of [[0],[0.60],[0.85],[0.90]]){
         const f=fixture({rolls,cap:4,extraInv:{ADAGA:2,PORRETE:2,CLAVA:2,ESSENCIA_ARCANA:1}});
         let rolled=false;f.context.Math.random=()=>{rolled=true;return 0;};
         assert.equal(f.attempt().transmutation.error,'inventory_full');
@@ -199,17 +291,20 @@ test('atomic file persists receipt and consumed inventory for a fresh process st
     const restarted=fixture();
     Object.assign(restarted.p,saved);
     assert.deepEqual(restarted.send({t:'transmuteStatus',opId:f.opId}).transmutation,receipt);
-    assert.deepEqual(restarted.send({t:'invTransmute',opId:f.opId,version:1,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,receipt);
+    assert.deepEqual(restarted.send({t:'invTransmute',opId:f.opId,version:2,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,receipt);
     assert.equal(restarted.p.gold,1880);
 });
 
 test('enchanted results are compatible with every real output equipment kind',()=>{
     const begin=source.indexOf('const ITEM_META = {'),end=source.indexOf('\n};',begin)+3;
     const meta=vm.runInNewContext(source.slice(begin,end)+'\nITEM_META');
-    for(const keys of [['ADAGA','PORRETE','CLAVA'],['MACA','ESPADA_LONGA','MACHADO'],['ESPADA_OSSO','ESCUDO_OSSO','ARMADURA_OSSO']]){
+    for(const keys of [['ADAGA','PORRETE','CLAVA'],['MACA','ESPADA_OSSO','SABRE'],
+        ['ESPADA_ACO','BESTA','MARRETA'],['ESPADA_DRACO','ELMO_DRACO','CAJADO_FOGO'],
+        ['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL']]){
         const pool=rules.quote(keys).pool;
         for(let i=0;i<pool.length;i++){
-            const f=fixture({keys,rolls:[0.999,(i+0.5)/pool.length]});
+            const q=rules.quote(keys);
+            const f=fixture({keys,gold:20000,rolls:[(q.chances.material+q.chances.plain+0.5*q.chances.enchanted)/100,(i+0.5)/pool.length]});
             f.context.itemMetaForKey=key=>meta[equipmentRules.parse(key).base];
             const receipt=f.attempt().transmutation;
             assert.equal(receipt.ok,true);assert.equal(equipmentRules.parse(receipt.newKey).base,pool[i]);

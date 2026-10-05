@@ -24,5 +24,14 @@
 #transmutationStatus{flex:0 0 auto;min-width:0;max-height:145px;overflow-y:auto;overflow-wrap:anywhere;border-left:3px solid #b28bce;background:#2b2333;color:#f2e9dc;padding:9px 12px;font:12px/1.4 "Segoe UI",sans-serif}
 #transmutationStatus[data-kind="ok"]{border-left-color:#80c987}
 #transmutationStatus[data-kind="error"]{border-left-color:#ed938d}
+#transmutationStatus[data-kind="superior"]{border:1px solid #c6953b;border-left:4px solid #ffe08a;background:linear-gradient(110deg,#392a12,#241c2c);color:#fff0ca}
+.tm-result{display:flex;align-items:center;gap:12px}
+.tm-result-icon{width:48px;height:48px;object-fit:contain;image-rendering:pixelated;flex-shrink:0}
+.tm-result-title{display:block;color:#ffe19e;font-size:13px;margin-bottom:5px;letter-spacing:1px}
+.tm-result small{display:block;margin-top:5px;color:#d0bca2;font-size:10px}
+#transmutationPanel .tm-superior-chance{border-color:#ad8134;color:#ffe19e;background:#3a2b12;font-weight:700}
+.tm-superior-preview{border-top:1px solid #77582b;margin-top:14px;padding-top:12px;color:#ffe19e}
+.tm-superior-preview small{font:11px/1.5 "Segoe UI",sans-serif;color:#c7b692}
+#transmutationPanel .tm-mixed{color:#efbe87}
 #transmutationStatus p{margin:0}
 @media(max-width:600px){#transmutationPanel{padding:8px 9px 16px}#transmutationPanel .tm-grid{grid-template-columns:1fr}#transmutationPanel .tm-pool{columns:1}#craftModal [data-craft-tab]{font-size:10px;padding:6px 3px}}

@@ -6,7 +6,7 @@
 <script src="/equipment-rules.js?v=1"></script>
 <script src="/game-audio.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
-<link rel="stylesheet" href="/transmutation.css?v=1">
+<link rel="stylesheet" href="/transmutation.css?v=2">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#06060c">
@@ -4101,7 +4101,7 @@ function setLang(l){
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
   window.ValadaresTransmutationUI?.refreshIfOpen();
-  if (document.getElementById('craftModal')?.classList.contains('transmute-active')) document.getElementById('craftHint').innerHTML = LANG==='en'?'Three distinct plain pieces · one random result · server confirmed':'Três peças comuns distintas · um resultado aleatório · confirmado pelo servidor';
+  if (document.getElementById('craftModal')?.classList.contains('transmute-active')) document.getElementById('craftHint').innerHTML = LANG==='en'?'Three distinct pieces · same tier unlocks promotion':'Três peças diferentes · mesma faixa libera evolução';
   renderForgeFeedback();
   if (document.getElementById('craftModal')?.classList.contains('forge-active')) renderForja();
   syncInvHeight();
@@ -10569,7 +10569,7 @@ function switchCraftTab(which){
     document.getElementById('forgeTools').style.display = which === 'forja' ? 'flex' : 'none';
     for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel'],['transmute','transmutationPanel']])document.getElementById(id).style.display=tab===which?'':'none';
     const hint=document.getElementById('craftHint');
-    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):which==='transmute'?(LANG==='en'?'Three distinct plain pieces · check the chances before confirming':'Três peças comuns distintas · confira as chances antes de confirmar'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
+    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):which==='transmute'?(LANG==='en'?'Three distinct pieces · same tier unlocks promotion':'Três peças diferentes · mesma faixa libera evolução'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
     if(which==='enchant')window.ValadaresEnchantUI?.render();
     else if(which==='transmute')window.ValadaresTransmutationUI?.render();
     else if(which==='forja')renderForja();else renderCraft();
@@ -17544,7 +17544,7 @@ function loop(ts){
 <script src="/adventure-feedback.js?v=20261005a"></script>
 <script src="/training-rules.js?v=1"></script>
 <script src="/enchanting-ui.js?v=1"></script>
-<script src="/transmutation-rules.js?v=1"></script>
-<script src="/transmutation-ui.js?v=1"></script>
+<script src="/transmutation-rules.js?v=2"></script>
+<script src="/transmutation-ui.js?v=2"></script>
 </body>
 </html>

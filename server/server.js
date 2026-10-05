@@ -1102,13 +1102,17 @@ function executeTransmutation(p, msg){
     if (Object.keys(projected).length >= SAVE_CAPS.invKeys) return fail('inventory_full',quoted);
     const categoryRoll = Math.random() * 100;
     const category = categoryRoll < quote.chances.material ? 'material'
-        : categoryRoll < quote.chances.material + quote.chances.plain ? 'plain' : 'enchanted';
+        : categoryRoll < quote.chances.material + quote.chances.plain ? 'plain'
+        : categoryRoll < quote.chances.material + quote.chances.plain + quote.chances.enchanted
+            ? 'enchanted' : 'superior';
     let newKey, qty;
     if (category === 'material'){
         newKey = equipmentRules.MATERIAL;
         qty = quote.essenceQty;
     } else {
-        const baseKey = quote.pool[Math.floor(Math.random() * quote.pool.length)];
+        const outputPool = category === 'superior' ? quote.superiorPool : quote.pool;
+        if (!outputPool.length) return fail('bad_output',quoted);
+        const baseKey = outputPool[Math.floor(Math.random() * outputPool.length)];
         const meta = itemMetaForKey(baseKey);
         if (!meta || !equipmentRules.KINDS.includes(meta.kind)) return fail('bad_output',quoted);
         newKey = baseKey;
@@ -1130,6 +1134,7 @@ function executeTransmutation(p, msg){
     const old = {inv:p.inv,gold:p.gold,transmutationOps:p.transmutationOps,
         transmutationToken:p.transmutationToken,save:acc.save ? {...acc.save} : null,savedAt:acc.savedAt};
     const result = {ok:true,opId,keys,cost:quote.cost,tier:quote.tier,category,newKey,qty};
+    if (category === 'superior') result.resultTier = quote.resultTier;
     p.inv = projected;
     p.gold -= quote.cost;
     p.transmutationOps = [...(p.transmutationOps || []),{opId,request:{version:msg.version,keys},result}].slice(-20);
