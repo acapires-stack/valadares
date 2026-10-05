@@ -2019,7 +2019,7 @@
             <div id="trainCanAfford" style="color:#666;font-size:10px"></div>
         </div>
         <div id="trainBtns" style="display:flex;flex-direction:column;gap:6px"></div>
-        <div class="chest-hint" data-i18n-html="training.hint">cada sessão = 1 XP na skill · andar cancela · <kbd>ESC</kbd> fechar/parar</div>
+        <div class="chest-hint" data-i18n-html="training.hint">XP por sessão cresce com a skill e bônus · preço sobe com o nível · andar cancela · <kbd>ESC</kbd> fechar/parar</div>
         <button class="chest-close" onclick="closeTraining()">×</button>
     </div>
 </div>
@@ -2852,6 +2852,8 @@ const I18N = {
     'altar.gold_available': '{g} g disponíveis',
     'altar.study_magic': 'Estudar Magia',
     'altar.per_session': '/sessão',
+    'train.progressive': 'preço progressivo',
+    'train.estimated': 'estimado {g}g',
     'altar.sessions_to_next': '~{n} sessões pro próximo',
     'altar.stat_heal': '<span style="color:#74d176">+{n} HP base</span> · {mp}mp · cd {cd}s',
     'altar.stat_aoe': '<span style="color:#ff8030">{dmg} dano base</span> · AoE raio {r} · {mp}mp · cd {cd}s',
@@ -3065,7 +3067,7 @@ const I18N = {
     'chest.withdraw_all': '◀ PEGAR TUDO',
     'chest.withdraw_gold': '← retirar todo ouro',
     'chest.hint': 'cada baú é independente — escolha o seu &nbsp;|&nbsp; <kbd>ESC</kbd> fechar',
-    'training.hint': 'cada sessão = 1 XP na skill · andar cancela · <kbd>ESC</kbd> fechar/parar',
+    'training.hint': 'XP por sessão cresce com a skill e bônus · preço sobe com o nível · andar cancela · <kbd>ESC</kbd> fechar/parar',
     'altar.hint': 'você pode equipar 1 magia por vez · pague pra trocar · <kbd>ESC</kbd> fechar',
     'quests.hint': '<kbd>Q</kbd> ou <kbd>ESC</kbd> fechar',
     'stats.hint': '<kbd>I</kbd> ou <kbd>ESC</kbd> fechar',
@@ -3114,7 +3116,10 @@ const I18N = {
     'log.left_station': '<span class="log-sys">Saiu do {place}.</span>',
     'log.select_skill': '<span class="log-sys">Selecione uma skill.</span>',
     'log.not_enough_gold': '<span class="log-sys">Sem ouro suficiente.</span>',
-    'log.training': '<span class="log-sys">Treinando {skill}: {n} sessões ({g}g total)</span>',
+    'log.training': '<span class="log-sys">Treinando {skill}: {n} sessões (custo estimado {g}g)</span>',
+    'log.training_wait': '<span class="log-sys">Aguarde a confirmação do treino anterior.</span>',
+    'training.reason_rejected': 'servidor recusou a sessão',
+    'training.reason_disconnect': 'conexão interrompida',
     'log.pvp_requires': '<span class="log-sys">PvP exige {req}g (você tem {have}g).</span>',
     'log.pvp_requires_attack': '<span class="log-sys">PvP exige {req}g pra atacar um player (você tem {have}g).</span>',
     'log.pvp_auto_on': '<span class="log-dmg">⚔ PvP LIGADO automaticamente (você atacou um player).</span>',
@@ -3255,8 +3260,8 @@ const I18N = {
     'skill.Espada': 'Espada', 'skill.Machado': 'Machado', 'skill.Clava': 'Clava',
     'skill.Distância': 'Distância', 'skill.Punho': 'Punho', 'skill.Escudo': 'Escudo', 'skill.Magia': 'Magia',
     'train.current': 'Skill atual: <span style="color:#e0c060">{val}</span> (xp {xp}/{next})',
-    'train.cost_line': 'Custo: <span style="color:#ffcc40">{cost}g</span>/sessão · Tempo: 2s/sessão · <span style="color:#74d176">+{xp} XP</span>/sessão',
-    'train.sessions_to_level': '<span style="color:#aacfff">~{n} sessões pro próximo nível</span> ({g}g)',
+    'train.cost_line': 'Custo inicial: <span style="color:#ffcc40">{cost}g</span>/sessão (progressivo) · Tempo: 2s/sessão · <span style="color:#74d176">+{xp} XP</span>/sessão',
+    'train.sessions_to_level': '<span style="color:#aacfff">~{n} sessões pro próximo nível</span> (custo estimado {g}g)',
     'train.can_afford': 'Você consegue pagar {n} sessões ({gold}g)',
     /*F2PT*/
   },
@@ -3565,6 +3570,8 @@ const I18N = {
     'altar.gold_available': '{g} g available',
     'altar.study_magic': 'Study Magic',
     'altar.per_session': '/session',
+    'train.progressive': 'progressive price',
+    'train.estimated': 'estimated {g}g',
     'altar.sessions_to_next': '~{n} sessions to next',
     'altar.stat_heal': '<span style="color:#74d176">+{n} base HP</span> · {mp}mp · cd {cd}s',
     'altar.stat_aoe': '<span style="color:#ff8030">{dmg} base dmg</span> · AoE radius {r} · {mp}mp · cd {cd}s',
@@ -3778,7 +3785,7 @@ const I18N = {
     'chest.withdraw_all': '◀ TAKE ALL',
     'chest.withdraw_gold': '← withdraw all gold',
     'chest.hint': 'each chest is independent — pick yours &nbsp;|&nbsp; <kbd>ESC</kbd> close',
-    'training.hint': 'each session = 1 skill XP · walking cancels · <kbd>ESC</kbd> close/stop',
+    'training.hint': 'XP per session grows with skill and bonuses · price rises with level · walking cancels · <kbd>ESC</kbd> close/stop',
     'altar.hint': 'you can equip 1 spell at a time · pay to switch · <kbd>ESC</kbd> close',
     'quests.hint': '<kbd>Q</kbd> or <kbd>ESC</kbd> to close',
     'stats.hint': '<kbd>I</kbd> or <kbd>ESC</kbd> to close',
@@ -3827,7 +3834,10 @@ const I18N = {
     'log.left_station': '<span class="log-sys">Left the {place}.</span>',
     'log.select_skill': '<span class="log-sys">Select a skill.</span>',
     'log.not_enough_gold': '<span class="log-sys">Not enough gold.</span>',
-    'log.training': '<span class="log-sys">Training {skill}: {n} sessions ({g}g total)</span>',
+    'log.training': '<span class="log-sys">Training {skill}: {n} sessions (estimated cost {g}g)</span>',
+    'log.training_wait': '<span class="log-sys">Wait for the previous training result.</span>',
+    'training.reason_rejected': 'server rejected the session',
+    'training.reason_disconnect': 'connection interrupted',
     'log.pvp_requires': '<span class="log-sys">PvP requires {req}g (you have {have}g).</span>',
     'log.pvp_requires_attack': '<span class="log-sys">PvP requires {req}g to attack a player (you have {have}g).</span>',
     'log.pvp_auto_on': '<span class="log-dmg">⚔ PvP turned ON automatically (you attacked a player).</span>',
@@ -3968,8 +3978,8 @@ const I18N = {
     'skill.Espada': 'Sword', 'skill.Machado': 'Axe', 'skill.Clava': 'Club',
     'skill.Distância': 'Ranged', 'skill.Punho': 'Fist', 'skill.Escudo': 'Shield', 'skill.Magia': 'Magic',
     'train.current': 'Current skill: <span style="color:#e0c060">{val}</span> (xp {xp}/{next})',
-    'train.cost_line': 'Cost: <span style="color:#ffcc40">{cost}g</span>/session · Time: 2s/session · <span style="color:#74d176">+{xp} XP</span>/session',
-    'train.sessions_to_level': '<span style="color:#aacfff">~{n} sessions to next level</span> ({g}g)',
+    'train.cost_line': 'Starting cost: <span style="color:#ffcc40">{cost}g</span>/session (progressive) · Time: 2s/session · <span style="color:#74d176">+{xp} XP</span>/session',
+    'train.sessions_to_level': '<span style="color:#aacfff">~{n} sessions to next level</span> (estimated cost {g}g)',
     'train.can_afford': 'You can afford {n} sessions ({gold}g)',
     /*F2EN*/
   }
@@ -7626,6 +7636,8 @@ function connectMP(){
         }
     };
     ws.onclose = (ev) => {
+        if (training) stopTraining(tr('training.reason_disconnect'));
+        trainingRequestPending = null;
         resetCasinoOnDisconnect();
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
@@ -8155,6 +8167,7 @@ function handleMP(msg){
         }
         // N3 fase 3: quest state autoritativo
         if (msg.skills && typeof msg.skills === 'object') player.skills = msg.skills;
+        if (msg.trainResult) handleTrainingResult(msg.trainResult);
         if (msg.quests && typeof msg.quests === 'object'){
             player.quests.active    = msg.quests.active    || {};
             player.quests.completed = msg.quests.completed || [];
@@ -13856,8 +13869,9 @@ function renderAltar(){
     const sk = player.skills.Magia;
     const cost = trainingCostPerSession('Magia');
     const xpPerSess = trainingXpPerSession('Magia');
-    const toLvl = Math.ceil((sk.xpNext - sk.xp) / xpPerSess);
-    const maxAfford = Math.floor(player.gold / cost);
+    const toLvl = Math.max(1, Math.ceil((sk.xpNext - sk.xp) / xpPerSess));
+    const maxPlan = trainingQuote('Magia', Infinity);
+    const maxAfford = maxPlan.sessions;
     const opts = [10, 50, 100, maxAfford];
     const labels = ['10×','50×','100×',`MAX (${maxAfford})`];
     const studyHtml = `<div class="craft-row" style="margin-bottom:14px;background:#08080d;border-color:#3a3050">
@@ -13867,12 +13881,13 @@ function renderAltar(){
             <span style="margin-left:6px;color:#aaa;font-size:10px">skill ${sk.val} (xp ${sk.xp}/${sk.xpNext})</span>
         </div>
         <div class="craft-in" style="color:#aaa">
-            <span style="color:#ffcc40">${cost}g</span>${tr('altar.per_session')} · 2s · <span style="color:#74d176">+${xpPerSess} XP</span> · ${tr('altar.sessions_to_next', {n: toLvl})}
+            <span style="color:#ffcc40">${trainingGold(cost)}g</span>${tr('altar.per_session')} (${tr('train.progressive')}) · 2s · <span style="color:#74d176">+${xpPerSess} XP</span> · ${tr('altar.sessions_to_next', {n: toLvl})} (${tr('train.estimated', {g: trainingGold(trainingQuote('Magia', toLvl, Infinity).cost)})})
         </div>
         <div style="grid-column:1/-1;display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
             ${opts.map((q,i) => {
-                const can = q > 0 && q <= maxAfford;
-                return `<button class="chest-btn ${i===3?'chest-btn-primary':''}" style="flex:1;min-width:90px" ${can?'':'disabled'} onclick="startMagicTraining(${q})">${labels[i]} = ${q*cost}g</button>`;
+                const plan = i === 3 ? maxPlan : trainingQuote('Magia', q, Infinity);
+                const can = q > 0 && (i === 3 || trainingQuote('Magia', q).sessions === q);
+                return `<button class="chest-btn ${i===3?'chest-btn-primary':''}" style="flex:1;min-width:90px" ${can?'':'disabled'} onclick="startMagicTraining(${q})">${labels[i]} ≈ ${trainingGold(plan.cost)}g</button>`;
             }).join('')}
         </div>
     </div>`;
@@ -13908,10 +13923,23 @@ window.closeAltar = closeAltar;
 window.switchSpell = switchSpell;
 
 // ─── Boneco de Treino ────────────────────────────────────────────────────────
-let training = null;   // { remaining, total, skill, cost, lastTick }
+let training = null;   // { remaining, total, skill, location, lastTick, pending }
+let trainingRequestPending = null; // { requestId, batch } — uma tentativa até o ACK ou desconexão
+
+function trainingBonuses(){
+    const pet = PET_DEFS[player.pet];
+    const petBonus = pet?.buffKey === 'xpBonus' && player.pets?.[player.pet]
+        ? petBuffValue(pet, player.pets[player.pet].lvl) : 0;
+    return { xpBonus: Math.max(0, Number(player.permaBuffs?.xpBonus) || 0) + petBonus,
+        wisdom: _dailyEvent?.id === 'wisdom' && _dailyEvent.until > Date.now() };
+}
+function trainingGold(n){ return n.toLocaleString(LANG === 'en' ? 'en-US' : 'pt-BR'); }
+function trainingQuote(skillName, count, gold = player.gold){
+    return window.ValadaresTrainingRules.quote(player.skills[skillName], count, { gold, ...trainingBonuses() });
+}
 
 function trainingCostPerSession(skillName){
-    return Math.max(5, player.skills[skillName].val * 2);
+    return window.ValadaresTrainingRules.cost(player.skills[skillName].val);
 }
 
 let trainingSelectedSkill = null;
@@ -13920,7 +13948,7 @@ function getTrainableSkills(){
     // Boneco: armas + Escudo apenas. Magia treina no Altar.
     const skills = [];
     const wK = player.equipped.weapon;
-    if (wK && ITEMS[wK] && ITEMS[wK].skill && player.skills[ITEMS[wK].skill]){
+    if (wK && ITEMS[wK] && ITEMS[wK].skill && ITEMS[wK].skill !== 'Magia' && player.skills[ITEMS[wK].skill]){
         skills.push(ITEMS[wK].skill);
     } else {
         skills.push('Punho');
@@ -13946,7 +13974,8 @@ function renderTraining(){
     const cost = trainingCostPerSession(skill);
     const sk = player.skills[skill];
     const xpPerSess = trainingXpPerSession(skill);
-    const sessionsToLevel = Math.ceil((sk.xpNext - sk.xp) / xpPerSess);
+    const sessionsToLevel = Math.max(1, Math.ceil((sk.xpNext - sk.xp) / xpPerSess));
+    const nextCost = trainingQuote(skill, sessionsToLevel, Infinity).cost;
 
     // Tabs por skill treinável
     document.getElementById('trainArmaLabel').innerHTML = skills.map(s =>
@@ -13955,36 +13984,38 @@ function renderTraining(){
 
     document.getElementById('trainSkillStat').innerHTML =
         tr('train.current', {val: sk.val, xp: sk.xp, next: sk.xpNext}) + '<br>' +
-        tr('train.cost_line', {cost, xp: xpPerSess}) + '<br>' +
-        tr('train.sessions_to_level', {n: sessionsToLevel, g: sessionsToLevel*cost});
-    const maxAfford = Math.floor(player.gold / cost);
-    document.getElementById('trainCanAfford').textContent = tr('train.can_afford', {n: maxAfford, gold: player.gold});
+        tr('train.cost_line', {cost: trainingGold(cost), xp: xpPerSess}) + '<br>' +
+        tr('train.sessions_to_level', {n: sessionsToLevel, g: trainingGold(nextCost)});
+    const maxPlan = trainingQuote(skill, Infinity);
+    const maxAfford = maxPlan.sessions;
+    document.getElementById('trainCanAfford').textContent = tr('train.can_afford', {n: maxAfford, gold: trainingGold(player.gold)});
     const opts = [10, 50, 100, maxAfford];
     const labels = ['10×', '50×', '100×', `MAX (${maxAfford})`];
     document.getElementById('trainBtns').innerHTML = opts.map((q, i) => {
-        const can = q > 0 && q <= maxAfford;
-        return `<button class="chest-btn ${i===3?'chest-btn-primary':''}" ${can?'':'disabled'} onclick="startTraining(${q})">${labels[i]} = ${q*cost}g · ${(q*2)}s</button>`;
+        const plan = i === 3 ? maxPlan : trainingQuote(skill, q, Infinity);
+        const can = q > 0 && (i === 3 || trainingQuote(skill, q).sessions === q);
+        return `<button class="chest-btn ${i===3?'chest-btn-primary':''}" ${can?'':'disabled'} onclick="startTraining(${q})">${labels[i]} ≈ ${trainingGold(plan.cost)}g · ${(q*2)}s</button>`;
     }).join('');
 }
 
 function startTraining(count, opts){
     opts = opts || {};
+    if (trainingRequestPending){ log(tr('log.training_wait')); return; }
     const loc = opts.location || 'dummy';
     const skill = opts.skill || trainingSelectedSkill;
     const atOk = loc === 'altar' ? atAltar() : atDummy();
     if (!atOk){ log(tr('log.left_station', {place: loc==='altar'?tr('lbl.altar'):tr('lbl.dummy')})); return; }
     if (!skill || !player.skills[skill]){ log(tr('log.select_skill')); return; }
-    const cost = trainingCostPerSession(skill);
-    const maxAfford = Math.floor(player.gold / cost);
-    const actual = Math.min(count, maxAfford);
+    const plan = trainingQuote(skill, count);
+    const actual = plan.sessions;
     if (actual < 1){ log(tr('log.not_enough_gold')); return; }
     training = {
-        remaining: actual, total: actual, skill, cost, location: loc,
+        remaining: actual, total: actual, skill, location: loc, pending: false,
         lastTick: performance.now(),
     };
     closeTraining();
     closeAltar();
-    log(tr('log.training', {skill: skillDisp(skill), n: actual, g: actual*cost}));
+    log(tr('log.training', {skill: skillDisp(skill), n: actual, g: trainingGold(plan.cost)}));
 }
 function startMagicTraining(count){
     startTraining(count, { location:'altar', skill:'Magia' });
@@ -14165,27 +14196,42 @@ function stopTraining(reason){
     training = null;
 }
 
-// XP por sessão escala com xpNext da skill — ~60 sessões = 1 nível
+function handleTrainingResult(result){
+    const pending = trainingRequestPending;
+    if (!pending || (result.requestId && result.requestId !== pending.requestId)) return;
+    trainingRequestPending = null;
+    if (!training || training !== pending.batch || !training.pending || result.skill !== training.skill) return;
+    training.pending = false;
+    if (result.ok !== true){ stopTraining(tr('training.reason_rejected')); return; }
+    training.remaining--;
+    training.lastTick = performance.now();
+    addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${skillDisp(training.skill)}`, '#ffcc40');
+    if (training.remaining <= 0) stopTraining('completo');
+    if (document.getElementById('trainingModal').style.display === 'flex') renderTraining();
+    if (document.getElementById('altarModal').style.display === 'flex') renderAltar();
+}
+
+// XP por sessão e modificadores espelham a aplicação autoritativa do servidor.
 function trainingXpPerSession(skillName){
-    const sk = player.skills[skillName];
-    return Math.max(1, Math.floor(sk.xpNext / 60));
+    return window.ValadaresTrainingRules.sessionXp(player.skills[skillName], trainingBonuses());
 }
 function tickTraining(dt){
     if (!training) return;
     const ok = training.location === 'altar' ? atAltar() : atDummy();
     if (!ok){ stopTraining(`saiu do ${training.location==='altar'?'altar':'boneco'}`); return; }
+    if (training.pending || trainingRequestPending) return;
     const now = performance.now();
     if (now - training.lastTick >= TRAINING_TIME){
-        if (player.gold < training.cost){ stopTraining('acabou o ouro'); return; }
-        // T3: server credita XP + debita gold (handler trainAttempt). O addFloat/remaining
-        // abaixo é só feedback de UI; o progresso real é autoritativo no server.
-        if (ws && ws.readyState === 1 && _wsAuthed){
-            try { ws.send(JSON.stringify({ t:'trainAttempt', skill: training.skill })); } catch {}
-        }
-        addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${skillDisp(training.skill)}`, '#ffcc40');
-        training.remaining--;
-        training.lastTick = now;
-        if (training.remaining <= 0) stopTraining('completo');
+        const cost = trainingCostPerSession(training.skill);
+        if (player.gold < cost){ stopTraining('acabou o ouro'); return; }
+        if (!ws || ws.readyState !== 1 || !_wsAuthed){ stopTraining(tr('training.reason_disconnect')); return; }
+        // A sessão só avança com o recibo do servidor; nunca retransmitir tentativa incerta.
+        const requestId = crypto.randomUUID();
+        try {
+            ws.send(JSON.stringify({ t:'trainAttempt', skill: training.skill, requestId }));
+            training.pending = true;
+            trainingRequestPending = { requestId, batch: training };
+        } catch { stopTraining(tr('training.reason_disconnect')); }
     }
 }
 
@@ -16069,6 +16115,8 @@ function logout(){
     // limpa o mundo
     monsters.length = 0;
     groundItems.length = 0;
+    training = null;
+    trainingRequestPending = null;
     logLines.length = 0;
     floatTexts.length = 0;
     Object.keys(remotePlayers).forEach(k => delete remotePlayers[k]);
@@ -17515,6 +17563,7 @@ function loop(ts){
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261004b"></script>
 <script src="/adventure-feedback.js?v=20261005a"></script>
+<script src="/training-rules.js?v=1"></script>
 <script src="/enchanting-ui.js?v=1"></script>
 </body>
 </html>

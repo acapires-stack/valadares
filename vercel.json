@@ -19,6 +19,10 @@
   ],
   "headers": [
     {
+      "source": "/training-rules.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
       "source": "/equipment-rules.js",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
     },

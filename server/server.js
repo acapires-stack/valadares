@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const equipmentRules = require('../equipment-rules');
+const trainingRules = require('../training-rules');
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
 const CASINO_ENABLED = false;
@@ -1455,7 +1456,7 @@ function rollLoot(mobType, luck, floor){
     const iLk   = f >= 1 ? DUNGEON_ITEM_LUCK_SCALE * (f - 1) : 0;
     const out = [];
     for (const [type, chance, qMin, qMax] of table){
-        const c = type === 'GOLD' ? chance : Math.min(0.95, chance * (1 + lk + iLk));
+        const c = type === 'GOLD' || chance >= 1 ? chance : Math.min(0.95, chance * (1 + lk + iLk));
         if (Math.random() < c){
             let qty = qMin + Math.floor(Math.random() * (qMax - qMin + 1));
             if (type === 'GOLD' && gMult > 1) qty = Math.max(1, Math.round(qty * gMult));
@@ -2122,6 +2123,7 @@ const I18N_SRV = {
     'srv.train_too_fast': 'Calma — espere entre treinos.',
     'srv.train_not_at_altar': 'Treine Magia no Altar.',
     'srv.train_not_at_dummy': 'Aproxime-se do Boneco de treino.',
+    'srv.train_wrong_equipment': 'Equipe a arma ou escudo correspondente para treinar esta skill.',
     'srv.train_no_gold': 'Gold insuficiente pra treinar.',
     'srv.train_failed': 'Não foi possível treinar.',
     'srv.no_mana': 'Sem mana suficiente.',
@@ -2228,6 +2230,7 @@ const I18N_SRV = {
     'srv.train_too_fast': 'Easy — wait between training sessions.',
     'srv.train_not_at_altar': 'Train Magic at the Altar.',
     'srv.train_not_at_dummy': 'Get closer to the training Dummy.',
+    'srv.train_wrong_equipment': 'Equip the matching weapon or shield to train this skill.',
     'srv.train_no_gold': 'Not enough gold to train.',
     'srv.train_failed': "Couldn't train.",
     'srv.no_mana': 'Not enough mana.',
@@ -4498,50 +4501,54 @@ function dropMobLoot(m, loot, killer){
     return spawned;
 }
 
+// Só dano de jogadores presentes no andar do boss participa de recompensas.
+function bossLootContributors(m, fallbackKiller){
+    const floor = m.floor || 0;
+    const contributors = [];
+    for (const [pid, dmg] of Object.entries(m.damageBy || {})){
+        const pp = players.get(Number(pid));
+        if (pp && !pp.disconnected && pp.ws?.readyState === 1 &&
+            (pp.floor || 0) === floor && Number.isFinite(dmg) && dmg > 0){
+            contributors.push({ p:pp, dmg });
+        }
+    }
+    if (!contributors.length && fallbackKiller && !fallbackKiller.disconnected &&
+        fallbackKiller.ws?.readyState === 1 && (fallbackKiller.floor || 0) === floor){
+        contributors.push({ p:fallbackKiller, dmg:1 });
+    }
+    return contributors;
+}
+
+function bossRewardBonus(contributors, key){
+    if (!contributors.length) return 0;
+    const maxDmg = Math.max(...contributors.map(c => c.dmg));
+    let weighted = 0, total = 0;
+    for (const c of contributors){
+        const weight = c.dmg / maxDmg;
+        const bonus = (c.p.permaBuffs?.[key] || 0) + petBuffVal(c.p, key);
+        weighted += weight * bonus;
+        total += weight;
+    }
+    return weighted / total;
+}
+
 // M4 anti-ninja: distribui o loot de um boss unique entre quem deu dano.
 // Gold = proporcional à contribuição; itens = sorteio ponderado pelo dano
 // (quem bateu mais tem mais chance de cada item). Vai DIRETO pro inventário —
 // não cai no chão. fallbackKiller leva tudo se ninguém foi rastreado.
-function distributeBossLoot(m, loot, fallbackKiller){
-    const dmgBy = m.damageBy || {};
-    // Quem deu dano (online)
-    const damagers = [];
-    for (const pid in dmgBy){
-        const pp = players.get(Number(pid));
-        if (pp && !pp.disconnected && dmgBy[pid] > 0) damagers.push({ p: pp, dmg: dmgBy[pid] });
-    }
-    if (!damagers.length){
-        if (fallbackKiller && !fallbackKiller.disconnected) damagers.push({ p: fallbackKiller, dmg: 1 });
-        else return;
-    }
-    // Beneficiários + peso:
-    //  - Se algum damager está em PARTY → divide IGUAL entre todos os membros
-    //    online da(s) party(s) no mesmo andar + os damagers solo (peso 1 cada).
-    //  - Senão (todos solo) → por dano individual (peso = dano).
-    const inParty = damagers.some(d => findPartyOfPlayer(d.p.name));
-    const benef = new Map();   // pid -> { p, weight }
-    if (inParty){
-        // Em party: quem DEU DANO divide igual. (Antes puxava TODOS os membros da
-        // party no andar, mesmo com 0 de dano → alts parados no andar 5 farmavam o
-        // loot do boss. Agora só participa do rateio quem efetivamente bateu.)
-        for (const d of damagers) benef.set(d.p.id, { p: d.p, weight: 1 });
-    } else {
-        for (const d of damagers) benef.set(d.p.id, { p: d.p, weight: d.dmg });
-    }
-    const contribs = Array.from(benef.values()).map(b => ({ p: b.p, dmg: b.weight }));
-    const totalDmg = contribs.reduce((s, c) => s + c.dmg, 0) || 1;
+function distributeBossLoot(m, loot, contributors){
+    if (!contributors.length) return;
+    // Escala os pesos para evitar overflow de soma sem alterar a proporção.
+    const maxDmg = Math.max(...contributors.map(c => c.dmg));
+    const contribs = contributors.map(c => ({ p:c.p, dmg:c.dmg / maxDmg }));
+    const totalDmg = contribs.reduce((s, c) => s + c.dmg, 0);
     const got = new Map();   // pid -> { p, gold, items:{} }
     const slot = (pp) => { let g = got.get(pp.id); if (!g){ g = { p: pp, gold: 0, items: {} }; got.set(pp.id, g); } return g; };
+    let goldTotal = 0;
     for (const it of loot){
         if (!it || !it.type) continue;
         if (it.type === 'GOLD'){
-            let dist = 0;
-            for (const c of contribs){
-                const share = Math.floor((it.qty || 0) * (c.dmg / totalDmg));
-                if (share > 0){ slot(c.p).gold += share; dist += share; }
-            }
-            const rest = (it.qty || 0) - dist;   // arredondamento → maior peso
-            if (rest > 0){ const top = contribs.reduce((a,b) => b.dmg > a.dmg ? b : a, contribs[0]); slot(top.p).gold += rest; }
+            goldTotal += it.qty || 0;
         } else {
             let r = Math.random() * totalDmg, winner = contribs[0];
             for (const c of contribs){ r -= c.dmg; if (r <= 0){ winner = c; break; } }
@@ -4549,6 +4556,13 @@ function distributeBossLoot(m, loot, fallbackKiller){
             g.items[it.type] = (g.items[it.type] || 0) + (it.qty | 0 || 1);
         }
     }
+    let distributedGold = 0;
+    for (const c of contribs){
+        const share = Math.floor(goldTotal * (c.dmg / totalDmg));
+        if (share > 0){ slot(c.p).gold += share; distributedGold += share; }
+    }
+    const rest = goldTotal - distributedGold;   // arredondamento → maior peso
+    if (rest > 0){ const top = contribs.reduce((a,b) => b.dmg > a.dmg ? b : a, contribs[0]); slot(top.p).gold += rest; }
     for (const g of got.values()){
         const pp = g.p;
         if (g.gold > 0){ pp.gold = (pp.gold || 0) + g.gold; syncGoldRank(pp.name, pp.gold); }
@@ -4566,6 +4580,25 @@ function distributeBossLoot(m, loot, fallbackKiller){
             bossLoot: { boss: m.type, gold: g.gold, items: g.items },
         });
     }
+}
+
+// Um único cálculo e entrega para morte por golpe e por DoT.
+function grantMobLoot(m, killer){
+    const isBoss = !!m.unique;
+    const contributors = isBoss ? bossLootContributors(m, killer) : [];
+    const luck = isBoss ? bossRewardBonus(contributors, 'rareLuck')
+        : ((killer?.permaBuffs?.rareLuck || 0) + (killer ? petBuffVal(killer, 'rareLuck') : 0));
+    const goldBonus = isBoss ? bossRewardBonus(contributors, 'lootBonus')
+        : ((killer?.permaBuffs?.lootBonus || 0) + (killer ? petBuffVal(killer, 'lootBonus') : 0));
+    const loot = rollLoot(m.type, luck, m.floor);
+    if (goldBonus > 0){
+        for (const it of loot){
+            if (it.type === 'GOLD' && it.qty > 0) it.qty = Math.max(1, Math.round(it.qty * (1 + goldBonus)));
+        }
+    }
+    const drops = isBoss ? [] : dropMobLoot(m, loot, killer);
+    if (isBoss) distributeBossLoot(m, loot, contributors);
+    return { loot, drops, isBoss };
 }
 
 // ─── Lote 1b: progresso de quest SERVER-AUTORITATIVO ──────────────────────
@@ -4696,20 +4729,7 @@ function handleMobDeath(m, killerId){
     }
     monsters.delete(m.id);
     const killer = players.get(killerId);
-    const loot = rollLoot(m.type, ((killer && killer.permaBuffs && killer.permaBuffs.rareLuck) || 0) + (killer ? petBuffVal(killer, 'rareLuck') : 0), m.floor);
-    const isBoss = !!m.unique;
-    // M5 talent t_loot (+15% gold) — espelha o caminho do attackMob.
-    if (!isBoss && killer){
-        const lootBonus = (killer.permaBuffs?.lootBonus || 0) + petBuffVal(killer, 'lootBonus');
-        if (lootBonus > 0){ for (const it of loot){ if (it && it.type === 'GOLD' && it.qty > 0) it.qty = Math.max(1, Math.round(it.qty * (1 + lootBonus))); } }
-    }
-    // M4 anti-ninja: boss distribui por dano (direto no inv); mob comum cai no chão
-    // com dono+lock (dropMobLoot). Antes a morte por DoT mandava só `loot` sem `drops`
-    // server-side → o cliente criava drop com id local que o groundPickup nunca catava
-    // = loot perdido online. Agora o caminho do DoT é igual ao do attackMob.
-    let spawnedDrops = [];
-    if (isBoss) distributeBossLoot(m, loot, killer);
-    else spawnedDrops = dropMobLoot(m, loot, killer);
+    const { loot, drops:spawnedDrops, isBoss } = grantMobLoot(m, killer);
     // T1: XP authoritative na skill da arma equipada do killer
     let xpGained = 0, skillUsed = null, petGain = null;
     if (killer){
@@ -4752,9 +4772,10 @@ function tickMobDots(){
             const d = m.dots[i];
             if (now < d.nextTickAt) continue;
             const dmg = d.dmg;
+            const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
             // Anti-ninja: dano de DoT conta pro dono do loot (todos os mobs agora)
-            if (d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dmg; }
+            if (d.byId != null){ m.damageBy = m.damageBy || {}; m.damageBy[d.byId] = (m.damageBy[d.byId] || 0) + dealtDamage; }
             floats.push({ mobId: m.id, text: `-${dmg}`, color: DOT_COLORS[d.type] || '#aaa' });
             d.ticksLeft--;
             if (d.ticksLeft <= 0) m.dots.splice(i, 1);
@@ -5849,6 +5870,7 @@ function sharePartyKill(killer, mob){
     const shareXp = Math.max(1, Math.round((mob.xp || 0) * PARTY_XP_FRACTION));
     for (const pp of partyMembersOnline(party)){
         if (pp.name === killer.name) continue;
+        if ((pp.floor || 0) !== (mob.floor || 0)) continue;
         if (chebyshev(pp.x, pp.y, mob.x, mob.y) > PARTY_SHARE_RADIUS) continue;
         if (pp.ws.readyState !== 1) continue;
         // T3: XP authoritative na skill da arma equipada do membro
@@ -7460,15 +7482,22 @@ wss.on('connection', (ws, request) => {
         // gold + aplica XP autoritative. Rate-limit 1500ms entre tentativas
         // (TRAINING_TIME no cliente é 2000ms — margem).
         if (msg.t === 'trainAttempt') {
+            const skill = String(msg.skill || '');
+            const requestId = typeof msg.requestId === 'string' && /^[a-f\d-]{36}$/i.test(msg.requestId)
+                ? msg.requestId : undefined;
             const reject = (reason) => {
                 // ok:false não era tratado no cliente (falha silenciosa). serverMsg já renderiza.
                 // i18n: traduz por p.lang (trp); fallback p/ srv.train_failed em reason desconhecida.
                 const key = 'srv.train_' + reason;
                 const txt = I18N_SRV.pt[key] ? trp(p, key) : trp(p, 'srv.train_failed');
                 sendTo(id, { t:'serverMsg', level:'warn', text: txt });
+                sendTo(id, { t:'invUpdate', trainResult:{ ok:false, skill, reason, requestId } });
             };
-            const skill = String(msg.skill || '');
             if (!p.skills || !p.skills[skill]) return reject('unknown_skill');
+            const weaponSkill = weaponSkillOf(p);
+            const dummySkill = weaponSkill === 'Magia' ? 'Punho' : weaponSkill;
+            if (skill !== 'Magia' && skill !== dummySkill &&
+                !(skill === 'Escudo' && hasShieldEquipped(p))) return reject('wrong_equipment');
             // Rate limit
             const now = Date.now();
             p._lastTrainAt = p._lastTrainAt || 0;
@@ -7482,14 +7511,14 @@ wss.on('connection', (ws, request) => {
                 return reject(skill === 'Magia' ? 'not_at_altar' : 'not_at_dummy');
             }
             const sk = p.skills[skill];
-            const cost = Math.max(5, (sk.val || 10) * 2);
+            const cost = trainingRules.cost(sk.val || 10);
             if ((p.gold || 0) < cost) return reject('no_gold');
             p.gold -= cost;
             syncGoldRank(p.name, p.gold);
             const xp = Math.max(1, Math.floor((sk.xpNext || 50) / 60));
             gainSkillXpServer(p, skill, xp);
             sendInvUpdate(p, {
-                trainResult:{ ok:true, skill, xp, cost },
+                trainResult:{ ok:true, skill, xp, cost, requestId },
                 skills: p.skills,
                 reason:'train',
             });
@@ -8156,7 +8185,7 @@ wss.on('connection', (ws, request) => {
             // Anti-ninja: rastreia dano por player em TODOS os mobs — o dono do loot
             // (boss = direto no inv; mob comum = bag no chão) é quem deu mais dano.
             // damageBy some quando o mob é deletado na morte (sem leak).
-            m.damageBy = m.damageBy || {}; m.damageBy[id] = (m.damageBy[id] || 0) + dmg;
+            m.damageBy = m.damageBy || {}; m.damageBy[id] = (m.damageBy[id] || 0) + dealtDamage;
             // T1/T3: XP de skill por hit (não só por kill).
             // - Melee (range≤1, sem ammo, sem spear): +1 na skill da arma
             // - Distância (range>1 OU ammo OU throwSpear): +1 em Distância
@@ -8231,29 +8260,7 @@ wss.on('connection', (ws, request) => {
                     }
                 }
                 monsters.delete(m.id);
-                // Loot autoritativo: server roda LOOT e mantém drops no chão.
-                // Cada item ganha id server-side; broadcast spawn pra TODOS verem.
-                const loot = rollLoot(m.type, ((p.permaBuffs && p.permaBuffs.rareLuck) || 0) + petBuffVal(p, 'rareLuck'), m.floor);
-                // M5 talent t_loot: +15% gold de drops. Aplica antes do spawn.
-                const lootBonus = (p.permaBuffs?.lootBonus || 0) + petBuffVal(p, 'lootBonus');
-                if (lootBonus > 0){
-                    for (const it of loot){
-                        if (it && it.type === 'GOLD' && it.qty > 0){
-                            it.qty = Math.max(1, Math.round(it.qty * (1 + lootBonus)));
-                        }
-                    }
-                }
-                let spawnedDrops = [];
-                const isBoss = !!m.unique;
-                if (isBoss){
-                    // M4 anti-ninja: boss unique distribui o loot por dano, direto
-                    // no inventário de quem bateu. NÃO cai no chão.
-                    distributeBossLoot(m, loot, p);
-                } else {
-                    // Mob comum: cai no chão (3×3) com dono+lock (anti-ninja). dropMobLoot
-                    // carimba owner/ownerUntil = top-damager (+ party dele) por LOOT_LOCK_MS.
-                    spawnedDrops = dropMobLoot(m, loot, p);
-                }
+                const { loot, drops:spawnedDrops, isBoss } = grantMobLoot(m, p);
                 // T1: XP authoritative na skill da arma equipada
                 const skillUsed = weaponSkillOf(p);
                 gainSkillXpServer(p, skillUsed, m.xp || 1);

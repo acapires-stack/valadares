@@ -12,6 +12,7 @@ RUN npm install --omit=dev --no-audit --no-fund
 # Copia o resto do server
 COPY server/ ./server/
 COPY equipment-rules.js ./equipment-rules.js
+COPY training-rules.js ./training-rules.js
 
 # Railway define $PORT dinamicamente; server.js já respeita process.env.PORT
 EXPOSE 8080

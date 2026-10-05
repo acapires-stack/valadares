@@ -6,6 +6,7 @@
     "watchPatterns": [
       "server/**",
       "equipment-rules.js",
+      "training-rules.js",
       "package.json",
       "package-lock.json",
       "Dockerfile",
