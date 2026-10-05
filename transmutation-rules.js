@@ -4,7 +4,7 @@
     else root.ValadaresTransmutation = rules;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = 3;
+    const VERSION = 4;
     // As faixas 1 a 6 são entradas permitidas; a faixa 7 é somente saída.
     const tiers = [null,
         { cost:120, essenceQty:1, chances:{material:60,plain:25,enchanted:5,superior:10},
@@ -17,7 +17,7 @@
             pool:['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO'] },
         { cost:12000, essenceQty:10, chances:{material:40,plain:25,enchanted:30,superior:5},
             pool:['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO'] },
-        { cost:30000, essenceQty:15, chances:{material:35,plain:25,enchanted:38,superior:2},
+        { cost:30000, essenceQty:15, chances:{material:32,plain:25,enchanted:38,superior:5},
             pool:['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'] },
     ];
     const transcendentPool=['ESPADA_INFINITA','COROA_CELESTIAL','CAJADO_ASTRAL'];
@@ -26,11 +26,16 @@
     function tierOf(key) {
         return typeof key === 'string' ? (tierByKey.get(key) || 0) : 0;
     }
+    function pityInfo(failures) {
+        const n=Number(failures);
+        const safe=Number.isFinite(n) ? Math.max(0,Math.min(19,Math.trunc(n))) : 0;
+        return {failures:safe,chance:5+5*safe,remaining:20-safe};
+    }
     function invalid(error) {
         return {valid:false,error,tier:0,resultTier:0,sameTier:false,cost:0,essenceQty:0,
-            chances:{material:0,plain:0,enchanted:0,superior:0},pool:[],superiorPool:[]};
+            chances:{material:0,plain:0,enchanted:0,superior:0},pool:[],superiorPool:[],pity:null};
     }
-    function quote(keys) {
+    function quote(keys, failures=0) {
         if (!Array.isArray(keys) || keys.length !== 3 || keys.some(k => typeof k !== 'string')) return invalid('bad_keys');
         if (new Set(keys).size !== 3) return invalid('duplicate_keys');
         const ranks=keys.map(tierOf);
@@ -41,10 +46,20 @@
         const pool=tier===6 ? [...def.pool] : def.pool.filter(key => !keys.includes(key));
         if (!pool.length) return invalid('empty_pool');
         const chances={...def.chances};
+        const pity=tier===6 && sameTier ? pityInfo(failures) : null;
+        if (pity){
+            let transfer=pity.chance-chances.superior;
+            for(const category of ['material','plain','enchanted']){
+                const amount=Math.min(chances[category],transfer);
+                chances[category]-=amount;
+                transfer-=amount;
+            }
+            chances.superior=pity.chance;
+        }
         if (!sameTier){chances.material+=chances.superior;chances.superior=0;}
         return {valid:true,error:null,tier,resultTier:tier+1,sameTier,cost:def.cost,
-            essenceQty:def.essenceQty,chances,pool,
+            essenceQty:def.essenceQty,chances,pool,pity,
             superiorPool:sameTier ? [...(tiers[tier+1]?.pool || transcendentPool)] : []};
     }
-    return Object.freeze({VERSION,tierOf,quote});
+    return Object.freeze({VERSION,tierOf,pityInfo,quote});
 });

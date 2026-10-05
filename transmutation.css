@@ -37,6 +37,10 @@
 .tm-ascension-preview{border-color:#81d9ec;color:#c6f7ff}
 .tm-ascension-preview strong{color:#baf3ff}
 #transmutationPanel .tm-mythic-warning{border-left:3px solid #b98bd8;padding:7px 9px;background:#302339;color:#f1dbf7}
+#transmutationPanel .tm-pity{border:1px solid #7c729e;border-radius:4px;background:#252139;padding:9px 10px;color:#dfd9f4}
+#transmutationPanel .tm-pity strong{color:#c9eefa}
+#transmutationStatus .tm-pity-receipt{display:block;margin:5px 0 0 60px;color:#c9eefa}
+@media(max-width:600px){#transmutationStatus .tm-pity-receipt{margin-left:0}}
 #transmutationPanel .tm-mixed{color:#efbe87}
 #transmutationStatus p{margin:0}
 @media(max-width:600px){#transmutationPanel{padding:8px 9px 16px}#transmutationPanel .tm-grid{grid-template-columns:1fr}#transmutationPanel .tm-pool{columns:1}#craftModal [data-craft-tab]{font-size:10px;padding:6px 3px}}

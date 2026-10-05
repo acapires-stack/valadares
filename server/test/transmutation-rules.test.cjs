@@ -21,21 +21,22 @@ function literalFunction(name){
     throw Error(`incomplete ${name}`);
 }
 const serverFunctions = ['flushAccounts','updateEnchantSave','transmutationOpId',
-    'transmutationStatusResult','executeTransmutation','hasInv','sendInvUpdate'].map(literalFunction).join('\n');
+    'transmutationStatusResult','deriveTransmutationPity','executeTransmutation','hasInv','sendInvUpdate'].map(literalFunction).join('\n');
 const dispatchStart = source.indexOf("if (msg.t === 'transmuteStatus')");
 const dispatchEnd = source.indexOf("if (msg.t === 'invEnchant')",dispatchStart);
 assert.ok(dispatchStart > 0 && dispatchEnd > dispatchStart);
 const dispatch = source.slice(dispatchStart,dispatchEnd);
 
 function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,saveFails=false,
-    equipmentVersion=equipmentRules.VERSION,extraInv={}}={}){
+    equipmentVersion=equipmentRules.VERSION,extraInv={},pity=0}={}){
     const opId=crypto.randomUUID();
     const sent=[];
     const p={authedName:'tester',inv:{...Object.fromEntries(keys.map(k=>[k,1])),...extraInv},
-        gold,equipped:{},transmutationOps:[],transmutationToken:opId,
+        gold,equipped:{},transmutationOps:[],transmutationToken:opId,transmutationPity:pity,
         enchantOps:[],enchantToken:crypto.randomUUID(),x:51,y:52,floor:0,hp:10,
         equipmentVersion,ws:{readyState:1,send:s=>sent.push(JSON.parse(s))}};
-    const acc={save:{inv:p.inv,gold:p.gold,transmutationOps:[],transmutationToken:opId},savedAt:1};
+    const acc={save:{inv:p.inv,gold:p.gold,transmutationOps:[],transmutationToken:opId,
+        transmutationPity:pity},savedAt:1};
     const accounts=new Map([['tester',acc]]);
     const fsFake={writeFileSync(){if(saveFails) throw Error('disk full');},renameSync(){}};
     const random=Math; const math=Object.create(random);
@@ -51,12 +52,12 @@ function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,s
     vm.runInContext(serverFunctions,context);
     const invoke=vm.runInContext(`(function(msg,p){${dispatch}})`,context);
     function send(msg){invoke(msg,p); return sent.at(-1);}
-    function attempt(overrides={}){return send({t:'invTransmute',version:3,opId,keys,...overrides});}
+    function attempt(overrides={}){return send({t:'invTransmute',version:4,opId,keys,...overrides});}
     return {p,acc,opId,sent,send,attempt,context,fsFake};
 }
 
 test('shared table, whitelist, odds, weakest tier and browser UMD',()=>{
-    assert.equal(rules.VERSION,3);
+    assert.equal(rules.VERSION,4);
     for(const [key,tier] of [['ADAGA',1],['VARINHA_APRENDIZ',1],['ESPADA_OSSO',2],
         ['ESPADA_ACO',3],['ESPADA_DRACO',4],['ESPADA_GUARDIAO',5],['ESPADA_ETERNA',6],
         ['COROA_VALADARES',6],['CAJADO_ETERNO',6]])
@@ -70,7 +71,7 @@ test('shared table, whitelist, odds, weakest tier and browser UMD',()=>{
         [['ESPADA_ACO','BESTA','MARRETA'],3,1500,4,[50,25,15,10]],
         [['ESPADA_DRACO','ELMO_DRACO','CAJADO_FOGO'],4,4500,6,[45,25,20,10]],
         [['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL'],5,12000,10,[40,25,30,5]],
-        [['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'],6,30000,15,[35,25,38,2]],
+        [['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'],6,30000,15,[32,25,38,5]],
         [['ADAGA','MACA','ESPADA_ACO'],1,120,1,[70,25,5,0]],
     ]){
         const q=rules.quote(keys);
@@ -93,8 +94,24 @@ test('shared table, whitelist, odds, weakest tier and browser UMD',()=>{
     assert.equal(rules.quote(['ADAGA','PORRETE','ESPADA_INFINITA']).error,'ineligible_item');
     const browser={};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','..','transmutation-rules.js'),'utf8'),browser);
-    assert.equal(browser.ValadaresTransmutation.VERSION,3);
+    assert.equal(browser.ValadaresTransmutation.VERSION,4);
     assert.equal(browser.ValadaresTransmutation.quote(['ADAGA','MACA','ESPADA_ACO']).cost,120);
+});
+
+test('tier-six protection starts at five, grows by five and guarantees attempt twenty',()=>{
+    const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+    for(const [failures,chances] of [
+        [0,[32,25,38,5]],[1,[27,25,38,10]],[10,[0,7,38,55]],[19,[0,0,0,100]],
+    ]){
+        const info=rules.pityInfo(failures),q=rules.quote(keys,failures);
+        assert.deepEqual(info,{failures,chance:5+5*failures,remaining:20-failures});
+        assert.deepEqual(Object.values(q.chances),chances);
+        assert.deepEqual(q.pity,info);
+        assert.equal(Object.values(q.chances).reduce((a,b)=>a+b),100);
+    }
+    assert.deepEqual(rules.pityInfo(999),{failures:19,chance:100,remaining:1});
+    assert.equal(rules.quote(['ADAGA','PORRETE','CLAVA'],19).pity,null);
+    assert.equal(rules.quote(['ADAGA','ESPADA_ETERNA','CAJADO_ETERNO'],19).pity,null);
 });
 
 test('each approved input belongs to one progressing tier and every superior pool is valid',()=>{
@@ -154,7 +171,7 @@ test('all six tiers honor four category thresholds in the server handler',()=>{
         const {material,plain,enchanted}=q.chances;
         for(const [percent,expected] of [[0,'material'],[material,'plain'],
             [material+plain,'enchanted'],[material+plain+enchanted,'superior']]){
-            const f=fixture({keys,gold:40000,rolls:[percent/100,0]});
+            const f=fixture({keys,gold:40000,rolls:[(percent+0.001)/100,0]});
             const receipt=f.attempt().transmutation;
             assert.equal(receipt.ok,true,`${q.tier} ${expected}`);
             assert.equal(receipt.category,expected,`${q.tier} ${percent}`);
@@ -234,6 +251,112 @@ test('tier six consumes three distinct mythics and returns only one normal prize
     }
 });
 
+test('only confirmed tier-six misses advance protection and the twentieth attempt is guaranteed',()=>{
+    const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+    const f=fixture({keys,gold:700000});
+    f.context.Math.random=()=>0;
+    for(let failures=0;failures<19;failures++){
+        for(const key of keys) f.p.inv[key]=1;
+        const opId=f.p.transmutationToken;
+        const update=f.send({t:'invTransmute',version:4,opId,keys});
+        const receipt=update.transmutation;
+        assert.equal(receipt.ok,true);
+        assert.notEqual(receipt.category,'superior');
+        assert.equal(receipt.pityBefore,failures);
+        assert.equal(receipt.pityAfter,failures+1);
+        assert.equal(receipt.chance,5+5*failures);
+        assert.equal(f.p.transmutationPity,failures+1);
+        assert.equal(f.acc.save.transmutationPity,failures+1);
+        assert.equal(update.transmutationPity,failures+1);
+        assert.deepEqual(f.send({t:'transmuteStatus',opId}).transmutation,receipt);
+        assert.deepEqual(f.send({t:'invTransmute',version:4,opId,keys}).transmutation,receipt);
+        assert.equal(f.p.transmutationPity,failures+1);
+        if(failures===0){
+            const other=['ADAGA','PORRETE','CLAVA'];
+            for(const key of other) f.p.inv[key]=1;
+            const result=f.send({t:'invTransmute',version:4,opId:f.p.transmutationToken,keys:other}).transmutation;
+            assert.equal(result.ok,true);assert.equal(result.pityAfter,undefined);
+            assert.equal(f.p.transmutationPity,1);
+        }
+    }
+    for(const key of keys) f.p.inv[key]=1;
+    const final=f.send({t:'invTransmute',version:4,opId:f.p.transmutationToken,keys}).transmutation;
+    assert.equal(final.category,'superior');
+    assert.equal(final.pityBefore,19);
+    assert.equal(final.pityAfter,0);
+    assert.equal(final.chance,100);
+    assert.equal(f.p.transmutationPity,0);
+    assert.equal(f.acc.save.transmutationPity,0);
+});
+
+test('join migrates ten trusted version-three misses to 55%, but saved zero wins',()=>{
+    const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+    const f=fixture({keys,gold:60000});
+    const make=(i,category='material')=>{const opId=crypto.randomUUID();return {opId,
+        request:{version:3,keys},result:{ok:true,opId,keys,cost:30000,tier:6,
+            category,newKey:'ESSENCIA_ARCANA',qty:15}};};
+    const history=Array.from({length:10},(_,i)=>make(i));
+    const winning=make(10);
+    winning.result={...winning.result,category:'superior',newKey:'ESPADA_INFINITA',qty:1,resultTier:7};
+    assert.equal(f.context.deriveTransmutationPity([...history.slice(0,3),winning,...history.slice(3,5)]),2);
+    const forged=make(11);forged.result.opId='different';
+    assert.equal(f.context.deriveTransmutationPity([...history,forged]),10);
+    history.splice(4,0,{opId:crypto.randomUUID(),request:{version:3,keys:['ADAGA','PORRETE','CLAVA']},
+        result:{ok:true,tier:1,category:'material',cost:120,keys:['ADAGA','PORRETE','CLAVA']}});
+    f.acc.save.transmutationOps=history;
+    delete f.acc.save.transmutationPity;
+    const start=source.indexOf('p.transmutationToken = typeof acc?.save?.transmutationToken');
+    const end=source.indexOf('if (acc && acc.save){',start);
+    const hydrate=vm.runInContext(`(function(p,acc){${source.slice(start,end)}})`,f.context);
+    hydrate(f.p,f.acc);
+    assert.equal(f.p.transmutationPity,10);
+    assert.equal(f.context.updateEnchantSave(f.p),true);
+    assert.equal(f.acc.save.transmutationPity,10);
+    const receipt=f.send({t:'invTransmute',version:4,opId:f.p.transmutationToken,keys}).transmutation;
+    assert.equal(receipt.chance,55);
+    assert.equal(receipt.pityBefore,10);
+    f.acc.save.transmutationPity=0;
+    hydrate(f.p,f.acc);
+    assert.equal(f.p.transmutationPity,0);
+});
+
+test('tier-six save failure restores pity and retry or restart cannot double-count',()=>{
+    const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+    const f=fixture({keys,gold:60000,pity:10,saveFails:true,rolls:[0.01,0.01]});
+    const before=JSON.parse(JSON.stringify(f.acc.save));
+    assert.equal(f.attempt().transmutation.error,'save_failed');
+    assert.equal(f.p.transmutationPity,10);
+    assert.deepEqual(JSON.parse(JSON.stringify(f.acc.save)),before);
+    f.context.fs.writeFileSync=()=>{};
+    const receipt=f.attempt().transmutation;
+    assert.equal(receipt.ok,true);
+    assert.equal(receipt.pityBefore,10);
+    assert.equal(receipt.pityAfter,11);
+    const resumed=fixture({keys,gold:60000});
+    Object.assign(resumed.p,f.acc.save);
+    assert.deepEqual(resumed.send({t:'transmuteStatus',opId:f.opId}).transmutation,receipt);
+    assert.equal(resumed.p.transmutationPity,11);
+    assert.deepEqual(resumed.send({t:'invTransmute',version:4,opId:f.opId,keys}).transmutation,receipt);
+    assert.equal(resumed.p.transmutationPity,11);
+});
+
+test('client save and restore uploads overwrite forged protection, receipts and token',()=>{
+    const p={transmutationPity:7,transmutationOps:[{opId:'trusted'}],transmutationToken:'trusted-token'};
+    for(const handler of ['saveUpload','restoreUpload']){
+        const start=source.indexOf(`if (msg.t === '${handler}')`);
+        const bodyStart=source.indexOf('data.transmutationOps = p.transmutationOps || [];',start);
+        const bodyEnd=source.indexOf('data.transmutationPity = p.transmutationPity || 0;',bodyStart)
+            +'data.transmutationPity = p.transmutationPity || 0;'.length;
+        assert.ok(bodyStart>start && bodyEnd>bodyStart);
+        const apply=vm.runInNewContext(`(function(data,p){${source.slice(bodyStart,bodyEnd)}return data;})`);
+        const data=apply({transmutationPity:19,transmutationOps:[{opId:'forged'}],
+            transmutationToken:'forged-token'},p);
+        assert.equal(data.transmutationPity,7);
+        assert.deepEqual(data.transmutationOps,p.transmutationOps);
+        assert.equal(data.transmutationToken,'trusted-token');
+    }
+});
+
 test('worn base, upgraded or enchanted mythics do not block loose backpack copies',()=>{
     const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
     const armorStart=source.indexOf('const SRV_ARMOR_UPGRADES = [');
@@ -309,22 +432,26 @@ test('new transcendent equipment is recognized by real server stats, skills, for
     }
 });
 
-test('version-one and version-two receipts remain queryable; unexecuted old versions cannot roll',()=>{
+test('version-one through version-three receipts remain queryable; unexecuted old versions cannot roll',()=>{
     const f=fixture();
     const historical={ok:true,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA'],cost:120,
         tier:1,category:'material',newKey:'ESSENCIA_ARCANA',qty:1};
-    const secondId=crypto.randomUUID(), historicalV2={...historical,opId:secondId};
+    const secondId=crypto.randomUUID(), thirdId=crypto.randomUUID();
+    const historicalV2={...historical,opId:secondId}, historicalV3={...historical,opId:thirdId};
     f.p.transmutationOps=[
         {opId:f.opId,request:{version:1,keys:historical.keys},result:historical},
         {opId:secondId,request:{version:2,keys:historical.keys},result:historicalV2},
+        {opId:thirdId,request:{version:3,keys:historical.keys},result:historicalV3},
     ];
     f.p.transmutationToken=crypto.randomUUID();
     assert.deepEqual(f.send({t:'transmuteStatus',opId:f.opId}).transmutation,historical);
     assert.deepEqual(f.send({t:'transmuteStatus',opId:secondId}).transmutation,historicalV2);
+    assert.deepEqual(f.send({t:'transmuteStatus',opId:thirdId}).transmutation,historicalV3);
     assert.deepEqual(f.attempt({version:1}).transmutation,historical);
     assert.deepEqual(f.attempt({version:2,opId:secondId}).transmutation,historicalV2);
+    assert.deepEqual(f.attempt({version:3,opId:thirdId}).transmutation,historicalV3);
     assert.equal(f.p.gold,2000);
-    for(const version of [1,2]){
+    for(const version of [1,2,3]){
         const fresh=fixture();
         fresh.context.Math.random=()=>{throw Error('legacy request must not roll');};
         assert.equal(fresh.attempt({version}).transmutation.error,'update_required');
@@ -349,7 +476,7 @@ test('duplicates, conflicting payload, stale token and read-only status never ch
     next.p.inv=f.acc.save.inv; next.p.gold=f.acc.save.gold;
     next.p.transmutationOps=f.acc.save.transmutationOps;
     next.p.transmutationToken=f.acc.save.transmutationToken;
-    assert.deepEqual(next.send({t:'invTransmute',version:3,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,first);
+    assert.deepEqual(next.send({t:'invTransmute',version:4,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,first);
     assert.equal(next.p.gold,gold);
 });
 
@@ -369,7 +496,7 @@ test('invalid inputs, location, funds, capacity and equipment version reject wit
         else {assert.equal(result.error,error); assert.equal(f.p.gold,before); assert.equal(f.p.transmutationToken,f.opId);}
     }
     const f=fixture();
-    assert.equal(f.attempt({version:2}).transmutation.error,'update_required');
+    assert.equal(f.attempt({version:3}).transmutation.error,'update_required');
     assert.equal(f.attempt({keys:['ADAGA','ADAGA','CLAVA']}).transmutation.error,'duplicate_keys');
     assert.equal(f.attempt({keys:['ADAGA','PORRETE','ESPADA_INFINITA']}).transmutation.error,'ineligible_item');
 });
@@ -412,7 +539,7 @@ test('atomic file persists receipt and consumed inventory for a fresh process st
     const restarted=fixture();
     Object.assign(restarted.p,saved);
     assert.deepEqual(restarted.send({t:'transmuteStatus',opId:f.opId}).transmutation,receipt);
-    assert.deepEqual(restarted.send({t:'invTransmute',opId:f.opId,version:3,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,receipt);
+    assert.deepEqual(restarted.send({t:'invTransmute',opId:f.opId,version:4,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,receipt);
     assert.equal(restarted.p.gold,1880);
     const mythics=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
     const sixth=fixture({keys:mythics,gold:40000,rolls:[0.35,0]});
@@ -420,11 +547,13 @@ test('atomic file persists receipt and consumed inventory for a fresh process st
     const sixthReceipt=sixth.attempt().transmutation;
     const savedSixth=JSON.parse(fs.readFileSync(file,'utf8')).accounts[0].save;
     assert.equal(savedSixth.gold,10000);
+    assert.equal(savedSixth.transmutationPity,1);
     assert.deepEqual(Object.keys(savedSixth.inv),['ESPADA_ETERNA']);
     const resumed=fixture({keys:mythics,gold:40000});
     Object.assign(resumed.p,savedSixth);
+    assert.equal(resumed.p.transmutationPity,1);
     assert.deepEqual(resumed.send({t:'transmuteStatus',opId:sixth.opId}).transmutation,sixthReceipt);
-    assert.deepEqual(resumed.send({t:'invTransmute',opId:sixth.opId,version:3,keys:mythics}).transmutation,sixthReceipt);
+    assert.deepEqual(resumed.send({t:'invTransmute',opId:sixth.opId,version:4,keys:mythics}).transmutation,sixthReceipt);
     assert.equal(resumed.p.gold,10000);
 });
 

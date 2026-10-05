@@ -1058,7 +1058,8 @@ function updateEnchantSave(p){
         permaBuffs:p.permaBuffs,dyes:p.dyes,pets:p.pets,pet:p.pet };
     Object.assign(acc.save, { inv:p.inv, equipped:p.equipped, gold:p.gold, enchantOps:p.enchantOps,
         enchantToken:p.enchantToken, transmutationOps:p.transmutationOps,
-        transmutationToken:p.transmutationToken, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
+        transmutationToken:p.transmutationToken, transmutationPity:p.transmutationPity,
+        hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
     return flushAccounts();
 }
@@ -1068,6 +1069,28 @@ function transmutationOpId(value){
 function transmutationStatusResult(p, opId){
     const previous = (p.transmutationOps || []).find(x => x && x.opId === opId);
     return previous ? previous.result : {ok:false,error:'not_found',opId};
+}
+function deriveTransmutationPity(ops){
+    let failures=0;
+    if (!Array.isArray(ops)) return 0;
+    for (let i=ops.length-1;i>=0 && failures<19;i--){
+        const op=ops[i], req=op?.request, result=op?.result;
+        if (!transmutationOpId(op?.opId) || result?.opId !== op.opId ||
+            req?.version !== 3 || !Array.isArray(req.keys) || req.keys.length !== 3 ||
+            new Set(req.keys).size !== 3 || !req.keys.every(k =>
+                k === 'ESPADA_ETERNA' || k === 'COROA_VALADARES' || k === 'CAJADO_ETERNO') ||
+            !result?.ok || result.tier !== 6 || result.cost !== 30000 ||
+            !Array.isArray(result.keys) || result.keys.some((k,j) => k !== req.keys[j])) continue;
+        const parsed=equipmentRules.parse(result.newKey);
+        const isMythic=parsed.valid && req.keys.includes(parsed.base);
+        if (result.category === 'superior' && result.qty === 1 && result.resultTier === 7 &&
+            ['ESPADA_INFINITA','COROA_CELESTIAL','CAJADO_ASTRAL'].includes(result.newKey)) break;
+        if (result.category === 'material' && result.newKey === equipmentRules.MATERIAL && result.qty === 15 ||
+            result.category === 'plain' && isMythic && !parsed.enchanted && !parsed.plus && result.qty === 1 ||
+            result.category === 'enchanted' && isMythic && parsed.enchanted && !parsed.plus && result.qty === 1)
+            failures++;
+    }
+    return failures;
 }
 function executeTransmutation(p, msg){
     const opId = transmutationOpId(msg.opId);
@@ -1086,7 +1109,7 @@ function executeTransmutation(p, msg){
     if (msg.version !== transmutationRules.VERSION || p.equipmentVersion !== equipmentRules.VERSION) return fail('update_required');
     if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId ||
         chebyshev(p.x,p.y,51,52) > 1) return fail('not_at_bench');
-    const quote = transmutationRules.quote(keys);
+    const quote = transmutationRules.quote(keys,p.transmutationPity);
     if (!quote.valid) return fail(quote.error);
     const quoted = {cost:quote.cost,tier:quote.tier};
     if (keys.some(key => !itemMetaForKey(key) || !equipmentRules.KINDS.includes(itemMetaForKey(key).kind)))
@@ -1135,16 +1158,24 @@ function executeTransmutation(p, msg){
     const acc = p.authedName && getAccount(p.authedName);
     if (!acc) return fail('save_failed',quoted);
     const old = {inv:p.inv,gold:p.gold,transmutationOps:p.transmutationOps,
-        transmutationToken:p.transmutationToken,save:acc.save ? {...acc.save} : null,savedAt:acc.savedAt};
+        transmutationToken:p.transmutationToken,transmutationPity:p.transmutationPity,
+        save:acc.save ? {...acc.save} : null,savedAt:acc.savedAt};
     const result = {ok:true,opId,keys,cost:quote.cost,tier:quote.tier,category,newKey,qty};
     if (category === 'superior') result.resultTier = quote.resultTier;
+    if (quote.pity){
+        result.pityBefore=quote.pity.failures;
+        result.pityAfter=category === 'superior' ? 0 : Math.min(19,quote.pity.failures+1);
+        result.chance=quote.pity.chance;
+    }
     p.inv = projected;
     p.gold -= quote.cost;
+    if (quote.pity) p.transmutationPity=result.pityAfter;
     p.transmutationOps = [...(p.transmutationOps || []),{opId,request:{version:msg.version,keys},result}].slice(-20);
     p.transmutationToken = crypto.randomUUID();
     if (!updateEnchantSave(p)){
         p.inv = old.inv; p.gold = old.gold;
         p.transmutationOps = old.transmutationOps; p.transmutationToken = old.transmutationToken;
+        p.transmutationPity = old.transmutationPity;
         acc.save = old.save; acc.savedAt = old.savedAt;
         return fail('save_failed',quoted);
     }
@@ -1181,7 +1212,8 @@ function sendInvUpdate(p, extra){
     if (!p || p.ws.readyState !== 1) return;
     const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null,
         enchantToken:p.enchantToken || null,
-        transmutationVersion:transmutationRules.VERSION, transmutationToken:p.transmutationToken || null };
+        transmutationVersion:transmutationRules.VERSION, transmutationToken:p.transmutationToken || null,
+        transmutationPity:p.transmutationPity || 0 };
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
 }
@@ -6495,6 +6527,7 @@ wss.on('connection', (ws, request) => {
             data.enchantToken = p.enchantToken || null;
             data.transmutationOps = p.transmutationOps || [];
             data.transmutationToken = p.transmutationToken || null;
+            data.transmutationPity = p.transmutationPity || 0;
             // talents (RANKS) + permaBuffs: persiste os do SERVER (vivos), não os do cliente —
             // senão o save do cliente reverteria os ranks (era a causa do "reseta ao escolher outro").
             if (p.talents && typeof p.talents === 'object') data.talents = p.talents;
@@ -6546,6 +6579,11 @@ wss.on('connection', (ws, request) => {
             try { if (JSON.stringify(data).length > SAVE_MAX_BYTES){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.backup_too_big') }); return; } } catch { return; }
             if (isEmptyDefaultSaveServer(data)){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.backup_also_empty') }); return; }
             sanitizeSave(data, p.authedName);   // clampa gold/skills
+            // Recibos, token e proteção são estado do servidor mesmo em restauração
+            // administrativa; o backup enviado pelo cliente não pode criar pity.
+            data.transmutationOps = p.transmutationOps || [];
+            data.transmutationToken = p.transmutationToken || null;
+            data.transmutationPity = p.transmutationPity || 0;
             acc.save = data;
             acc.savedAt = Date.now();
             acc._restoreUntil = 0;
@@ -6588,6 +6626,9 @@ wss.on('connection', (ws, request) => {
             p.transmutationToken = typeof acc?.save?.transmutationToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.transmutationToken)
                 ? acc.save.transmutationToken : crypto.randomUUID();
             p.transmutationOps = Array.isArray(acc?.save?.transmutationOps) ? acc.save.transmutationOps.slice(-20) : [];
+            p.transmutationPity = Number.isInteger(acc?.save?.transmutationPity) && acc.save.transmutationPity >= 0
+                && acc.save.transmutationPity <= 19 ? acc.save.transmutationPity
+                : deriveTransmutationPity(p.transmutationOps);
             if (acc && acc.save){
                 p.enchantOps = Array.isArray(acc.save.enchantOps) ? acc.save.enchantOps.slice(-20) : [];
                 // Posição: última PERSISTIDA no server (validada). Default SAFE acima cobre
@@ -6698,7 +6739,8 @@ wss.on('connection', (ws, request) => {
             // M4: login sempre nasce no overworld (masmorra é efêmera — deslogar
             // lá embaixo te traz pra cidade). Snapshots filtrados pelo floor do player.
             p.floor = 0;
-            if ((acc?.save?.enchantToken !== p.enchantToken || acc?.save?.transmutationToken !== p.transmutationToken) && !updateEnchantSave(p)){
+            if ((acc?.save?.enchantToken !== p.enchantToken || acc?.save?.transmutationToken !== p.transmutationToken
+                || acc?.save?.transmutationPity !== p.transmutationPity) && !updateEnchantSave(p)){
                 p.name = 'Anônimo';
                 sendTo(id,{t:'serverMsg',level:'warn',text:'Não foi possível salvar sua sessão. Tente entrar novamente.'});
                 setTimeout(() => { try { ws.close(1011,'save-failed'); } catch {} },200);
@@ -6713,6 +6755,7 @@ wss.on('connection', (ws, request) => {
                 enchantToken: p.enchantToken,
                 transmutationVersion: transmutationRules.VERSION,
                 transmutationToken: p.transmutationToken,
+                transmutationPity: p.transmutationPity,
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
