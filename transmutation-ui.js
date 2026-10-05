@@ -57,8 +57,9 @@
         refreshIfOpen();
     }
     function eligible(){
-        const worn=new Set(Object.values(player.equipped||{}).filter(Boolean).map(k=>window.ValadaresEquipment?.parse(k).base||k));
-        return Object.keys(player.inv||{}).filter(k=>ownCount(k)>0&&RULES.tierOf(k)>0&&!worn.has(k)).sort((a,b)=>RULES.tierOf(a)-RULES.tierOf(b)||name(a).localeCompare(name(b),LANG==='en'?'en':'pt'));
+        // Equipped copies are stored outside player.inv. Only backpack units
+        // can be consumed; wearing the same base must not hide spare copies.
+        return Object.keys(player.inv||{}).filter(k=>ownCount(k)>0&&RULES.tierOf(k)>0).sort((a,b)=>RULES.tierOf(a)-RULES.tierOf(b)||name(a).localeCompare(name(b),LANG==='en'?'en':'pt'));
     }
     function validSelection(keys,choices){return keys.length===3&&new Set(keys).size===3&&keys.every(k=>choices.includes(k)&&ownCount(k)>0)}
     function currentQuote(choices){return validSelection(selected,choices)?RULES.quote(selected):null}
@@ -108,7 +109,7 @@
         document.getElementById('craftGoldLabel').textContent=player.gold+' g';
         let html='<h3>✦ '+txt('Mesa de Transmutação','Transmutation Table')+'</h3>';
         html+='<p>'+txt('Troque três equipamentos por um resultado surpresa. Cada combinação consome uma unidade das peças escolhidas e o ouro indicado.','Trade three equipment pieces for a surprise result. Each combination consumes one of each selected piece and the displayed gold.')+'</p>';
-        html+='<p class="tm-note">'+txt('Três peças diferentes da mesma faixa liberam a chance de subir uma faixa. Míticas ★★ são aceitas; Ascendentes ★★★ são somente resultado. Peças equipadas, melhoradas ou encantadas ficam protegidas.','Three different pieces of the same tier unlock a chance to move up one tier. Mythic ★★ pieces are accepted; Ascendant ★★★ pieces are output only. Equipped, upgraded or enchanted pieces are protected.')+'</p>';
+        html+='<p class="tm-note">'+txt('Três peças diferentes da mesma faixa liberam a chance de subir uma faixa. Míticas ★★ são aceitas; Ascendentes ★★★ são somente resultado. Usa somente cópias da mochila, sem melhoria ou encantamento. O equipamento que você está vestindo fica protegido.','Three different pieces of the same tier unlock a chance to move up one tier. Mythic ★★ pieces are accepted; Ascendant ★★★ pieces are output only. Uses only unupgraded, unenchanted backpack copies. The equipment you are wearing stays protected.')+'</p>';
         html+='<p class="tm-note">✧ '+ownCount(MATERIAL)+' '+txt('essências arcanas na mochila','arcane essences in backpack')+'</p>';
         html+='<div class="tm-grid">';
         for(let i=0;i<3;i++){

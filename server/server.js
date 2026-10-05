@@ -1091,8 +1091,8 @@ function executeTransmutation(p, msg){
     const quoted = {cost:quote.cost,tier:quote.tier};
     if (keys.some(key => !itemMetaForKey(key) || !equipmentRules.KINDS.includes(itemMetaForKey(key).kind)))
         return fail('ineligible_item',quoted);
-    if (Object.values(p.equipped || {}).some(key => keys.includes(getUpgradeTier(key).base)))
-        return fail('equipped_input',quoted);
+    // p.inv contém apenas cópias na mochila; equipados já foram retirados dali
+    // pelo invEquip. Consumir somente p.inv preserva qualquer exemplar vestido.
     if (keys.some(key => !hasInv(p,key,1))) return fail('no_items',quoted);
     if (!Number.isFinite(p.gold) || p.gold < quote.cost) return fail('no_gold',quoted);
     // Reserve capacity for every possible outcome before rolling. Otherwise a

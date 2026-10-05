@@ -21,7 +21,7 @@ function literalFunction(name){
     throw Error(`incomplete ${name}`);
 }
 const serverFunctions = ['flushAccounts','updateEnchantSave','transmutationOpId',
-    'transmutationStatusResult','executeTransmutation','sendInvUpdate'].map(literalFunction).join('\n');
+    'transmutationStatusResult','executeTransmutation','hasInv','sendInvUpdate'].map(literalFunction).join('\n');
 const dispatchStart = source.indexOf("if (msg.t === 'transmuteStatus')");
 const dispatchEnd = source.indexOf("if (msg.t === 'invEnchant')",dispatchStart);
 assert.ok(dispatchStart > 0 && dispatchEnd > dispatchStart);
@@ -47,8 +47,7 @@ function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,s
         transmutationRules:rules,equipmentRules,SAVE_CAPS:{invKeys:cap},
         chebyshev:(ax,ay,bx,by)=>Math.max(Math.abs(ax-bx),Math.abs(ay-by)),
         itemMetaForKey:key=>itemMeta[equipmentRules.parse(key).base] || null,
-        getUpgradeTier:equipmentRules.parse,enchantedIdExists:()=>false,
-        hasInv:(player,key,qty)=>(player.inv[key]||0)>=qty});
+        getUpgradeTier:equipmentRules.parse,enchantedIdExists:()=>false});
     vm.runInContext(serverFunctions,context);
     const invoke=vm.runInContext(`(function(msg,p){${dispatch}})`,context);
     function send(msg){invoke(msg,p); return sent.at(-1);}
@@ -207,10 +206,6 @@ test('tier six consumes three distinct mythics and returns only one normal prize
     const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
     const q=rules.quote(keys);
     assert.deepEqual(q.pool,keys);
-    const equipped=fixture({keys,gold:40000});
-    equipped.p.equipped.weapon='ESPADA_ETERNA_PLUS_1';
-    assert.equal(equipped.attempt().transmutation.error,'equipped_input');
-    assert.equal(equipped.p.gold,40000);
     assert.equal(rules.quote(['ESPADA_ETERNA_PLUS_1','COROA_VALADARES','CAJADO_ETERNO']).error,'ineligible_item');
     const enchanted=equipmentRules.make('ESPADA_ETERNA',0,'abcdef012345',equipmentRules.roll('weapon',[],0));
     assert.equal(rules.quote([enchanted,'COROA_VALADARES','CAJADO_ETERNO']).error,'ineligible_item');
@@ -236,6 +231,48 @@ test('tier six consumes three distinct mythics and returns only one normal prize
         assert.equal(receipt.resultTier,7);
         assert.equal(receipt.newKey,q.superiorPool[i]);
         assert.equal(rules.tierOf(receipt.newKey),0);
+    }
+});
+
+test('worn base, upgraded or enchanted mythics do not block loose backpack copies',()=>{
+    const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
+    const armorStart=source.indexOf('const SRV_ARMOR_UPGRADES = [');
+    const armorEnd=source.indexOf('\n];',armorStart)+3;
+    const stats=vm.createContext({ITEM_META:itemMeta,getUpgradeTier:equipmentRules.parse,
+        equippedAffixes:p=>equipmentRules.bonuses(p.equipped,base=>itemMeta[base]?.kind)});
+    vm.runInContext(source.slice(armorStart,armorEnd)+'\n'+
+        literalFunction('srvUpgradeBonusArmor')+'\n'+literalFunction('totalDefenseServer'),stats);
+    const enchantedSword=equipmentRules.make('ESPADA_ETERNA',5,'abcdef012345',equipmentRules.roll('weapon',[],0));
+    const enchantedCrown=equipmentRules.make('COROA_VALADARES',5,'abcdef012346',equipmentRules.roll('head',[],0));
+    for(const worn of [
+        {weapon:'ESPADA_ETERNA',head:'COROA_VALADARES'},
+        {weapon:'ESPADA_ETERNA_PLUS_5',head:'COROA_VALADARES_PLUS_5'},
+        {weapon:enchantedSword,head:enchantedCrown},
+    ]){
+        const f=fixture({keys,gold:40000,rolls:[0],cap:1});
+        f.p.equipped={...worn};f.p.hp=109;f.p.maxHp=157;
+        const before={...f.p.equipped};
+        const defense=stats.totalDefenseServer(f.p);
+        assert.ok(defense>0);
+        const result=f.attempt().transmutation;
+        assert.equal(result.ok,true);
+        assert.equal(result.category,'material');
+        assert.deepEqual(JSON.parse(JSON.stringify(f.p.inv)),{ESSENCIA_ARCANA:15});
+        assert.deepEqual(f.p.equipped,before);
+        assert.deepEqual(f.acc.save.equipped,before);
+        assert.equal(stats.totalDefenseServer(f.p),defense);
+        assert.equal(f.p.hp,109);assert.equal(f.p.maxHp,157);
+        assert.equal(f.p.gold,10000);
+
+        const missing=fixture({keys,gold:40000});
+        missing.p.equipped={...worn};
+        delete missing.p.inv.ESPADA_ETERNA;
+        missing.context.Math.random=()=>{throw Error('missing backpack copy must not roll');};
+        const refused=missing.attempt().transmutation;
+        assert.equal(refused.error,'no_items');
+        assert.equal(missing.p.gold,40000);
+        assert.equal(missing.p.transmutationToken,missing.opId);
+        assert.deepEqual(missing.p.equipped,before);
     }
 });
 
@@ -316,12 +353,11 @@ test('duplicates, conflicting payload, stale token and read-only status never ch
     assert.equal(next.p.gold,gold);
 });
 
-test('invalid inputs, location, funds, equipped base, capacity and equipment version reject without mutation',()=>{
+test('invalid inputs, location, funds, capacity and equipment version reject without mutation',()=>{
     for(const [opts,change,error] of [
         [{},f=>{},null],
         [{gold:119},f=>{},'no_gold'],
         [{},f=>{f.p.floor=1;},'not_at_bench'],
-        [{},f=>{f.p.equipped.weapon='ADAGA';},'equipped_input'],
         [{},f=>{delete f.p.inv.ADAGA;},'no_items'],
         [{cap:0},f=>{},'inventory_full'],
         [{rolls:[0.99],equipmentVersion:0},f=>{},'update_required'],
