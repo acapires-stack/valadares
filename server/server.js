@@ -8,6 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const equipmentRules = require('../equipment-rules');
 const trainingRules = require('../training-rules');
+const transmutationRules = require('../transmutation-rules');
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
 const CASINO_ENABLED = false;
@@ -1053,9 +1054,93 @@ function updateEnchantSave(p){
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,talents:p.talents,
         permaBuffs:p.permaBuffs,dyes:p.dyes,pets:p.pets,pet:p.pet };
     Object.assign(acc.save, { inv:p.inv, equipped:p.equipped, gold:p.gold, enchantOps:p.enchantOps,
-        enchantToken:p.enchantToken, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
+        enchantToken:p.enchantToken, transmutationOps:p.transmutationOps,
+        transmutationToken:p.transmutationToken, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
     return flushAccounts();
+}
+function transmutationOpId(value){
+    return typeof value === 'string' && /^[a-f0-9-]{36}$/i.test(value) ? value : null;
+}
+function transmutationStatusResult(p, opId){
+    const previous = (p.transmutationOps || []).find(x => x && x.opId === opId);
+    return previous ? previous.result : {ok:false,error:'not_found',opId};
+}
+function executeTransmutation(p, msg){
+    const opId = transmutationOpId(msg.opId);
+    const keys = Array.isArray(msg.keys) ? msg.keys.slice() : null;
+    const base = {opId,keys,cost:0,tier:0,category:null,newKey:null,qty:0};
+    const fail = (error, extra) => ({...base,...extra,ok:false,error});
+    if (!opId) return fail('bad_op_id');
+    const previous = (p.transmutationOps || []).find(x => x && x.opId === opId);
+    if (previous){
+        const req = previous.request;
+        if (!req || req.version !== msg.version || !Array.isArray(keys) ||
+            req.keys.length !== keys.length || req.keys.some((k,i) => k !== keys[i])) return fail('op_conflict');
+        return previous.result;
+    }
+    if (opId !== p.transmutationToken) return fail('stale_op');
+    if (msg.version !== transmutationRules.VERSION || p.equipmentVersion !== equipmentRules.VERSION) return fail('update_required');
+    if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId ||
+        chebyshev(p.x,p.y,51,52) > 1) return fail('not_at_bench');
+    const quote = transmutationRules.quote(keys);
+    if (!quote.valid) return fail(quote.error);
+    const quoted = {cost:quote.cost,tier:quote.tier};
+    if (keys.some(key => !itemMetaForKey(key) || !equipmentRules.KINDS.includes(itemMetaForKey(key).kind)))
+        return fail('ineligible_item',quoted);
+    if (Object.values(p.equipped || {}).some(key => keys.includes(getUpgradeTier(key).base)))
+        return fail('equipped_input',quoted);
+    if (keys.some(key => !hasInv(p,key,1))) return fail('no_items',quoted);
+    if (!Number.isFinite(p.gold) || p.gold < quote.cost) return fail('no_gold',quoted);
+    // Reserve capacity for every possible outcome before rolling. Otherwise a
+    // full backpack could reject only unwanted outcomes and permit free rerolls.
+    const projected = {...p.inv};
+    for (const key of keys){
+        projected[key]--;
+        if (projected[key] <= 0) delete projected[key];
+    }
+    if (Object.keys(projected).length >= SAVE_CAPS.invKeys) return fail('inventory_full',quoted);
+    const categoryRoll = Math.random() * 100;
+    const category = categoryRoll < quote.chances.material ? 'material'
+        : categoryRoll < quote.chances.material + quote.chances.plain ? 'plain' : 'enchanted';
+    let newKey, qty;
+    if (category === 'material'){
+        newKey = equipmentRules.MATERIAL;
+        qty = quote.essenceQty;
+    } else {
+        const baseKey = quote.pool[Math.floor(Math.random() * quote.pool.length)];
+        const meta = itemMetaForKey(baseKey);
+        if (!meta || !equipmentRules.KINDS.includes(meta.kind)) return fail('bad_output',quoted);
+        newKey = baseKey;
+        qty = 1;
+        if (category === 'enchanted'){
+            let itemId = null;
+            for (let tries=0;tries<10;tries++){
+                const candidate = crypto.randomBytes(6).toString('hex');
+                if (!enchantedIdExists(candidate)){itemId=candidate;break;}
+            }
+            if (!itemId) return fail('id_unavailable',quoted);
+            newKey = equipmentRules.make(baseKey,0,itemId,equipmentRules.roll(meta.kind,[],0));
+        }
+    }
+    projected[newKey] = (projected[newKey] || 0) + qty;
+    if (Object.keys(projected).length > SAVE_CAPS.invKeys) return fail('inventory_full',quoted);
+    const acc = p.authedName && getAccount(p.authedName);
+    if (!acc) return fail('save_failed',quoted);
+    const old = {inv:p.inv,gold:p.gold,transmutationOps:p.transmutationOps,
+        transmutationToken:p.transmutationToken,save:acc.save ? {...acc.save} : null,savedAt:acc.savedAt};
+    const result = {ok:true,opId,keys,cost:quote.cost,tier:quote.tier,category,newKey,qty};
+    p.inv = projected;
+    p.gold -= quote.cost;
+    p.transmutationOps = [...(p.transmutationOps || []),{opId,request:{version:msg.version,keys},result}].slice(-20);
+    p.transmutationToken = crypto.randomUUID();
+    if (!updateEnchantSave(p)){
+        p.inv = old.inv; p.gold = old.gold;
+        p.transmutationOps = old.transmutationOps; p.transmutationToken = old.transmutationToken;
+        acc.save = old.save; acc.savedAt = old.savedAt;
+        return fail('save_failed',quoted);
+    }
+    return result;
 }
 function equippedAffixes(p){
     return equipmentRules.bonuses(p.equipped, base => ITEM_META[base]?.kind);
@@ -1087,7 +1172,8 @@ function hasInv(p, key, qty){
 function sendInvUpdate(p, extra){
     if (!p || p.ws.readyState !== 1) return;
     const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null,
-        enchantToken:p.enchantToken || null };
+        enchantToken:p.enchantToken || null,
+        transmutationVersion:transmutationRules.VERSION, transmutationToken:p.transmutationToken || null };
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
 }
@@ -6399,6 +6485,8 @@ wss.on('connection', (ws, request) => {
             if (p.chests && typeof p.chests === 'object') data.chests = p.chests;
             data.enchantOps = p.enchantOps || [];
             data.enchantToken = p.enchantToken || null;
+            data.transmutationOps = p.transmutationOps || [];
+            data.transmutationToken = p.transmutationToken || null;
             // talents (RANKS) + permaBuffs: persiste os do SERVER (vivos), não os do cliente —
             // senão o save do cliente reverteria os ranks (era a causa do "reseta ao escolher outro").
             if (p.talents && typeof p.talents === 'object') data.talents = p.talents;
@@ -6489,6 +6577,9 @@ wss.on('connection', (ws, request) => {
             p.equipmentVersion = msg.equipmentVersion === equipmentRules.VERSION ? equipmentRules.VERSION : 0;
             p.enchantToken = typeof acc?.save?.enchantToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.enchantToken)
                 ? acc.save.enchantToken : crypto.randomUUID();
+            p.transmutationToken = typeof acc?.save?.transmutationToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.transmutationToken)
+                ? acc.save.transmutationToken : crypto.randomUUID();
+            p.transmutationOps = Array.isArray(acc?.save?.transmutationOps) ? acc.save.transmutationOps.slice(-20) : [];
             if (acc && acc.save){
                 p.enchantOps = Array.isArray(acc.save.enchantOps) ? acc.save.enchantOps.slice(-20) : [];
                 // Posição: última PERSISTIDA no server (validada). Default SAFE acima cobre
@@ -6599,7 +6690,7 @@ wss.on('connection', (ws, request) => {
             // M4: login sempre nasce no overworld (masmorra é efêmera — deslogar
             // lá embaixo te traz pra cidade). Snapshots filtrados pelo floor do player.
             p.floor = 0;
-            if (acc?.save?.enchantToken !== p.enchantToken && !updateEnchantSave(p)){
+            if ((acc?.save?.enchantToken !== p.enchantToken || acc?.save?.transmutationToken !== p.transmutationToken) && !updateEnchantSave(p)){
                 p.name = 'Anônimo';
                 sendTo(id,{t:'serverMsg',level:'warn',text:'Não foi possível salvar sua sessão. Tente entrar novamente.'});
                 setTimeout(() => { try { ws.close(1011,'save-failed'); } catch {} },200);
@@ -6612,6 +6703,8 @@ wss.on('connection', (ws, request) => {
                 equipmentVersion: equipmentRules.VERSION,
                 enchantingEnabled: ENCHANTING_ENABLED,
                 enchantToken: p.enchantToken,
+                transmutationVersion: transmutationRules.VERSION,
+                transmutationToken: p.transmutationToken,
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
@@ -6906,6 +6999,17 @@ wss.on('connection', (ws, request) => {
             if (!saveForge()) return;
             if (targetEquipped) broadcastPstatsAll(p);
             sendInvUpdate(p, { forge:{ ok:true, itemKey, newKey, cost, plus: targetPlus } });
+            return;
+        }
+
+        if (msg.t === 'transmuteStatus') {
+            const opId = transmutationOpId(msg.opId);
+            sendInvUpdate(p, { transmutation:transmutationStatusResult(p,opId) });
+            return;
+        }
+
+        if (msg.t === 'invTransmute') {
+            sendInvUpdate(p, { transmutation:executeTransmutation(p,msg) });
             return;
         }
 

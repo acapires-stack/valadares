@@ -6,6 +6,7 @@
 <script src="/equipment-rules.js?v=1"></script>
 <script src="/game-audio.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
+<link rel="stylesheet" href="/transmutation.css?v=1">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#06060c">
@@ -2514,6 +2515,7 @@
             <button class="train-tab active" data-craft-tab="craft" onclick="switchCraftTab('craft')" data-i18n="craft.tab_recipes">RECEITAS</button>
             <button class="train-tab" data-craft-tab="forja" onclick="switchCraftTab('forja')" data-i18n="craft.tab_forge">🔥 FORJA</button>
             <button class="train-tab" data-craft-tab="enchant" onclick="switchCraftTab('enchant')">✧ <span data-i18n="enchant.tab">ENCANTAR</span></button>
+            <button class="train-tab" data-craft-tab="transmute" onclick="switchCraftTab('transmute')">✦ <span data-i18n="transmute.tab">TRANSMUTAR</span></button>
         </div>
         <div id="forgeTools" class="forge-tools" style="display:none">
             <input id="forgeSearch" type="search" autocomplete="off" data-i18n-ph="forge.search_ph" placeholder="Buscar equipamento">
@@ -2521,9 +2523,11 @@
             <small id="forgeCount"></small>
         </div>
         <p id="forgeFeedback" class="ench-notice" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+        <div id="transmutationStatus" role="status" aria-live="polite" aria-atomic="true" hidden></div>
         <div id="craftList" class="craft-list"></div>
         <div id="forjaPanel" class="craft-list" style="display:none"></div>
         <div id="enchantPanel" class="craft-list" style="display:none"></div>
+        <div id="transmutationPanel" class="craft-list" style="display:none"></div>
         <div class="chest-hint" id="craftHint" data-i18n-html="craft.hint_recipes">click em <b>fabricar</b> &nbsp;|&nbsp; custos em ouro escalam com poder do item &nbsp;|&nbsp; <kbd>ESC</kbd> fechar</div>
         <button class="chest-close" onclick="closeCraft()">×</button>
     </div>
@@ -4096,6 +4100,8 @@ function setLang(l){
   if (window.valadaresUi) window.valadaresUi.updateLabels();
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
+  window.ValadaresTransmutationUI?.refreshIfOpen();
+  if (document.getElementById('craftModal')?.classList.contains('transmute-active')) document.getElementById('craftHint').innerHTML = LANG==='en'?'Three distinct plain pieces · one random result · server confirmed':'Três peças comuns distintas · um resultado aleatório · confirmado pelo servidor';
   renderForgeFeedback();
   if (document.getElementById('craftModal')?.classList.contains('forge-active')) renderForja();
   syncInvHeight();
@@ -6896,11 +6902,12 @@ function openCraft(){
     document.getElementById('craftModal').style.display = 'flex';
     switchCraftTab(document.querySelector('[data-craft-tab].active')?.dataset.craftTab || 'craft');
 }
-function closeCraft(){ document.getElementById('craftModal').style.display = 'none'; saveState(); }
+function closeCraft(){ window.ValadaresTransmutationUI?.onClose(); document.getElementById('craftModal').style.display = 'none'; saveState(); }
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
     window.ValadaresAdventureFeedback?.closeSummary?.();
+    window.ValadaresTransmutationUI?.onClose();
     if (document.getElementById('casinoModal')?.style.display === 'flex') stopCasinoAnimation();
     ['chestModal','craftModal','altarModal','trainingModal','shopModal','questsModal','statsModal','chainDialogModal','settingsModal','tutorialModal','rankingModal','friendsModal','achievementsModal','tradeModal','guildModal','goldShopModal','talentsModal','casinoModal','dyeModal','auctionModal','petModal','arenaModal','dungeonEnterModal'].forEach(id => {
         const el = document.getElementById(id);
@@ -7794,6 +7801,7 @@ function handleMP(msg){
             try { saveState(); } catch {}
         }
         _didInitialAuth = true;
+        window.ValadaresTransmutationUI?.onAuth(msg);
         sendJoinNow();
         // A UI lê somente o personagem já reconciliado com o save da conta.
         if (window.valadaresUi) window.valadaresUi.onAuth();
@@ -7858,6 +7866,7 @@ function handleMP(msg){
         window.equipmentServerVersion = msg.equipmentVersion || 0;
         window.enchantToken = msg.enchantToken || null;
         window.enchantingEnabled = msg.enchantingEnabled !== false;
+        window.ValadaresTransmutationUI?.onServerState(msg);
         serverWeaponDots = msg.weaponDotsAuthoritative === true;
         player.regen = null;
         // estado completo: jogadores e monstros do servidor
@@ -8195,10 +8204,13 @@ function handleMP(msg){
         // Recria entries em ITEMS pros _PLUS_N novos que o server criou
         if (typeof ensureAllUpgradeItemsFromState === 'function') ensureAllUpgradeItemsFromState();
         if (msg.enchantToken) window.enchantToken = msg.enchantToken;
+        window.ValadaresTransmutationUI?.onServerState(msg);
+        if (msg.transmutation) window.ValadaresTransmutationUI?.handleResult(msg.transmutation);
         if (msg.reason === 'join') { _forgePending = false; renderForgeFeedback(); }
         if (msg.enchant) window.ValadaresEnchantUI?.handleResult(msg.enchant);
         if (msg.enchant || msg.equipped) recomputeStats();
         window.ValadaresEnchantUI?.refreshIfOpen();
+        window.ValadaresTransmutationUI?.refreshIfOpen();
         // As assinaturas detectam quantidades, itens e equipamento. Atualizar
         // apenas XP não deve reconstruir toda a interface a cada golpe.
         // Forja: feedback de sucesso/falha
@@ -10552,11 +10564,14 @@ window.attemptForge = attemptForge;
 function switchCraftTab(which){
     document.querySelectorAll('[data-craft-tab]').forEach(t=>t.classList.toggle('active',t.dataset.craftTab===which));
     document.getElementById('craftModal').classList.toggle('forge-active', which === 'forja');
+    document.getElementById('craftModal').classList.toggle('transmute-active', which === 'transmute');
+    window.ValadaresTransmutationUI?.onTabChange(which);
     document.getElementById('forgeTools').style.display = which === 'forja' ? 'flex' : 'none';
-    for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel']])document.getElementById(id).style.display=tab===which?'':'none';
+    for(const [tab,id] of [['craft','craftList'],['forja','forjaPanel'],['enchant','enchantPanel'],['transmute','transmutationPanel']])document.getElementById(id).style.display=tab===which?'':'none';
     const hint=document.getElementById('craftHint');
-    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
+    hint.innerHTML=which==='enchant'?(LANG==='en'?'One piece · up to three bonuses · no destruction':'Uma peça · até três bônus · sem destruição'):which==='transmute'?(LANG==='en'?'Three distinct plain pieces · check the chances before confirming':'Três peças comuns distintas · confira as chances antes de confirmar'):tr(which==='craft'?'craft.hint_recipes':'craft.hint_forge');
     if(which==='enchant')window.ValadaresEnchantUI?.render();
+    else if(which==='transmute')window.ValadaresTransmutationUI?.render();
     else if(which==='forja')renderForja();else renderCraft();
     renderForgeFeedback();
 }
@@ -16058,6 +16073,7 @@ function logout(){
         log(tr('log.cant_logout_combat'));
         return;
     }
+    window.ValadaresTransmutationUI?.onLogout();
     saveState();
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     // limpa credenciais da sessão atual
@@ -16233,6 +16249,7 @@ function startGame(multiplayer, name){
         bossName: mobName, beforeSummary: () => { closeAllModals(); clearAllKeys(); }
     });
     player.name = (name || 'Aventureiro').substring(0,14);
+    window.ValadaresTransmutationUI?.setAccount(player.name);
     document.getElementById('login').style.display = 'none';
     document.getElementById('charName').textContent = player.name;
     const restored = loadState();
@@ -17527,5 +17544,7 @@ function loop(ts){
 <script src="/adventure-feedback.js?v=20261005a"></script>
 <script src="/training-rules.js?v=1"></script>
 <script src="/enchanting-ui.js?v=1"></script>
+<script src="/transmutation-rules.js?v=1"></script>
+<script src="/transmutation-ui.js?v=1"></script>
 </body>
 </html>

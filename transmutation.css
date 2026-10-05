@@ -1,0 +1,28 @@
+#craftModal.transmute-active>.chest-box{height:min(790px,calc(100dvh - 24px))}
+#craftModal.transmute-active #transmutationPanel{flex:1 1 auto;max-height:none}
+#craftModal [data-craft-tab]{min-width:0;white-space:normal}
+#transmutationPanel{padding:10px 16px 18px;color:#e5d6bd}
+#transmutationPanel *{box-sizing:border-box}
+#transmutationPanel h3{font:500 21px Georgia,serif;color:#f0d9a7;margin:5px 0 7px}
+#transmutationPanel h4{font:600 12px "Segoe UI",sans-serif;color:#d7bfea;margin:18px 0 7px}
+#transmutationPanel p,#transmutationPanel li{font:12px/1.5 "Segoe UI",sans-serif;color:#c5b8aa}
+#transmutationPanel .tm-note{color:#dcc29a}
+#transmutationPanel .tm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+#transmutationPanel .tm-grid label{min-width:0;font:12px "Segoe UI",sans-serif;color:#e0c59b}
+#transmutationPanel select{display:block;width:100%;min-width:0;margin-top:5px;background:#1b1620;border:1px solid #745e79;border-radius:4px;color:#f1e5d0;padding:9px;font:12px "Segoe UI",sans-serif}
+#transmutationPanel .tm-card{border:1px solid #594665;border-radius:6px;background:#211b27;padding:10px 13px;margin:10px 0}
+#transmutationPanel .tm-cost{color:#ffd77d;font-weight:700}
+#transmutationPanel .tm-chances{display:flex;flex-wrap:wrap;gap:5px;margin:9px 0}
+#transmutationPanel .tm-chances span{border:1px solid #695574;border-radius:4px;padding:5px 7px;color:#e9d8ed;font:11px "Segoe UI",sans-serif}
+#transmutationPanel .tm-pool{margin:5px 0 0;padding-left:20px;columns:2}
+#transmutationPanel .tm-pool li{break-inside:avoid}
+#transmutationPanel details{margin-top:14px;border-top:1px solid #49394c;padding-top:10px}
+#transmutationPanel summary{cursor:pointer;color:#d5b4e9;font:12px "Segoe UI",sans-serif}
+#transmutationPanel .tm-actions,#transmutationStatus .tm-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#transmutationPanel button,#transmutationStatus button{border:1px solid #ad84b5;border-radius:4px;background:#49304f;color:#f5e9f2;padding:9px 12px;cursor:pointer;font:12px "Segoe UI",sans-serif}
+#transmutationPanel button:disabled,#transmutationStatus button:disabled{opacity:.45;cursor:default}
+#transmutationStatus{flex:0 0 auto;min-width:0;max-height:145px;overflow-y:auto;overflow-wrap:anywhere;border-left:3px solid #b28bce;background:#2b2333;color:#f2e9dc;padding:9px 12px;font:12px/1.4 "Segoe UI",sans-serif}
+#transmutationStatus[data-kind="ok"]{border-left-color:#80c987}
+#transmutationStatus[data-kind="error"]{border-left-color:#ed938d}
+#transmutationStatus p{margin:0}
+@media(max-width:600px){#transmutationPanel{padding:8px 9px 16px}#transmutationPanel .tm-grid{grid-template-columns:1fr}#transmutationPanel .tm-pool{columns:1}#craftModal [data-craft-tab]{font-size:10px;padding:6px 3px}}
