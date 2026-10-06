@@ -312,7 +312,7 @@ export async function createActors(pc,app,bridge){
    if(type==='TROLL')add('sphere',[.47,.25,.31],[0,.99,.28],'#617d5a');
    if(!shadow){const hand=new pc.Entity('arma inimiga');group.addChild(hand);hand.setLocalPosition(-.5,.87,.24);weapon(hand,skeleton||type==='CACADOR'?'sword':boss?'staff':'axe',false);}
   }
-  const visualSize=['RAT','SNAKE','SPIDER'].includes(type)?.5:1;
+  const visualSize=['RAT','SNAKE','SPIDER','SCORPION','LIZARD'].includes(type)?.5:1;
   const s=(kind==='pet' ? .48 : (def.size||1))*visualSize;group.setLocalScale(s,s,s);rec.visualHeight=Math.max(.1,...group.findComponents('render').flatMap(r=>r.meshInstances.map(mi=>mi.aabb.center.y+mi.aabb.halfExtents.y)));return rec;
  }
  // Confirmed death presentation is separate from authoritative monsters and selectable entries.
