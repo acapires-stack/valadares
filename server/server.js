@@ -11,6 +11,7 @@ const trainingRules = require('../training-rules');
 const transmutationRules = require('../transmutation-rules');
 const progression = require('../progression-content');
 const modernWorld = require('../modern-world');
+const appearanceRules = require('../appearance-rules');
 const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
@@ -1066,7 +1067,7 @@ function updateEnchantSave(p){
         progressionToken:p.progressionToken,progressionOps:p.progressionOps,
         expeditionClears:p.expeditionClears,expeditionPending:p.expeditionPending,
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
-        permaBuffs:p.permaBuffs,
+        permaBuffs:p.permaBuffs,appearance:appearanceRules.normalizarAppearance(p.appearance),
         hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
     return flushAccounts();
@@ -2548,7 +2549,7 @@ function snapshotPlayers(floor){
         pet: p.pet || null,
         equipped: p.equipped || null,
         badges: p.badges || [],
-        dyes: p.dyes || null,
+        dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance),
         guild: findGuildOfPlayer(p.name)?.name || null,
         ghost: !!p.disconnected,
     }));
@@ -2749,7 +2750,7 @@ function enterDungeonFloor(p, id, floor, dir){
             groundDrops: snapshotGroundDrops(floor),   // #5: cliente limpa/repopula loot do andar (não vaza entre andares)
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
 }
 
 // Tira o player da masmorra e o devolve pra cidade (overworld): restaura o PvP,
@@ -2776,7 +2777,7 @@ function returnPlayerToTown(p, id){
             groundDrops: snapshotGroundDrops(0),
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
 }
 
 function enterInterior(p,id,room){
@@ -2794,7 +2795,7 @@ function enterInterior(p,id,room){
     broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,
         pvp:false,hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,
         cosmetic:p.cosmetic||null,pet:p.pet||null,badges:p.badges||[],
-        dyes:p.dyes||null,guild:findGuildOfPlayer(p.name)?.name||null}},room.floor);
+        dyes:p.dyes||null,appearance:appearanceRules.normalizarAppearance(p.appearance),guild:findGuildOfPlayer(p.name)?.name||null}},room.floor);
 }
 function exitInterior(p,id,room){
     broadcast(id,{t:'leave',id},room.floor);
@@ -2810,7 +2811,7 @@ function exitInterior(p,id,room){
     broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,
         pvp:p.pvp,hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,
         cosmetic:p.cosmetic||null,pet:p.pet||null,badges:p.badges||[],
-        dyes:p.dyes||null,guild:findGuildOfPlayer(p.name)?.name||null}},0);
+        dyes:p.dyes||null,appearance:appearanceRules.normalizarAppearance(p.appearance),guild:findGuildOfPlayer(p.name)?.name||null}},0);
 }
 
 // Respawn PvE server-autoritativo (fix do LOOP DE MORTE — 2026-06-03).
@@ -3829,6 +3830,7 @@ const FLAGS_ALLOWLIST = new Set([
 ]);
 function sanitizeSave(data, ownerName){
     if (!data || typeof data !== 'object') return data;
+    if ('appearance' in data) data.appearance = appearanceRules.normalizarAppearance(data.appearance);
     let touched = false;
     const log = (k, was, now) => { touched = true; console.warn(`[save:${ownerName}] clamp ${k}: ${was} → ${now}`); };
     // Gold
@@ -4346,6 +4348,8 @@ async function sendEmail(to, subject, html){
 function setPlayerSave(name, data){
     const a = getAccount(name);
     if (!a) return false;
+    // Classic clients do not know this field. Only appearanceSet changes identity.
+    data.appearance = appearanceRules.normalizarAppearance(a.save?.appearance);
     a.save = data;
     a.savedAt = Date.now();
     queueSaveAccounts();
@@ -5067,13 +5071,13 @@ function handleMobDeath(m, killerId){
     }
     if (killer && killer.ws.readyState === 1){
         killer.ws.send(JSON.stringify({
-            t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot,
+            t:'mobKill', mobId:m.id, floor:m.floor||0, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot,
             drops: spawnedDrops, skill: skillUsed, xpGained, petGain,
         }));
         // Envia skills atualizadas (autoritativo)
         sendInvUpdate(killer, { skills: killer.skills, reason:'mobKill' });
     }
-    broadcast(killerId, { t:'mobDead', mobId:m.id, byName: killer?.name || '?', level: m.level });
+    broadcast(killerId, { t:'mobDead', mobId:m.id, floor:m.floor||0, byName: killer?.name || '?', level: m.level }, m.floor);
     // outros veem a bag aparecer (mesma do attackMob); scoped no andar
     if (!isBoss && spawnedDrops.length) broadcast(killerId, { t:'groundSpawn', drops: spawnedDrops }, m.floor);
     if (killer){
@@ -5374,7 +5378,7 @@ function broadcastPstatsAll(p){
     const payload = JSON.stringify({
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
         regen,
-        cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null,
+        cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance),
         scReadyAt: p.scReadyAt || 0   // 🕯️ Segunda Chance: cliente mostra cooldown no modal
     });
     const f = p.floor || 0;   // M4: só players do mesmo andar veem os stats
@@ -5382,6 +5386,16 @@ function broadcastPstatsAll(p){
         if ((other.floor || 0) !== f) continue;
         if (other.ws.readyState === 1) other.ws.send(payload);
     }
+}
+// Presentation-only acknowledgement: damage remains immediate and authoritative.
+function sendCombatImpact(p, targetId, amount, details = {}){
+    if (!(amount > 0)) return;
+    const weapon = ITEM_META[equipmentRules.parse(p.equipped?.weapon).base];
+    const weaponType = details.spell || weapon?.kind === 'wand' ? 'wand'
+        : details.thrown || weapon?.ranged ? 'ranged' : 'melee';
+    sendTo(p.id,{t:'combatImpact',eventId:`${p.id}:hit:${p._combatSequence=(p._combatSequence||0)+1}`,
+        attackPresentationAt:typeof details.attackPresentationAt==='number' && Number.isFinite(details.attackPresentationAt) && details.attackPresentationAt>=0 ? details.attackPresentationAt : undefined,
+        floor:p.floor||0,targetId,targetType:details.targetType||'monster',amount,weaponType,spell:details.spell||null,critical:!!details.critical});
 }
 const REGEN_HP_BASE_MS = 4000;
 const REGEN_MP_BASE_MS = 2000;
@@ -5968,10 +5982,10 @@ function handleExpeditionMobDeath(m,killer){
     const shieldXp=hasShieldEquipped(killer)?(m.xp||1):0;
     if(shieldXp)gainSkillXpServer(killer,'Escudo',shieldXp);
     gainPetXp(killer,m.xp||1);
-    sendTo(killer.id,{t:'mobKill',mobId:m.id,mobType:m.type,x:m.x,y:m.y,
+    sendTo(killer.id,{t:'mobKill',mobId:m.id,floor:m.floor||0,mobType:m.type,x:m.x,y:m.y,
         xp:m.xp,level:m.level,loot:[],drops:[],skill,xpGained:m.xp||1,shieldXp});
     sendInvUpdate(killer,{skills:killer.skills,reason:'expeditionKill'});
-    sendTo(killer.id,{t:'mobDead',mobId:m.id,byName:killer.name,level:m.level});
+    sendTo(killer.id,{t:'mobDead',mobId:m.id,floor:m.floor||0,byName:killer.name,level:m.level});
     if (e.guards>=4 && e.golems>=3 && !e.boss && !e.bossSpawned){
         const boss=spawnMob('GOLEM_REI',70,50,e.floor);
         if (boss){boss.unique=false;boss.expedition=true;boss.expeditionBoss=true;
@@ -6016,7 +6030,7 @@ function enterArenaFloor(p, id, floor, spawn, opponentName){
             arena: true, opponentName,
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
 }
 
 // Tira o player da arena de volta pra cidade, ao lugar de ORIGEM (clone de
@@ -6035,7 +6049,7 @@ function returnFromArena(p, id){
             groundDrops: snapshotGroundDrops(0),
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
     p._pvpBeforeArena = undefined;
     p._arenaReturn = undefined;
 }
@@ -6788,6 +6802,7 @@ wss.on('connection', (ws, request) => {
             // M6 Tinturaria — server é dono. Sobrescreve qualquer dyes do cliente
             // pelos valores autoritativos atuais (alteráveis só via handler dyeItem).
             data.dyes = p.dyes || {};
+            data.appearance = appearanceRules.normalizarAppearance(p.appearance);
             // ★ LOCKDOWN N3 — ENFORCEMENT (antes era só comentário!). setPlayerSave faz
             // `a.save = data` as-is, e o join re-hidrata p.gold/inv/skills/equipped/chests
             // desse save. Sem sobrescrever aqui pelos valores VIVOS do server, um cliente
@@ -6906,6 +6921,7 @@ wss.on('connection', (ws, request) => {
             // Se cliente legado (sem auth) ou conta nova, pega do msg como antes.
             ensurePlayerInvSlots(p);
             p.equipmentVersion = msg.equipmentVersion === equipmentRules.VERSION ? equipmentRules.VERSION : 0;
+            p.appearance = appearanceRules.normalizarAppearance(acc?.save?.appearance);
             p.enchantToken = typeof acc?.save?.enchantToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.enchantToken)
                 ? acc.save.enchantToken : crypto.randomUUID();
             p.transmutationToken = typeof acc?.save?.transmutationToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.transmutationToken)
@@ -7082,7 +7098,7 @@ wss.on('connection', (ws, request) => {
             } else {
                 ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
             }
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
             // Anuncia entrada (só pros outros)
             broadcastMsgKey('info', 'srv.entered_world', {name: p.name}, null, id);
             return;
@@ -7158,6 +7174,31 @@ wss.on('connection', (ws, request) => {
             // Se um mob acabou no mesmo tile (race com tickAI), empurra
             bumpMobAwayFrom(p.x, p.y, p.floor);
             broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp }, p.floor);
+            return;
+        }
+
+        if (msg.t === 'appearanceSet') {
+            if (!p.joined) return;
+            const requestId = typeof msg.requestId === 'string' ? msg.requestId.slice(0,64) : null;
+            const reply = (ok,error) => sendTo(id,{t:'appearanceResult',ok,error,requestId,
+                appearance:appearanceRules.normalizarAppearance(p.appearance)});
+            if (!appearanceRules.isValidAppearance(msg.appearance)) { reply(false,'invalid_appearance'); return; }
+            const next = appearanceRules.normalizarAppearance(msg.appearance);
+            if (JSON.stringify(next) === JSON.stringify(p.appearance)) { reply(true); return; }
+            if (p._appearanceAt && Date.now()-p._appearanceAt < 500) { reply(false,'too_fast'); return; }
+            const account = getAccount(p.authedName);
+            if (!account?.save) { reply(false,'session_not_ready'); return; }
+            const previous = {appearance:p.appearance,save:account.save,savedAt:account.savedAt};
+            p.appearance = next;
+            account.save = {...account.save,appearance:next};
+            account.savedAt = Date.now();
+            if (!flushAccounts()) {
+                p.appearance=previous.appearance; account.save=previous.save; account.savedAt=previous.savedAt;
+                reply(false,'save_failed'); return;
+            }
+            p._appearanceAt = Date.now();
+            reply(true);
+            broadcastPstatsAll(p);
             return;
         }
 
@@ -7716,7 +7757,8 @@ wss.on('connection', (ws, request) => {
             // Se ghost: server processa o dano local (cliente não está)
             if (tgt.disconnected){
                 tgt.hp = Math.max(0, (tgt.hp ?? 100) - amount);
-                broadcast(null, { t:'float', id: msg.targetId, text:`-${amount}`, color:'#ff3030', big:true });
+                sendCombatImpact(p,msg.targetId,amount,{critical:msg.crit,targetType:'player',attackPresentationAt:msg.attackPresentationAt});
+                broadcast(null, { t:'float', id: msg.targetId, text:`-${amount}`, color:'#ff3030', big:true },p.floor||0);
                 if (tgt.hp === 0){
                     // ghost killed: dropa 10% gold + 1 item random do inv
                     const goldDrop = Math.floor((tgt.gold || 0) * 0.10);
@@ -7766,6 +7808,7 @@ wss.on('connection', (ws, request) => {
             const wasAlive = (tgt.hp ?? 100) > 0;
             if (wasAlive){
                 tgt.hp = Math.max(0, (tgt.hp ?? 100) - actual);
+                sendCombatImpact(p,msg.targetId,actual,{critical:msg.crit,targetType:'player',attackPresentationAt:msg.attackPresentationAt});
                 if (isBotTarget){
                     broadcast(null, { t:'pstats', id: tgt.id, hp: tgt.hp, maxHp: tgt.maxHp, mp: 0, maxMp: 0, cosmetic: null, pet: null, equipped: tgt.equipped, badges: tgt.badges || [] });
                 } else {
@@ -7784,7 +7827,7 @@ wss.on('connection', (ws, request) => {
                 tgt.ws.send(JSON.stringify({ t:'pvpHit', from:id, fromName:p.name, amount, actual }));
             }
             // broadcast(null) inclui o atacante — antes ele não via o float do dano que dava
-            broadcast(null, { t:'float', id:msg.targetId, text:`-${actual}`, color:'#ff3030', big:true });
+            broadcast(null, { t:'float', id:msg.targetId, text:`-${actual}`, color:'#ff3030', big:true },p.floor||0);
             // Detecção morte do bot 007
             if (isBotTarget && tgt.hp === 0){
                 killImpostorBot(p);
@@ -8146,7 +8189,7 @@ wss.on('connection', (ws, request) => {
             // seguinte a usar o range/cap da MAGIA (não o da arma). A mana já foi paga e
             // validada acima → não dá pra forjar range de magia sem castar de verdade.
             // Exori (AoE) dispara vários attackMob no mesmo tick → a janela de 1s cobre o burst.
-            if (sp.range) p._spellWindow = { range: sp.range, damage: (sp.damage || 12) + wandBaseServer(p), until: now + 1000 };
+            if (sp.range) p._spellWindow = { range: sp.range, damage: (sp.damage || 12) + wandBaseServer(p), until: now + 1000, spellKey };
             // Cura em grupo — AoE de heal, alcança QUALQUER player em raio groupRange
             // (não precisa party). Cura o caster + outros players. Skipa bots e ghosts.
             let healedAmount = 0;
@@ -8795,6 +8838,7 @@ wss.on('connection', (ws, request) => {
                 : baseDmg;
             const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
+            sendCombatImpact(p,m.id,dealtDamage,{spell:spellWin?.spellKey,critical:msg.crit,thrown:!!msg.throwSpear,attackPresentationAt:msg.attackPresentationAt});
             // Vampirismo (t_lifesteal): cura % do dano causado (cap maxHp); sincroniza HP via pstats.
             const _ls = (p.permaBuffs && p.permaBuffs.lifesteal) || 0;
             if (_ls > 0 && dmg > 0 && (p.hp ?? 0) < (p.maxHp ?? 0)){
@@ -8852,10 +8896,11 @@ wss.on('connection', (ws, request) => {
             // broadcast update do mob
             const update = { t:'mobUpdate', id:m.id, hp:m.hp, maxHp:m.maxHp };
             for (const pp of players.values()){
+                if ((pp.floor||0)!==(m.floor||0)) continue;
                 if (pp.ws.readyState === 1) pp.ws.send(JSON.stringify(update));
             }
             // float visual em todos
-            broadcast(null, { t:'mobFloat', mobId:m.id, text:`-${dmg}`, color:'#ff8060', crit:!!msg.crit });
+            broadcast(null, { t:'mobFloat', mobId:m.id, text:`-${dmg}`, color:'#ff8060', crit:!!msg.crit },m.floor||0);
             if (m.hp === 0){
                 if (m.expedition){ handleExpeditionMobDeath(m,p); return; }
                 grantManaOnKill(p);
@@ -8890,11 +8935,11 @@ wss.on('connection', (ws, request) => {
                 const shieldXp = hasShieldEquipped(p) ? (m.xp || 1) : 0;
                 if (shieldXp > 0) gainSkillXpServer(p, 'Escudo', shieldXp);
                 // killer recebe mobKill (boss → loot:[] pro cliente não criar drops)
-                sendTo(id, { t:'mobKill', mobId:m.id, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp, petGain });
+                sendTo(id, { t:'mobKill', mobId:m.id, floor:m.floor||0, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp, petGain });
                 // Envia skills atualizadas (autoritativo)
                 sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
                 // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
-                broadcast(id, { t:'mobDead', mobId:m.id, byName:p.name, level:m.level }, m.floor);
+                broadcast(id, { t:'mobDead', mobId:m.id, floor:m.floor||0, byName:p.name, level:m.level }, m.floor);
                 if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops }, m.floor);
                 // Ranking: incrementa mobKills (e bossKills se for unique) — all-time + season
                 bumpMobKill(p.name, !!m.unique);

@@ -15,6 +15,6 @@ tree('devlog',name=>/\.(html|css|js|png|jpg|jpeg|svg|webp)$/.test(name));
 for(const file of ['boot.js','entry.js','renderer.js','world.js','scenery.js','actors.js','ui.js','minimap.js','ui.css'])copy('modern/'+file);
 copy('modern/vendor/playcanvas.mjs');copy('modern/vendor/LICENSE-PlayCanvas.txt');
 tree('modern/assets',name=>/-game\.glb$|\.(png|jpg|jpeg|webp|txt|json)$/.test(name)||/^modern\/assets\/scenery\/.+\.glb$/.test(name)||/^modern\/assets\/characters-series6\/[\w-]+\.glb$/.test(name)||/^modern\/assets\/audio\/[\w-]+\.mp3$/.test(name));
-const modules=['equipment-rules.js','training-rules.js','transmutation-rules.js','progression-content.js','modern-world.js'];
+const modules=['equipment-rules.js','training-rules.js','transmutation-rules.js','progression-content.js','modern-world.js','appearance-rules.js','appearance-ui.js'];
 for(const file of modules)if(!fs.existsSync(path.join(out,file)))throw Error('Missing runtime dependency '+file);
 console.log('Public browser build: '+count+' files; no server, local saves, tools or internal documents.');

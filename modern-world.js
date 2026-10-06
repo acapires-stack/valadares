@@ -21,12 +21,26 @@
   '000000000'
  ]);
  const interiorGrid=Object.freeze({region:interiorRegion,rows:interiorRows});
+ // Furniture occupies real tiles in each room. The centre aisle, north service
+ // approach (50,47) and south exit stay connected. Rendered furniture is aligned
+ // with these footprints in modern/world.js; the server owns movement as usual.
+ const furniture=Object.freeze({
+  pousada:[[47,48],[48,48],[53,48],[47,50],[48,50],[47,51],[48,51],[52,50],[53,50]],
+  oficina:[[53,47],[48,48],[47,48],[47,49],[47,50],[53,49],[53,50],[53,51]],
+  biblioteca:[[47,47],[48,47],[52,47],[53,47],[48,49],[52,49],[48,50],[52,50]],
+  mercado:[[53,49],[47,50],[52,50],[53,50]]
+ });
+ function furnishedGrid(id){
+  const rows=interiorRows.map(row=>row.split(''));
+  for(const [x,y]of furniture[id]||[])rows[y-interiorRegion.y0][x-interiorRegion.x0]='0';
+  return Object.freeze({region:interiorRegion,rows:Object.freeze(rows.map(row=>row.join('')))});
+ }
  const interiors=Object.freeze([
   {id:'pousada',label:'Taverna da Pousada',floor:1000,door:{x:44,y:46},spawn:{x:50,y:50},exit:{x:50,y:51},grid:interiorGrid,services:[]},
   {id:'oficina',label:'Ferraria da Oficina',floor:1001,door:{x:52,y:45},spawn:{x:50,y:50},exit:{x:50,y:51},grid:interiorGrid,services:[{kind:'craft',x:50,y:46}]},
   {id:'biblioteca',label:'Templo da Biblioteca',floor:1002,door:{x:57,y:49},spawn:{x:50,y:50},exit:{x:50,y:51},grid:interiorGrid,services:[{kind:'altar',x:50,y:46}]},
   {id:'mercado',label:'Sala de Treino do Mercado',floor:1003,door:{x:43,y:53},spawn:{x:50,y:50},exit:{x:50,y:51},grid:interiorGrid,services:[{kind:'dummy',x:50,y:46}]}
- ].map(i=>Object.freeze({...i,door:Object.freeze(i.door),spawn:Object.freeze(i.spawn),exit:Object.freeze(i.exit),services:Object.freeze(i.services.map(s=>Object.freeze(s)))})));
+ ].map(i=>Object.freeze({...i,grid:furnishedGrid(i.id),door:Object.freeze(i.door),spawn:Object.freeze(i.spawn),exit:Object.freeze(i.exit),services:Object.freeze(i.services.map(s=>Object.freeze(s)))})));
  function apply(map,T){
   for(const b of buildings){
    for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++){

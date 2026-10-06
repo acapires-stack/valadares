@@ -10,6 +10,7 @@
       "transmutation-rules.js",
       "progression-content.js",
       "modern-world.js",
+      "appearance-rules.js",
       "package.json",
       "package-lock.json",
       "Dockerfile",

@@ -2,6 +2,16 @@
 
 Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
 
+## Revisão profissional — candidato validado, publicação ainda pendente
+
+Esta seção supera os estados de entrega abaixo, mantidos como histórico. Alcione reprovou a revisão como acabamento integral e pediu especialistas; após Ctrl+F5 confirmou melhora e manteve o pedido. Não declarar remodelação completa.
+
+Quatro especialistas encerrados, nenhum escritor de produto ativo. Sete trajes independentes da arma e persistentes, proporções corretas, Skeleton_Minion e Wolf completos, golpes/impacto/morte sincronizados, áudio com variantes, minimapa nos dois layouts e quatro interiores revistos. Evidências e limites em `docs/remodelacao/REVISAO-PROFISSIONAL-20261006.md`. Build público 223 arquivos; ensaio integrado final PASS, 88 recursos, zero erros HTTP/JS, foco/clássico/compacto. Produção permanece em 81b618b até recibo posterior.
+
+Ainda falta arte autoral para parte da fauna, minotauro e chefes, corda/flecha do arco, visual próprio da besta e personalização modular. Downloads Standard Quaternius não cobrem a composição pronta; nenhuma compra adicional ou encaixe improvisado. Apreciação auditiva não foi fingida por medições.
+
+Alcione esclareceu que a janela dos downloads é Salvar como e sairia em minutos. Arquivos necessários já salvos; não abrir novos downloads que dependam de clique nativo. Prévia adicional 3338/8098 ativa, sessão local 12262; 3337/8097 preservada. Próxima ação: commit/recuperação e publicação conjunta autorizada usando o acesso administrativo normal, seguida de conferência pública. Se a sessão não estiver acessível, registrar a causa concreta sem contornar autenticação.
+
 ## Revisão integrada dos pacotes — publicada em 06/10/2026 às 15h56
 
 Alcione mudou a orientação de retoques isolados para revisar o conjunto, explorar ao máximo os pacotes e só então voltar a jogar. Escopo e evidência completos em `docs/remodelacao/REVISAO-INTEGRADA-20261006.md`. Inclui cenários por ambiente, armas e personagens selecionados da Series6, minimapa com descoberta preservada, músicas completas do acervo, loot sem sobreposição e protocolo de movimento confirmado.

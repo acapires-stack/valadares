@@ -42,6 +42,23 @@ mapCard.innerHTML = '<span class="modern-map__label">Mapa</span><canvas id="mode
 container.append(mapCard);
 const miniMap = byId('modernMiniMap');
 const minimap = createMinimap(miniMap, byId('modernMapLegend'), bridge);
+// Both layouts observe the same map/discovery state. Keep the legacy canvas in
+// place for the 2D client and renderer recovery; never race its draw loop.
+const legacyMap = byId('minimap');
+const sidebarMap = document.createElement('div');
+sidebarMap.className = 'modern-sidebar-map';
+sidebarMap.innerHTML = '<canvas id="modernSidebarMiniMap" width="140" height="140" role="img" aria-label="Mini mapa"></canvas><span class="modern-map__legend" id="modernSidebarMapLegend"></span>';
+legacyMap?.after(sidebarMap);
+const sidebarMinimap = createMinimap(byId('modernSidebarMiniMap'), byId('modernSidebarMapLegend'), bridge);
+const notifications = byId('toastContainer');
+if (notifications) new ResizeObserver(entries => {
+    body.style.setProperty('--modern-notice-height', `${Math.ceil(entries[0].contentRect.height)}px`);
+}).observe(notifications);
+const firstSteps = byId('firstSteps');
+if (firstSteps) new ResizeObserver(entries => {
+    const height = entries[0].target.getBoundingClientRect().height;
+    body.style.setProperty('--modern-guide-offset', `${height ? Math.ceil(height) + 10 : 0}px`);
+}).observe(firstSteps);
 
 const actions = [
     [' ', '⚔', 'Atacar', 'ESP', true],
@@ -96,6 +113,9 @@ container.append(actionBar);
 
 const character = byId('modernCharacter');
 const left = byId('leftSidebar');
+byId('appearanceOpen')?.addEventListener('click', () => {
+    if (body.classList.contains('touch')) body.classList.remove('menu-open');
+});
 function setCharacter(open) {
     body.classList.toggle('modern-character-open', open);
     character.setAttribute('aria-expanded', String(open));
@@ -112,6 +132,7 @@ for (const id of ['equipmentPanelBtn', 'inventoryPanelBtn', 'layoutModeBtn']) {
     byId(id)?.addEventListener('click', () => setCharacter(false));
 }
 document.addEventListener('keydown', event => {
+    if (window.ValadaresAppearanceUI?.isOpen?.()) return;
     if (event.key !== 'Escape' || !body.classList.contains('modern-character-open')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -122,8 +143,7 @@ document.addEventListener('pointerdown', event => {
 });
 
 const active = () => body.classList.contains('modern-renderer-ready') &&
-    body.classList.contains('layout-focus') && !body.classList.contains('touch') &&
-    innerWidth > 900 && bridge?.getStarted?.() && !document.hidden;
+    bridge?.getStarted?.() && !document.hidden;
 const set = (id, text) => { const node = byId(id); if (node.textContent !== text) node.textContent = text; };
 const fraction = (value, max) => Math.max(0, Math.min(100, 100 * (Number(value) || 0) / (Number(max) || 1)));
 function refresh() {
@@ -146,6 +166,7 @@ function refresh() {
         targetNode.hidden = false;
         set('modernTarget', entity?.name || bridge.getMonsterTypes?.()[entity?.type]?.name || 'Alvo');
     } else targetNode.hidden = true;
-    minimap.draw();
+    if (miniMap.offsetWidth) minimap.draw();
+    if (sidebarMap.offsetWidth) sidebarMinimap.draw();
 }
 setInterval(refresh, 100);

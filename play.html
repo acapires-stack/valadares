@@ -4,7 +4,9 @@
 <!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
 <script src="/equipment-rules.js?v=1"></script>
-<script src="/game-audio.js?v=3"></script>
+<script src="/appearance-rules.js?v=1"></script>
+<link rel="stylesheet" href="/appearance-ui.css?v=1">
+<script src="/game-audio.js?v=4"></script>
 <script src="/progression-content.js?v=2"></script>
 <script src="/modern-world.js?v=2"></script>
 <script src="/movement-sync.js?v=1"></script>
@@ -1917,6 +1919,7 @@
         <div class="s-section">
             <div class="s-label"><span data-i18n="hud.character">Personagem</span> <a href="#" onclick="event.preventDefault();logout()" style="float:right;font-size:9px;color:#5a4818;text-decoration:none;letter-spacing:1px" data-i18n="hud.logout">sair ⏏</a></div>
             <div class="s-value" id="charName" data-i18n="hud.adventurer">Aventureiro</div>
+            <button id="appearanceOpen" type="button" onclick="openAppearance()" data-i18n="hud.appearance">Aparência</button>
         </div>
 
         <div class="s-section">
@@ -2682,6 +2685,7 @@ const I18N = {
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ BANCADA',
     'hud.map': 'Mapa', 'hud.character': 'Personagem', 'hud.logout': 'sair ⏏', 'hud.adventurer': 'Aventureiro',
+    'hud.appearance': 'Aparência',
     'hud.floor': 'Andar {floor}',
     'stair.enter': '⬇ As Profundezas', 'stair.exit_city': '⬆ Sair (cidade)', 'stair.up': '⬆ Subir', 'stair.down': '⬇ Descer', 'stair.town': '⌂ Cidade',
     'toast.depths_unlock': '🕳️ Atalho desbloqueado — agora dá pra descer direto ao Andar {floor}!',
@@ -3425,6 +3429,7 @@ const I18N = {
     'modal.ranking': '🏆 RANKING',
     'modal.craft': '⚒ CRAFTING BENCH',
     'hud.map': 'Map', 'hud.character': 'Character', 'hud.logout': 'log out ⏏', 'hud.adventurer': 'Adventurer',
+    'hud.appearance': 'Appearance',
     'hud.floor': 'Floor {floor}',
     'stair.enter': '⬇ The Depths', 'stair.exit_city': '⬆ Leave (city)', 'stair.up': '⬆ Up', 'stair.down': '⬇ Down', 'stair.town': '⌂ Town',
     'toast.depths_unlock': '🕳️ Shortcut unlocked — you can now descend straight to Floor {floor}!',
@@ -6219,6 +6224,7 @@ function rollWeaponStatusOnMob(wItem, m, hitDamage){
 const spawn = { x: Math.floor(M_W/2), y: Math.floor(M_H/2) };
 const player = {
     name: 'Aventureiro',
+    appearance: AppearanceRules.normalizarAppearance(null),
     x: spawn.x, y: spawn.y,
     renderX: spawn.x, renderY: spawn.y,    // posição interpolada p/ render
     prevX: spawn.x, prevY: spawn.y,        // posição anterior
@@ -6987,6 +6993,7 @@ function closeCraft(){ window.ValadaresTransmutationUI?.onClose(); document.getE
 
 // Fecha qualquer outro modal aberto (evita sobreposição)
 function closeAllModals(){
+    window.ValadaresAppearanceUI?.close();
     window.ValadaresAdventureFeedback?.closeSummary?.();
     window.ValadaresTransmutationUI?.onClose();
     if (document.getElementById('casinoModal')?.style.display === 'flex') stopCasinoAnimation();
@@ -7466,7 +7473,7 @@ function throwSpear(){
         gainSkillXpLocal('Distância', 1);
         if (serverAuthMobs && ws && ws.readyState === 1){
             // server aplica dano + consome a lança equipada (throwSpear:true)
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:wItem.throwable, crit, throwSpear:true }));
+            ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmg, range:wItem.throwable, crit, throwSpear:true }));
         }
     }
     // projétil rotacionado
@@ -7567,7 +7574,7 @@ function doAttack(m){
         dmgW = Math.max(1, Math.floor(dmgW * elementalMult(m.type, wItem.element, wItem.element)));
         const eCol = ELEMENT_COL[wItem.element] || wItem.color || '#c060ff';
         addFloat(m.x, m.y, `-${dmgW}`, critW ? '#ffaa20' : eCol, true, critW ? -10 : 0);
-        if (critW) sndCrit(); else playGameSound('wand');
+        playGameSound('wand');
         log(tr('log.dmg_hit', {star: critW?'★ ':'', weapon: itmName(wKey), dmg: dmgW, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
@@ -7579,7 +7586,7 @@ function doAttack(m){
         gainSkillXpLocal('Magia', 1);
         player.attackTimer = effectiveAttackDelay();
         if (serverAuthMobs && ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgW, range: wItem.ranged || 5, crit: critW, dots: elementStatusRoll(wItem.element) }));
+            ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmgW, range: wItem.ranged || 5, crit: critW, dots: elementStatusRoll(wItem.element) }));
             player.target = m.id; m.aggro = true;
         }
         return;
@@ -7629,7 +7636,7 @@ function doAttack(m){
         if (critR) dmgR *= critMultPlayer();
         dmgR = Math.floor(dmgR * buffMult().dmg);
         addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
-        if (critR) sndCrit(); else playGameSound('ranged');
+        playGameSound('ranged');
         log(tr('log.dmg_hit', {star: critR?'★ ':'', weapon: itmName(wKey), dmg: dmgR, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
         projectiles.push({
             x: player.renderX, y: player.renderY,
@@ -7644,7 +7651,7 @@ function doAttack(m){
         // DoT procs (veneno/sangra/fogo do weapon +N)
         const procsR = rollWeaponStatusOnMob(wItem, m, dmgR);
         if (serverAuthMobs && ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
+            ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
             player.target = m.id; m.aggro = true;
         }
         return;
@@ -7675,7 +7682,7 @@ function doAttack(m){
     if (crit) dmg *= critMultPlayer();
     dmg = applyAttackMults(dmg);
     addFloat(m.x, m.y, `-${dmg}`, crit ? '#ffaa20' : '#ffdd66', crit, crit ? -10 : 0);
-    if (crit) sndCrit(); else sndHit();
+    sndHit();
     log(tr('log.dmg_hit', {star: crit?'★ ':'', weapon: skillDisp(w.skill), dmg, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
     gainSkillXpLocal(w.skill, 1);
     if (player.equipped.offhand && ITEMS[player.equipped.offhand].kind === 'offhand'){
@@ -7687,7 +7694,7 @@ function doAttack(m){
     if (serverAuthMobs && ws && ws.readyState === 1){
         // Lança 1H tem meleeRange (até 3 sqm); demais armas melee usam 1
         const attackRange = (wItem && wItem.meleeRange) || 1;
-        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range:attackRange, crit, dots: procs }));
+        ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmg, range:attackRange, crit, dots: procs }));
         player.target = m.id; m.aggro = true;
     }
 }
@@ -7813,6 +7820,8 @@ function connectMP(){
     };
     ws.onclose = (ev) => {
         movementSync.disconnect();
+        clearConfirmedCombatSounds();
+        window.ValadaresAppearanceUI?.reset();
         if (training) stopTraining(tr('training.reason_disconnect'));
         trainingRequestPending = null;
         resetCasinoOnDisconnect();
@@ -7878,7 +7887,10 @@ function sendJoinNow(){
 
 function handleMP(msg){
     if (msg.t === 'posAck') { movementSync.ack(msg); return; }
-    if (['state','dungeonEnter','dungeonExit','forceTeleport'].includes(msg.t)) movementSync.reset(msg.movement);
+    if (['state','dungeonEnter','dungeonExit','forceTeleport'].includes(msg.t)) {
+        clearConfirmedCombatSounds();
+        movementSync.reset(msg.movement);
+    }
     if (msg.t === 'authOk'){
         _wsAuthed = true;
         document.body.classList.add('game-active');
@@ -8022,6 +8034,7 @@ function handleMP(msg){
                     player.renderY = p.y; player.prevY = p.y;
                 }
                 if ('guild' in p) player.guild = p.guild;
+                player.appearance = AppearanceRules.normalizarAppearance(p.appearance);
                 if ('dyes' in p) player.dyes = (p.dyes && typeof p.dyes === 'object') ? p.dyes : {};
             }
         });
@@ -8040,6 +8053,9 @@ function handleMP(msg){
                 groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty, owner: d.owner, ownerName: d.ownerName, ownerUntil: d.ownerUntil });
             }
         }
+    } else if (msg.t === 'appearanceResult'){
+        if (AppearanceRules.isValidAppearance(msg.appearance)) player.appearance = AppearanceRules.normalizarAppearance(msg.appearance);
+        window.ValadaresAppearanceUI?.onResult(msg);
     } else if (msg.t === 'groundSpawn'){
         // Novos drops aparecem (mob morto por outro player, etc)
         if (Array.isArray(msg.drops)){
@@ -8108,6 +8124,7 @@ function handleMP(msg){
         // dispara playerDie() quando hp chega a 0.
         if (msg.id === myWsId){
             if (msg.regen) player.regen = msg.regen;
+            if ('appearance' in msg) player.appearance = AppearanceRules.normalizarAppearance(msg.appearance);
             const wasAlive = (player.hp ?? 100) > 0;
             if (typeof msg.hp === 'number') player.hp = msg.hp;
             if (typeof msg.maxHp === 'number') player.maxHp = msg.maxHp;
@@ -8124,11 +8141,13 @@ function handleMP(msg){
         const rp = remotePlayers[msg.id];
         if (rp){
             if (typeof msg.hp === 'number') rp.hp = msg.hp;
+            if (msg.hp<=0) clearConfirmedCombatSounds(msg.id,'player');
             if (typeof msg.maxHp === 'number') rp.maxHp = msg.maxHp;
             if (typeof msg.mp === 'number') rp.mp = msg.mp;
             if (typeof msg.maxMp === 'number') rp.maxMp = msg.maxMp;
             if ('cosmetic' in msg) rp.cosmetic = msg.cosmetic;
             if ('pet' in msg) rp.pet = msg.pet;
+            if ('appearance' in msg) rp.appearance = AppearanceRules.normalizarAppearance(msg.appearance);
             if (msg.equipped && typeof msg.equipped === 'object') rp.equipped = msg.equipped;
             if (Array.isArray(msg.badges)) rp.badges = msg.badges.slice(0, 2);
             if ('dyes' in msg) rp.dyes = (msg.dyes && typeof msg.dyes === 'object') ? msg.dyes : {};
@@ -8888,6 +8907,8 @@ function handleMP(msg){
                 if (m) addFloat(m.x, m.y, f.text, f.color || '#ff8060', !!f.crit);
             }
         }
+    } else if (msg.t === 'combatImpact'){
+        queueConfirmedCombatSound(msg);
     } else if (msg.t === 'mobUpdate'){
         const m = monsters.find(x => x.id === msg.id);
         if (m){ m.hp = msg.hp; m.maxHp = msg.maxHp; }
@@ -8900,15 +8921,21 @@ function handleMP(msg){
             });
         }
     } else if (msg.t === 'mobDead'){
+        presentConfirmedMobDeath(msg.mobId,false,null,msg.floor);
         const idx = monsters.findIndex(x => x.id === msg.mobId);
         if (idx >= 0) monsters.splice(idx, 1);
         if (player.target === msg.mobId){ player.target = null; /* mantém autoAttack pra pegar próximo */ }
     } else if (msg.t === 'mobKill'){
+        const sameFloor=mobDeathIsOnCurrentFloor(msg);
+        const deferKillSound=presentConfirmedMobDeath(msg.mobId,true,
+            {id:msg.mobId,type:msg.mobType,x:msg.x,y:msg.y,dir:'down',hp:0,floor:msg.floor},msg.floor);
+        const deadIndex=monsters.findIndex(m=>m.id===msg.mobId);
+        if(deadIndex>=0)monsters.splice(deadIndex,1);
         // sou o killer — loot + xp (server creditou skills authoritative; vem em msg.skill)
         const def = MTYPE[msg.mobType];
         if (def){
             const fakeMob = { id: msg.mobId, type: msg.mobType, name: mobName(msg.mobType), x: msg.x, y: msg.y, xpReward: msg.xpGained || msg.xp, skill: msg.skill };
-            mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null);
+            mobKilledByServer(fakeMob, msg.loot || null, msg.drops || null,deferKillSound||!sameFloor||document.hidden,sameFloor);
         }
         // Build de escudo: o servidor também creditou Escudo (mesmo XP) — loga pra confirmar.
         if (msg.shieldXp > 0) log(tr('log.shield_xp', {n: msg.shieldXp}));
@@ -9026,13 +9053,13 @@ function applyMobsSnapshot(list){
 }
 
 // Quando o server confirma que MATEI um mob: dispara loot + xp localmente
-function mobKilledByServer(m, serverLoot, serverDrops){
+function mobKilledByServer(m, serverLoot, serverDrops,deferKillSound=false,presentInWorld=true){
     statsRecordMobKill(m.type, MTYPE[m.type] && MTYPE[m.type].unique);
     notifyMobKilledForQuests(m.type);
-    sndKill();
+    if(!deferKillSound)sndKill();
     // N3 fase 2: server agora também atribui IDs autoritativos aos drops (msg.drops).
     // Cliente preserva esses IDs pra mandar de volta no groundPickup.
-    if (Array.isArray(serverDrops) && serverDrops.length){
+    if (presentInWorld && Array.isArray(serverDrops) && serverDrops.length){
         for (const d of serverDrops){
             if (d.type !== 'GOLD' && !ITEMS[d.type]){
                 console.warn('[loot] item desconhecido descartado:', d.type);
@@ -9042,7 +9069,7 @@ function mobKilledByServer(m, serverLoot, serverDrops){
             if (groundItems.find(g => g.id === d.id)) continue;
             groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty | 0 || 1, owner: d.owner, ownerName: d.ownerName, ownerUntil: d.ownerUntil });
         }
-    } else if (Array.isArray(serverLoot)){
+    } else if (presentInWorld && Array.isArray(serverLoot)){
         // Compat com server antigo (Hardening N2): só tem {type, qty}; gera id local
         for (const item of serverLoot){
             if (!item || !item.type) continue;
@@ -9061,12 +9088,12 @@ function mobKilledByServer(m, serverLoot, serverDrops){
     const wKey = player.equipped.weapon;
     const skill = m.skill || (wKey ? ITEMS[wKey].skill : 'Punho');
     log(tr('log.mob_killed', {mob: m.name, xp: m.xpReward||0, skill: skillDisp(skill)}));
-    addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
+    if(presentInWorld)addFloat(m.x, m.y, `+${m.xpReward||0}xp`, '#74d176');
     if (player.target === m.id){ player.target = null; /* mantém autoAttack */ }
     // #3/#6: coleta o loot recém-caído NA HORA da morte. Antes o pickup só rodava ao MOVER
     // → matar parado deixava tudo no chão. Raio 2 cobre o drop 3×3 do mob no melee; o server
     // valida a proximidade (chebyshev ≤2). Pro caso ranged (matar de longe) ainda anda até o loot.
-    pickupAt(player.x, player.y);
+    if(presentInWorld)pickupAt(player.x, player.y);
 }
 
 // ─── Multiplayer authoritative state ─────────────────────────────────────────
@@ -13202,12 +13229,14 @@ window.setLogFilter = setLogFilter;
 const keys = {};
 let attackPressed = false;
 document.addEventListener('keydown', e => {
+    if (window.ValadaresAppearanceUI?.isOpen()) return;
     // Se está digitando num input/textarea (login, chat, etc), não dispara atalhos
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
         && !(e.key === 'Escape' && t.closest('[id$="Modal"]'))) return;
     ensureAudio();   // resume AudioContext na primeira tecla (gesture requirement)
     keys[e.key] = true;
+    if ((e.key==='v' || e.key==='V') && !e.repeat && started){ e.preventDefault(); openAppearance(); return; }
     if ((e.key === 'g' || e.key === 'G') && !e.repeat && started){ e.preventDefault(); interactWorldPlace(); }
     if (e.key===' ' && !attackPressed){ attackPressed = true; engage(); }
     if (e.key==='e' || e.key==='E') eatBestFood();
@@ -13356,6 +13385,7 @@ function targetNearest(cycle, silent){
     }
 }
 function clearTarget(){
+    clearConfirmedCombatSounds();
     player.target = null;
     player.autoAttack = false;
     log(tr('log.target_cancelled'));
@@ -13629,7 +13659,7 @@ function castSpell(spellKey){
             // Fase 2: afinidade (magia==wand) × fraqueza/resistência do mob.
             dmg = Math.max(1, Math.floor(dmg * elementalMult(m.type, sp.element, wEq && wEq.element)));
             if (serverAuthMobs && ws && ws.readyState === 1){
-                ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false, dots: aoeStatusRoll(sp) }));
+                ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmg, range: sp.aoeRange, crit: false, dots: aoeStatusRoll(sp) }));
                 m.aggro = true;
             }
             addFloat(m.x, m.y, `-${dmg}`, critA ? '#ffaa20' : sp.glow, true);
@@ -13773,7 +13803,7 @@ function castSpell(spellKey){
         // attackMob/aoe"). Sem este guard, o killMonster local criava "mob zumbi" (server
         // seguia com o mob vivo) e o dano local sumia no próximo snapshot — FIREBALL/RAIO
         // não causavam dano real online.
-        ws.send(JSON.stringify({ t:'attackMob', monsterId:m.id, amount:dmg, range: sp.range, crit: false, dots: elementStatusRoll(sp.element) }));
+        ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmg, range: sp.range, crit: false, dots: elementStatusRoll(sp.element) }));
         m.aggro = true;
         log(tr('log.dmg_spell', {star: crit?'★ ':'', name: spellName(spellKey), dmg, mob: m.name}));
     }
@@ -14564,7 +14594,7 @@ function pvpAttackPlayer(targetId){
         });
     }
     if (ws && ws.readyState === 1){
-        ws.send(JSON.stringify({t:'pvpAttack', targetId, amount:dmg}));
+        ws.send(JSON.stringify({t:'pvpAttack', attackPresentationAt:performance.now(), targetId, amount:dmg}));
     }
     log(tr('log.pvp_dmg', {star: crit?'★ ':'', dmg, name: escapeHtml(tgt.name)}));
     gainSkillXpLocal(w.skill, 1);
@@ -15131,6 +15161,92 @@ function updateAmbient(){
     updateAudioScene();
 }
 function playGameSound(kind, details){ audioEngine?.play(kind,details || {}); }
+// Presentation only: the server's HP, death, targeting and rewards stay immediate.
+const confirmedCombatSounds = new Map();
+function clearConfirmedCombatSounds(targetId,targetType='monster'){
+    const actors=window.ValadaresModern?.renderer?.actors;
+    for (const [id,record] of confirmedCombatSounds){
+        if (targetId!==undefined && (String(record.targetId)!==String(targetId) || record.targetType!==targetType)) continue;
+        clearTimeout(record.timer); cancelAnimationFrame(record.frame); confirmedCombatSounds.delete(id);
+        if(record.death)actors?.cancelConfirmedDeath?.(id);
+    }
+    if(targetId===undefined)actors?.clearCombatPresentation?.();
+}
+function mobDeathIsOnCurrentFloor(msg){
+    // Legacy servers lack a floor: only an existing local victim proves origin.
+    return Number.isFinite(msg.floor) ? msg.floor===(player.floor||0) : monsters.some(m=>String(m.id)===String(msg.mobId));
+}
+function presentConfirmedMobDeath(targetId,killSound,fallbackMob,originFloor){
+    const actors=window.ValadaresModern?.state==='ready' ? window.ValadaresModern.renderer?.actors : null;
+    if(!actors?.retainConfirmedDeath || document.hidden || (Number.isFinite(originFloor) && originFloor!==(player.floor||0)))return false;
+    const record=[...confirmedCombatSounds.values()].reverse().find(r=>r.targetType==='monster' &&
+        String(r.targetId)===String(targetId) && r.floor===(player.floor||0));
+    const mob=record?.mob || monsters.find(m=>String(m.id)===String(targetId)) || (Number.isFinite(originFloor)?fallbackMob:null);
+    if(!mob)return false;
+    const now=performance.now(),contactAt=record ? record.contactAt??record.receivedAt+500 : now;
+    const presentation={eventId:record?.eventId||`death:${player.floor||0}:${targetId}`,targetId,mob:{...mob},
+        floor:player.floor||0,contactAt};
+    if(!actors.retainConfirmedDeath(presentation))return false;
+    if(!record)return false; // Past contact/no pending hit: death is presented immediately.
+    record.death={killSound:!!(killSound||record.death?.killSound),presentation};
+    return true;
+}
+function queueConfirmedCombatSound(msg){
+    if (!(msg.amount>0) || (msg.floor||0)!==(player.floor||0) || document.hidden) return;
+    const eventId=String(msg.eventId||'');
+    if (!eventId || confirmedCombatSounds.has(eventId)) return;
+    const modern=window.ValadaresModern?.state==='ready';
+    const details={eventId,weaponType:msg.weaponType,spell:msg.spell,critical:!!msg.critical};
+    if (!modern){playGameSound('impact',details);return;}
+    // A late acknowledgement after cancel/re-target must not attach to a new swing.
+    // Area spells may legitimately confirm several monsters without a selected one.
+    if (!msg.spell && (player.target==null || String(player.target)!==String(msg.targetId))) return;
+    const mob=msg.targetType!=='player' ? monsters.find(m=>String(m.id)===String(msg.targetId)) : null;
+    const record={eventId,targetId:msg.targetId,targetType:msg.targetType||'monster',floor:player.floor||0,
+        mob:mob?{...mob}:null,attackPresentationAt:msg.attackPresentationAt,
+        selection:player.target,selectionType:player.targetType,weapon:player.equipped?.weapon,
+        receivedAt:performance.now(),timer:null,frame:null};
+    confirmedCombatSounds.set(eventId,record);
+    // Bound memory even if a malformed server floods presentation events.
+    if (confirmedCombatSounds.size>32){
+        const first=confirmedCombatSounds.keys().next().value,old=confirmedCombatSounds.get(first);
+        clearTimeout(old.timer);cancelAnimationFrame(old.frame);confirmedCombatSounds.delete(first);
+        if(old.death)window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(first);
+    }
+    const play=()=>{
+        if (confirmedCombatSounds.get(eventId)!==record) return;
+        confirmedCombatSounds.delete(eventId);
+        const actor=window.ValadaresModern?.renderer?.actors?.entries?.get('self');
+        if (!started || document.hidden || performance.now()-record.receivedAt>500 ||
+            (player.floor||0)!==record.floor || player.equipped?.weapon!==record.weapon ||
+            (record.actor && (actor!==record.actor || actor.attackSequence!==record.sequence)) ||
+            (!record.death && record.selection!=null && (String(player.target)!==String(record.selection) || player.targetType!==record.selectionType))) {
+            if(record.death)window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(eventId);
+            return;
+        }
+        playGameSound('impact',details);
+        if(record.death?.killSound)sndKill();
+    };
+    // Let the actor observe this frame's attackTimer before reading its contact marker.
+    record.frame=requestAnimationFrame(()=>{
+        if (confirmedCombatSounds.get(eventId)!==record) return;
+        const actor=window.ValadaresModern?.renderer?.actors?.entries?.get('self');
+        // Timestamp only correlates presentation; it never authorizes game actions.
+        // An old acknowledgement cannot borrow the next attack's animation.
+        const correlated=!Number.isFinite(record.attackPresentationAt) || !Number.isFinite(actor?.attackStartedAt) ||
+            Math.abs(record.attackPresentationAt-actor.attackStartedAt)<=80;
+        record.actor=correlated?actor:null;record.sequence=correlated?actor?.attackSequence:null;
+        const now=performance.now(),contact=correlated?(Number(actor?.attackContactAt)||now):now;
+        const wait=Math.max(0,Math.min(contact-now,500-(now-record.receivedAt)));
+        record.contactAt=now+wait;
+        if(record.death){
+            record.death.presentation.contactAt=record.contactAt;
+            window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(record.death.presentation);
+        }
+        if (wait>0) record.timer=setTimeout(play,wait); else play();
+    });
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearConfirmedCombatSounds();});
 function playSfx(builder){ audioEngine?.playSfx(builder); }
 function sndHit(){ playGameSound('melee'); }
 function sndDmg(){ playGameSound('damage'); }
@@ -16382,6 +16498,7 @@ function logout(){
     if (ws){ try { ws.close(); } catch{} ws = null; }
     resetCasinoOnDisconnect();
     bossDeathTime = null;
+    window.ValadaresAppearanceUI?.reset();
     // reset do player ao baseline (próximo login carrega só o que tiver save)
     Object.assign(player, {
         x: spawn.x, y: spawn.y,
@@ -16391,6 +16508,7 @@ function logout(){
         hp: 100, maxHp: 100, mp: 100, maxMp: 100,
         target: null, autoAttack: false,
         weapon: null,
+        appearance: AppearanceRules.normalizarAppearance(null),
         equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null },
         pet: null, pets: {},   // M6: pet equipado (flat) + mapa {key:{lvl,xp}} autoritativo do server
         inv: {}, chests: { b1:{}, b2:{}, b3:{}, b4:{} }, gold: 0,
@@ -16522,6 +16640,12 @@ window.addEventListener('beforeunload', () => { if (started) saveState(); });
 let _saveStateIntervalId = null;
 let _playerSyncIntervalId = null;
 function startGame(multiplayer, name){
+    window.ValadaresAppearanceUI?.configure({
+        getPlayer:()=>player, getLanguage:()=>LANG,
+        isModern:()=>window.ValadaresModern?.state==='ready',
+        send:message=>{ if (!ws || ws.readyState!==1 || !_wsAuthed) return false; ws.send(JSON.stringify(message)); return true; },
+        beforeOpen:()=>{ closeAllModals(); clearAllKeys(); player.autoAttack=false; player.target=null; },
+    });
     window.ValadaresAdventureFeedback?.reset?.();
     window.ValadaresAdventureFeedback?.configure?.({
         getItem: key => {
@@ -16714,6 +16838,7 @@ function saveState(){
     if (!player.name) return;
     const data = {
         v: 2,
+        appearance: AppearanceRules.normalizarAppearance(player.appearance),
         skills: player.skills,
         equipped: player.equipped,
         weapon: player.weapon,
@@ -16790,6 +16915,7 @@ function loadState(){
 function applySaveData(d){
     try {
         if (!d || typeof d !== 'object') return false;
+        player.appearance = AppearanceRules.normalizarAppearance(d.appearance);
         if (d.skills)   Object.assign(player.skills, d.skills);
         if (d.equipped) Object.assign(player.equipped, d.equipped);
         if (d.weapon !== undefined) player.weapon = d.weapon;
@@ -17095,6 +17221,8 @@ function r3dBridge(){
 
 // A apresentação moderna consulta o estado existente; o jogo clássico continua
 // responsável pela simulação, pelas interações e pelo salvamento.
+function openAppearance(){ if (started) window.ValadaresAppearanceUI?.open(); }
+window.openAppearance = openAppearance;
 window.ValadaresModernBridge = {
     ...r3dBridge(),
     getCanvas: () => canvas,
@@ -17873,6 +18001,7 @@ function loop(ts){
 <script src="/enchanting-ui.js?v=1"></script>
 <script src="/transmutation-rules.js?v=5"></script>
 <script src="/transmutation-ui.js?v=5"></script>
+<script src="/appearance-ui.js?v=1"></script>
 <script type="module">
 if (window.VALADARES_MODERN) {
     await import('/modern/entry.js?v=20261006');

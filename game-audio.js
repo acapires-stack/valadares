@@ -19,13 +19,16 @@
         field: ['music-field'],
         dungeon: ['music-cave']
     };
-    const COOLDOWN = { melee: 75, ranged: 95, wand: 110, damage: 130, kill: 110,
+    const COOLDOWN = { melee: 75, ranged: 95, wand: 110, impact: 90, damage: 130, kill: 160,
         spell: 140, pickup: 120, critical: 160, rareLoot: 600, bossReward: 800,
         forgeSuccess: 600, forgeFailure: 600, forgeCancelled: 400,
         trainingDone: 800, levelup: 800, death: 800, footstep: 115 };
     const PRIORITY_SFX = new Set(['rareLoot', 'bossReward', 'forgeSuccess', 'forgeFailure',
         'forgeCancelled', 'trainingDone', 'levelup', 'death']);
     const ASSET_BASE = '/modern/assets/audio/';
+    // Audio filenames can keep their semantic role while the recorded take changes.
+    const ASSET_REVISION = '20261006-4';
+    const assetUrl = key => ASSET_BASE + key + '.mp3?v=' + ASSET_REVISION;
     const SAMPLE_KIND = { wand: 'wand', damage: 'damage', kill: 'kill', pickup: 'pickup',
         critical: 'critical', rareLoot: 'rare-loot', bossReward: 'boss-reward',
         forgeSuccess: 'forge-success', forgeFailure: 'forge-failure',
@@ -34,6 +37,10 @@
     const AMBIENT_SAMPLE = { pz: 'ambient-pz', grass: 'ambient-forest', cave: 'ambient-cave' };
     const COMMON_SAMPLES = ['melee-1', 'melee-2', 'ranged-1', 'ranged-2',
         'wand', 'damage', 'kill', 'critical', 'pickup'];
+    const VARIATIONS = { melee: 4, ranged: 4, 'impact-melee': 4, 'impact-ranged': 4,
+        'impact-magic': 2, 'foot-stone': 4, 'foot-grass': 4, 'foot-dirt': 4, 'foot-wood': 4 };
+    const LEVELS = { footstep: 0.19, melee: 0.28, ranged: 0.30, wand: 0.23,
+        spell: 0.32, impact: 0.48, critical: 0.44, kill: 0.24, damage: 0.40, pickup: 0.34 };
 
     function create(ctx){
         if (!ctx || typeof ctx.createGain !== 'function' || !ctx.destination)
@@ -44,6 +51,9 @@
         const voices = new Set();
         const lastPlay = new Map();
         const samples = new Map();
+        const variations = new Map();
+        const playedEvents = new Set();
+        const metrics = { sampled: 0, fallback: 0, duplicate: 0, throttled: 0 };
         let burstStart = 0, burstNormal = 0, burstPriority = 0;
         let timer = null, noiseBuffer = null, impulse = null, bed = null, sampledBed = null;
         let scoreName = 'pz', nextDetail = 0, nextMusicAt = 0, musicSlot = null;
@@ -57,15 +67,25 @@
         const reverbInput = ctx.createGain();
         const convolver = ctx.createConvolver();
         const reverbWet = ctx.createGain();
+        // Transparent at normal settings; retain headroom when users turn every bus up.
+        const mix = typeof ctx.createDynamicsCompressor === 'function' ? ctx.createDynamicsCompressor() : ctx.createGain();
+        const mixTrim = ctx.createGain();
+        if (mix.threshold){
+            mix.threshold.value = -6; mix.knee.value = 6; mix.ratio.value = 12;
+            mix.attack.value = 0.003; mix.release.value = 0.18;
+        }
+        // Browser compressors include makeup gain; compensate so quiet area music stays quiet.
+        mixTrim.gain.value = mix.threshold ? 0.8 : 1;
         masterGain.gain.value = 0;
         effectsGain.gain.value = volumes.effects / 100;
         ambientGain.gain.value = volumes.ambient / 100;
         musicGain.gain.value = volumes.music / 100;
         reverbInput.gain.value = 1;
         reverbWet.gain.value = 0.13;
-        effectsGain.connect(masterGain);
-        ambientGain.connect(masterGain);
-        musicGain.connect(masterGain);
+        effectsGain.connect(mix);
+        ambientGain.connect(mix);
+        musicGain.connect(mix);
+        mix.connect(mixTrim).connect(masterGain);
         reverbInput.connect(convolver).connect(reverbWet).connect(effectsGain);
         masterGain.connect(ctx.destination);
 
@@ -123,7 +143,7 @@
             const gain = ctx.createGain();
             gain.gain.setValueAtTime(Math.max(0.0001, amp), when);
             gain.connect(bus);
-            const voice = { gain, sources: [], pending: 0, ended: false };
+            const voice = { gain, bus, sources: [], pending: 0, ended: false };
             voices.add(voice);
             return voice;
         }
@@ -183,8 +203,27 @@
             }
         }
 
-        function sampleFor(kind, details, nowMs){
-            if (kind === 'melee' || kind === 'ranged') return kind + '-' + (Math.floor(nowMs / 97) % 2 + 1);
+        function variation(group){
+            let state = variations.get(group);
+            if (!state){ state = { bag: [], last: 0 }; variations.set(group, state); }
+            if (!state.bag.length){
+                state.bag = Array.from({ length: VARIATIONS[group] }, (_, i) => i + 1);
+                for (let i = state.bag.length - 1; i > 0; i--){
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [state.bag[i], state.bag[j]] = [state.bag[j], state.bag[i]];
+                }
+                if (state.bag[state.bag.length - 1] === state.last)
+                    [state.bag[0], state.bag[state.bag.length - 1]] = [state.bag[state.bag.length - 1], state.bag[0]];
+            }
+            state.last = state.bag.pop();
+            return group + '-' + state.last;
+        }
+        function sampleFor(kind, details){
+            if (kind === 'melee' || kind === 'ranged') return variation(kind);
+            if (kind === 'impact'){
+                return variation(details.weaponType === 'wand' || details.weaponType === 'magic' || details.spell ?
+                    'impact-magic' : details.weaponType === 'ranged' ? 'impact-ranged' : 'impact-melee');
+            }
             if (kind === 'spell'){
                 const spell = String(details && details.spell || '').toLowerCase();
                 if (/dark|shadow|poison|curse|sombr|veneno/.test(spell)) return 'spell-dark';
@@ -197,7 +236,7 @@
                 const surface = /wood|interior|madeira/.test(material) ? 'wood' :
                     /stone|rock|cave|concrete|pedra/.test(material) ? 'stone' :
                     /grass|forest|floresta|grama/.test(material) ? 'grass' : 'dirt';
-                return 'foot-' + surface + '-' + (Math.floor(nowMs / 137) % 2 + 1);
+                return variation('foot-' + surface);
             }
             return SAMPLE_KIND[kind] || null;
         }
@@ -206,7 +245,7 @@
             const controller = typeof AbortController === 'function' ? new AbortController() : null;
             const entry = { buffer: null, controller };
             samples.set(key, entry);
-            Promise.resolve().then(() => fetch(ASSET_BASE + key + '.mp3', controller ? { signal: controller.signal } : {}))
+            Promise.resolve().then(() => fetch(assetUrl(key), controller ? { signal: controller.signal } : {}))
                 .then(response => {
                     if (!response.ok) throw new Error('audio asset unavailable');
                     return response.arrayBuffer();
@@ -223,6 +262,9 @@
             if (commonSamplesStarted || volumes.effects === 0 || typeof fetch !== 'function') return;
             commonSamplesStarted = true;
             for (const key of COMMON_SAMPLES) loadSample(key);
+            for (const [group, count] of Object.entries(VARIATIONS))
+                for (let i = 1; i <= count; i++) loadSample(group + '-' + i);
+            for (const key of ['spell-generic', 'spell-fire', 'spell-ice', 'spell-dark']) loadSample(key);
         }
         function ambientSampleKey(){ return scene.interior ? 'ambient-interior' : AMBIENT_SAMPLE[scene.biome] || null; }
         function playSample(voice, buffer, at){
@@ -235,20 +277,31 @@
         function play(kind, details = {}){
             if (!usable() || volumes.master === 0 || volumes.effects === 0 || typeof kind !== 'string') return false;
             const nowMs = Date.now();
+            const eventId = typeof details.eventId === 'string' ? kind + ':' + details.eventId : null;
+            if (eventId && playedEvents.has(eventId)){ metrics.duplicate++; return false; }
+            if (eventId){
+                playedEvents.add(eventId);
+                if (playedEvents.size > 512) playedEvents.delete(playedEvents.values().next().value);
+            }
             refreshBurst(nowMs);
             const priority = PRIORITY_SFX.has(kind);
-            if (priority ? burstPriority >= 3 : burstNormal >= 13) return false;
-            if (nowMs - (lastPlay.get(kind) || 0) < (COOLDOWN[kind] || 60)) return false;
+            if ((priority ? burstPriority >= 3 : burstNormal >= 13) ||
+                nowMs - (lastPlay.get(kind) || 0) < (COOLDOWN[kind] || 60)){
+                metrics.throttled++; return false;
+            }
             const at = ctx.currentTime;
             const key = sampleFor(kind, details, nowMs);
             const buffer = key && samples.get(key)?.buffer;
             if (key && !buffer) loadSample(key);
-            let amp = buffer ? (kind === 'footstep' ? 0.30 : 0.48) : 0.75;
+            let amp = buffer ? (LEVELS[kind] ?? 0.42) : 0.75;
+            if (buffer && kind === 'impact' && key.startsWith('impact-magic')) amp *= 0.65;
+            if (buffer && kind === 'impact' && details.critical) amp *= 1.15;
             if (kind === 'pickup' && scene.combat) amp *= 0.45;
             const v = newVoice(effectsGain, at, amp);
             if (!v) return false;
             if (buffer){
                 playSample(v, buffer, at);
+                metrics.sampled++;
                 lastPlay.set(kind, nowMs);
                 if (priority) burstPriority++;
                 else burstNormal++;
@@ -259,8 +312,10 @@
                 case 'footstep':
                     noise(v, at, 0.075, 0.085, scene.interior ? 1050 : 780); break;
                 case 'melee':
-                    noise(v, at, 0.115, 0.17, 2100, true);
-                    tone(v, 190 + variant * 300, at, 0.12, 0.095, 'triangle', 0.48); break;
+                    noise(v, at, 0.115, 0.12, 2100, true); break;
+                case 'impact':
+                    noise(v, at, 0.09, 0.12, 1200);
+                    tone(v, 170 + variant * 300, at, 0.10, 0.07, 'triangle', 0.48); break;
                 case 'ranged':
                     noise(v, at, 0.09, 0.10, 2900, true);
                     tone(v, 580, at, 0.13, 0.07, 'triangle', 0.55); break;
@@ -314,6 +369,7 @@
                     return false;
             }
             lastPlay.set(kind, nowMs);
+            metrics.fallback++;
             if (priority) burstPriority++;
             else burstNormal++;
             return true;
@@ -444,6 +500,7 @@
             try {
                 media = new Audio();
                 media.preload = 'none';
+                // These unchanged full music pieces keep their cache across SFX revisions.
                 media.src = ASSET_BASE + key + '.mp3';
                 source = ctx.createMediaElementSource(media);
                 gain = ctx.createGain();
@@ -505,12 +562,15 @@
             if (fadingMusic && ctx.currentTime >= fadingMusic.releaseAt) discardMusic(fadingMusic);
             syncMusic();
             if (nextDetail < horizon){
-                if (volumes.ambient > 0) detail(Math.max(ctx.currentTime + 0.012, nextDetail));
+                // Recordings already contain life/room detail; do not overlay synthetic birds indoors.
+                if (volumes.ambient > 0 && !sampledBed && !scene.interior)
+                    detail(Math.max(ctx.currentTime + 0.012, nextDetail));
                 nextDetail = ctx.currentTime + 3.5 + Math.random() * 4.5;
             }
         }
-        function stopVoices(){
+        function stopVoices(bus){
             for (const v of [...voices]){
+                if (bus && v.bus !== bus) continue;
                 target(v.gain.gain, 0, 0.008);
                 for (const source of v.sources){
                     try { source.stop(ctx.currentTime + 0.08); } catch {}
@@ -541,6 +601,7 @@
             for (const key of Object.keys(volumes)){
                 if (Number.isFinite(next[key])) volumes[key] = Math.max(0, Math.min(100, next[key]));
             }
+            if (volumes.effects === 0) stopVoices(effectsGain);
             syncActivity();
         }
         function setScene(next){
@@ -592,13 +653,19 @@
             samples.clear();
             masterGain.gain.setValueAtTime(0, ctx.currentTime);
             // Keep the injected AudioContext under the caller's ownership.
-            for (const node of [masterGain, effectsGain, ambientGain, musicGain, reverbInput, convolver, reverbWet]){
+            for (const node of [masterGain, mix, mixTrim, effectsGain, ambientGain, musicGain, reverbInput, convolver, reverbWet]){
                 try { node.disconnect(); } catch {}
             }
             noiseBuffer = null;
             impulse = null;
         }
-        return { masterGain, effectsGain, reverbInput, setVolumes, setScene, play, playSfx, dispose };
+        function inspect(){
+            return { scene: { ...scene }, volumes: { ...volumes }, voices: voices.size,
+                music: musicSlot?.key || null, fadingMusic: fadingMusic?.key || null,
+                ambient: sampledBed?.key || (bed ? 'synthesis' : null), metrics: { ...metrics },
+                loadedSamples: [...samples].filter(([, entry]) => entry.buffer).map(([key]) => key) };
+        }
+        return { masterGain, effectsGain, reverbInput, setVolumes, setScene, play, playSfx, inspect, dispose };
     }
     return { create };
 });

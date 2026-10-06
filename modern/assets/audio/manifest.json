@@ -3,15 +3,15 @@
   "files": [
     {
       "name": "melee-1.mp3",
-      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_01.wav",
-      "bytes": 4669,
-      "sha256": "d628bb26c91c5602347727a95389c161f54187e0aee4f1f14e287d1c29fdac6d"
+      "source": "Whooshes/whoosh_weapon_knife_swing_01.wav",
+      "bytes": 3360,
+      "sha256": "9ba55354546a72bec7d2d7809665def1b973c051ea9c9442daa71e526f666a54"
     },
     {
       "name": "melee-2.mp3",
-      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_02.wav",
-      "bytes": 3833,
-      "sha256": "9d462734a21fe29958070688667be0e1534c9cbe2e3f964256598e226f97348a"
+      "source": "Whooshes/whoosh_weapon_knife_swing_02.wav",
+      "bytes": 2942,
+      "sha256": "a54f73e88e924a86a07c7e3c7dcc942d6111f88b534bb71283eda4fe4fa96fa4"
     },
     {
       "name": "ranged-1.mp3",
@@ -198,6 +198,138 @@
       "source": "Backgrounds/background_room_tone_loop_01.wav",
       "bytes": 34736,
       "sha256": "d44280bfdf13d6ad7742bbae2ea11be606b783cfc1cd4d8d6344fafbc469c36f"
+    },
+    {
+      "name": "impact-melee-1.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_01.wav",
+      "bytes": 4669,
+      "sha256": "d628bb26c91c5602347727a95389c161f54187e0aee4f1f14e287d1c29fdac6d"
+    },
+    {
+      "name": "impact-ranged-1.mp3",
+      "source": "Punches/punch_general_body_impact_01.wav",
+      "bytes": 4251,
+      "sha256": "802a06e2d835629cb7bdbdae31ef875a97d291ac430bcc3d560bc3ddc543cdd5"
+    },
+    {
+      "name": "impact-melee-2.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_02.wav",
+      "bytes": 3833,
+      "sha256": "9d462734a21fe29958070688667be0e1534c9cbe2e3f964256598e226f97348a"
+    },
+    {
+      "name": "impact-ranged-2.mp3",
+      "source": "Punches/punch_general_body_impact_02.wav",
+      "bytes": 4460,
+      "sha256": "f88309293eaf55f40f2db49b930ee06555978fe717e5254f38688b7076e753f9"
+    },
+    {
+      "name": "melee-3.mp3",
+      "source": "Whooshes/whoosh_weapon_knife_swing_03.wav",
+      "bytes": 2942,
+      "sha256": "bbc714b78cceb185a6faaae58109b6a96332fda10d42593033d83152e98ecd5c"
+    },
+    {
+      "name": "ranged-3.mp3",
+      "source": "Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_03.wav",
+      "bytes": 5037,
+      "sha256": "d6b4eef0d5b85ae76a248a73ee361c03e8b87c0dcf8a87ad8dfdbeab44e2c201"
+    },
+    {
+      "name": "impact-melee-3.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_03.wav",
+      "bytes": 4042,
+      "sha256": "ede5588ce65bd6ac2c06f745c8a46cc2a83a70a3e94cb0d5da8ec9f00c676600"
+    },
+    {
+      "name": "impact-ranged-3.mp3",
+      "source": "Punches/punch_general_body_impact_03.wav",
+      "bytes": 4669,
+      "sha256": "f22cb11c9c84babc8404c7a413c8362e837662795dd0caef8a1583dc326fc645"
+    },
+    {
+      "name": "foot-grass-3.mp3",
+      "source": "Footsteps/footstep_grass_walk_03.wav",
+      "bytes": 5087,
+      "sha256": "ff6457a318d16306c8788dbb0b352d9beca27535bcbf802f0060b73bd38c69f5"
+    },
+    {
+      "name": "foot-dirt-3.mp3",
+      "source": "Footsteps/footstep_dirt_walk_run_03.wav",
+      "bytes": 2788,
+      "sha256": "dde9d6023a223169d1459d3555f266e7258c6fb9fadffc6a5748dcf5be269c95"
+    },
+    {
+      "name": "foot-stone-3.mp3",
+      "source": "Footsteps/footstep_concrete_walk_03.wav",
+      "bytes": 2788,
+      "sha256": "8fa31346cacffe4170a62ad0c8e46ebb7fe627483065c7310f87452286d5d87c"
+    },
+    {
+      "name": "foot-wood-3.mp3",
+      "source": "Footsteps/footstep_wood_walk_03.wav",
+      "bytes": 2370,
+      "sha256": "69c82c74ddd728cd08c0bdd68f52ef4836cf3e2fa84ea4900adba112640f79ec"
+    },
+    {
+      "name": "melee-4.mp3",
+      "source": "Whooshes/whoosh_weapon_knife_swing_04.wav",
+      "bytes": 2942,
+      "sha256": "784b9049b48429b02bcacb84b059d184c8ce1c2573e6a10fbe84bfdc6014b1d9"
+    },
+    {
+      "name": "ranged-4.mp3",
+      "source": "Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_04.wav",
+      "bytes": 4828,
+      "sha256": "9e9d95caefd007dd2a3facdc0ae72824a98ad98b3a6b2abe646d7ec6364efc7b"
+    },
+    {
+      "name": "impact-melee-4.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_04.wav",
+      "bytes": 4042,
+      "sha256": "a4eef3bc64f0bece53a0c260bd0dbb4fdb5ae1a8084b3c3395bc68884ceadd76"
+    },
+    {
+      "name": "impact-ranged-4.mp3",
+      "source": "Punches/punch_general_body_impact_04.wav",
+      "bytes": 3833,
+      "sha256": "51ccc25f25a7ff66fbd8391ee3a23ff75e03ce72e723e3ec8ed61bd00bcefe61"
+    },
+    {
+      "name": "foot-grass-4.mp3",
+      "source": "Footsteps/footstep_grass_walk_04.wav",
+      "bytes": 5296,
+      "sha256": "650f35e92cdc7ff18c11d05d1d49104f2963011620e468b7054442e3de0aa8e7"
+    },
+    {
+      "name": "foot-dirt-4.mp3",
+      "source": "Footsteps/footstep_dirt_walk_run_04.wav",
+      "bytes": 3206,
+      "sha256": "b033f5e7fc4be320e5f8f0fff04bedae66baaad1a261b523b24a943983471fcc"
+    },
+    {
+      "name": "foot-stone-4.mp3",
+      "source": "Footsteps/footstep_concrete_walk_04.wav",
+      "bytes": 2788,
+      "sha256": "5ff85274ad4aec2010b870bbffe1cc17e04a58fa25e70d950e8bdcb5c321b5c9"
+    },
+    {
+      "name": "foot-wood-4.mp3",
+      "source": "Footsteps/footstep_wood_walk_04.wav",
+      "bytes": 2788,
+      "sha256": "3836cd81b8ff1a2ae27d7ed8cd758cc370f9b5bc344888fc1f23f8024d953f1b"
+    },
+    {
+      "name": "impact-magic-1.mp3",
+      "source": "Magic_Spells/magic_deflect_spell_impact1.wav",
+      "bytes": 6082,
+      "sha256": "14e27e944da676873271c5161abf0aa75c0b63dc6351084662e5e86cdd33e8f0"
+    },
+    {
+      "name": "impact-magic-2.mp3",
+      "source": "Magic_Spells/magic_deflect_spell_impact2.wav",
+      "bytes": 6082,
+      "sha256": "1a22c083514b1395901d07a29822ac35e020d9443dcfcd6c2c0ef2fdd63cf978"
     },
     {
       "name": "music-pz-tree.mp3",

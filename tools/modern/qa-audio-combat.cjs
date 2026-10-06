@@ -1,4 +1,5 @@
-// Focused browser check for combat effects and the nine common audio samples.
+// Focused browser check for combat effects and the essential common samples.
+// Additional authored variants are covered by qa-audio-profissional-regression.cjs.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -36,9 +37,9 @@ const common = new Set(['melee-1', 'melee-2', 'ranged-1', 'ranged-2',
         await page.waitForTimeout(100);
         assert.equal(requested.size, 0, 'muted effects must not preload');
         await page.evaluate(() => qaEngine.setVolumes({ effects: 100 }));
-        await page.waitForFunction(() => performance.getEntriesByType('resource')
-            .filter(entry => entry.name.includes('/modern/assets/audio/')).length >= 9);
-        assert.deepEqual(requested, common, 'active scene must preload exactly the common samples');
+        await page.waitForFunction(names => names.every(name => performance.getEntriesByType('resource')
+            .some(entry => new URL(entry.name).pathname === '/modern/assets/audio/' + name + '.mp3')), [...common]);
+        assert([...common].every(name => requested.has(name)), 'active scene must preload every essential sample');
         const decoded = await page.evaluate(async () => {
             const names = ['critical', 'wand'];
             return Promise.all(names.map(async name => {

@@ -32,7 +32,7 @@ export async function createRenderer(bridge){
  function labels(){ctx.clearRect(0,0,width,height);const player=bridge.getPlayer(),target=bridge.getTarget?.()||{id:player.target,type:player.targetType};
   for(const [id,r]of actors.entries){const e=r.data;const x=(e.renderX??e.x)+.5,z=(e.renderY??e.y)+.5;const isTarget=id===`${target.type==='player'?'remote':'mob'}:${target.id}`;
    if(isTarget){const pos=project(x,.035,z);ctx.strokeStyle='#f3c76b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,18*width/720,9*height/528,0,0,Math.PI*2);ctx.stroke();}
-   const y=r.kind==='mob'?Math.max(.7,(bridge.getMonsterTypes?.()[e.type]?.size||1)*1.35):1.6;const pos=project(x,y,z);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;
+   const y=Number.isFinite(r.visualHeight)?r.visualHeight+.18:r.kind==='mob'?Math.max(.7,(bridge.getMonsterTypes?.()[e.type]?.size||1)*1.35):1.6;const pos=project(x,y,z);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;
    if(r.kind==='npc'){const distance=Math.hypot(e.x-player.x,e.y-player.y);if(distance<4)text(bridge.npcName?.(e)||e.name,pos.x,pos.y,'#e7c787',11);}
    else if(r.kind==='remote'||r.kind==='player'){
     const cosmetic=bridge.getItems?.()[e.equipped?.cosmetic||e.cosmetic]||{};

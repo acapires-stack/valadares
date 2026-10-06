@@ -1,3 +1,5 @@
+import '../appearance-rules.js';
+const {normalizarAppearance,APPEARANCE_BODIES,APPEARANCE_PALETTES}=globalThis.AppearanceRules;
 // Original real-time presentation; authoritative entities and timings stay in the game.
 // Models face +Z at rest; positive yaw turns that forward vector toward +X.
 const FORWARD={down:0,left:-90,up:180,right:90};
@@ -5,11 +7,11 @@ export async function createActors(pc,app,bridge){
  const materials=new Map();
  const material=(hex,metal=0)=>{const key=hex+':'+metal;if(materials.has(key))return materials.get(key);const m=new pc.StandardMaterial();m.diffuse=new pc.Color().fromString(hex);m.metalness=metal;m.useMetalness=true;m.gloss=metal?0.45:0.15;m.update();materials.set(key,m);return m;};
  const shape=(parent,type,scale,pos,color,rotation)=>{const e=new pc.Entity(type);e.addComponent('render',{type,material:material(color),castShadows:Math.max(...scale)>.22,receiveShadows:true});e.setLocalScale(...scale);e.setLocalPosition(...pos);if(rotation)e.setLocalEulerAngles(...rotation);parent.addChild(e);return e;};
- const legacyNames=['Knight','Mage','Rogue_Hooded','Barbarian','Skeleton_Warrior'];
+ const legacyNames=['Knight','Mage','Rogue_Hooded','Barbarian','Skeleton_Minion'];
  const seriesNames=['Farmer_A','Farmer_B','Lorekeeper','Cleric','OrcBrute','Monstrosity','Hoarder','MagicalGirl'];
  const propForWeapon={sword:'AvianSwordsman_Sword',axe:'Orc_Axe',mace:'Cleric_Mace',spear:'PlantWarrior_Spear',staff:'Lorekeeper_Staff',bow:'PlantWarrior_Bow_withString'};
  const shieldProp='Cleric_Shield';
- const load=(name,series=false)=>new Promise((resolve,reject)=>app.assets.loadFromUrl(new URL(series?`./assets/characters-series6/${name}.glb`:`./assets/characters/${name}-game.glb`,import.meta.url).href,'container',(err,a)=>{if(err){if(a){a.unload();app.assets.remove(a);}reject(err);}else resolve(a);}));
+ const load=(name,series=false)=>new Promise((resolve,reject)=>app.assets.loadFromUrl(new URL(name==='Wolf'?'./assets/animals/Wolf-game.glb':series?`./assets/characters-series6/${name}.glb`:`./assets/characters/${name}-game.glb`,import.meta.url).href,'container',(err,a)=>{if(err){if(a){a.unload();app.assets.remove(a);}reject(err);}else resolve(a);}));
  const loaded=await Promise.all(legacyNames.map(n=>load(n)));
  const assets=Object.fromEntries(legacyNames.map((n,i)=>[n,loaded[i]]));
  const failedSeries=[],pending=new Map();let destroyed=false;
@@ -17,9 +19,35 @@ export async function createActors(pc,app,bridge){
  const seriesRig=model=>model==='OrcBrute'||model==='Monstrosity'?'Rig_Large':seriesNames.includes(model)?'Rig_Medium':null;
  const ready=(name,fallback)=>{if(!name)return fallback;const rig=seriesRig(name);if(!rig)return fallback;ensure(name);ensure(rig+'_General');ensure(rig+'_MovementBasic');return assets[name]&&assets[rig+'_General']&&assets[rig+'_MovementBasic']?name:fallback;};
  const gearReady=name=>{if(!name)return false;ensure(name);return !!assets[name];};
- function animate(entity,model){entity.addComponent('anim',{activate:true});const prefix=seriesRig(model);const clips=prefix?[...assets[prefix+'_General'].resource.animations,...assets[prefix+'_MovementBasic'].resource.animations,...assets[model].resource.animations]:assets[model].resource.animations;for(const a of clips)if(a.resource.name!=='T-Pose')entity.anim.assignAnimation(a.resource.name,a.resource,undefined,1,true);}
- const root=new pc.Entity('Atores');app.root.addChild(root);const entries=new Map();let now=0;
- function weaponKind(e){const it=bridge.getItems?.()[e.equipped?.weapon];if(!it)return 'unarmed';const s=(it.skill||'').toLowerCase(),key=(e.equipped.weapon||'').toLowerCase();if(s.includes('magia')||/staff|wand|cajad/.test(key))return 'staff';if(s.includes('dist')||it.ranged)return 'bow';if(s.includes('mach')||/axe/.test(key))return 'axe';if(s.includes('clav')||/mace|club/.test(key))return 'mace';if(it.meleeRange>1||/spear|lanc/.test(key))return 'spear';return 'sword';}
+ const mediumCombatTracks=[];
+ function sameRigCombat(){
+  if(!mediumCombatTracks.length)for(const {resource:t}of assets.Knight.resource.animations)if(/Attack|Shoot/.test(t.name)){
+   // These 23 medium bones have the same rest transforms. Only the authored armature name differs.
+   const curves=t.curves.map(c=>new pc.AnimCurve(c.paths.map(p=>({...p,entityPath:p.entityPath.map(n=>n==='Rig'?'Rig_Medium':n)})),c.input,c.output,c.interpolation));
+   mediumCombatTracks.push(new pc.AnimTrack(t.name,t.duration,t.inputs,t.outputs,curves));
+  }return mediumCombatTracks;
+ }
+ function animate(entity,model){
+  entity.addComponent('anim',{activate:true});const prefix=seriesRig(model);
+  const clips=prefix?[...assets[prefix+'_General'].resource.animations,...assets[prefix+'_MovementBasic'].resource.animations,...assets[model].resource.animations]:assets[model].resource.animations;
+  const durations={};if(prefix==='Rig_Medium')for(const track of sameRigCombat())clips.push({resource:track});for(const a of clips)if(a.resource.name!=='T-Pose'){
+   const name=a.resource.name;durations[name]=a.resource.duration;
+   entity.anim.assignAnimation(name,a.resource,undefined,1,/^(Idle|Running|Walking)/.test(name));
+  }return durations;
+ }
+ // A single scalar preserves the artist's anatomy. Hats and held items do not change body height.
+ function sizeBody(entity,height){
+  let low=Infinity,high=-Infinity;
+  for(const r of entity.findComponents('render'))if(r.enabled&&/_(Body|Head|Arm|Leg|Jaw)/.test(r.entity.name))for(const mi of r.meshInstances){const b=mi.aabb;low=Math.min(low,b.center.y-b.halfExtents.y);high=Math.max(high,b.center.y+b.halfExtents.y);}
+  const authored=high-low,scale=Number.isFinite(authored)&&authored>.1?height/authored:.6;entity.setLocalScale(scale,scale,scale);return height;
+ }
+ function attachAuthored(parent,boneName,child){
+  const bone=parent.findByName(boneName);if(!bone)return;const position=child.getPosition().clone(),rotation=child.getRotation().clone(),scale=child.getLocalScale().clone();
+  child.reparent(bone);child.setPosition(position);child.setRotation(rotation);child.setLocalScale(scale);
+ }
+
+ const root=new pc.Entity('Atores');app.root.addChild(root);const entries=new Map(),deathVisuals=new Map(),deathEvents=new Set();let now=0,gestureSerial=0;
+ function weaponKind(e){const all=bridge.getItems?.()||{},keyId=e.equipped?.weapon,it=all[keyId]||all[keyId?.replace(/_PLUS_\d+$/,'')];if(!it)return 'unarmed';const s=(it.skill||'').toLowerCase(),key=(e.equipped.weapon||'').toLowerCase();if(s.includes('magia')||/staff|wand|cajad/.test(key))return 'staff';if(it.meleeRange>1||/spear|lanc/.test(key))return 'spear';if(s.includes('dist')||it.ranged)return 'bow';if(s.includes('mach')||/axe/.test(key))return 'axe';if(s.includes('clav')||/mace|club/.test(key))return 'mace';return 'sword';}
  function weapon(parent,kind,offhand,definition={}){
   const steel=definition.color||'#b7c8cf',gold='#b69555',wood='#483326';
   if(kind==='sword'){shape(parent,'box',[.035,.58,.09],[0,.3,0],steel);shape(parent,'box',[.035,.055,.27],[0,.04,0],gold);shape(parent,'cylinder',[.05,.21,.05],[0,-.07,0],wood);}
@@ -31,18 +59,39 @@ export async function createActors(pc,app,bridge){
   if(offhand){const shield=new pc.Entity('escudo');parent.addChild(shield);shape(shield,'cylinder',[.4,.065,.4],[0,0,0],definition.color||wood,[90,0,0]);shape(shield,'sphere',[.12,.12,.06],[0,0,.055],gold);return shield;}
  }
  function equipVisual(parent,kind,offhand,definition,owned){const name=offhand?shieldProp:propForWeapon[kind];if(!gearReady(name))return weapon(parent,kind,offhand,definition);const item=assets[name].resource.instantiateRenderEntity({castShadows:true});item.name=name;parent.addChild(item);if(!offhand)parent.setLocalEulerAngles(0,0,90);const scale=name==='PlantWarrior_Bow_withString'?.72:name==='Lorekeeper_Staff'?.64:name==='PlantWarrior_Spear'?.58:name==='Cleric_Shield'?.95:.72;item.setLocalScale(scale,scale,scale);if(kind==='bow'){item.setLocalRotation(new pc.Quat().setFromEulerAngles(0,90,0).mul(new pc.Quat().setFromEulerAngles(-90,0,0)));item.setLocalPosition(0,.45,.35);}else if(kind==='staff')item.setLocalPosition(0,.35,.25);else if(kind==='spear')item.setLocalPosition(0,.25,.15);if(definition?.color)for(const r of item.findComponents('render'))for(const mi of r.meshInstances){const m=mi.material.clone();m.diffuse=new pc.Color().fromString(definition.color);m.update();owned.push(m);mi.material=m;}return item;}
- function appearance(e){
+ function appearance(e,kind){
+  const identity=normalizarAppearance(kind==='player'?(e._appearancePreview||e.appearance):e.appearance),palette=APPEARANCE_PALETTES.find(x=>x.id===identity.palette);
   const raw=e.equipped||{},cosmetic=e.cosmetic||raw.cosmetic||null;
   const eq=bridge.withCosmetics?.({...raw},cosmetic)||raw,items=bridge.getItems?.()||{};
   const base=key=>key?.replace(/_PLUS_\d+$/,'')||null;
   const item=key=>key?(items[key]||items[base(key)]||null):null;
   const dyes=e.dyes||eq.dyes||{},head=base(eq.head),cosmeticDef=item(cosmetic);
-  const body=dyes.armor||item(eq.armor)?.color||e.color||e.bodyColor||'#5b6170';
+  const body=dyes.armor||palette.color||item(eq.armor)?.color||null;
   const feet=dyes.feet||item(eq.feet)?.color||null;
   const headColor=dyes.head||item(eq.head)?.color||'#939ca5';
   const cape=eq.cape?(dyes.cosmetic||eq.cape):null;
   const crown=cosmeticDef?.crown||(/^COROA_/.test(cosmetic||'')?cosmeticDef?.color:null)||(/^COROA_/.test(head||'')?headColor:null);
-  return {eq,dyes,head,body,feet,headColor,cape,crown,cosmetic};
+  return {eq,dyes,head,body,feet,headColor,cape,crown,cosmetic,identity,palette};
+ }
+ // Recolor only the authored cloth/metal swatches. Multiplication alone cannot turn a green hood wine-red.
+ function colorOutfit(source,model,color){
+  const m=source.clone(),target=new pc.Color().fromString(color).linear();
+  const mask=model==='MagicalGirl'?'tex.r > tex.g * 1.8 && tex.r > tex.b * 1.25':model==='Rogue_Hooded'?'tex.g > tex.r * 1.25 && tex.g > tex.b * 1.15':model==='Knight'||model==='Cleric'?'maxc - minc < maxc * .32 && tex.b >= tex.r * .93':model==='Mage'?'tex.b > tex.r * 1.08 && tex.b > tex.g * 1.08':'tex.b > tex.r * 1.12 && tex.b > tex.g * 1.03';
+  m.diffuse=new pc.Color(1,1,1);m.setParameter('appearance_color',[target.r,target.g,target.b]);
+  m.getShaderChunks('glsl').set('diffusePS',`uniform vec3 material_diffuse;
+   uniform vec3 appearance_color;
+   void getAlbedo() {
+    dAlbedo=material_diffuse.rgb;
+    #ifdef STD_DIFFUSE_TEXTURE
+     vec3 tex={STD_DIFFUSE_TEXTURE_DECODE}(texture2DBias({STD_DIFFUSE_TEXTURE_NAME},{STD_DIFFUSE_TEXTURE_UV},{STD_TEXTURE_BIAS})).{STD_DIFFUSE_TEXTURE_CHANNEL};
+     float maxc=max(tex.r,max(tex.g,tex.b));float minc=min(tex.r,min(tex.g,tex.b));
+     bool garment=maxc>.003 && (${mask});
+     dAlbedo*=garment ? appearance_color * (maxc/max(.001,max(appearance_color.r,max(appearance_color.g,appearance_color.b)))) : tex;
+    #endif
+    #ifdef STD_DIFFUSE_VERTEX
+     dAlbedo*=saturate(vVertexColor.{STD_DIFFUSE_VERTEX_CHANNEL});
+    #endif
+   }`);m.update();return m;
  }
  function crown(parent,color,high=false){
   shape(parent,'cylinder',[.34,.09,.34],[0,2.18,0],color);
@@ -51,149 +100,91 @@ export async function createActors(pc,app,bridge){
  }
  const npcTools={eremita:'staff',domador:'staff',crepusculo:'staff',vohrim:'staff',vendedor:'staff',ferreiro:'mace',mineiro:'axe',cacadora:'bow',arena:'sword'};
  const npcPreferred={eremita:'Lorekeeper',crepusculo:'Cleric',vohrim:'Lorekeeper',vendedor:'Cleric',tintureira:'MagicalGirl',ferreiro:'Farmer_A',mineiro:'Farmer_B',mercador:'Hoarder',leiloeiro:'Farmer_B',banqueiro:'Lorekeeper',atendente:'Farmer_A',crupie:'Farmer_B',domador:'Farmer_A'};
- function humanoidModel(e,kind,id,w){const old=kind==='npc'?(/tint|eremita|crepus|vohrim|vendedor/.test(id)?'Mage':/cacadora|leiloeiro|mercador|domador/.test(id)?'Rogue_Hooded':'Knight'):(w==='staff'?'Mage':w==='bow'?'Rogue_Hooded':w==='axe'?'Barbarian':'Knight');return kind==='npc'?ready(npcPreferred[e.id],old):old;}
+ function humanoidModel(e,kind,id,w){
+  if(kind!=='npc'){const selected=APPEARANCE_BODIES.find(x=>x.id===normalizarAppearance(kind==='player'?(e._appearancePreview||e.appearance):e.appearance).body).model;return seriesRig(selected)?ready(selected,'Knight'):selected;}
+  const fallback=/tint|eremita|crepus|vohrim|vendedor/.test(id)?'Mage':/cacadora|leiloeiro|mercador|domador/.test(id)?'Rogue_Hooded':'Knight';return ready(npcPreferred[e.id],fallback);
+ }
+
  function humanoid(e,kind,id){
-  const look=kind==='npc'?null:appearance(e);
+  const look=kind==='npc'?null:appearance(e,kind);
   const w=kind==='npc'?(npcTools[e.id]||'unarmed'):weaponKind(e);
   const model=humanoidModel(e,kind,id,w);
-  const entity=assets[model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);entity.setLocalScale(.42,.60,.42);
+  const entity=assets[model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);
   const rigMeshes=entity.findComponents('render');for(const r of rigMeshes){const n=r.entity.name;
    const isSeries=!!seriesRig(model),modeled=isSeries?/^(Farmer_|Lorekeeper_|Cleric_|Hoarder_|MagicalGirl_)/.test(n):/^(Knight|Mage|Rogue|Barbarian)_/.test(n);
    const hat=/Knight_Helmet|Mage_Hat|Barbarian_Hat/.test(n),cape=/Cape/.test(n),builtInTool=/HolyWater|Staff|Tome/.test(n);
    r.enabled=modeled&&!builtInTool&&(!hat||(kind==='npc'&&n==='Mage_Hat')||(kind!=='npc'&&!!look.eq.head&&!look.crown))&&(!cape||kind==='npc'||!!look.cape);
    for(const mi of r.meshInstances)mi.castShadow=r.enabled;
   }
-  animate(entity,model);
+  const visualHeight=sizeBody(entity,1.42),clips=animate(entity,model);
   const owned=[];
   const right=entity.findByName('handslot.r'),left=entity.findByName('handslot.l');
-  if(right){const holder=new pc.Entity('Arma');right.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,w,false,bridge.getItems?.()[e.equipped?.weapon],owned);}
-  if(left&&e.equipped?.offhand){const holder=new pc.Entity('Escudo');left.addChild(holder);holder.setLocalEulerAngles(0,90,0);equipVisual(holder,'',true,bridge.getItems?.()[e.equipped.offhand],owned);}
+  const weaponHand=w==='bow'?left:right;
+  if(weaponHand){const holder=new pc.Entity('Arma');weaponHand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,w,false,bridge.getItems?.()[e.equipped?.weapon],owned);}
+  if(left&&w!=='bow'&&e.equipped?.offhand){const holder=new pc.Entity('Escudo');left.addChild(holder);holder.setLocalEulerAngles(0,90,0);equipVisual(holder,'',true,bridge.getItems?.()[e.equipped.offhand],owned);}
   if(look?.crown)crown(entity,look.crown,look.head==='COROA_CELESTIAL');
-  else if(look?.eq.head&&model==='Rogue_Hooded'){
-   shape(entity,'cylinder',[.37,.11,.37],[0,2.12,0],look.headColor);
-  }
-  if(look?.eq.head&&!look.crown&&/ELMO_CHIFRES|ELMO_DRACO/.test(look.head))for(const side of [-1,1])shape(entity,'cone',[.1,.27,.1],[side*.27,2.32,0],'#d8c6a3',[0,0,side*25]);
+
+
   for(const r of rigMeshes){const name=r.entity.name;let dye=null;
-   if(kind==='npc')dye=/Cape|Hat/.test(name)?e.hat:/Body/.test(name)?e.body:null;
-   else if(/Body/.test(name))dye=look.body;
-   else if(/LegLeft|LegRight/.test(name))dye=look.feet;
-   else if(/Helmet|Hat/.test(name))dye=look.headColor;
-   else if(/Cape/.test(name))dye=look.cape;
+   if(kind==='npc')continue;
+   const cloth=/Body|Arm|Leg|Cape|Hat|Helmet/.test(name)||model==='Rogue_Hooded'&&/Head_Hooded/.test(name);
+   if(look.palette.color&&cloth&&!look.dyes.armor){for(const mi of r.meshInstances){const m=colorOutfit(mi.material,model,look.palette.color);owned.push(m);mi.material=m;}continue;}
+   if(/Body/.test(name))dye=look.body;else if(/LegLeft|LegRight/.test(name))dye=look.feet;else if(/Helmet|Hat/.test(name))dye=look.headColor;else if(/Cape/.test(name))dye=look.cape;
    if(!dye)continue;for(const mi of r.meshInstances){const m=mi.material.clone();m.diffuse=new pc.Color().fromString(dye);m.update();owned.push(m);mi.material=m;}
   }
-  const rec={entity,model,w,kind,id,owned,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:'',targetAngle:0};
+
+  const rec={entity,model,w,kind,id,owned,visualHeight,clips,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:'',targetAngle:0};
   return rec;
  }
  const RIGGED_MOBS={
-  ORC:{model:'Barbarian',preferred:'OrcBrute',weapon:'axe',skin:'#728a4f',armor:'#615342'},
-  ORC_LIDER:{model:'Barbarian',preferred:'OrcBrute',weapon:'axe',skin:'#78914e',armor:'#8a3659',cape:'#702b46',hat:true},
-  TROLL:{model:'Barbarian',preferred:'Monstrosity',weapon:'mace',skin:'#637f5b',armor:'#52634e'},
-  MINOTAUR:{model:'Barbarian',weapon:'axe',skin:'#936347',armor:'#644534',horns:true},
-  SKELETON:{model:'Skeleton_Warrior',weapon:'sword',cape:'#4b4248'},
-  CACADOR:{model:'Rogue_Hooded',weapon:'bow',skin:'#b1845a',armor:'#a25c29',cape:'#634329'},
-  CARRASCO:{model:'Barbarian',weapon:'axe',skin:'#9c7464',armor:'#732838',cape:'#491c2a',mask:true},
-  SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',skin:'#97719f',armor:'#592582',cape:'#331443',crown:'#b47bdf',eyes:'#e8a6ff'},
-  SENHOR_VALADARES:{model:'Knight',weapon:'sword',armor:'#bf9839',cape:'#e9be55',crown:'#f4d26d'},
-  ARAUTO:{model:'Mage',weapon:'staff',skin:'#c5afcf',armor:'#8462b3',cape:'#d3b96d',crown:'#b9a0e1'}
+  ORC:{model:'Barbarian',preferred:'OrcBrute',weapon:'axe',height:1.65},
+  ORC_LIDER:{model:'Barbarian',preferred:'OrcBrute',weapon:'axe',height:1.65,armor:'#d7acac'},
+  TROLL:{model:'Barbarian',preferred:'Monstrosity',weapon:'mace',height:1.75},
+  MINOTAUR:{model:'Barbarian',weapon:'axe',height:1.62,armor:'#b79773',horns:true},
+  SKELETON:{model:'Skeleton_Minion',weapon:'sword',height:1.38},
+  CACADOR:{model:'Rogue_Hooded',weapon:'bow',height:1.35,armor:'#c8bb9e',cape:'#baaa80'},
+  CARRASCO:{model:'Barbarian',weapon:'axe',height:1.48,armor:'#a56e75',cape:'#935569',hat:true},
+  SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',height:1.4,armor:'#b691cb',cape:'#86639e',hat:true},
+  SENHOR_VALADARES:{model:'Knight',weapon:'sword',height:1.35,armor:'#efce8c',cape:'#d9b86f',hat:true},
+  ARAUTO:{model:'Mage',weapon:'staff',height:1.4,armor:'#c4bce2',cape:'#e3d09d'}
  };
  function enemyHumanoid(e,kind,id){
   const type=e.type,base=RIGGED_MOBS[type],cfg={...base,model:ready(base.preferred,base.model)},def=bridge.getMonsterTypes?.()[type]||{};
-  const entity=assets[cfg.model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);
-  const size=Math.min(def.size||1,1.65),wide=type==='TROLL'||type==='MINOTAUR'?1.16:1;
-  const scale=seriesRig(cfg.model)? .29 : .42;
-  entity.setLocalScale(scale*size*wide,(seriesRig(cfg.model)? .34 : .6)*size,scale*size*wide);
-  const owned=[];
+  const entity=assets[cfg.model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);const owned=[];
   for(const r of entity.findComponents('render')){
-   const n=r.entity.name,body=/Body/.test(n),head=/Head|Jaw|Eyes/.test(n),limb=/Arm|Leg/.test(n),cape=/Cape|Cloak/.test(n),hat=/Hat|Helmet/.test(n);
-   r.enabled=/^(Barbarian|Skeleton_Warrior|Knight|Mage|Rogue|OrcBrute|Monstrosity)_/.test(n)&&(body||head||limb||cape||hat)
-    &&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&(!/Barbarian_Head/.test(n)||type!=='MINOTAUR'&&type!=='CARRASCO');
-   for(const mi of r.meshInstances){mi.castShadow=r.enabled;
-    let color=cape?cfg.cape:body?cfg.armor:head||limb?cfg.skin:null;
-    if(type==='SKELETON'&&(head||limb))color=null;
-    if(!color)continue;const m=mi.material.clone();m.diffuse=new pc.Color().fromString(color);m.update();owned.push(m);mi.material=m;
-   }
+   const n=r.entity.name,cape=/Cape|Cloak/.test(n),hat=/Hat|Helmet/.test(n);
+   r.enabled=/^(Barbarian|Skeleton_Minion|Knight|Mage|Rogue|OrcBrute|Monstrosity)_/.test(n)&&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&!(cfg.horns&&/Barbarian_Head/.test(n));
+   // Keep the purchased creature's skin, eyes, teeth and armor details intact.
+   const color=cape?cfg.cape:/Body|Shoulderpad|LegArmor/.test(n)?cfg.armor:null;
+   for(const mi of r.meshInstances){mi.castShadow=r.enabled;if(color){const m=mi.material.clone();m.diffuse=new pc.Color().fromString(color);m.update();owned.push(m);mi.material=m;}}
   }
-  animate(entity,cfg.model);
-  const hand=entity.findByName('handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,cfg.weapon,false,{color:type==='SENHOR_VALADARES'?'#f8d46f':type==='SENHOR_PROFUNDEZAS'?'#b778e2':undefined},owned);}
-  if(cfg.crown)crown(entity,cfg.crown,type==='SENHOR_VALADARES');
-  if(cfg.horns){
-   shape(entity,'sphere',[.43,.4,.46],[0,1.59,.24],'#85543e');
-   shape(entity,'sphere',[.35,.23,.32],[0,1.44,.59],'#ae8060');
-   shape(entity,'sphere',[.2,.11,.13],[0,1.42,.83],'#493a33');
-   for(const side of [-1,1]){
-    shape(entity,'cone',[.18,.49,.17],[side*.47,1.92,.08],'#e5d0a8',[0,0,-side*48]);
-    shape(entity,'sphere',[.055,.05,.03],[side*.22,1.66,.66],'#e3bb78');
-   }
+  const visualHeight=sizeBody(entity,cfg.height*Math.min(def.size||1,1.9)),clips=animate(entity,cfg.model);
+  const hand=entity.findByName(cfg.weapon==='bow'?'handslot.l':'handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,cfg.weapon,false,{},owned);}
+  // This legacy approximation remains until an authored minotaur is available.
+  // Unlike the former root-space add-ons, these parts follow the head bone.
+  if(cfg.horns){const head=new pc.Entity('Cabeca minotauro');entity.addChild(head);
+   shape(head,'sphere',[.48,.43,.43],[0,1.94,.13],'#8c6349');shape(head,'sphere',[.38,.24,.36],[0,1.8,.4],'#ad805d');
+   for(const side of [-1,1]){shape(head,'cone',[.15,.46,.15],[side*.32,2.19,.06],'#dfcfad',[0,0,-side*48]);shape(head,'sphere',[.055,.05,.035],[side*.17,2.01,.35],'#171914');shape(head,'sphere',[.06,.04,.035],[side*.1,1.8,.58],'#4a3429');}
+   attachAuthored(entity,'head',head);
   }
-  if(cfg.mask){
-   shape(entity,'sphere',[.33,.39,.34],[0,1.57,.18],'#30252b');
-   shape(entity,'box',[.47,.1,.06],[0,1.61,.5],'#79515b');
-   for(const side of [-1,1])shape(entity,'sphere',[.055,.045,.03],[side*.13,1.63,.55],'#e48472');
-  }
-  if(cfg.eyes)for(const side of [-1,1])shape(entity,'sphere',[.055,.045,.035],[side*.16,1.85,.52],cfg.eyes);
-  if(type==='ORC_LIDER'||type==='CARRASCO'||type==='TROLL')for(const side of [-1,1])shape(entity,'sphere',[.28,.19,.29],[side*.55,1.4,0],cfg.armor);
-  if(type==='ORC'||type==='ORC_LIDER'){
-   for(const side of [-1,1]){
-    shape(entity,'cone',[.065,.18,.07],[side*.19,1.57,.52],'#e8d6ad',[25,0,-side*12]);
-    shape(entity,'cone',[.12,.22,.1],[side*.38,1.81,.04],'#5c523c',[0,0,-side*34]);
-   }
-   if(type==='ORC_LIDER'){
-    shape(entity,'cylinder',[.045,1.7,.045],[.49,1.67,-.24],'#48362b');
-    shape(entity,'box',[.47,.7,.045],[.49,2.24,-.22],'#a93652');
-    shape(entity,'sphere',[.12,.12,.07],[.49,2.32,-.17],'#e7b867');
-   }
-  }
-  if(type==='TROLL'){
-   shape(entity,'sphere',[.51,.42,.38],[0,1.16,.22],'#4e6550');
-   for(const side of [-1,1]){
-    shape(entity,'sphere',[.31,.33,.29],[side*.64,.93,.23],'#647d60');
-    shape(entity,'cone',[.09,.22,.09],[side*.18,1.51,.55],'#d0bf9e',[25,0,0]);
-   }
-  }
-  if(type==='SKELETON'){
-   for(let i=0;i<3;i++)shape(entity,'capsule',[.33,.045,.06],[0,1.12-i*.13,.28],'#e0dccb');
-   shape(entity,'sphere',[.04,.04,.025],[-.14,1.82,.35],'#dd5954');shape(entity,'sphere',[.04,.04,.025],[.14,1.82,.35],'#dd5954');
-  }
-  if(type==='CACADOR'){
-   shape(entity,'cylinder',[.32,.1,.35],[0,2.06,0],'#583b27');
-   shape(entity,'box',[.09,.62,.1],[.37,.95,-.27],'#6a4324');
-   for(const side of [-1,1])shape(entity,'box',[.07,.23,.12],[side*.25,.76,.34],'#b07c3d');
-  }
-  if(type==='CARRASCO'){
-   shape(entity,'box',[.7,.11,.16],[0,1.54,.5],'#34232b');
-   for(const side of [-1,1])shape(entity,'cone',[.11,.3,.11],[side*.6,1.57,0],'#722832',[0,0,-side*35]);
-  }
-  if(type==='SENHOR_PROFUNDEZAS'){
-   for(const side of [-1,1]){
-    shape(entity,'cone',[.19,.74,.16],[side*.45,2.2,-.08],'#422058',[0,0,-side*32]);
-    shape(entity,'sphere',[.24,.3,.15],[side*.55,1.28,.08],'#8d44b7');
-    shape(entity,'sphere',[.09,.1,.08],[side*.62,1.3,.26],'#e4a2ff');
-   }
-   shape(entity,'sphere',[.26,.29,.16],[0,1.25,.42],'#bd78ec');
-  }
-  if(type==='SENHOR_VALADARES'){
-   for(const side of [-1,1]){
-    shape(entity,'box',[.3,.43,.2],[side*.55,1.38,-.05],'#d8ae45',[0,0,side*18]);
-    shape(entity,'cone',[.13,.47,.13],[side*.58,1.83,-.06],'#f4ce60',[0,0,-side*27]);
-   }
-   shape(entity,'sphere',[.23,.25,.13],[0,1.27,.39],'#f6df8b');
-   shape(entity,'cylinder',[.46,.08,.46],[0,2.44,0],'#f5d976');
-  }
-  if(type==='ARAUTO'){
-   for(const side of [-1,1]){
-    shape(entity,'cone',[.43,.86,.07],[side*.64,1.58,-.21],'#baa0dd',[0,0,-side*42]);
-    shape(entity,'sphere',[.14,.14,.09],[side*.68,1.53,-.12],'#eee0a7');
-   }
-   shape(entity,'sphere',[.23,.26,.13],[0,1.28,.41],'#d8c7ef');
-  }
-  return {entity,kind,id,type,model:cfg.model,w:cfg.weapon,owned,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
+  return {entity,kind,id,type,model:cfg.model,w:cfg.weapon,owned,visualHeight,clips,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
+ }
+
+ function animal(e,kind,id){
+  const entity=assets.Wolf.resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);
+  // Original author rig/materials/clips. Measured standing height: 1.044 at uniform scale .38.
+  const visualHeight=.95*(bridge.getMonsterTypes?.()[e.type]?.size||1),scale=.38*visualHeight/1.044;entity.setLocalScale(scale,scale,scale);
+  entity.addComponent('anim',{activate:true});const clips={};for(const {resource:track}of assets.Wolf.resource.animations){clips[track.name]=track.duration;entity.anim.assignAnimation(track.name,track,undefined,1,/^(Idle|Walk|Gallop)$/.test(track.name));}
+  return {entity,kind,id,type:e.type,model:'Wolf',animal:true,w:'bite',owned:[],visualHeight,clips,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
  }
  function creature(e,kind,id){
+  if(e.type==='WOLF'){ensure('Wolf');if(assets.Wolf)return animal(e,kind,id);}
   if(kind==='mob'&&RIGGED_MOBS[e.type])return enemyHumanoid(e,kind,id);
   const group=new pc.Entity(id);root.addChild(group);
   const type=e.type||'RAT',def=bridge.getMonsterTypes?.()[type]||{},c=def.color||'#687f66';
   const rec={entity:group,kind,id,type,parts:[],owned:[],lastX:NaN,lastZ:NaN,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1};
-  const add=(form,size,at,color=c,rot)=>shape(group,form,size,at,color,rot);
+  // Creature sphere dimensions were authored as radii; PlayCanvas spheres use unit diameter.
+  const add=(form,size,at,color=c,rot)=>shape(group,form,form==='sphere'?size.map(v=>v*2):size,at,color,rot);
   const move=(form,size,at,color=c,rot=[0,0,0],swing=12)=>{const part=add(form,size,at,color,rot);rec.parts.push({part,rot,swing});return part;};
   const eyes=(y,z,span=.12,col='#e5ce92')=>{for(const side of [-1,1])add('sphere',[.035,.034,.026],[side*span,y,z],col);};
   const quadruped=(body,head,legs)=>{
@@ -321,34 +312,73 @@ export async function createActors(pc,app,bridge){
    if(type==='TROLL')add('sphere',[.47,.25,.31],[0,.99,.28],'#617d5a');
    if(!shadow){const hand=new pc.Entity('arma inimiga');group.addChild(hand);hand.setLocalPosition(-.5,.87,.24);weapon(hand,skeleton||type==='CACADOR'?'sword':boss?'staff':'axe',false);}
   }
-  const s=kind==='pet' ? .48 : (def.size||1);group.setLocalScale(s,s,s);return rec;
+  const s=kind==='pet' ? .48 : (def.size||1);group.setLocalScale(s,s,s);rec.visualHeight=Math.max(.1,...group.findComponents('render').flatMap(r=>r.meshInstances.map(mi=>mi.aabb.center.y+mi.aabb.halfExtents.y)));return rec;
  }
+ // Confirmed death presentation is separate from authoritative monsters and selectable entries.
+ function retainConfirmedDeath(detail){
+  if(destroyed||!detail||detail.targetId==null)return false;
+  const floor=bridge.getFloor?.()??bridge.getPlayer()?.floor??0;if((detail.floor??0)!==floor)return false;
+  const id='mob:'+detail.targetId,time=performance.now(),prior=deathVisuals.get(id);
+  if(prior){if(prior.eventId!==detail.eventId)return false;if(!prior.started)prior.contactAt=Math.max(time,Math.min(prior.receivedAt+500,Number.isFinite(detail.contactAt)?detail.contactAt:time));return true;}
+  if(detail.eventId&&deathEvents.has(detail.eventId))return false;
+  let rec=entries.get(id);const snapshot=detail.mob||rec?.data;if(!snapshot?.type)return false;
+  if(!rec){rec=creature({...snapshot,hp:1},'mob',id);rec.data={...snapshot};rec.entity.setPosition((snapshot.renderX??snapshot.x)+.5,0,(snapshot.renderY??snapshot.y)+.5);rec.entity.setEulerAngles(0,(FORWARD[snapshot.dir]??0)+(rec.angleOffset||0),0);}
+  else entries.delete(id);
+  if(rec.entity.anim)rec.entity.anim.speed=0;
+  if(detail.eventId){deathEvents.add(detail.eventId);if(deathEvents.size>128)deathEvents.delete(deathEvents.values().next().value);}
+  deathVisuals.set(id,{rec,eventId:detail.eventId,floor,receivedAt:time,contactAt:Math.max(time,Math.min(time+500,Number.isFinite(detail.contactAt)?detail.contactAt:time)),started:false,scale:rec.entity.getLocalScale().clone()});return true;
+ }
+ function cancelConfirmedDeath(eventId){for(const [id,death]of deathVisuals)if(death.eventId===eventId){dispose(death.rec);deathVisuals.delete(id);}}
+ function clearCombatPresentation(){for(const death of deathVisuals.values())dispose(death.rec);deathVisuals.clear();}
+ function updateDeathVisuals(floor){const time=performance.now();for(const [id,death]of deathVisuals){
+  if(death.floor!==floor||entries.has(id)){dispose(death.rec);deathVisuals.delete(id);continue;}
+  if(time<death.contactAt)continue;
+  const rec=death.rec,elapsed=(time-death.contactAt)/1000;
+  if(elapsed>=.65){dispose(rec);deathVisuals.delete(id);continue;}
+  if(!death.started){death.started=true;rec.state=rec.animal?'Death':'Death_A';if(rec.entity.anim){rec.entity.anim.baseLayer.transition(rec.state,.035,0);rec.entity.anim.speed=(rec.clips?.[rec.state]||.8)/.55;}}
+  if(!rec.entity.anim){const angle=Math.min(1,elapsed/.4)*75;rec.entity.setEulerAngles(angle,rec.angle||0,0);}
+  const shrink=elapsed<.5?1:Math.max(0,1-(elapsed-.5)/.15);rec.entity.setLocalScale(death.scale.x*shrink,death.scale.y*shrink,death.scale.z*shrink);
+ }}
  function signature(e,kind){
   if(kind==='pet')return e.type||kind;
   const w=kind==='mob'?RIGGED_MOBS[e.type]?.weapon:kind==='npc'?(npcTools[e.id]||'unarmed'):weaponKind(e);
   const prop=propForWeapon[w],visual=prop?(gearReady(prop)?'asset':'shape'):'none';
   const shield=e.equipped?.offhand?(gearReady(shieldProp)?'asset':'shape'):'none';
-  if(kind==='mob')return (e.type||kind)+'|'+visual;
+  if(kind==='mob'){if(e.type==='WOLF'){ensure('Wolf');return 'WOLF|'+(assets.Wolf?'authored':'pending');}return (e.type||kind)+'|'+visual;}
   if(kind==='npc')return e.id+'|'+e.body+'|'+e.hat+'|'+visual;
   const q=e.equipped||{},d=e.dyes||q.dyes||{};
-  return [weaponKind(e),q.weapon,q.offhand,q.armor,q.head,q.feet,q.cape,e.cosmetic||q.cosmetic,
+  const identity=normalizarAppearance(kind==='player'?(e._appearancePreview||e.appearance):e.appearance);
+  return [identity.body,identity.palette,weaponKind(e),q.weapon,q.offhand,q.armor,q.head,q.feet,q.cape,e.cosmetic||q.cosmetic,
    e.color,e.bodyColor,d.armor,d.head,d.feet,d.cosmetic,visual,shield].join('|');
  }
  function update(dt){
   now+=dt;const seen=new Set(),p=bridge.getPlayer(),cam=bridge.getCamera();
   const bounds=bridge.getViewBounds?.()||{minX:cam.x-.5,maxX:cam.x+bridge.VP_W+.5,minY:cam.y-.5,maxY:cam.y+bridge.VP_H+.5};
   const visible=e=>{const x=e.renderX??e.x??e.pos?.x,z=e.renderY??e.y??e.pos?.y;return Number.isFinite(x)&&x>=bounds.minX&&x<bounds.maxX&&z>=bounds.minY&&z<bounds.maxY;};
-  const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id);const expected=kind==='mob'&&RIGGED_MOBS[e.type]?ready(RIGGED_MOBS[e.type].preferred,RIGGED_MOBS[e.type].model):kind==='npc'?humanoidModel(e,kind,id,npcTools[e.id]||'unarmed'):kind==='player'||kind==='remote'?humanoidModel(e,kind,id,weaponKind(e)):null;if(rec&&(rec.sig!==sig||expected&&rec.model!==expected)){dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);rec.sig=sig;entries.set(id,rec);}rec.data=e;
+  const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id);const expected=kind==='mob'&&RIGGED_MOBS[e.type]?ready(RIGGED_MOBS[e.type].preferred,RIGGED_MOBS[e.type].model):kind==='npc'?humanoidModel(e,kind,id,npcTools[e.id]||'unarmed'):kind==='player'||kind==='remote'?humanoidModel(e,kind,id,weaponKind(e)):null;if(rec&&(rec.sig!==sig||expected&&rec.model!==expected)){dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);// First sight and visual rebuilds consume the current cooldown snapshot; they are not new attacks.
+   rec.previousTimer=e.attackTimer||0;rec.previousAtkAnim=e.atkAnim||0;rec.previousArtAttackAt=e.artAttackAt||0;rec.sig=sig;entries.set(id,rec);}rec.data=e;
    const x=(e.renderX??e.x??e.pos?.x)+.5,z=(e.renderY??e.y??e.pos?.y)+.5;const distance=Number.isFinite(rec.lastX)?Math.hypot(x-rec.lastX,z-rec.lastZ):0;const moving=distance>.0008;rec.entity.setPosition(x,0,z);
-   let angle=FORWARD[e.dir]??(moving?Math.atan2(x-rec.lastX,z-rec.lastZ)*180/Math.PI:rec.angle||0);rec.angle=angle;rec.entity.setEulerAngles(0,angle,0);
+   let angle=FORWARD[e.dir]??(moving?Math.atan2(x-rec.lastX,z-rec.lastZ)*180/Math.PI:rec.angle||0);rec.angle=angle;rec.entity.setEulerAngles(0,angle+(rec.angleOffset||0),0);
    const timer=e.attackTimer||0,atk=e.atkAnim||0,hit=e.artAttackAt||0;
    const newStrike=timer>rec.previousTimer+60||(atk>0&&rec.previousAtkAnim<=0)||(hit>0&&hit!==rec.previousArtAttackAt);
    rec.previousTimer=timer;rec.previousAtkAnim=atk;rec.previousArtAttackAt=hit;
-   if(newStrike&&now-rec.lastStrikeAt>.14){rec.strikeUntil=now+.34;rec.lastStrikeAt=now;}
-   if(rec.model){const attacking=now<rec.strikeUntil,series=!!seriesRig(rec.model);let state=e.hp<=0?'Death_A':attacking?(series?(seriesRig(rec.model)==='Rig_Large'?'1H_Melee_Attack_Chop':'Use_Item'):(rec.w==='staff'?'Spellcast_Shoot':rec.w==='bow'?'2H_Ranged_Shoot':rec.w==='unarmed'?'Unarmed_Melee_Attack_Punch_A':'1H_Melee_Attack_Chop')):moving?'Running_A':series?'Idle_A':'Idle';
-    if(state!==rec.state){rec.entity.anim.baseLayer.transition(state,.1);rec.state=state;}
-    else if(newStrike&&attacking){rec.entity.anim.baseLayer.transition(series?'Idle_A':'Idle',0);rec.entity.anim.baseLayer.transition(state,.06);}
-    rec.entity.anim.speed=attacking?1:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
+   const strikeStarted=newStrike&&now-rec.lastStrikeAt>.14;
+   if(strikeStarted){
+    const preferred=rec.animal?'Attack':rec.w==='staff'?'Spellcast_Shoot':rec.w==='bow'?'2H_Ranged_Shoot':rec.w==='unarmed'?'Unarmed_Melee_Attack_Punch_A':'1H_Melee_Attack_Chop';rec.attackState=rec.clips?.[preferred]?preferred:seriesRig(rec.model)==='Rig_Large'?'1H_Melee_Attack_Chop':'Use_Item';
+    const duration=rec.clips?.[rec.attackState]||.6;
+    // Finish windup, contact and recovery inside the existing attack interval.
+    const cadence=(timer||e.attackDelay||800)/1000;rec.attackSeconds=Math.max(.3,Math.min(duration,cadence*.9));rec.attackSpeed=duration/rec.attackSeconds;
+    rec.strikeUntil=now+rec.attackSeconds;rec.lastStrikeAt=now;
+    const phase=rec.animal?.525:rec.w==='staff'?.3214:rec.w==='bow'?.4219:rec.w==='unarmed'?.3409:.5625;
+    rec.attackStartedAt=performance.now();rec.attackContactTime=now+rec.attackSeconds*phase;rec.attackContactAt=rec.attackStartedAt+rec.attackSeconds*phase*1000;rec.attackSequence=++gestureSerial;rec.contactSent=false;
+    document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'prepare',sequence:rec.attackSequence,contactAt:rec.attackContactAt,durationMs:rec.attackSeconds*1000}}));
+   }
+   if(!rec.contactSent&&Number.isFinite(rec.attackContactTime)&&now>=rec.attackContactTime){
+    rec.contactSent=true;document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'contact',sequence:rec.attackSequence,contactAt:rec.attackContactAt}}));
+   }
+   if(rec.model){const attacking=now<rec.strikeUntil,series=!!seriesRig(rec.model),speed=distance/Math.max(dt,.001);let state=e.hp<=0?(rec.animal?'Death':'Death_A'):attacking?rec.attackState:moving?(rec.animal?(speed>2.5?'Gallop':'Walk'):'Running_A'):series?'Idle_A':'Idle';
+    if(state!==rec.state||strikeStarted&&attacking){rec.entity.anim.baseLayer.transition(state,strikeStarted?.035:.1,0);rec.state=state;}
+    rec.entity.anim.speed=attacking?rec.attackSpeed:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
    }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type==='SOMBRA'?Math.sin(now*3)*.075:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;
     rec.entity.setLocalPosition(x,bob+(now<rec.strikeUntil?Math.sin((rec.strikeUntil-now)*20)*.035:0),z);
     for(let i=0;i<rec.parts.length;i++){const {part,rot,swing}=rec.parts[i];const a=moving||rec.type==='BAT'||now<rec.strikeUntil?Math.sin(now*(rec.type==='BAT'?12:10)+i*Math.PI*.7)*swing:0;part.setLocalEulerAngles(rot[0]+(rec.type==='BAT'?0:a),rot[1],rot[2]+(rec.type==='BAT'?a:0));}
@@ -358,8 +388,9 @@ export async function createActors(pc,app,bridge){
   sync('self',p,'player');for(const [id,e]of Object.entries(bridge.getRemotePlayers?.()||{}))sync('remote:'+id,e,'remote');for(const e of bridge.getMonsters?.()||[])if(e.hp>0)sync('mob:'+e.id,e,'mob');
   if((p.floor||0)===0)for(const e of bridge.getNpcs?.()||[])sync('npc:'+e.id,{...e,x:e.pos?.x??e.x,y:e.pos?.y??e.y},'npc');
   const pet=bridge.getPet?.();if(pet&&pet.x!==undefined&&pet.pet)sync('pet',{...pet,type:pet.pet},'pet');
+  updateDeathVisuals(bridge.getFloor?.()??p.floor??0);
   for(const [id,rec]of entries)if(!seen.has(id)){dispose(rec);entries.delete(id);}
  }
  function dispose(rec){rec.entity.destroy();for(const m of rec.owned)m.destroy();}
- return {update,entries,diagnostics:()=>({visible:entries.size,models:Object.keys(assets),pending:[...pending.keys()],failedSeries}),destroy(){destroyed=true;for(const rec of entries.values())dispose(rec);entries.clear();root.destroy();for(const m of materials.values())m.destroy();for(const a of loaded){a.unload();app.assets.remove(a);}}};
+ return {update,entries,retainConfirmedDeath,cancelConfirmedDeath,clearCombatPresentation,diagnostics:()=>({visible:entries.size,deathVisuals:deathVisuals.size,models:Object.keys(assets),pending:[...pending.keys()],failedSeries}),destroy(){destroyed=true;clearCombatPresentation();for(const rec of entries.values())dispose(rec);entries.clear();root.destroy();for(const m of materials.values())m.destroy();for(const a of loaded){a.unload();app.assets.remove(a);}}};
 }

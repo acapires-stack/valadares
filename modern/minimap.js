@@ -15,7 +15,7 @@ export function createMinimap(canvas, legend, bridge) {
         en: { door: 'Door', exit: 'Exit', down: 'Down', up: 'Up', town: 'Village', craft: 'Workbench', altar: 'Altar', dummy: 'Training', npc: 'Person' }
     };
     const roomNames = {
-        pt: { pousada: 'Pousada', oficina: 'Oficina', biblioteca: 'Biblioteca', mercado: 'Mercado' },
+        pt: { pousada: 'Taverna', oficina: 'Ferraria', biblioteca: 'Templo', mercado: 'Sala de treino' },
         en: { pousada: 'Tavern', oficina: 'Forge', biblioteca: 'Temple', mercado: 'Training hall' }
     };
     const dir = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };

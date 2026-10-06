@@ -1,0 +1,13 @@
+{
+  "author": "Quaternius",
+  "pack": "Ultimate Animated Animals",
+  "license": "CC0 1.0",
+  "packUrl": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+  "sourceUrl": "https://drive.google.com/file/d/1lFQoQ9ln2Z2wGuFFWObj9i5jHqUl_ftG/view",
+  "sourceFile": "Wolf.gltf",
+  "sourceSha256": "cc02e9d128b5715f352ee8bea086f97a35f1d875d240de99b0f9f2775c37d415",
+  "outputSha256": "142291b6f9114c2fc9ac8e51ffda8d9f959c5726036c3ea9946be173b608a5aa",
+  "sourceBytes": 3175890,
+  "outputBytes": 1920324,
+  "transformation": "Binary container conversion only; unchanged meshes, materials, rig and all 12 animations."
+}

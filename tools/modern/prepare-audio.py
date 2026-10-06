@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 DEST = ROOT / "modern" / "assets" / "audio"
 DEFAULT_ZIP = Path.home() / "Downloads" / "Gamemaster_Audio_Pro_Sound_Collection_v1.3_16bit_44.1k.zip"
 FILES = {
-    "melee-1": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_01.wav",
-    "melee-2": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_02.wav",
+    "melee-1": "Whooshes/whoosh_weapon_knife_swing_01.wav",
+    "melee-2": "Whooshes/whoosh_weapon_knife_swing_02.wav",
     "ranged-1": "Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_01.wav",
     "ranged-2": "Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_02.wav",
     "wand": "Magic_Spells/spell_harness_magic_01.wav",
@@ -50,6 +50,18 @@ FILES = {
     "ambient-cave": "Animals_Nature_Ambiences/cave_ambience_loop_01.wav",
     "ambient-interior": "Backgrounds/background_room_tone_loop_01.wav",
 }
+# A launch is air/string/magic movement; contact is a separate confirmed event.
+# Four recorded variations use a shuffle bag in game-audio.js, independent of cadence.
+for i in range(1, 5):
+    FILES[f"melee-{i}"] = f"Whooshes/whoosh_weapon_knife_swing_{i:02}.wav"
+    FILES[f"ranged-{i}"] = f"Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_{i:02}.wav"
+    FILES[f"impact-melee-{i}"] = f"Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_{i:02}.wav"
+    FILES[f"impact-ranged-{i}"] = f"Punches/punch_general_body_impact_{i:02}.wav"
+    for surface, recording in {"grass": "grass_walk", "dirt": "dirt_walk_run",
+                               "stone": "concrete_walk", "wood": "wood_walk"}.items():
+        FILES[f"foot-{surface}-{i}"] = f"Footsteps/footstep_{recording}_{i:02}.wav"
+for i in range(1, 3):
+    FILES[f"impact-magic-{i}"] = f"Magic_Spells/magic_deflect_spell_impact{i}.wav"
 MUSIC = {
     "music-pz-tree": "zz_Bonus_Music_zz/music_calm_tree_of_life.wav",
     "music-pz-lake": "zz_Bonus_Music_zz/music_calm_green_lake_serenade.wav",
@@ -57,7 +69,8 @@ MUSIC = {
     "music-cave": "zz_Bonus_Music_zz/music_epic_orchestral_bg_underscore.wav",
 }
 TRIM_SECONDS = {"wand": 1.0, "spell-dark": 1.25, "spell-fire": 1.2,
-                "spell-generic": 0.85, "pickup": 0.7, "critical": 0.35}
+                "spell-generic": 0.85, "pickup": 0.7, "critical": 0.35,
+                "impact-magic-1": 0.65, "impact-magic-2": 0.65}
 
 
 def digest(path):

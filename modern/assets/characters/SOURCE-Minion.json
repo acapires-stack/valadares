@@ -1,0 +1,10 @@
+{
+  "author": "Kay Lousberg",
+  "license": "CC0 1.0",
+  "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0/15b62b9bad122f72926c10fb14d622c73819fa54/addons/kaykit_character_pack_skeletons/Characters/gltf/Skeleton_Minion.glb",
+  "sourceSha256": "6ffc003f895bed0b074791e0e490846210a2e2f8fc7da300aba53cc185f95968",
+  "derivedSha256": "07a2b7e29d7c1bda8019332284df237c3f6abb579f636a0548cedfafe0b4d243",
+  "change": "Keep 10 existing animation clips; compact unused binary bufferViews. Meshes unchanged.",
+  "originalBytes": 4814296,
+  "derivedBytes": 751532
+}
