@@ -4,6 +4,8 @@ Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jog
 
 ## Revisão profissional — candidato validado, publicação ainda pendente
 
+Candidato de runtime preservado em `9c17edfe04f73979dd3539ed54138c06c31476dc`. Retorno para 81b618b preparado e validado em `C:/Users/Alcione/Documents/Codex/2026-10-06/valadare/work/rollback-profissional-81b618b.patch`, sem restore de contas. Publicação não iniciada: ferramenta não alcança a aba administrativa antiga (`Debugger unattached`), e aba nova abre normalmente, porém no login. Solicitado a Alcione entrar nessa aba e avisar; nenhuma senha pedida no chat, nenhum comando de manutenção/push enviado. Estado de acesso e próxima ação em `work/revisao-profissional/STATUS.md` da conversa.
+
 Esta seção supera os estados de entrega abaixo, mantidos como histórico. Alcione reprovou a revisão como acabamento integral e pediu especialistas; após Ctrl+F5 confirmou melhora e manteve o pedido. Não declarar remodelação completa.
 
 Quatro especialistas encerrados, nenhum escritor de produto ativo. Sete trajes independentes da arma e persistentes, proporções corretas, Skeleton_Minion e Wolf completos, golpes/impacto/morte sincronizados, áudio com variantes, minimapa nos dois layouts e quatro interiores revistos. Evidências e limites em `docs/remodelacao/REVISAO-PROFISSIONAL-20261006.md`. Build público 223 arquivos; ensaio integrado final PASS, 88 recursos, zero erros HTTP/JS, foco/clássico/compacto. Produção permanece em 81b618b até recibo posterior.
