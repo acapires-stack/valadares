@@ -9,6 +9,8 @@ const crypto = require('crypto');
 const equipmentRules = require('../equipment-rules');
 const trainingRules = require('../training-rules');
 const transmutationRules = require('../transmutation-rules');
+const progression = require('../progression-content');
+const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
 const CASINO_ENABLED = false;
@@ -735,6 +737,7 @@ const ITEM_META = {
     SILK:{kind:'mat'}, ASA_MORCEGO:{kind:'mat'}, OSSO:{kind:'mat'}, CHIFRE:{kind:'mat'},
     ESCAMA:{kind:'mat'}, GARRA:{kind:'mat'}, PEDRA_GOLEM:{kind:'mat'}, ESSENCIA:{kind:'mat'},
     ESSENCIA_ARCANA:{kind:'mat'},
+    ...progression.items,
     // armas 1H
     ADAGA:        { kind:'weapon', hand:'1h', base:3, def:1 },
     ESPADA:       { kind:'weapon', hand:'1h', base:4, def:2 },
@@ -874,7 +877,7 @@ const RECIPES = [
 // Espelhadas do cliente (play.html). Só os campos que o server precisa pra validar
 // turn-in e calcular reward: kind, type/items/count, reward, choices.
 const QUESTS = [
-    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:10 }, reward:{ gold:50,  xp:{Punho:100} } },
+    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:10 }, reward:{ gold:50,  xp:{Punho:100}, item:{PORRETE:1} } },
     { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80,  xp:{Espada:100} } },
     { id:'q_seda',   goal:{ kind:'item', type:'SILK',      count:5  }, reward:{ gold:200 } },
     { id:'q_orcs',   goal:{ kind:'mob',  type:'ORC',       count:3  }, reward:{ gold:300, xp:{Espada:50,Machado:50,Clava:50} } },
@@ -1059,6 +1062,10 @@ function updateEnchantSave(p){
     Object.assign(acc.save, { inv:p.inv, equipped:p.equipped, gold:p.gold, enchantOps:p.enchantOps,
         enchantToken:p.enchantToken, transmutationOps:p.transmutationOps,
         transmutationToken:p.transmutationToken, transmutationPity:p.transmutationPity,
+        progressionToken:p.progressionToken,progressionOps:p.progressionOps,
+        expeditionClears:p.expeditionClears,expeditionPending:p.expeditionPending,
+        quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
+        permaBuffs:p.permaBuffs,
         hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
     return flushAccounts();
@@ -1095,21 +1102,24 @@ function deriveTransmutationPity(ops){
 function executeTransmutation(p, msg){
     const opId = transmutationOpId(msg.opId);
     const keys = Array.isArray(msg.keys) ? msg.keys.slice() : null;
+    const family = msg.family === undefined ? '' : (typeof msg.family === 'string' ? msg.family : null);
     const base = {opId,keys,cost:0,tier:0,category:null,newKey:null,qty:0};
     const fail = (error, extra) => ({...base,...extra,ok:false,error});
     if (!opId) return fail('bad_op_id');
+    if (family === null) return fail('invalid_family');
     const previous = (p.transmutationOps || []).find(x => x && x.opId === opId);
     if (previous){
         const req = previous.request;
         if (!req || req.version !== msg.version || !Array.isArray(keys) ||
-            req.keys.length !== keys.length || req.keys.some((k,i) => k !== keys[i])) return fail('op_conflict');
+            req.keys.length !== keys.length || req.keys.some((k,i) => k !== keys[i]) ||
+            (req.family || '') !== family) return fail('op_conflict');
         return previous.result;
     }
     if (opId !== p.transmutationToken) return fail('stale_op');
     if (msg.version !== transmutationRules.VERSION || p.equipmentVersion !== equipmentRules.VERSION) return fail('update_required');
     if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId ||
         chebyshev(p.x,p.y,51,52) > 1) return fail('not_at_bench');
-    const quote = transmutationRules.quote(keys,p.transmutationPity);
+    const quote = transmutationRules.quote(keys,p.transmutationPity,family);
     if (!quote.valid) return fail(quote.error);
     const quoted = {cost:quote.cost,tier:quote.tier};
     if (keys.some(key => !itemMetaForKey(key) || !equipmentRules.KINDS.includes(itemMetaForKey(key).kind)))
@@ -1160,7 +1170,7 @@ function executeTransmutation(p, msg){
     const old = {inv:p.inv,gold:p.gold,transmutationOps:p.transmutationOps,
         transmutationToken:p.transmutationToken,transmutationPity:p.transmutationPity,
         save:acc.save ? {...acc.save} : null,savedAt:acc.savedAt};
-    const result = {ok:true,opId,keys,cost:quote.cost,tier:quote.tier,category,newKey,qty};
+    const result = {ok:true,opId,keys,family,cost:quote.cost,tier:quote.tier,category,newKey,qty};
     if (category === 'superior') result.resultTier = quote.resultTier;
     if (quote.pity){
         result.pityBefore=quote.pity.failures;
@@ -1170,7 +1180,7 @@ function executeTransmutation(p, msg){
     p.inv = projected;
     p.gold -= quote.cost;
     if (quote.pity) p.transmutationPity=result.pityAfter;
-    p.transmutationOps = [...(p.transmutationOps || []),{opId,request:{version:msg.version,keys},result}].slice(-20);
+    p.transmutationOps = [...(p.transmutationOps || []),{opId,request:{version:msg.version,keys,family},result}].slice(-20);
     p.transmutationToken = crypto.randomUUID();
     if (!updateEnchantSave(p)){
         p.inv = old.inv; p.gold = old.gold;
@@ -1178,6 +1188,45 @@ function executeTransmutation(p, msg){
         p.transmutationPity = old.transmutationPity;
         acc.save = old.save; acc.savedAt = old.savedAt;
         return fail('save_failed',quoted);
+    }
+    return result;
+}
+function executeProgressionCraft(p, msg){
+    const key = typeof msg.key === 'string' ? msg.key : '';
+    const opId = transmutationOpId(msg.opId);
+    const fail = error => ({ok:false,error,key,opId});
+    if (!opId) return fail('bad_op_id');
+    const prior = (p.progressionOps || []).find(op => op.opId === opId);
+    if (prior) return prior.key === key ? prior.result : fail('op_conflict');
+    if (!PROGRESSION_ENABLED) return fail('disabled');
+    if (opId !== p.progressionToken) return fail('stale_op');
+    if (p.equipmentVersion !== equipmentRules.VERSION) return fail('update_required');
+    const recipe = Object.hasOwn(progression.recipes,key) ? progression.recipes[key] : null;
+    if (!recipe) return fail('bad_recipe');
+    if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId ||
+        chebyshev(p.x,p.y,51,52) > 1) return fail('not_at_bench');
+    if (Object.entries(recipe.in).some(([input,qty]) => !hasInv(p,input,qty))) return fail('no_materials');
+    if (!Number.isFinite(p.gold) || p.gold < recipe.gold) return fail('no_gold');
+    const projected = {...p.inv};
+    for (const [input,qty] of Object.entries(recipe.in)){
+        projected[input] -= qty;
+        if (projected[input] <= 0) delete projected[input];
+    }
+    projected[key] = (projected[key] || 0) + 1;
+    if (Object.keys(projected).length > SAVE_CAPS.invKeys || projected[key] > SAVE_CAPS.itemQty)
+        return fail('inventory_full');
+    const acc = p.authedName && getAccount(p.authedName);
+    if (!acc) return fail('save_failed');
+    const old={inv:p.inv,gold:p.gold,progressionOps:p.progressionOps,
+        progressionToken:p.progressionToken,save:acc.save?{...acc.save}:null,savedAt:acc.savedAt};
+    const result={ok:true,key,opId,cost:recipe.gold};
+    p.inv=projected; p.gold-=recipe.gold;
+    p.progressionOps=[...(p.progressionOps||[]),{opId,key,result}].slice(-20);
+    p.progressionToken=crypto.randomUUID();
+    if (!updateEnchantSave(p)){
+        p.inv=old.inv; p.gold=old.gold; p.progressionOps=old.progressionOps;
+        p.progressionToken=old.progressionToken; acc.save=old.save; acc.savedAt=old.savedAt;
+        return fail('save_failed');
     }
     return result;
 }
@@ -1213,7 +1262,10 @@ function sendInvUpdate(p, extra){
     const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null,
         enchantToken:p.enchantToken || null,
         transmutationVersion:transmutationRules.VERSION, transmutationToken:p.transmutationToken || null,
-        transmutationPity:p.transmutationPity || 0 };
+        transmutationPity:p.transmutationPity || 0,
+        progressionToken:p.progressionToken || null,
+        expeditionClears:p.expeditionClears || 0,
+        expeditionPending:p.expeditionPending || null };
     if (extra) Object.assign(msg, extra);
     p.ws.send(JSON.stringify(msg));
 }
@@ -2668,6 +2720,12 @@ function enterDungeonFloor(p, id, floor, dir){
 // o player renascia DENTRO da masmorra colado no boss e o AI do andar seguia batendo. (#5)
 function returnPlayerToTown(p, id){
     if ((p.floor || 0) > 0) broadcast(id, { t:'leave', id }, p.floor);   // some do andar
+    if (p.expedition){
+        const floor=p.expedition.floor;
+        for (const m of [...monsters.values()]) if (m.floor === floor) monsters.delete(m.id);
+        dungeonFloors.delete(floor);
+        p.expedition=null;
+    }
     p.pvp = !!p._pvpBeforeDungeon;
     p.floor = 0;
     p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
@@ -2708,7 +2766,7 @@ function tickRespawns(){
     // Bosses por timer
     const now = Date.now();
     for (const b of BOSSES){
-        const has = Array.from(monsters.values()).some(m => m.type === b.type);
+        const has = Array.from(monsters.values()).some(m => m.type === b.type && (m.floor||0)===0);
         if (!has){
             const deathAt = bossDeath.get(b.type) || 0;
             if (now - deathAt >= b.respawn){
@@ -3293,6 +3351,7 @@ function seasonCombinedScore(r){
 // Espelha o campo `skill` do ITEMS do cliente. Server usa pra creditar XP
 // authoritative ao matar mob (sem confiar no que o cliente passa).
 const WEAPON_SKILL = {
+    ...Object.fromEntries(Object.entries(progression.items).filter(([,item]) => item.skill).map(([key,item]) => [key,item.skill])),
     // Espada
     ADAGA:'Espada', ADAGA_DUPLA:'Espada', ESPADA:'Espada', ESPADA_DRACO:'Espada',
     ESPADA_ETERNA:'Espada', ESPADA_INFINITA:'Espada', ESPADA_HL:'Espada', ESPADA_LONGA:'Espada', ESPADA_OSSO:'Espada', SABRE:'Espada',
@@ -3557,7 +3616,7 @@ function saveStateToDisk(){
             archive: seasonState.archive,
         },
         guilds: Array.from(guilds.values()),
-        monsters: Array.from(monsters.values()).map(m => ({
+        monsters: Array.from(monsters.values()).filter(m => !m.expedition).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
             aggro:m.aggro, unique:m.unique, level:m.level, floor:m.floor||0,
@@ -3628,6 +3687,7 @@ function loadStateFromDisk(){
         let _dropped = 0;
         if (Array.isArray(d.monsters)){
             for (const m of d.monsters){
+                if (m.floor >= 8000 && m.floor < 9000) continue;
                 // População COMUM do overworld não persiste (fix superpopulação 12/06):
                 // o estado vivo acumulava 5× o design (667 vs ~140 — mobs orbitando fora
                 // das regiões inflavam o respawn, ver count por âncora no tickRespawns)
@@ -4884,6 +4944,7 @@ function onDungeonBossDeath(m, killer){
 // Resolve a morte de um mob (extração da lógica do attackMob handler) —
 // reutilizado pra mortes por DoT (veneno/sangra/fogo).
 function handleMobDeath(m, killerId){
+    if (m.expedition){ handleExpeditionMobDeath(m, players.get(killerId)); return; }
     if (m.unique){
         if (m.type === MEGA_BOSS_TYPE){
             const killer = players.get(killerId);
@@ -5131,7 +5192,7 @@ function pvpDamageCapServer(p){
     return base * 15 + 100;
 }
 // Cap de range PvP. Cliente envia `range` — sem cap aceitaria range:999.
-// Melee = 1; ranged usa weapon.ranged (4-8); throwable usa weapon.throwable.
+// Melee = 1; lanças reutilizáveis alcançam 3; ranged/throwable preservam seu alcance.
 function pvpRangeCapServer(p){
     const wKey = p.equipped?.weapon;
     if (!wKey) return 1;
@@ -5139,6 +5200,7 @@ function pvpRangeCapServer(p){
     const meta = ITEM_META[tier.base];
     if (meta && typeof meta.ranged === 'number') return Math.min(8, meta.ranged);
     if (meta && typeof meta.throwable === 'number') return Math.min(8, meta.throwable);
+    if (meta && typeof meta.meleeRange === 'number') return Math.min(3, Math.max(1, meta.meleeRange));
     return 1;
 }
 
@@ -5146,8 +5208,8 @@ function pvpRangeCapServer(p){
 // Mesma filosofia do PvP: o cliente segue mandando amount/range no attackMob,
 // mas o server DERIVA o alcance e CAPA o dano. O número que o player vê continua
 // o roll dele (zero risco de "dano errado"); só o exagero é barrado.
-// Alcance da arma = o máximo que ela alcança legitimamente (ranged/throwable; a
-// lança 1H usa throwable, que cobre o meleeRange dela). Punho/melee puro = 1.
+// Alcance da arma = o máximo que ela alcança legitimamente (ranged/throwable/
+// meleeRange até 3). Punho/melee puro = 1.
 // Cap 8 (nenhuma arma passa disso; magia de range maior entra pela janela de spell).
 function weaponRangeServer(p){
     const wKey = p.equipped && p.equipped.weapon;
@@ -5155,7 +5217,7 @@ function weaponRangeServer(p){
     const tier = getUpgradeTier(wKey);
     const meta = ITEM_META[tier.base];
     if (!meta) return 1;
-    return Math.min(8, Math.max(meta.ranged || 0, meta.throwable || 0, 1));
+    return Math.min(8, Math.max(meta.ranged || 0, meta.throwable || 0, Math.min(3, meta.meleeRange || 0), 1));
 }
 // Teto de dano por hit no PvE. Mantém msg.amount; só limita o exagero.
 // Magia (dentro da janela do spellCast): teto pelo dano da magia + Magia/3, folga
@@ -5723,6 +5785,145 @@ function genArenaGrid(floor){
     }
     const stairs = { spawn: { x: ARENA_SPAWN_A.x, y: ARENA_SPAWN_A.y }, up: null, down: null, boss: null };
     return { floor, region: { x0, y0, x1, y1 }, rows, walkable, floorTiles, stairs };
+}
+
+// Short solo instance. The 8000-8999 range is outside dungeon and arena floors.
+let expeditionFloorSeq=8000;
+function genForgeGrid(floor){
+    const region={x0:40,y0:42,x1:74,y1:58};
+    const walkable=new Set(),floorTiles=[],rows=[];
+    const rooms=[
+        [42,47,45,55], // chegada e patrulha orc
+        [54,63,44,56], // forja dos golens
+        [68,72,46,54], // câmara do rei
+    ];
+    function opened(x,y){
+        if (rooms.some(([x0,x1,y0,y1])=>x>=x0&&x<=x1&&y>=y0&&y<=y1))return true;
+        return (x>=48&&x<=53&&y>=49&&y<=51) ||
+            (x>=64&&x<=67&&y>=49&&y<=51);
+    }
+    for(let y=region.y0;y<=region.y1;y++){
+        let row='';
+        for(let x=region.x0;x<=region.x1;x++){
+            const floorTile=opened(x,y);
+            row+=floorTile?'1':'0';
+            if(floorTile){walkable.add(x+','+y);floorTiles.push({x,y});}
+        }
+        rows.push(row);
+    }
+    const stairs={spawn:{x:43,y:50},up:{x:43,y:50},down:null,town:null,boss:{x:70,y:50}};
+    return {floor,region,rows,walkable,floorTiles,stairs};
+}
+function expeditionStatus(p){
+    const e=p.expedition;
+    return {ok:true,stage:e ? (e.cleared?'cleared':'active'):'ready',
+        guards:e?.guards||0,golems:e?.golems||0,boss:e?.boss||0,
+        clears:p.expeditionClears||0,pending:p.expeditionPending||null};
+}
+function sendExpeditionStatus(p, extra){
+    sendTo(p.id,{t:'expeditionResult',...expeditionStatus(p),...extra});
+}
+function enterExpedition(p){
+    if (!PROGRESSION_ENABLED) return {ok:false,error:'disabled'};
+    if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId)
+        return {ok:false,error:'unavailable'};
+    if (chebyshev(p.x,p.y,progression.expedition.npc.x,progression.expedition.npc.y)>2)
+        return {ok:false,error:'not_at_blacksmith'};
+    if (p.expeditionPending) return {ok:false,error:'claim_pending',pending:p.expeditionPending};
+    let floor=0;
+    for (let tries=0;tries<1000;tries++){
+        const candidate=8000+((expeditionFloorSeq++-8000)%1000);
+        if (![...players.values()].some(other => other.floor===candidate) && !dungeonFloors.has(candidate)){
+            floor=candidate;break;
+        }
+    }
+    if (!floor) return {ok:false,error:'instance_full'};
+    const g=genForgeGrid(floor);
+    dungeonFloors.set(floor,g);
+    p.expedition={floor,guards:0,golems:0,boss:0,cleared:false};
+    const layout=[
+        ['ORC',45,47],['ORC',47,49],['ORC',45,52],['ORC',47,54],
+        ['GOLEM',56,47],['GOLEM',59,49],['GOLEM',58,53],
+    ];
+    for (const [type,x,y] of layout){
+        const mob=spawnMob(type,x,y,floor);
+        if (!mob){
+            for (const old of [...monsters.values()]) if (old.floor===floor) monsters.delete(old.id);
+            dungeonFloors.delete(floor); p.expedition=null; return {ok:false,error:'spawn_failed'};
+        }
+        mob.expedition=true;
+        mob.dmg=type==='ORC'?7:8;
+    }
+    broadcast(p.id,{t:'leave',id:p.id},0);
+    p._pvpBeforeDungeon=!!p.pvp;
+    p.pvp=false;
+    p.floor=floor;p.x=g.stairs.spawn.x;p.y=g.stairs.spawn.y;
+    sendTo(p.id,{t:'dungeonEnter',floor,dir:'down',x:p.x,y:p.y,
+        grid:{region:g.region,rows:g.rows},stairs:g.stairs,expedition:progression.expedition.id,
+        expeditionLayout:'forge_ruins_v1',
+        pvp:false,players:[],mobs:snapshotMobs(floor),groundDrops:[]});
+    sendExpeditionStatus(p);
+    return {ok:true};
+}
+function handleExpeditionMobDeath(m,killer){
+    const e=killer?.expedition;
+    if (!e || e.floor!==m.floor) return;
+    if (m.expeditionBoss){
+        if (e.guards<4 || e.golems<3 || e.boss || e.cleared) return;
+        const reward={FRAGMENTO_FORJA:3};
+        if (!(killer.expeditionClears||0)) reward.MACHADO_FORJA=1;
+        const acc=getAccount(killer.authedName);
+        if (!acc){m.hp=1;return;}
+        const old={clears:killer.expeditionClears||0,pending:killer.expeditionPending,
+            save:acc.save?{...acc.save}:null,savedAt:acc.savedAt};
+        killer.expeditionClears=old.clears+1;
+        killer.expeditionPending={id:crypto.randomUUID(),reward};
+        if (!updateEnchantSave(killer)){
+            killer.expeditionClears=old.clears;killer.expeditionPending=old.pending;
+            acc.save=old.save;acc.savedAt=old.savedAt;m.hp=1;
+            sendExpeditionStatus(killer,{ok:false,error:'save_failed'});
+            return;
+        }
+        e.boss=1;e.cleared=true;
+    } else if (m.type==='ORC') e.guards=Math.min(4,e.guards+1);
+    else if (m.type==='GOLEM') e.golems=Math.min(3,e.golems+1);
+    monsters.delete(m.id);
+    grantManaOnKill(killer);
+    const skill=weaponSkillOf(killer);
+    gainSkillXpServer(killer,skill,m.xp||1);
+    const shieldXp=hasShieldEquipped(killer)?(m.xp||1):0;
+    if(shieldXp)gainSkillXpServer(killer,'Escudo',shieldXp);
+    gainPetXp(killer,m.xp||1);
+    sendTo(killer.id,{t:'mobKill',mobId:m.id,mobType:m.type,x:m.x,y:m.y,
+        xp:m.xp,level:m.level,loot:[],drops:[],skill,xpGained:m.xp||1,shieldXp});
+    sendInvUpdate(killer,{skills:killer.skills,reason:'expeditionKill'});
+    sendTo(killer.id,{t:'mobDead',mobId:m.id,byName:killer.name,level:m.level});
+    if (e.guards>=4 && e.golems>=3 && !e.boss && !e.bossSpawned){
+        const boss=spawnMob('GOLEM_REI',70,50,e.floor);
+        if (boss){boss.unique=false;boss.expedition=true;boss.expeditionBoss=true;
+            boss.hp=boss.maxHp=450;boss.dmg=12;boss.xp=700;boss.level=1;e.bossSpawned=true;
+            sendTo(killer.id,{t:'mobs',list:snapshotMobs(e.floor)});
+        }
+    }
+    sendExpeditionStatus(killer,e.cleared?{reward:killer.expeditionPending.reward}:null);
+}
+function claimExpeditionReward(p){
+    const pending=p.expeditionPending;
+    if (!pending) return {ok:false,error:'no_pending'};
+    const projected={...p.inv};
+    for (const [key,qty] of Object.entries(pending.reward)) projected[key]=(projected[key]||0)+qty;
+    if (Object.keys(projected).length>SAVE_CAPS.invKeys ||
+        Object.values(projected).some(qty=>qty>SAVE_CAPS.itemQty)) return {ok:false,error:'inventory_full',pending};
+    const acc=getAccount(p.authedName);
+    if (!acc) return {ok:false,error:'save_failed',pending};
+    const old={inv:p.inv,pending,save:acc.save?{...acc.save}:null,savedAt:acc.savedAt};
+    p.inv=projected;p.expeditionPending=null;
+    if (!updateEnchantSave(p)){
+        p.inv=old.inv;p.expeditionPending=old.pending;acc.save=old.save;acc.savedAt=old.savedAt;
+        return {ok:false,error:'save_failed',pending};
+    }
+    sendInvUpdate(p,{reason:'expeditionReward'});
+    return {...expeditionStatus(p),reward:pending.reward};
 }
 
 // Teleporta UM player pra instância da arena (clone enxuto de enterDungeonFloor).
@@ -6528,6 +6729,10 @@ wss.on('connection', (ws, request) => {
             data.transmutationOps = p.transmutationOps || [];
             data.transmutationToken = p.transmutationToken || null;
             data.transmutationPity = p.transmutationPity || 0;
+            data.progressionToken = p.progressionToken || null;
+            data.progressionOps = p.progressionOps || [];
+            data.expeditionClears = p.expeditionClears || 0;
+            data.expeditionPending = p.expeditionPending || null;
             // talents (RANKS) + permaBuffs: persiste os do SERVER (vivos), não os do cliente —
             // senão o save do cliente reverteria os ranks (era a causa do "reseta ao escolher outro").
             if (p.talents && typeof p.talents === 'object') data.talents = p.talents;
@@ -6584,6 +6789,10 @@ wss.on('connection', (ws, request) => {
             data.transmutationOps = p.transmutationOps || [];
             data.transmutationToken = p.transmutationToken || null;
             data.transmutationPity = p.transmutationPity || 0;
+            data.progressionToken = p.progressionToken || null;
+            data.progressionOps = p.progressionOps || [];
+            data.expeditionClears = p.expeditionClears || 0;
+            data.expeditionPending = p.expeditionPending || null;
             acc.save = data;
             acc.savedAt = Date.now();
             acc._restoreUntil = 0;
@@ -6629,6 +6838,17 @@ wss.on('connection', (ws, request) => {
             p.transmutationPity = Number.isInteger(acc?.save?.transmutationPity) && acc.save.transmutationPity >= 0
                 && acc.save.transmutationPity <= 19 ? acc.save.transmutationPity
                 : deriveTransmutationPity(p.transmutationOps);
+            p.progressionToken = transmutationOpId(acc?.save?.progressionToken) || crypto.randomUUID();
+            p.progressionOps = Array.isArray(acc?.save?.progressionOps)
+                ? acc.save.progressionOps.filter(op => transmutationOpId(op?.opId)).slice(-20) : [];
+            p.expeditionClears = Math.max(0,Math.min(100000,Math.floor(Number(acc?.save?.expeditionClears)||0)));
+            { const pending=acc?.save?.expeditionPending;
+              p.expeditionPending = pending && transmutationOpId(pending.id) &&
+                  pending.reward && typeof pending.reward === 'object' && !Array.isArray(pending.reward) &&
+                  Object.keys(pending.reward).length>0 &&
+                  Object.entries(pending.reward).every(([k,q]) =>
+                      (k === 'FRAGMENTO_FORJA' || k === 'MACHADO_FORJA') && Number.isInteger(q) && q>0 && q<=3)
+                  ? pending : null; }
             if (acc && acc.save){
                 p.enchantOps = Array.isArray(acc.save.enchantOps) ? acc.save.enchantOps.slice(-20) : [];
                 // Posição: última PERSISTIDA no server (validada). Default SAFE acima cobre
@@ -6740,6 +6960,7 @@ wss.on('connection', (ws, request) => {
             // lá embaixo te traz pra cidade). Snapshots filtrados pelo floor do player.
             p.floor = 0;
             if ((acc?.save?.enchantToken !== p.enchantToken || acc?.save?.transmutationToken !== p.transmutationToken
+                || acc?.save?.progressionToken !== p.progressionToken
                 || acc?.save?.transmutationPity !== p.transmutationPity) && !updateEnchantSave(p)){
                 p.name = 'Anônimo';
                 sendTo(id,{t:'serverMsg',level:'warn',text:'Não foi possível salvar sua sessão. Tente entrar novamente.'});
@@ -6756,6 +6977,9 @@ wss.on('connection', (ws, request) => {
                 transmutationVersion: transmutationRules.VERSION,
                 transmutationToken: p.transmutationToken,
                 transmutationPity: p.transmutationPity,
+                progressionToken: p.progressionToken,
+                expeditionClears: p.expeditionClears,
+                expeditionPending: p.expeditionPending,
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
@@ -7061,6 +7285,16 @@ wss.on('connection', (ws, request) => {
 
         if (msg.t === 'invTransmute') {
             sendInvUpdate(p, { transmutation:executeTransmutation(p,msg) });
+            return;
+        }
+        if (msg.t === 'progressionCraft') {
+            sendInvUpdate(p,{progressionCraft:executeProgressionCraft(p,msg)});
+            return;
+        }
+        if (msg.t === 'progressionCraftStatus') {
+            const opId=transmutationOpId(msg.opId);
+            const prior=(p.progressionOps||[]).find(op=>op.opId===opId);
+            sendInvUpdate(p,{progressionCraft:prior?.result||{ok:false,error:'not_found',opId}});
             return;
         }
 
@@ -7571,11 +7805,33 @@ wss.on('connection', (ws, request) => {
                 }
                 // valida items se a goal pede coleta
                 if (q.goal.kind === 'item' && !hasInv(p, q.goal.type, q.goal.count)) return reject('no_items');
+                const projected={...p.inv};
+                if (q.goal.kind === 'item'){
+                    projected[q.goal.type]-=q.goal.count;
+                    if (projected[q.goal.type] <= 0) delete projected[q.goal.type];
+                }
+                for (const [key,qty] of Object.entries(q.reward.item || {}))
+                    projected[key]=(projected[key]||0)+qty;
+                if (Object.keys(projected).length>SAVE_CAPS.invKeys ||
+                    Object.values(projected).some(qty=>qty>SAVE_CAPS.itemQty)) return reject('inventory_full');
+                const questAcc=getAccount(p.authedName);
+                if (!questAcc) return reject('save_failed');
+                const previous={inv:{...p.inv},gold:p.gold,quests:JSON.parse(JSON.stringify(p.quests)),
+                    skills:JSON.parse(JSON.stringify(p.skills||{})),flags:JSON.parse(JSON.stringify(p.flags||{})),
+                    permaBuffs:JSON.parse(JSON.stringify(p.permaBuffs||{})),hp:p.hp,mp:p.mp,
+                    maxHp:p.maxHp,maxMp:p.maxMp,_gearHp:p._gearHp,_gearMp:p._gearMp,
+                    save:questAcc.save?JSON.parse(JSON.stringify(questAcc.save)):null,savedAt:questAcc.savedAt};
                 // consome items + marca completa
                 if (q.goal.kind === 'item') incInv(p, q.goal.type, -q.goal.count);
                 delete p.quests.active[q.id];
                 p.quests.completed.push(q.id);
                 const delta = applyQuestReward(p, q.reward);
+                if (!updateEnchantSave(p)){
+                    for (const key of ['inv','gold','quests','skills','flags','permaBuffs','hp','mp',
+                        'maxHp','maxMp','_gearHp','_gearMp']) p[key]=previous[key];
+                    questAcc.save=previous.save;questAcc.savedAt=previous.savedAt;
+                    return reject('save_failed');
+                }
                 sendInvUpdate(p, {
                     questResult:{ ok:true, kind:'simple', questId:q.id, delta },
                     skills: p.skills, quests: p.quests,
@@ -8102,6 +8358,27 @@ wss.on('connection', (ws, request) => {
         }
 
         // ─── M4 Masmorra: descer/subir andares (sem fundo; teto técnico 999) ──
+        if (msg.t === 'expeditionStatus') { sendExpeditionStatus(p); return; }
+        if (msg.t === 'expeditionClaim' || msg.t === 'progressionClaim') {
+            sendTo(id,{t:'expeditionResult',...claimExpeditionReward(p)}); return;
+        }
+        if (msg.t === 'expeditionEnter') {
+            const r=PROGRESSION_ENABLED ? enterExpedition(p) : {ok:false,error:'disabled'};
+            if (!r.ok) sendTo(id,{t:'expeditionResult',...r});
+            return;
+        }
+        if (msg.t === 'expeditionExit') {
+            if (!p.expedition || p.floor!==p.expedition.floor) {
+                sendTo(id,{t:'expeditionResult',ok:false,error:'not_in_expedition'});return;
+            }
+            const g=dungeonFloors.get(p.floor);
+            if (!p.expedition.cleared && (!g || chebyshev(p.x,p.y,g.stairs.spawn.x,g.stairs.spawn.y)>1)){
+                sendTo(id,{t:'expeditionResult',ok:false,error:'not_at_exit'});return;
+            }
+            returnPlayerToTown(p,id);
+            sendExpeditionStatus(p);
+            return;
+        }
         // enterDungeon: overworld → andar 1 OU andar de banda desbloqueado por boss
         // (checkpoint — msg.floor validado contra p.dungeonUnlock). descendDungeon:
         // andar N → N+1 (escada de descida). exitDungeon: sobe 1 andar (andar 1 →
@@ -8150,7 +8427,7 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'exitDungeon') {
-            if (p.arena) return;   // M7: sem escada dentro da arena
+            if (p.arena || p.expedition) return;   // cada instância tem sua saída própria
             const now = Date.now();
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
@@ -8458,6 +8735,7 @@ wss.on('connection', (ws, request) => {
             // float visual em todos
             broadcast(null, { t:'mobFloat', mobId:m.id, text:`-${dmg}`, color:'#ff8060', crit:!!msg.crit });
             if (m.hp === 0){
+                if (m.expedition){ handleExpeditionMobDeath(m,p); return; }
                 grantManaOnKill(p);
                 // morte
                 if (m.unique){
@@ -9263,6 +9541,7 @@ wss.on('connection', (ws, request) => {
         }
         // Body stays: mantém ghost por GHOST_TIMEOUT_MS, atacável e droppable
         if (p.disconnected){ players.delete(id); return; }
+        if (p.expedition) returnPlayerToTown(p,id);
         // Se o player nunca chegou a logar (WS caiu antes do join), só remove — não vira ghost órfão sem nome
         if (!p.name || p.name === 'Anônimo'){
             // Mas ainda pode ter autenticado — usa authedName se houver

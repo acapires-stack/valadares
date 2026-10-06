@@ -5,8 +5,9 @@
 <script src="/consent.js" defer></script>
 <script src="/equipment-rules.js?v=1"></script>
 <script src="/game-audio.js?v=1"></script>
+<script src="/progression-content.js?v=2"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
-<link rel="stylesheet" href="/transmutation.css?v=4">
+<link rel="stylesheet" href="/transmutation.css?v=5">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#06060c">
@@ -1743,6 +1744,7 @@
     <link rel="stylesheet" href="/ui-polish.css?v=20261004c">
     <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
     <link rel="stylesheet" href="/adventure-feedback.css?v=20261005b">
+    <link rel="stylesheet" href="/journey.css?v=1">
 </head>
 <body>
 
@@ -2867,6 +2869,8 @@ const I18N = {
     'tip.defense': '+{n} defesa',
     'tip.atk_speed': 'Velocidade de ataque +{pct}%',
     'tip.melee_range': 'Alcance corpo a corpo: {n} tiles',
+    'tip.permanent_spear': 'Combate a 3 passos; não é consumida ao atacar.',
+    'log.permanent_spear': '<span class="log-sys">Esta lança não é arremessável. Use o ataque normal a até 3 passos.</span>',
     'tip.range_arrows': 'Alcance: {n} tiles (consome flechas)',
     'tip.range_wand': 'Alcance: {n} tiles · tiro básico: {cost} mana',
     'tip.proc_poison': '☠ {pct}% chance de veneno ({dmg} dano × {ticks} ticks)',
@@ -3608,6 +3612,8 @@ const I18N = {
     'tip.defense': '+{n} defense',
     'tip.atk_speed': 'Attack speed +{pct}%',
     'tip.melee_range': 'Melee range: {n} tiles',
+    'tip.permanent_spear': 'Fight from 3 steps away; this spear is not consumed when attacking.',
+    'log.permanent_spear': '<span class="log-sys">This spear cannot be thrown. Use the normal attack within 3 steps.</span>',
     'tip.range_arrows': 'Range: {n} tiles (uses arrows)',
     'tip.range_wand': 'Range: {n} tiles · basic shot: {cost} mana',
     'tip.proc_poison': '☠ {pct}% poison chance ({dmg} dmg × {ticks} ticks)',
@@ -4102,6 +4108,7 @@ function setLang(l){
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
   window.ValadaresTransmutationUI?.refreshIfOpen();
+  window.ValadaresJourneyUI?.refresh();
   if (document.getElementById('craftModal')?.classList.contains('transmute-active')) document.getElementById('craftHint').innerHTML = LANG==='en'?'Three distinct pieces · same tier unlocks promotion · mythic tier may ascend':'Três peças diferentes · mesma faixa libera evolução · míticas podem ascender';
   renderForgeFeedback();
   if (document.getElementById('craftModal')?.classList.contains('forge-active')) renderForja();
@@ -5795,6 +5802,18 @@ const ITEM_EN = {
     VARINHA_APRENDIZ:{name:'Apprentice Wand'}, CAJADO_FOGO:{name:'Fire Staff'}, CAJADO_GELO:{name:'Ice Staff'}, CAJADO_RAIO:{name:'Lightning Staff'},
     CAJADO_RUNICO:{name:'Runic Staff ★'}, CAJADO_ETERNO:{name:'Eternal Staff ★★'},
 };
+// O catálogo de progressão é compartilhado com o servidor; o cliente só usa
+// nomes/stats para mostrar e desenhar. Crédito e fabricação seguem autoritativos.
+const PERMANENT_SPEARS = new Set(['LANCA_DRACO','LANCA_GUARDIAO','LANCA_ETERNA','LANCA_CELESTIAL']);
+if (window.ValadaresProgression) for (const [key, meta] of Object.entries(window.ValadaresProgression.items)) {
+    ITEMS[key] = { name:meta.name, kind:meta.kind, color:meta.color, hand:meta.hand,
+        base:meta.base, def:meta.def, skill:meta.skill, ranged:meta.ranged,
+        throwable:PERMANENT_SPEARS.has(key) ? undefined : meta.throwable,
+        throwDmg:PERMANENT_SPEARS.has(key) ? undefined : meta.throwDmg, meleeRange:meta.meleeRange,
+        tier:meta.tier, family:meta.family,
+        rarity:meta.tier === 7 ? 'ascendant' : meta.tier === 6 ? 'myth' : meta.tier === 5 ? 'legendary' : 'common' };
+    ITEM_EN[key] = { name:meta.nameEn };
+}
 function itmName(key){
     if (!key) return key;
     const en = LANG === 'en';
@@ -6488,6 +6507,8 @@ let _overworldVisited = null;   // guarda o fog do overworld enquanto na masmorr
 function enterDungeonClient(msg){
     const fromFloor = (player.floor || 0);
     player.floor = msg.floor || 1;
+    player._expedition = msg.expedition || null;
+    player._expeditionExit = msg.expedition ? (msg.stairs?.spawn || msg.stairs?.up || null) : null;
     map = msg.grid ? applyDungeonGrid(msg.grid) : genDungeonFloor(player.floor);  // M4 3b: grid do server (fallback local)
     dungeonStairs = msg.stairs || null;             // escadas deste andar (server-autoritativo)
     player.x = msg.x; player.y = msg.y;
@@ -6495,7 +6516,7 @@ function enterDungeonClient(msg){
     player.prevX = msg.x; player.prevY = msg.y;
     player.target = null; player.autoAttack = false;
     snapRender(player);
-    player.pvp = true;                              // PvP forçado em qualquer andar
+    player.pvp = msg.expedition ? false : true;     // expedição solo não usa PvP das Profundezas
     // Andar inteiro visível (sem fog). Guarda o fog do OVERWORLD só ao entrar dele
     // (0→andar); em troca de andar NÃO sobrescreve (senão perde o fog real da cidade).
     if (fromFloor === 0 && player.visited) _overworldVisited = player.visited;
@@ -6507,7 +6528,12 @@ function enterDungeonClient(msg){
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot não vaza entre andares
     if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }); }
-    if (msg.arena){
+    if (msg.expedition){
+        dungeonStairs = msg.stairs || null;
+        const label = LANG === 'en' ? 'Ruins of the Forge · solo expedition' : 'Ruínas da Forja · expedição solo';
+        if (typeof showServerToast === 'function') showServerToast('event', label, null, 4500);
+        log(`<span class="log-sys">${label}</span>`);
+    } else if (msg.arena){
         // M7 Arena: instância isolada (não é masmorra). Chrome próprio, sem escadas.
         dungeonStairs = null;
         player._arena = player._arena || { opponentName: msg.opponentName };
@@ -6521,6 +6547,8 @@ function enterDungeonClient(msg){
 }
 function exitDungeonClient(msg){
     player.floor = 0;
+    player._expedition = null;
+    player._expeditionExit = null;
     map = overworldMap;                             // restaura o overworld
     player.x = msg.x; player.y = msg.y;
     player.renderX = msg.x; player.renderY = msg.y;
@@ -6665,6 +6693,7 @@ function itemFullDesc(def, key){
         if (def.def) lines.push(tr('tip.defense', {n: def.def}));
         if (def.atkSpd) lines.push(tr('tip.atk_speed', {pct: Math.round(def.atkSpd*100)}));
         if (def.meleeRange && def.meleeRange > 1) lines.push(tr('tip.melee_range', {n: def.meleeRange}));
+        if (key && PERMANENT_SPEARS.has(getUpgradeTier(key).base)) lines.push(tr('tip.permanent_spear'));
         if (def.ranged && def.kind !== 'wand') lines.push(tr('tip.range_arrows', {n: def.ranged}));
         if (def.kind === 'wand') lines.push(tr('tip.range_wand', {n: def.ranged, cost: WAND_MANA_COST}));
         for (const type of ['poison','bleed','burn']) if (def[type]) lines.push(weaponProcDescription(type, def[type]));
@@ -7381,9 +7410,12 @@ function throwSpear(){
     if (playerInSafeZone()){
         log(tr('log.no_attack_pz')); return;
     }
-    player.lastAttackAt = Date.now();
     const wKey = player.equipped.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
+    if (wKey && PERMANENT_SPEARS.has(getUpgradeTier(wKey).base)){
+        log(tr('log.permanent_spear')); return;
+    }
+    player.lastAttackAt = Date.now();
     if (!wItem || !wItem.throwable){
         log(tr('log.equip_spear')); return;
     }
@@ -7841,6 +7873,7 @@ function handleMP(msg){
         if (window.valadaresUi) window.valadaresUi.onAuth();
         window.ValadaresAdventureFeedback?.reset?.();
         if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onReady();
+        window.ValadaresJourneyUI?.refresh();
         return;
     }
     if (msg.t === 'secondChance'){
@@ -7897,6 +7930,10 @@ function handleMP(msg){
         return;
     }
     if (msg.t === 'state'){
+        window.ValadaresJourneyUI?.onServerState(msg);
+        if (player._expedition) window.ValadaresJourneyUI?.onDungeonExit();
+        player._expedition = null;
+        player._expeditionExit = null;
         window.equipmentServerVersion = msg.equipmentVersion || 0;
         window.enchantToken = msg.enchantToken || null;
         window.enchantingEnabled = msg.enchantingEnabled !== false;
@@ -8089,6 +8126,7 @@ function handleMP(msg){
         }
         renderDailyEventWidget();
     } else if (msg.t === 'invUpdate'){
+        window.ValadaresJourneyUI?.onServerState(msg);
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
@@ -8309,6 +8347,7 @@ function handleMP(msg){
         if (msg.questResult && msg.questResult.ok){
             const d = msg.questResult.delta || {};
             window.valadaresAdventureGuide?.onQuestResult?.(msg.questResult);
+            window.ValadaresJourneyUI?.onQuestResult();
             if (d.gold)  log(`<span class="log-up">+${d.gold}g</span>`);
             if (d.items) for (const [k, n] of Object.entries(d.items)){
                 const it = ITEMS[k];
@@ -8354,6 +8393,14 @@ function handleMP(msg){
             if (typeof sndLevelUp === 'function') sndLevelUp();
             saveState();
         }
+        if (msg.progressionCraft) {
+            const result = msg.progressionCraft;
+            if (window.ValadaresJourneyUI?.onCraftResult(result)) {
+                if (result.ok) log(`<span class="log-up">${LANG === 'en' ? 'Crafted' : 'Criado'}: ${escapeHtml(itmName(result.key || result.out))} · ${result.cost || 0}g</span>`);
+                else if (typeof showServerToast === 'function') showServerToast('warn', window.ValadaresJourneyUI.errorText(result.error), null, 4000);
+            }
+        }
+        window.ValadaresJourneyUI?.refresh();
         // A próxima frame reconcilia somente o que mudou no inventário.
     } else if (msg.t === 'hlHuntResult'){
         if (msg.ok){
@@ -8397,6 +8444,7 @@ function handleMP(msg){
         // Toast visível no centro — o log vai pra aba COMBATE e o player pode
         // estar na aba CHAT, fazendo a falha parecer silenciosa ("não dá nada").
         if (typeof showServerToast === 'function') showServerToast('warn', tr('toast.warn_reason', {text, reason: msg.reason}), null, 5000);
+        window.ValadaresJourneyUI?.onQuestResult();
     } else if (msg.t === 'questProgress'){
         // Lote 1b: progresso de quest é server-autoritativo (kill/visita). Aplica o
         // valor ABSOLUTO do server por cima do otimista local e atualiza a UI.
@@ -8412,13 +8460,24 @@ function handleMP(msg){
         if (typeof renderQuests === 'function' && document.getElementById('questsModal')?.style.display === 'flex') renderQuests();
         const chainNpc = msg.chainId && NPCS.find(n => n.chain === msg.chainId);
         if (chainNpc && typeof renderChainDialog === 'function' && document.getElementById('chainDialogModal')?.style.display === 'flex') renderChainDialog(chainNpc);
+        window.ValadaresJourneyUI?.refresh();
+    } else if (msg.t === 'expeditionResult'){
+        window.ValadaresJourneyUI?.result(msg);
+        if (msg.error && typeof showServerToast === 'function') showServerToast('warn',
+            window.ValadaresJourneyUI.errorText(msg.error), null, 4500);
+        if (msg.reward && typeof showServerToast === 'function') {
+            const prize=Object.entries(msg.reward).map(([key,qty])=>`${qty}× ${escapeHtml(itmName(key))}`).join(' · ');
+            showServerToast('event', (LANG === 'en' ? 'Expedition reward: ' : 'Prêmio da expedição: ') + prize, null, 5500);
+        }
     } else if (msg.t === 'dungeonEnter'){
         // M4: server confirmou descida pro andar. Troca o grid ativo, teleporta,
         // PvP forçado, e repopula remotePlayers com quem está no andar.
         enterDungeonClient(msg);
+        window.ValadaresJourneyUI?.onDungeonEnter(msg);
     } else if (msg.t === 'dungeonExit'){
         // M4: voltou pra cidade. Restaura overworld, PvP anterior, players da cidade.
         exitDungeonClient(msg);
+        window.ValadaresJourneyUI?.onDungeonExit(msg);
     } else if (msg.t === 'dungeonResult'){
         const errs = { not_at_entrance: tr('err.dg_not_entrance'), not_at_exit: tr('err.dg_not_exit') };
         if (msg.error && typeof showServerToast === 'function') showServerToast('warn', errs[msg.error] || tr('err.failed'), null, 4000);
@@ -9943,7 +10002,7 @@ function checkAchievements(){
 // ─── Quests ──────────────────────────────────────────────────────────────────
 const QUESTS = [
     { id:'q_ratos',    name:'Caçada infestante', desc:'Ratos invadiram o pátio. Mate 10.',
-      goal:{ kind:'mob', type:'RAT', count:10 }, reward:{ gold:50,  xp:{Punho:100} } },
+      goal:{ kind:'mob', type:'RAT', count:10 }, reward:{ gold:50,  xp:{Punho:100}, item:{PORRETE:1} } },
     { id:'q_cobras',   name:'Defenda o pátio',   desc:'Mate 5 cobras-do-pântano.',
       goal:{ kind:'mob', type:'SNAKE', count:5 }, reward:{ gold:80,  xp:{Espada:100} } },
     { id:'q_seda',     name:'Trama da Aranha',   desc:'Colete 5 sedas (de aranhas).',
@@ -10983,7 +11042,15 @@ function drawMinimap(){
         const f = player.floor || 0;
         if (f >= 1 && !player._arena){
             const txt = document.getElementById('floorBadgeText');
-            if (txt) txt.textContent = tr('hud.floor', { floor: f });
+            if (txt) txt.textContent = player._expedition
+                ? (LANG === 'en' ? 'Ruins of the Forge · Solo' : 'Ruínas da Forja · Solo')
+                : tr('hud.floor', { floor: f });
+            if (player._expedition){
+                fb.style.borderColor = '#d89452';
+                fb.style.boxShadow = '0 2px 12px rgba(185,88,30,.45)';
+                if (fb.style.display === 'none') fb.style.display = '';
+                return;
+            }
             const t = Math.min(1, (f - 1) / Math.max(1, DUNGEON_TINT_FULL_C - 1));
             fb.style.borderColor = `rgb(${Math.round(110 + 90*t)},${Math.round(58 - 28*t)},${Math.round(130 - 20*t)})`;
             fb.style.boxShadow = `0 2px 12px rgba(${Math.round(110 + 90*t)},20,90,0.45)`;
@@ -11461,7 +11528,7 @@ function updateMobileHotbar(){
     // Lança: empty se equipped weapon não tem throwable. Qty = inv da mesma key.
     const wKey = player.equipped?.weapon;
     const wItem = wKey ? ITEMS[wKey] : null;
-    const canThrow = !!(wItem && wItem.throwable);
+    const canThrow = !!(wItem && wItem.throwable && !PERMANENT_SPEARS.has(getUpgradeTier(wKey).base));
     const spearQty = canThrow ? ((inv[wKey] || 0) + 1) : 0;
     setSlot('mhbSlotSpear', 'mhbQtySpear', spearQty, canThrow);
 }
@@ -12204,7 +12271,7 @@ function drawWeaponIcon(ctx, def, key, S, P, c, dark, light){
         return;
     }
     // Lança
-    if (def.throwable){
+    if (def.throwable || (def.meleeRange > 1 && def.family === 'lanca')){
         // haste diagonal + ponta
         for (let i=0; i<14; i++){
             P(4+i, 18-i, 1, 1, grip);
@@ -13708,6 +13775,11 @@ function drawDayNightTint(day){
     // M4 3b polish: na masmorra, banho de cor (roxo→vermelho) que cresce com o andar
     // — ignora o ciclo dia/noite (a masmorra não vê o céu).
     const dFloor = (player && player.floor) || 0;
+    if (player._expedition){
+        ctx.save(); ctx.fillStyle='rgba(126,58,23,0.10)';
+        ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore();
+        return;
+    }
     if (dFloor >= 1){
         // Rampa 1→5 = look validado pelo dono (intocada). Masmorra sem fundo: 2ª rampa
         // (t2, andares 6→20) aprofunda o vermelho devagar — fundura continua legível.
@@ -13745,7 +13817,9 @@ function drawLighting(cam, day){
     let darkness = day.darkness;
     let baseR = 8, baseG = 10, baseB = 30;
     let lightScale = 1;
-    if (dFloor >= 1){
+    if (player._expedition){
+        darkness=0.52; baseR=42; baseG=20; baseB=12; lightScale=1.2;
+    } else if (dFloor >= 1){
         // M4 3b polish: tonalidade por profundidade — andar 1 leve → andar 5
         // escuro e ameaçador (avermelha/arroxeia); a luz do player encolhe = claustrofobia.
         // Sem fundo: 2ª rampa (t2, andares 6→20) escurece mais um pouco e encolhe a luz
@@ -14297,7 +14371,7 @@ function togglePvP(){
     // Masmorra/arena: PvP é FORÇADO (o server agora ignora t:'pvp' fora do floor 0 —
     // sem este guard o toggle local dessincronizava do server).
     if ((player.floor || 0) !== 0){
-        log(`<span class="log-sys">${tr('log.pvp_forced_dungeon')}</span>`);
+        log(`<span class="log-sys">${player._expedition ? (LANG === 'en' ? 'PvP is disabled in this solo expedition.' : 'PvP está desativado nesta expedição solo.') : tr('log.pvp_forced_dungeon')}</span>`);
         return;
     }
     if (!player.pvp && player.gold < PVP_MIN_GOLD){
@@ -14580,6 +14654,13 @@ function checkDungeonStairs(x, y){
         }
     } else {
         const sUp = dunStairUp(), sDown = dunStairDown(), sTown = dunStairTown();
+        if (player._expedition){
+            if ((sTown && x === sTown.x && y === sTown.y) || (sUp && x === sUp.x && y === sUp.y)){
+                _lastStairTrigger = now;
+                try { ws.send(JSON.stringify({ t:'expeditionExit' })); } catch {}
+            }
+            return;
+        }
         if (sTown && x === sTown.x && y === sTown.y){
             _lastStairTrigger = now;
             try { ws.send(JSON.stringify({ t:'returnDungeonTown' })); } catch {}
@@ -16192,6 +16273,7 @@ function logout(){
     document.body.classList.remove('game-active', 'panel-equipment', 'panel-inventory', 'menu-open');
     if (window.valadaresUi) window.valadaresUi.onLogout();
     if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onLogout();
+    window.ValadaresJourneyUI?.onLogout();
     window.ValadaresAdventureFeedback?.reset?.();
     document.getElementById('charInput').value = '';
     document.getElementById('pwdInput').value = '';
@@ -17280,7 +17362,9 @@ function loop(ts){
             // Sem fundo: a escada de descida existe se o server mandou (stairs.down) —
             // o teto saiu do cliente. Rótulos via tr() (eram o último PT hardcoded da masmorra).
             const su = dunStairUp(), sd = dunStairDown();
-            if (su) drawStair(su, false, onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
+            if (su) drawStair(su, false, player._expedition
+                ? (LANG === 'en' ? 'Exit expedition' : 'Sair da expedição')
+                : onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
             if (sd) drawStair(sd, true, tr('stair.down'));
             const town = dunStairTown();
             if (town){
@@ -17600,6 +17684,7 @@ function loop(ts){
 <script src="/item-art.js?v=20261004c"></script>
 <script src="/item-art-arms.js?v=20261004c"></script>
 <script src="/item-art-gear.js?v=20261004c"></script>
+<script src="/item-art-progression.js?v=1"></script>
 <script src="/item-art-supplies.js?v=20261004c"></script>
 <script src="/character-art.js?v=20261004b"></script>
 <script src="/monster-art.js?v=20261003b"></script>
@@ -17608,11 +17693,12 @@ function loop(ts){
 <script src="/village-art.js?v=20261004a"></script>
 <script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
-<script src="/adventure-guide.js?v=20261004b"></script>
+<script src="/adventure-guide.js?v=20261006a"></script>
+<script src="/journey-ui.js?v=2"></script>
 <script src="/adventure-feedback.js?v=20261005b"></script>
 <script src="/training-rules.js?v=1"></script>
 <script src="/enchanting-ui.js?v=1"></script>
-<script src="/transmutation-rules.js?v=4"></script>
-<script src="/transmutation-ui.js?v=4.1"></script>
+<script src="/transmutation-rules.js?v=5"></script>
+<script src="/transmutation-ui.js?v=5"></script>
 </body>
 </html>

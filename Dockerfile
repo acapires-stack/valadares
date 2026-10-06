@@ -14,6 +14,7 @@ COPY server/ ./server/
 COPY equipment-rules.js ./equipment-rules.js
 COPY training-rules.js ./training-rules.js
 COPY transmutation-rules.js ./transmutation-rules.js
+COPY progression-content.js ./progression-content.js
 
 # Railway define $PORT dinamicamente; server.js já respeita process.env.PORT
 EXPOSE 8080

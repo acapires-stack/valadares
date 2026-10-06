@@ -4,7 +4,7 @@
     I18N.en['transmute.tab']='TRANSMUTE';
     const RULES=window.ValadaresTransmutation;
     const MATERIAL='ESSENCIA_ARCANA';
-    let owner='',storageKey='',selected=['','',''],armed='',pending=null,result=null;
+    let owner='',storageKey='',selected=['','',''],family='',armed='',pending=null,result=null;
     let version=0,token='',pity=null,pitySocket=null,timer=null,checkedSocket=null,checkBusy=false,lastRenderState='';
     const panel=()=>document.getElementById('transmutationPanel');
     const banner=()=>document.getElementById('transmutationStatus');
@@ -19,7 +19,7 @@
         return 'valadares:transmutation:v1:'+encodeURIComponent(endpoint)+':'+encodeURIComponent(account.toLowerCase());
     }
     function savePending(){
-        try{if(pending)localStorage.setItem(storageKey,JSON.stringify({opId:pending.opId,keys:pending.keys,version:pending.version,pityAtSend:pending.pityAtSend}));else localStorage.removeItem(storageKey);return true}catch{return false}
+        try{if(pending)localStorage.setItem(storageKey,JSON.stringify({opId:pending.opId,keys:pending.keys,family:pending.family||'',version:pending.version,pityAtSend:pending.pityAtSend}));else localStorage.removeItem(storageKey);return true}catch{return false}
     }
     function clearTimer(){if(timer)clearTimeout(timer);timer=null}
     function startTimeout(){
@@ -33,12 +33,12 @@
     function setAccount(account){
         const next=String(account||'').toLowerCase();if(next===owner)return;
         clearTimer();owner=next;storageKey=next?keyFor(next):'';
-        selected=['','',''];armed='';pending=null;result=null;version=0;token='';pity=null;pitySocket=null;checkedSocket=null;checkBusy=false;
+        selected=['','',''];family='';armed='';pending=null;result=null;version=0;token='';pity=null;pitySocket=null;checkedSocket=null;checkBusy=false;
         if(!storageKey)return;
         try{const saved=JSON.parse(localStorage.getItem(storageKey));
             // A consulta de recibo antigo não depende das regras de preço/eligibilidade atuais.
             if(saved&&typeof saved.opId==='string'&&Array.isArray(saved.keys)&&saved.keys.length===3&&new Set(saved.keys).size===3&&saved.keys.every(k=>typeof k==='string'&&k.length>0)){
-                pending={opId:saved.opId,keys:saved.keys,version:Number.isInteger(saved.version)?saved.version:1,pityAtSend:Number.isInteger(saved.pityAtSend)?saved.pityAtSend:null,waiting:false};
+                pending={opId:saved.opId,keys:saved.keys,family:typeof saved.family==='string'?saved.family:'',version:Number.isInteger(saved.version)?saved.version:1,pityAtSend:Number.isInteger(saved.pityAtSend)?saved.pityAtSend:null,waiting:false};
                 result={kind:'warn',message:()=>txt('Há uma operação anterior sem confirmação. Confira seu estado antes de começar outra.','A previous operation has no confirmation. Check its status before starting another.')};
             }
         }catch{}
@@ -69,8 +69,9 @@
         return Object.keys(player.inv||{}).filter(k=>ownCount(k)>0&&RULES.tierOf(k)>0).sort((a,b)=>RULES.tierOf(a)-RULES.tierOf(b)||name(a).localeCompare(name(b),LANG==='en'?'en':'pt'));
     }
     function validSelection(keys,choices){return keys.length===3&&new Set(keys).size===3&&keys.every(k=>choices.includes(k)&&ownCount(k)>0)}
-    function currentQuote(choices){return validSelection(selected,choices)?RULES.quote(selected,pity===null?0:pity):null}
-    function selectedFingerprint(q){return q&&q.valid?JSON.stringify([selected,q.tier,q.resultTier,q.sameTier,q.cost,q.essenceQty,q.chances,q.pool,q.superiorPool,pity]):''}
+    function targetFamily(keys){return keys.length===3&&keys.every(k=>RULES.tierOf(k)===6)?family:''}
+    function currentQuote(choices){return validSelection(selected,choices)?RULES.quote(selected,pity===null?0:pity,targetFamily(selected)):null}
+    function selectedFingerprint(q){return q&&q.valid?JSON.stringify([selected,targetFamily(selected),q.tier,q.resultTier,q.sameTier,q.cost,q.essenceQty,q.chances,q.pool,q.superiorPool,pity]):''}
     function reason(q){
         if(!online())return txt('Conecte-se ao jogo para continuar.','Connect to the game to continue.');
         if(version!==RULES.VERSION||!token)return txt('Aguardando autorização da bancada.','Waiting for workbench authorization.');
@@ -137,6 +138,11 @@
             html+='</select></label>';
         }
         html+='</div>';
+        if(q?.valid&&q.tier===6&&q.sameTier){
+            html+='<label class="tm-family">'+txt('Alvo da ascensão','Ascension target')+'<select data-tm-family '+(block?'disabled':'')+'><option value="" '+(!family?'selected':'')+'>'+txt('Clássicos: Espada do Infinito, Coroa Celestial ou Cajado Astral','Classics: Sword of Infinity, Celestial Crown or Astral Staff')+'</option>';
+            for(const f of RULES.families||[])html+='<option value="'+safe(f.id)+'" '+(family===f.id?'selected':'')+'>'+safe(LANG==='en'?f.nameEn:f.name)+'</option>';
+            html+='</select></label><p class="tm-note">'+txt('Escolher uma família direciona apenas o prêmio Ascendente. A chance de ascensão, o custo e sua proteção acumulada continuam iguais. Confira abaixo quais peças podem sair.','Choosing a family only targets the Ascendant prize. Ascension chance, cost and your accumulated protection stay the same. Review the possible items below.')+'</p>';
+        }
         if(!choices.length)html+='<p>'+txt('Nenhuma peça elegível na mochila. São aceitas peças sem melhoria ou encantamento até a faixa mítica ★★.','No eligible piece in your backpack. Unupgraded, unenchanted pieces up to mythic ★★ tier are accepted.')+'</p>';
         if(q&&q.valid){
             const pityUnknown=q.tier===6&&pity===null;
@@ -171,7 +177,7 @@
         renderStatus();
         lastRenderState=renderState();
     }
-    function renderState(){return JSON.stringify([owner,LANG,online(),atCraft(),version,token,pity,player.inv,player.equipped,player.gold,selected,armed,pending,typeof result?.message==='function'?result.message():result?.message])}
+    function renderState(){return JSON.stringify([owner,LANG,online(),atCraft(),version,token,pity,player.inv,player.equipped,player.gold,selected,family,armed,pending,typeof result?.message==='function'?result.message():result?.message])}
     function refreshIfOpen(){const modal=document.getElementById('craftModal');if(modal?.style.display==='flex'&&modal.classList.contains('transmute-active')&&lastRenderState!==renderState())render();else renderStatus()}
     function queryStatus(auto){
         if(!pending||!online()||version!==RULES.VERSION||checkBusy)return;
@@ -183,17 +189,17 @@
         if(!pending||pending.version!==RULES.VERSION||!pending.notFound||!available()||pending.waiting||
             (RULES.quote(pending.keys).tier===6&&pity===null))return;
         pending.notFound=false;pending.waiting=true;result=null;renderStatus();
-        try{ws.send(JSON.stringify({t:'invTransmute',version:pending.version,opId:pending.opId,keys:pending.keys}));startTimeout()}
+        try{ws.send(JSON.stringify({t:'invTransmute',version:pending.version,opId:pending.opId,keys:pending.keys,family:pending.family||''}));startTimeout()}
         catch{pending.waiting=false;result={kind:'warn',message:()=>txt('Envio incerto. Confira a operação antes de tentar novamente.','Send state unknown. Check the operation before trying again.')};renderStatus()}
     }
     function attempt(){
         const choices=eligible(),q=currentQuote(choices);
         if(pending||!q?.valid||reason(q)||armed!==selectedFingerprint(q))return;
-        pending={opId:token,keys:[...selected],version:RULES.VERSION,pityAtSend:q.tier===6?pity:null,waiting:false};
+        pending={opId:token,keys:[...selected],family:targetFamily(selected),version:RULES.VERSION,pityAtSend:q.tier===6?pity:null,waiting:false};
         checkedSocket=ws;
         if(!savePending()){pending=null;result={kind:'error',message:()=>txt('Não foi possível guardar a operação neste aparelho. Libere espaço e tente novamente.','Could not save this operation on this device. Free storage and try again.')};renderStatus();return}
         armed='';pending.waiting=true;result=null;render();
-        try{ws.send(JSON.stringify({t:'invTransmute',version:RULES.VERSION,opId:pending.opId,keys:pending.keys}));startTimeout()}
+        try{ws.send(JSON.stringify({t:'invTransmute',version:RULES.VERSION,opId:pending.opId,keys:pending.keys,family:pending.family||''}));startTimeout()}
         catch{pending.waiting=false;result={kind:'warn',message:()=>txt('Envio incerto. Confira esta operação antes de continuar.','Send state unknown. Check this operation before continuing.')};renderStatus();render()}
     }
     function handleResult(r){
@@ -238,6 +244,8 @@
         renderStatus();refreshIfOpen();
     }
     document.addEventListener('change',e=>{
+        const target=e.target.closest('#transmutationPanel [data-tm-family]');
+        if(target){if(pending)return;family=(RULES.families||[]).some(f=>f.id===target.value)?target.value:'';armed='';render();return}
         const slot=e.target.closest('#transmutationPanel [data-tm-slot]');if(!slot)return;
         selected[Number(slot.dataset.tmSlot)]=slot.value;armed='';render();
     });

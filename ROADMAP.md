@@ -3,6 +3,10 @@
 > Mapa de decisão pra próximas sessões. O `SESSION_NOTES.md` tem o registro
 > cronológico do que rolou; este aqui é o **norte**.
 
+## Prioridade revisada em 06/10/2026 — preparar o jogo para quem chegar
+
+Alcione definiu que reunir uma turma agora é difícil e que devemos continuar melhorando o jogo para receber melhor quem chegar. Conseguir jogadores não é condição para avançar. A sequência é conferir e corrigir a experiência inicial, tornar progressão e recompensas claras, completar as famílias de armas começando por machados e acrescentar uma expedição curta que funcione com poucos jogadores. As primeiras revisões são focais, sem adiar as armas por melhorias opcionais. Cada entrega deve ser conferida no jogo; retenção será medida quando houver jogadores reais. Convites e encontros ficam para uma oportunidade futura. O detalhamento está em [Plano de jogadores, armas e mapa](docs/PLANO_JOGADORES_E_ENDGAME_2026-10-05.md). Os quatro pontos foram implementados em 06/10: guia inicial com Porrete equipável, painel Jornada com objetivos e receitas, 19 peças novas até T7 com escolha de família na ascensão, e expedição solo Ruínas da Forja. A validação local cobre primeira missão, fabricação, reentrada e repetição da expedição; o plano detalha a recuperação compatível. O histórico abaixo permanece como referência, com estados antigos a reconfirmar antes de execução.
+
 ---
 
 ## 🟢 Estado em 28/05/2026

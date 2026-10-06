@@ -5,11 +5,12 @@ const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const rules = require('../../transmutation-rules');
+const progression = require('../../progression-content');
 const equipmentRules = require('../../equipment-rules');
 
 const source = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
 const metaStart=source.indexOf('const ITEM_META = {'),metaEnd=source.indexOf('\n};',metaStart)+3;
-const itemMeta=vm.runInNewContext(source.slice(metaStart,metaEnd)+'\nITEM_META');
+const itemMeta=vm.runInNewContext(source.slice(metaStart,metaEnd)+'\nITEM_META',{progression});
 function literalFunction(name){
     const start = source.indexOf(`function ${name}(`);
     assert.ok(start >= 0, `${name} present`);
@@ -45,19 +46,19 @@ function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,s
         fs:fsFake,accounts,ACCOUNTS_FILE:'isolated-accounts.json',
         ACCOUNTS_BACKUP_INTERVAL_MS:Infinity,_lastAccountsBackupAt:0,
         _diskAccountsCount:()=>0,backupAccountsFile(){},getAccount:n=>accounts.get(n),
-        transmutationRules:rules,equipmentRules,SAVE_CAPS:{invKeys:cap},
+        transmutationRules:rules,equipmentRules,progression,SAVE_CAPS:{invKeys:cap},
         chebyshev:(ax,ay,bx,by)=>Math.max(Math.abs(ax-bx),Math.abs(ay-by)),
         itemMetaForKey:key=>itemMeta[equipmentRules.parse(key).base] || null,
         getUpgradeTier:equipmentRules.parse,enchantedIdExists:()=>false});
     vm.runInContext(serverFunctions,context);
     const invoke=vm.runInContext(`(function(msg,p){${dispatch}})`,context);
     function send(msg){invoke(msg,p); return sent.at(-1);}
-    function attempt(overrides={}){return send({t:'invTransmute',version:4,opId,keys,...overrides});}
+    function attempt(overrides={}){return send({t:'invTransmute',version:5,opId,keys,...overrides});}
     return {p,acc,opId,sent,send,attempt,context,fsFake};
 }
 
 test('shared table, whitelist, odds, weakest tier and browser UMD',()=>{
-    assert.equal(rules.VERSION,4);
+    assert.equal(rules.VERSION,5);
     for(const [key,tier] of [['ADAGA',1],['VARINHA_APRENDIZ',1],['ESPADA_OSSO',2],
         ['ESPADA_ACO',3],['ESPADA_DRACO',4],['ESPADA_GUARDIAO',5],['ESPADA_ETERNA',6],
         ['COROA_VALADARES',6],['CAJADO_ETERNO',6]])
@@ -80,21 +81,22 @@ test('shared table, whitelist, odds, weakest tier and browser UMD',()=>{
         assert.equal(q.essenceQty,essence);
         assert.deepEqual(Object.values(q.chances),chances);
         assert.equal(Object.values(q.chances).reduce((a,b)=>a+b),100);
-        if(tier===6) assert.deepEqual(q.pool,keys);
+        if(tier===6) assert.ok(keys.every(k=>q.pool.includes(k)));
         else assert.ok(keys.every(k=>!q.pool.includes(k)));
         assert.equal(q.sameTier,chances[3]>0);
         assert.equal(q.superiorPool.length>0,q.sameTier);
         if(q.sameTier && tier<6) assert.ok(q.superiorPool.every(k=>rules.tierOf(k)===tier+1));
     }
-    assert.deepEqual(rules.quote(['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL']).superiorPool,
-        ['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO']);
+    assert.ok(rules.quote(['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL']).superiorPool
+        .includes('MACHADO_CATACLISMO'));
     assert.deepEqual(rules.quote(['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO']).superiorPool,
         ['ESPADA_INFINITA','COROA_CELESTIAL','CAJADO_ASTRAL']);
     assert.equal(rules.quote(['ADAGA','ADAGA','CLAVA']).error,'duplicate_keys');
     assert.equal(rules.quote(['ADAGA','PORRETE','ESPADA_INFINITA']).error,'ineligible_item');
     const browser={};
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','..','progression-content.js'),'utf8'),browser);
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','..','transmutation-rules.js'),'utf8'),browser);
-    assert.equal(browser.ValadaresTransmutation.VERSION,4);
+    assert.equal(browser.ValadaresTransmutation.VERSION,5);
     assert.equal(browser.ValadaresTransmutation.quote(['ADAGA','MACA','ESPADA_ACO']).cost,120);
 });
 
@@ -114,14 +116,30 @@ test('tier-six protection starts at five, grows by five and guarantees attempt t
     assert.equal(rules.quote(['ADAGA','ESPADA_ETERNA','CAJADO_ETERNO'],19).pity,null);
 });
 
+test('family choice rejects prototype and non-string payloads before any roll',()=>{
+    const keys=['ESPADA_ETERNA','MACHADO_CATACLISMO','ARCO_ECLIPSE'];
+    for (const family of ['__proto__','constructor',{},null])
+        assert.equal(rules.quote(keys,0,family).error,'invalid_family');
+    const f=fixture({keys,gold:40000,rolls:[0.999,0]});
+    for (const family of ['__proto__','constructor',{},null]){
+        assert.equal(f.attempt({family}).transmutation.error,'invalid_family');
+        assert.equal(f.p.gold,40000);
+        assert.equal(f.p.transmutationToken,f.opId);
+    }
+    const receipt=f.attempt({family:'machado'}).transmutation;
+    assert.equal(receipt.ok,true);
+    assert.equal(receipt.newKey,'MACHADO_ABISMO');
+    assert.equal(f.attempt({family:'clava'}).transmutation.error,'op_conflict');
+});
+
 test('each approved input belongs to one progressing tier and every superior pool is valid',()=>{
     const expected=[
         ['ADAGA','PORRETE','CLAVA','ESPADA','LANCA','ARCO','ESCUDO_MAD','BOTAS','ELMO','COURO','VARINHA_APRENDIZ'],
         ['MACA','ESPADA_OSSO','SABRE','ADAGA_DUPLA','BORDAO','LANCA_LONGA','ARCO_CACA','ESCUDO_OSSO','ESCUDO_FERRO','ARMADURA','BOTAS_COURO','ELMO_CHIFRES','MACHADO','ESPADA_LONGA','MARTELO'],
         ['ESPADA_ACO','BESTA','MARRETA','MACA_GIGANTE','MACHADO_MINO','ARMADURA_OSSO','ESCUDO_PEDRA','BOTAS_RAPIDA'],
-        ['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO'],
-        ['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO'],
-        ['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'],
+        ['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO','MACHADO_FORJA','ARCO_DRACO','LANCA_DRACO'],
+        ['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO','MACHADO_RUINAS','MARTELO_COLOSSO','BESTA_GUARDIAO','LANCA_GUARDIAO'],
+        ['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO','MACHADO_CATACLISMO','MARTELO_ETERNAL','ARCO_ECLIPSE','LANCA_ETERNA','LAMINA_ETERNA_1H','ESCUDO_ETERNAL'],
     ];
     assert.equal(new Set(expected.flat()).size,expected.flat().length);
     for(let tier=1;tier<=6;tier++){
@@ -222,12 +240,12 @@ test('mixed tiers transfer superior probability to material, while tier five pro
 test('tier six consumes three distinct mythics and returns only one normal prize',()=>{
     const keys=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
     const q=rules.quote(keys);
-    assert.deepEqual(q.pool,keys);
+    assert.ok(keys.every(k=>q.pool.includes(k)));
     assert.equal(rules.quote(['ESPADA_ETERNA_PLUS_1','COROA_VALADARES','CAJADO_ETERNO']).error,'ineligible_item');
     const enchanted=equipmentRules.make('ESPADA_ETERNA',0,'abcdef012345',equipmentRules.roll('weapon',[],0));
     assert.equal(rules.quote([enchanted,'COROA_VALADARES','CAJADO_ETERNO']).error,'ineligible_item');
     for(let i=0;i<3;i++){
-        const f=fixture({keys,gold:40000,rolls:[0.35,(i+0.5)/3],cap:1});
+        const f=fixture({keys,gold:40000,rolls:[0.35,(i+0.5)/q.pool.length],cap:1});
         const receipt=f.attempt().transmutation;
         assert.equal(receipt.ok,true);
         assert.equal(receipt.category,'plain');
@@ -258,7 +276,7 @@ test('only confirmed tier-six misses advance protection and the twentieth attemp
     for(let failures=0;failures<19;failures++){
         for(const key of keys) f.p.inv[key]=1;
         const opId=f.p.transmutationToken;
-        const update=f.send({t:'invTransmute',version:4,opId,keys});
+        const update=f.send({t:'invTransmute',version:5,opId,keys});
         const receipt=update.transmutation;
         assert.equal(receipt.ok,true);
         assert.notEqual(receipt.category,'superior');
@@ -269,18 +287,18 @@ test('only confirmed tier-six misses advance protection and the twentieth attemp
         assert.equal(f.acc.save.transmutationPity,failures+1);
         assert.equal(update.transmutationPity,failures+1);
         assert.deepEqual(f.send({t:'transmuteStatus',opId}).transmutation,receipt);
-        assert.deepEqual(f.send({t:'invTransmute',version:4,opId,keys}).transmutation,receipt);
+        assert.deepEqual(f.send({t:'invTransmute',version:5,opId,keys}).transmutation,receipt);
         assert.equal(f.p.transmutationPity,failures+1);
         if(failures===0){
             const other=['ADAGA','PORRETE','CLAVA'];
             for(const key of other) f.p.inv[key]=1;
-            const result=f.send({t:'invTransmute',version:4,opId:f.p.transmutationToken,keys:other}).transmutation;
+            const result=f.send({t:'invTransmute',version:5,opId:f.p.transmutationToken,keys:other}).transmutation;
             assert.equal(result.ok,true);assert.equal(result.pityAfter,undefined);
             assert.equal(f.p.transmutationPity,1);
         }
     }
     for(const key of keys) f.p.inv[key]=1;
-    const final=f.send({t:'invTransmute',version:4,opId:f.p.transmutationToken,keys}).transmutation;
+    const final=f.send({t:'invTransmute',version:5,opId:f.p.transmutationToken,keys}).transmutation;
     assert.equal(final.category,'superior');
     assert.equal(final.pityBefore,19);
     assert.equal(final.pityAfter,0);
@@ -312,7 +330,7 @@ test('join migrates ten trusted version-three misses to 55%, but saved zero wins
     assert.equal(f.p.transmutationPity,10);
     assert.equal(f.context.updateEnchantSave(f.p),true);
     assert.equal(f.acc.save.transmutationPity,10);
-    const receipt=f.send({t:'invTransmute',version:4,opId:f.p.transmutationToken,keys}).transmutation;
+    const receipt=f.send({t:'invTransmute',version:5,opId:f.p.transmutationToken,keys}).transmutation;
     assert.equal(receipt.chance,55);
     assert.equal(receipt.pityBefore,10);
     f.acc.save.transmutationPity=0;
@@ -336,7 +354,7 @@ test('tier-six save failure restores pity and retry or restart cannot double-cou
     Object.assign(resumed.p,f.acc.save);
     assert.deepEqual(resumed.send({t:'transmuteStatus',opId:f.opId}).transmutation,receipt);
     assert.equal(resumed.p.transmutationPity,11);
-    assert.deepEqual(resumed.send({t:'invTransmute',version:4,opId:f.opId,keys}).transmutation,receipt);
+    assert.deepEqual(resumed.send({t:'invTransmute',version:5,opId:f.opId,keys}).transmutation,receipt);
     assert.equal(resumed.p.transmutationPity,11);
 });
 
@@ -402,7 +420,7 @@ test('worn base, upgraded or enchanted mythics do not block loose backpack copie
 test('new transcendent equipment is recognized by real server stats, skills, forging and combat',()=>{
     const skillStart=source.indexOf('const WEAPON_SKILL = {');
     const skillEnd=source.indexOf('\n};',skillStart)+3;
-    const context=vm.createContext({equipmentRules,console,itemMeta,Math,
+    const context=vm.createContext({equipmentRules,console,itemMeta,Math,progression,
         getUpgradeTier:equipmentRules.parse,
         equippedAffixes:()=>({def:0,critDamage:0}),
         srvUpgradeBonusArmor:()=>null});
@@ -476,7 +494,7 @@ test('duplicates, conflicting payload, stale token and read-only status never ch
     next.p.inv=f.acc.save.inv; next.p.gold=f.acc.save.gold;
     next.p.transmutationOps=f.acc.save.transmutationOps;
     next.p.transmutationToken=f.acc.save.transmutationToken;
-    assert.deepEqual(next.send({t:'invTransmute',version:4,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,first);
+    assert.deepEqual(next.send({t:'invTransmute',version:5,opId:f.opId,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,first);
     assert.equal(next.p.gold,gold);
 });
 
@@ -539,7 +557,7 @@ test('atomic file persists receipt and consumed inventory for a fresh process st
     const restarted=fixture();
     Object.assign(restarted.p,saved);
     assert.deepEqual(restarted.send({t:'transmuteStatus',opId:f.opId}).transmutation,receipt);
-    assert.deepEqual(restarted.send({t:'invTransmute',opId:f.opId,version:4,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,receipt);
+    assert.deepEqual(restarted.send({t:'invTransmute',opId:f.opId,version:5,keys:['ADAGA','PORRETE','CLAVA']}).transmutation,receipt);
     assert.equal(restarted.p.gold,1880);
     const mythics=['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'];
     const sixth=fixture({keys:mythics,gold:40000,rolls:[0.35,0]});
@@ -553,13 +571,13 @@ test('atomic file persists receipt and consumed inventory for a fresh process st
     Object.assign(resumed.p,savedSixth);
     assert.equal(resumed.p.transmutationPity,1);
     assert.deepEqual(resumed.send({t:'transmuteStatus',opId:sixth.opId}).transmutation,sixthReceipt);
-    assert.deepEqual(resumed.send({t:'invTransmute',opId:sixth.opId,version:4,keys:mythics}).transmutation,sixthReceipt);
+    assert.deepEqual(resumed.send({t:'invTransmute',opId:sixth.opId,version:5,keys:mythics}).transmutation,sixthReceipt);
     assert.equal(resumed.p.gold,10000);
 });
 
 test('enchanted results are compatible with every real output equipment kind',()=>{
     const begin=source.indexOf('const ITEM_META = {'),end=source.indexOf('\n};',begin)+3;
-    const meta=vm.runInNewContext(source.slice(begin,end)+'\nITEM_META');
+    const meta=vm.runInNewContext(source.slice(begin,end)+'\nITEM_META',{progression});
     for(const keys of [['ADAGA','PORRETE','CLAVA'],['MACA','ESPADA_OSSO','SABRE'],
         ['ESPADA_ACO','BESTA','MARRETA'],['ESPADA_DRACO','ELMO_DRACO','CAJADO_FOGO'],
         ['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL'],

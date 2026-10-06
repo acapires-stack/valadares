@@ -12,7 +12,7 @@ function functionSource(name){
     assert.ok(end >= 0, `unterminated ${name}`);
     return source.slice(start, end + 2);
 }
-const directStart = source.indexOf('            if (m.hp === 0){\n                grantManaOnKill(p);');
+const directStart = source.indexOf('            if (m.hp === 0){\n                if (m.expedition){ handleExpeditionMobDeath(m,p); return; }\n                grantManaOnKill(p);');
 const directEndMarker = '\n            }\n            return;\n        }\n\n        if (msg.t === \'pkDeath\')';
 const directEnd = source.indexOf(directEndMarker, directStart);
 assert.ok(directStart >= 0 && directEnd > directStart, 'direct attack death block changed');

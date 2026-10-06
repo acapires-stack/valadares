@@ -8,6 +8,7 @@
       "equipment-rules.js",
       "training-rules.js",
       "transmutation-rules.js",
+      "progression-content.js",
       "package.json",
       "package-lock.json",
       "Dockerfile",

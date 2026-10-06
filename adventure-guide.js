@@ -38,7 +38,7 @@
     let momentKind = '', momentSignature = '', momentReward = null;
     const copy = {
         pt: {
-            title:'Primeira aventura', reopen:'📜 Guia', close:'Recolher guia', missions:'Missões',
+            title:'Primeira aventura', reopen:'📜 Guia', close:'Recolher guia', missions:'Missões', equipReward:'Equipar Porrete', rewardLabel:'Ao entregar: ',
             introStep:'1 de 3 · O pátio precisa de ajuda', intro:'Encontre a Atendente e aceite a Caçada infestante. Ela está em (47, 53).',
             introNear:'Você está ao lado da Atendente. Aceite a missão para começar.', accept:'Aceitar Caçada',
             huntStep:'2 de 3 · Caçada infestante', hunt:'Mate 10 ratos. Saia da zona segura para lutar; use Espaço no computador ou o botão de ataque no celular. Volte à zona segura se precisar se recuperar.',
@@ -47,14 +47,14 @@
             returnStep:'3 de 3 · Volte à Atendente', return:'A caçada terminou. Volte à Atendente em (47, 53) e entregue a missão.',
             returnNear:'Você está ao lado dela. Entregue a missão para receber a recompensa.', deliver:'Entregar missão',
             pending:'Aguardando confirmação do servidor…', doneStep:'Aventura concluída',
-            done:'A entrega foi confirmada. Você recebeu 50 gold e 100 XP de Punho.',
-            next:'Próximo objetivo: Defenda o pátio. Veja a missão no quadro da Atendente.',
+            done:'Missão entregue. Confira o prêmio no inventário e continue sua jornada.',
+            next:'O próximo objetivo aparece no painel Jornada.',
             explore:'Abra Missões para escolher seu próximo desafio.', surface:'Volte à superfície para continuar esta aventura na vila.',
             offline:'Conecte-se ao servidor para continuar.', danger:'Vida baixa: volte à zona segura agora.',
             safeRoute:'Centro da zona segura: (50, 50)', safety:'Como recuperar',
             safetyInfo:'Na zona segura, pare de lutar e aguarde a vida se recuperar. Se tiver comida ou poção de vida no inventário, você também pode usá-la.',
             achievementTitle:'Primeira conquista', achievementEyebrow:'CAÇADA INFESTANTE · CONCLUÍDA',
-            achievementText:'A vila reconhece sua primeira vitória.', achievementNext:'Próximo objetivo: Defenda o pátio. Abra Missões na Atendente.',
+            achievementText:'A vila reconhece sua primeira vitória.', achievementNext:'Equipe o Porrete recebido; o próximo objetivo aparece no painel Jornada.',
             resumeTitle:'Sua aventura continua', resumeEyebrow:'ONDE VOCÊ PAROU', resumeNext:'Próxima missão',
             resumeDeliver:'Próxima ação: entregue à Atendente em (47, 53)',
             resumeContinue:'Próxima ação: continue o objetivo e acompanhe Missões',
@@ -62,7 +62,7 @@
             directions:{left:'oeste ←', right:'leste →', up:'norte ↑', down:'sul ↓'}
         },
         en: {
-            title:'First adventure', reopen:'📜 Guide', close:'Collapse guide', missions:'Quests',
+            title:'First adventure', reopen:'📜 Guide', close:'Collapse guide', missions:'Quests', equipReward:'Equip Cudgel', rewardLabel:'On turn-in: ',
             introStep:'1 of 3 · The yard needs help', intro:'Find the Attendant and accept Infestation Hunt. She is at (47, 53).',
             introNear:'You are next to the Attendant. Accept the quest to begin.', accept:'Accept Infestation Hunt',
             huntStep:'2 of 3 · Infestation Hunt', hunt:'Kill 10 rats. Leave the safe zone to fight; use Space on desktop or the attack button on mobile. Return to safety if you need to recover.',
@@ -71,14 +71,14 @@
             returnStep:'3 of 3 · Return to the Attendant', return:'The hunt is done. Return to the Attendant at (47, 53) and turn in the quest.',
             returnNear:'You are next to her. Turn in the quest to receive the reward.', deliver:'Turn in quest',
             pending:'Waiting for server confirmation…', doneStep:'Adventure complete',
-            done:'The turn-in was confirmed. You received 50 gold and 100 Fist XP.',
-            next:'Next objective: Defend the Yard. Find it on the Attendant’s quest board.',
+            done:'Quest turned in. Check your reward in the inventory and continue your journey.',
+            next:'Your next objective appears in the Journey panel.',
             explore:'Open Quests to choose your next challenge.', surface:'Return to the surface to continue this village adventure.',
             offline:'Connect to the server to continue.', danger:'Low health: return to the safe zone now.',
             safeRoute:'Safe zone center: (50, 50)', safety:'How to recover',
             safetyInfo:'In the safe zone, stop fighting and wait for health to recover. If you have food or a health potion in your inventory, you can use it too.',
             achievementTitle:'First achievement', achievementEyebrow:'INFESTATION HUNT · COMPLETE',
-            achievementText:'The village recognizes your first victory.', achievementNext:'Next objective: Defend the Yard. Open Quests at the Attendant.',
+            achievementText:'The village recognizes your first victory.', achievementNext:'Equip the rewarded Cudgel; your next objective appears in the Journey panel.',
             resumeTitle:'Your adventure continues', resumeEyebrow:'WHERE YOU LEFT OFF', resumeNext:'Next quest',
             resumeDeliver:'Next step: turn in at the Attendant (47, 53)',
             resumeContinue:'Next step: continue the objective and check Quests',
@@ -97,6 +97,15 @@
     const hasQuest = () => !!player.quests?.active?.q_ratos;
     const done = () => !!player.quests?.completed?.includes('q_ratos');
     const nearAttendant = () => (player.floor || 0) === 0 && typeof atQuestNpc === 'function' && atQuestNpc();
+    function rewardPreview(){
+        const q = typeof QUESTS !== 'undefined' && QUESTS.find(row => row.id === 'q_ratos');
+        if (!q) return '';
+        const r=q.reward || {}, parts=[];
+        if (r.gold) parts.push(r.gold + 'g');
+        for (const [skill,amount] of Object.entries(r.xp || {})) parts.push(amount + ' XP ' + (typeof skillDisp === 'function' ? skillDisp(skill) : skill));
+        for (const [key,amount] of Object.entries(r.item || {})) parts.push(amount + '× ' + (typeof itmName === 'function' ? itmName(key) : key));
+        return parts.length ? words().rewardLabel + parts.join(' · ') : '';
+    }
 
     function activeQuest() {
         const active = player.quests?.active || {};
@@ -141,7 +150,7 @@
         momentEyebrow.textContent = kind === 'achievement' ? w.achievementEyebrow : w.resumeEyebrow;
         momentText.textContent = data.text;
         momentDetail.textContent = data.detail;
-        momentAction.textContent = w.missions;
+        momentAction.textContent = kind === 'achievement' && (momentReward?.items?.PORRETE || 0) > 0 ? w.equipReward : w.missions;
         momentClose.setAttribute('aria-label', w.close);
         render();
     }
@@ -157,7 +166,7 @@
         const achievement = momentKind === 'achievement';
         put(momentTitle, achievement ? w.achievementTitle : w.resumeTitle);
         put(momentEyebrow, achievement ? w.achievementEyebrow : w.resumeEyebrow);
-        put(momentAction, w.missions);
+        put(momentAction, achievement && (momentReward?.items?.PORRETE || 0) > 0 ? w.equipReward : w.missions);
         momentClose.setAttribute('aria-label', w.close);
         if (!achievement) {
             const current = resumeData();
@@ -172,9 +181,12 @@
         for (const [skill, value] of Object.entries(momentReward?.xp || {})) {
             rewards.push(`+${value} XP ${skill === 'Punho' && w === copy.en ? 'Fist' : skill}`);
         }
+        for (const [key, amount] of Object.entries(momentReward?.items || {})) {
+            rewards.push(`+${amount}× ${typeof itmName === 'function' ? itmName(key) : key}`);
+        }
         put(momentText, w.achievementText);
         put(momentDetail, (rewards.length ? rewards.join(' · ') + ' · ' : '')
-            + (player.quests?.completed?.includes('q_cobras') ? w.explore : w.achievementNext));
+            + ((momentReward?.items?.PORRETE || 0) > 0 ? w.achievementNext : w.explore));
     }
     function onQuestResult(result) {
         if (!ready || !name || !result?.ok || result.kind !== 'simple' || result.questId !== 'q_ratos'
@@ -184,6 +196,10 @@
         momentReward = { gold: Number.isFinite(delta.gold) && delta.gold > 0 ? delta.gold : 0, xp: {} };
         if (delta.xp && typeof delta.xp === 'object') for (const [skill, value] of Object.entries(delta.xp)) {
             if (Number.isFinite(value) && value > 0) momentReward.xp[skill] = value;
+        }
+        momentReward.items = {};
+        if (delta.items && typeof delta.items === 'object') for (const [key, value] of Object.entries(delta.items)) {
+            if (Number.isFinite(value) && value > 0) momentReward.items[key] = value;
         }
         writeState('firstQuestCelebrated', '1');
         const w = words();
@@ -273,8 +289,8 @@
     function render() {
         const w = words();
         const in3d = typeof r3dOn !== 'undefined' && r3dOn;
-        root.hidden = !ready || in3d;
-        if (root.hidden) return;
+        root.hidden = !ready || in3d || (done() && !momentKind);
+        if (root.hidden) { moment.hidden = true; return; }
         if (hasQuest() && !observedActive && !done()) {
             observedActive = true;
             syncAcceptance();
@@ -341,6 +357,7 @@
             detail.textContent = '';
             action.hidden = true;
         }
+        if (!done() && !syncing && !lowHealth && online()) detail.textContent = [detail.textContent,rewardPreview()].filter(Boolean).join(' · ');
         if (!online() && !done()) detail.textContent = w.offline;
         action.disabled = !online();
     }
@@ -354,8 +371,11 @@
         if (event.key === 'Escape' && momentKind && !moment.hidden) closeMoment();
     });
     momentAction.addEventListener('click', () => {
+        const equipReward = momentKind === 'achievement' && (momentReward?.items?.PORRETE || 0) > 0
+            && (player.inv?.PORRETE || 0) > 0 && !player.equipped?.weapon;
         closeMoment();
-        if (typeof openQuests === 'function') openQuests();
+        if (equipReward && typeof equip === 'function') equip('PORRETE');
+        else if (typeof openQuests === 'function') openQuests();
     });
     action.addEventListener('click', () => {
         if (!online() || !nearAttendant() || done()) return;

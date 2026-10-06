@@ -1,10 +1,12 @@
 (function (root, factory) {
-    const rules = factory();
+    const rules = factory(root);
     if (typeof module === 'object' && module.exports) module.exports = rules;
     else root.ValadaresTransmutation = rules;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
     'use strict';
-    const VERSION = 4;
+    const VERSION = 5;
+    const progression = typeof module === 'object' && module.exports
+        ? require('./progression-content') : (root.ValadaresProgression || {families:[],ascendantPools:{}});
     // As faixas 1 a 6 são entradas permitidas; a faixa 7 é somente saída.
     const tiers = [null,
         { cost:120, essenceQty:1, chances:{material:60,plain:25,enchanted:5,superior:10},
@@ -14,11 +16,11 @@
         { cost:1500, essenceQty:4, chances:{material:50,plain:25,enchanted:15,superior:10},
             pool:['ESPADA_ACO','BESTA','MARRETA','MACA_GIGANTE','MACHADO_MINO','ARMADURA_OSSO','ESCUDO_PEDRA','BOTAS_RAPIDA'] },
         { cost:4500, essenceQty:6, chances:{material:45,plain:25,enchanted:20,superior:10},
-            pool:['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO'] },
+            pool:['LAMINA_DRACO_1H','ESPADA_DRACO','MARTELO_GOLEM','ARMADURA_ESCAMA','ELMO_DRACO','BOTAS_VENTO','CAJADO_FOGO','CAJADO_GELO','CAJADO_RAIO','MACHADO_FORJA','ARCO_DRACO','LANCA_DRACO'] },
         { cost:12000, essenceQty:10, chances:{material:40,plain:25,enchanted:30,superior:5},
-            pool:['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO'] },
+            pool:['ESPADA_GUARDIAO','ESCUDO_GUARDIAO','ESPADA_HL','ARMADURA_TRONO','COROA_VENDEDOR','CAJADO_RUNICO','MACHADO_RUINAS','MARTELO_COLOSSO','BESTA_GUARDIAO','LANCA_GUARDIAO'] },
         { cost:30000, essenceQty:15, chances:{material:32,plain:25,enchanted:38,superior:5},
-            pool:['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO'] },
+            pool:['ESPADA_ETERNA','COROA_VALADARES','CAJADO_ETERNO','MACHADO_CATACLISMO','MARTELO_ETERNAL','ARCO_ECLIPSE','LANCA_ETERNA','LAMINA_ETERNA_1H','ESCUDO_ETERNAL'] },
     ];
     const transcendentPool=['ESPADA_INFINITA','COROA_CELESTIAL','CAJADO_ASTRAL'];
     const tierByKey = new Map();
@@ -35,12 +37,15 @@
         return {valid:false,error,tier:0,resultTier:0,sameTier:false,cost:0,essenceQty:0,
             chances:{material:0,plain:0,enchanted:0,superior:0},pool:[],superiorPool:[],pity:null};
     }
-    function quote(keys, failures=0) {
+    function quote(keys, failures=0, family='') {
+        if (typeof family !== 'string' || (family && !Object.hasOwn(progression.ascendantPools,family)))
+            return invalid('invalid_family');
         if (!Array.isArray(keys) || keys.length !== 3 || keys.some(k => typeof k !== 'string')) return invalid('bad_keys');
         if (new Set(keys).size !== 3) return invalid('duplicate_keys');
         const ranks=keys.map(tierOf);
         if (ranks.some(t => t === 0)) return invalid('ineligible_item');
         const tier=Math.min(...ranks), sameTier=ranks.every(t=>t===tier), def=tiers[tier];
+        if (family && (tier !== 6 || !sameTier)) return invalid('family_unavailable');
         // Na faixa 6 há exatamente três míticos. Consomem-se os três e volta
         // somente UM prêmio normal; excluir ingredientes tornaria o pool vazio.
         const pool=tier===6 ? [...def.pool] : def.pool.filter(key => !keys.includes(key));
@@ -57,9 +62,12 @@
             chances.superior=pity.chance;
         }
         if (!sameTier){chances.material+=chances.superior;chances.superior=0;}
+        const nextPool = tiers[tier+1]?.pool || transcendentPool;
+        const selectedPool = family && sameTier ? progression.ascendantPools[family] : nextPool;
+        if (family && sameTier && !selectedPool.length) return invalid('family_unavailable');
         return {valid:true,error:null,tier,resultTier:tier+1,sameTier,cost:def.cost,
             essenceQty:def.essenceQty,chances,pool,pity,
-            superiorPool:sameTier ? [...(tiers[tier+1]?.pool || transcendentPool)] : []};
+            superiorPool:sameTier ? [...selectedPool] : [],family};
     }
-    return Object.freeze({VERSION,tierOf,pityInfo,quote});
+    return Object.freeze({VERSION,tierOf,pityInfo,quote,families:progression.families});
 });
