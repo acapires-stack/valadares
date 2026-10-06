@@ -1,0 +1,21 @@
+{
+  "checks": [
+    "second real session appears as animated remote character",
+    "right click on 3D remote opens contextual menu on screen",
+    "trade invitation reaches the other real client and both open negotiation",
+    "cancel trade closes both clients without transfer"
+  ],
+  "remote": {
+    "name": "RemodelaTouch",
+    "x": 52,
+    "y": 50,
+    "distance": 2,
+    "model": [
+      {
+        "name": "RemodelaTouch",
+        "enabled": true
+      }
+    ]
+  },
+  "errors": []
+}

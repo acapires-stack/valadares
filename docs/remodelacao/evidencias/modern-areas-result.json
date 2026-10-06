@@ -1,0 +1,213 @@
+{
+  "startedAt": "2026-10-06T16:10:37.088Z",
+  "checks": [
+    "expedição real: floor, mapa, renderer e captura",
+    "saída de expedição pela interface e retorno ao mapa da cidade"
+  ],
+  "positions": [
+    {
+      "label": "cidade inicial",
+      "x": 77,
+      "y": 22,
+      "hp": 139,
+      "floor": 0,
+      "expedition": null,
+      "stair": {
+        "down": {
+          "x": 83,
+          "y": 17
+        }
+      },
+      "mapIsOverworld": true,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 147,
+      "rendererFloor": 0,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 4,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "walk 78,22 nearby",
+      "x": 77,
+      "y": 22,
+      "hp": 139,
+      "floor": 0,
+      "expedition": null,
+      "stair": {
+        "down": {
+          "x": 83,
+          "y": 17
+        }
+      },
+      "mapIsOverworld": true,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 147,
+      "rendererFloor": 0,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 4,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "expedição",
+      "x": 43,
+      "y": 50,
+      "hp": 139,
+      "floor": 8000,
+      "expedition": "ruinas_forja",
+      "stair": {
+        "spawn": {
+          "x": 43,
+          "y": 50
+        },
+        "up": {
+          "x": 43,
+          "y": 50
+        },
+        "down": null,
+        "town": null,
+        "boss": {
+          "x": 70,
+          "y": 50
+        }
+      },
+      "mapIsOverworld": false,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 7,
+      "rendererFloor": 8000,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 5,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "walk 43,50 nearby",
+      "x": 43,
+      "y": 50,
+      "hp": 139,
+      "floor": 8000,
+      "expedition": "ruinas_forja",
+      "stair": {
+        "spawn": {
+          "x": 43,
+          "y": 50
+        },
+        "up": {
+          "x": 43,
+          "y": 50
+        },
+        "down": null,
+        "town": null,
+        "boss": {
+          "x": 70,
+          "y": 50
+        }
+      },
+      "mapIsOverworld": false,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 7,
+      "rendererFloor": 8000,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 5,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "retorno da expedição",
+      "x": 50,
+      "y": 50,
+      "hp": 141,
+      "floor": 0,
+      "expedition": null,
+      "stair": {
+        "down": {
+          "x": 83,
+          "y": 17
+        }
+      },
+      "mapIsOverworld": true,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 147,
+      "rendererFloor": 0,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 8,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "status": "INCOMPLETE",
+  "failure": "Error: Limite de passos: {\"target\":{\"x\":83,\"y\":17},\"position\":{\"x\":67,\"y\":18,\"hp\":126,\"floor\":0,\"expedition\":null,\"stair\":{\"down\":{\"x\":83,\"y\":17}},\"mapIsOverworld\":true,\"mapRef\":true,\"npcs\":13,\"mobs\":147,\"rendererFloor\":0,\"chunks\":9,\"rendererError\":null,\"rendererReady\":true,\"actors\":{\"visible\":6,\"models\":[\"Knight\",\"Mage\",\"Rogue_Hooded\"]}}}\n    at walk (C:\\claude\\_worktrees\\valadares-remodelacao-20261006\\tools\\modern\\qa-areas.cjs:71:10)\n    at async C:\\claude\\_worktrees\\valadares-remodelacao-20261006\\tools\\modern\\qa-areas.cjs:107:3",
+  "finishedAt": "2026-10-06T16:11:24.744Z",
+  "atFailure": {
+    "x": 67,
+    "y": 18,
+    "floor": 0,
+    "diag": {
+      "ready": true,
+      "fps": 60,
+      "error": null,
+      "actors": {
+        "visible": 6,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      },
+      "world": {
+        "floor": 0,
+        "chunks": 9,
+        "chunkSize": 12,
+        "materials": 34,
+        "generated": 93,
+        "mapReady": true
+      },
+      "width": 925.265625,
+      "height": 678.515625,
+      "drawCalls": 337
+    },
+    "log": ": -19 em Troll (97/160)⚠ Troll: 12 dano⚠ Troll: 12 danoMachado: -16 em Troll (78/160)⚠ Rato: 2 dano⚠ Troll: 12 dano⚡ Atordoado por Troll! (1.5s)⚠ Troll: 12 danoMachado: -18 em Troll (62/160)⚡ Atordoado por Troll! (1.5s)⚠ Troll: 12 dano⚠ Rato: 2 danoMachado: -19 em Troll (44/160)⚠ Troll: 12 dano⚠ Troll: 12 dano⚠ Troll: 12 danoMachado: -16 em Troll (25/160)⚠ Rato: 2 dano━━ Você morreu ━━Perdeu: Punho 18→17, Espada 18→17, Machado 18→17, Clava 18→17, Distância 18→17, Escudo 18→17, Magia 18→17⚠ Troll: 12 danoMachado: -16 em Cobra (18/35)⚠ Cobra: 4 dano★ Machado: -38 em Cobra (1/35)☠ Cobra morreu! (+18 xp Machado)Pegou 1× Adaga+2 ouro (12050)Machado: -18 em Troll (43/160)⚠ Troll: 12 danoMachado: -16 em Troll (25/160)⚠ Troll: 12 dano★ Machado: -34 em Troll (9/160)☠ Troll morreu! (+160 xp Machado)Pegou 1× Escudo de madeira+19 ouro (12069)⚠ Rato: 2 danoMachado: -15 em Rato (18/18)⚠ Troll: 12 dano"
+  }
+}

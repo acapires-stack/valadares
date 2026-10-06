@@ -1,0 +1,44 @@
+{
+  "checks": [
+    "Missões button opens original modal and Esc closes",
+    "Atributos button opens original modal and Esc closes",
+    "Talentos button opens original modal and Esc closes",
+    "Conquistas button opens original modal and Esc closes",
+    "Ranking button opens original modal and Esc closes",
+    "Amigos button opens original modal and Esc closes",
+    "Opções button opens original modal and Esc closes",
+    "character drawer opens and Esc closes",
+    "inventory/equipment drawers retain original controls",
+    "chat button focuses original input; Esc releases typing",
+    "fullscreen canvas and action access 1366x768",
+    "fullscreen canvas and action access 1920x1080",
+    "fullscreen canvas and action access 1024x768",
+    "classic layout retains 3D and full sidebars",
+    "focus layout can be reopened"
+  ],
+  "diag": {
+    "ready": true,
+    "fps": 60,
+    "error": null,
+    "actors": {
+      "visible": 13,
+      "models": [
+        "Knight",
+        "Mage",
+        "Rogue_Hooded"
+      ]
+    },
+    "world": {
+      "floor": 0,
+      "chunks": 6,
+      "chunkSize": 12,
+      "materials": 21,
+      "generated": 6,
+      "mapReady": true
+    },
+    "width": 1600,
+    "height": 1000,
+    "drawCalls": 339
+  },
+  "errors": []
+}

@@ -1,0 +1,193 @@
+{
+  "startedAt": "2026-10-06T16:13:09.023Z",
+  "mode": "dungeon",
+  "checks": [
+    "masmorra real: andar 1, mapa, renderer e captura",
+    "subida real da masmorra e retorno à cidade"
+  ],
+  "positions": [
+    {
+      "label": "cidade inicial",
+      "x": 64,
+      "y": 18,
+      "hp": 152,
+      "maxHp": 166,
+      "potions": 30,
+      "floor": 0,
+      "expedition": null,
+      "stair": {
+        "down": {
+          "x": 83,
+          "y": 17
+        }
+      },
+      "mapIsOverworld": true,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 147,
+      "rendererFloor": 0,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 2,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "transição ao caminhar 83,17",
+      "x": 50,
+      "y": 52,
+      "hp": 153,
+      "maxHp": 166,
+      "potions": 30,
+      "floor": 1,
+      "expedition": null,
+      "stair": {
+        "spawn": {
+          "x": 50,
+          "y": 52
+        },
+        "up": {
+          "x": 59,
+          "y": 43
+        },
+        "down": {
+          "x": 42,
+          "y": 42
+        },
+        "town": null,
+        "boss": null
+      },
+      "mapIsOverworld": false,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 9,
+      "rendererFloor": 1,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 10,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "masmorra andar 1",
+      "x": 50,
+      "y": 52,
+      "hp": 153,
+      "maxHp": 166,
+      "potions": 30,
+      "floor": 1,
+      "expedition": null,
+      "stair": {
+        "spawn": {
+          "x": 50,
+          "y": 52
+        },
+        "up": {
+          "x": 59,
+          "y": 43
+        },
+        "down": {
+          "x": 42,
+          "y": 42
+        },
+        "town": null,
+        "boss": null
+      },
+      "mapIsOverworld": false,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 9,
+      "rendererFloor": 1,
+      "chunks": 9,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 10,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "transição ao caminhar 59,43",
+      "x": 50,
+      "y": 50,
+      "hp": 137,
+      "maxHp": 166,
+      "potions": 30,
+      "floor": 0,
+      "expedition": null,
+      "stair": {
+        "down": {
+          "x": 83,
+          "y": 17
+        }
+      },
+      "mapIsOverworld": true,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 147,
+      "rendererFloor": 0,
+      "chunks": 6,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 16,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    },
+    {
+      "label": "retorno da masmorra",
+      "x": 50,
+      "y": 50,
+      "hp": 137,
+      "maxHp": 166,
+      "potions": 30,
+      "floor": 0,
+      "expedition": null,
+      "stair": {
+        "down": {
+          "x": 83,
+          "y": 17
+        }
+      },
+      "mapIsOverworld": true,
+      "mapRef": true,
+      "npcs": 13,
+      "mobs": 147,
+      "rendererFloor": 0,
+      "chunks": 6,
+      "rendererError": null,
+      "rendererReady": true,
+      "actors": {
+        "visible": 16,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "status": "PASS",
+  "finishedAt": "2026-10-06T16:13:21.895Z"
+}

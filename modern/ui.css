@@ -1,0 +1,398 @@
+/* Valadares: apresentação contemporânea sobre a interface funcional existente. */
+:root {
+    --ui-world-reserve: 320px;
+    --modern-ink: #101c1c;
+    --modern-panel: #172524;
+    --modern-panel-light: #1d302e;
+    --modern-edge: #42615a;
+    --modern-gold: #d5ad6c;
+    --modern-text: #f0ebdb;
+    --modern-muted: #b5c0b7;
+}
+body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: radial-gradient(ellipse 65vw 60vh at 50% -20%, #3a5145 0, transparent 80%),
+                linear-gradient(150deg, #172726, #0c1818 65%, #162422);
+    color: var(--modern-text);
+}
+#title {
+    color: #f2d9a0;
+    letter-spacing: .23em;
+    font-size: clamp(17px, 1.6vw, 23px);
+    text-shadow: 0 2px 18px #050b09;
+}
+#connStatus {
+    font-size: 10px;
+    letter-spacing: .22em;
+    font-weight: 700;
+}
+#displayControls { gap: 7px; margin: 5px 0 10px; }
+#displayControls button, #firstSteps button {
+    background: #223430;
+    border: 1px solid #4c6b61;
+    color: #e7ecdf;
+    border-radius: 7px;
+    padding: 7px 12px;
+    min-height: 35px;
+    font-weight: 600;
+    transition: background .15s, border-color .15s, transform .15s;
+}
+#displayControls button:hover, #displayControls button:focus-visible,
+#displayControls button[aria-expanded="true"], #displayControls button[aria-pressed="false"] {
+    background: #354d42;
+    border-color: var(--modern-gold);
+    color: #fff1cc;
+}
+#displayControls button:active { transform: translateY(1px); }
+#gameWrapper {
+    background: #10201e;
+    border: 1px solid #3e5c52;
+    border-radius: 12px;
+    padding: 8px;
+    gap: 8px;
+    box-shadow: 0 24px 65px #050c0cbb, inset 0 1px #98c5a022;
+}
+#gameContainer {
+    overflow: visible;
+    border: 1px solid #647767;
+    border-radius: 7px;
+    box-shadow: 0 0 0 3px #0b1818, 0 9px 28px #030b0bb5;
+    background: #14211d;
+}
+#gameContainer canvas#canvas { border-radius: 6px 6px 0 0; }
+.sidebar {
+    background: linear-gradient(160deg, #203430 0%, #162522 70%, #12201e 100%);
+    border: 1px solid #426158;
+    border-top-color: #77917a;
+    border-radius: 8px;
+    box-shadow: inset 0 1px #d5e6be1a, 0 6px 18px #07111072;
+    color: var(--modern-text);
+}
+.s-section + .s-section { border-top-color: #70907a42; }
+.s-label { color: #d2d6c3; font-weight: 700; }
+.s-value, .skill-val { color: #f4db9f; }
+.skill-name { color: #d3dace; }
+#minimap {
+    border-color: #9baf8e;
+    border-radius: 5px;
+    box-shadow: 0 3px 12px #0009;
+}
+.bar-wrap, .skill-bar { background: #0d1d1b; border-color: #4a6257; border-radius: 10px; overflow: hidden; }
+.bar-fill { border-radius: inherit; }
+#chatPanel {
+    background: #172825;
+    border: 1px solid #466258;
+    border-top-color: #7b957e;
+    border-radius: 0 0 7px 7px;
+    overflow: hidden;
+}
+#chatMessages, #log { background: #101d1d; color: #e4e7dc; }
+#chatInputRow { background: #172825; }
+#chatInput {
+    background: #0f1e1c;
+    color: #f5f1e6;
+    border-color: #4e6d61;
+    border-radius: 5px;
+}
+.chest-box, .modal-box, #settingsModal > div, #talentsModal > div {
+    background: linear-gradient(150deg, #233a33, #122421);
+    border-color: #9a9468;
+    border-radius: 10px;
+    box-shadow: 0 24px 70px #000a;
+}
+#modernCanvas { border-radius: 6px 6px 0 0; }
+/* The engine writes inline canvas sizes; keep the legacy mobile canvas rule
+   from overriding its CSS size and collapsing the drawing surface to zero. */
+#gameContainer canvas#modernCanvas, #gameContainer canvas#modernLabels {
+    width: var(--modern-width, 100%) !important;
+    height: var(--modern-height, 100%) !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+}
+#controls { color: #b5c8b8; }
+#controls kbd { background: #223a33; border-color: #506d5f; color: #e7d7a1; }
+#journeySidebar, #journeyCard, #journeyMobile { background-color: #1a2e28; color: #dbe0cc; }
+.chat-tab, .log-filter { color: #c7d3c4; }
+.chat-tab.active, .log-filter.active { color: #ffe4a3; }
+#floorBadge { background: #182822e8; border-color: #ba9558; color: #f4daa1; }
+#recBtn { border-radius: 5px; }
+#firstSteps:not([hidden]) {
+    z-index: 40;
+    background: #172b27ed;
+    border-color: #c5aa71;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px #081614cc;
+}
+#recBtn { z-index: 41; }
+#login {
+    background: radial-gradient(circle at 75% 22%, #6f77534a 0, transparent 25%),
+                radial-gradient(circle at 18% 80%, #39584a88 0, transparent 32%),
+                linear-gradient(145deg, #10201f 0%, #172f2a 52%, #091616 100%);
+}
+#login::before {
+    content: '';
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    opacity: .35;
+    background: repeating-linear-gradient(125deg, transparent 0 80px, #bdcba907 80px 82px),
+                linear-gradient(90deg, transparent 0 2%, #f5e2af15 2.1%, transparent 2.2% 97.8%, #f5e2af15 97.9%, transparent 98%);
+}
+#login .box {
+    position: relative;
+    isolation: isolate;
+    width: min(460px, 96vw);
+    padding: clamp(22px, 3vw, 38px) clamp(22px, 3vw, 40px);
+    background: linear-gradient(145deg, #243a33f5, #122320fa 70%);
+    border: 1px solid #bba773;
+    border-radius: 14px;
+    box-shadow: 0 28px 80px #000b, 0 0 0 5px #c8bd8542, inset 0 1px #f4eed139;
+    text-align: left;
+}
+#login .box::before {
+    content: 'UMA JORNADA SEM FIM';
+    display: block;
+    color: #c9d2c2;
+    font: 700 10px system-ui, sans-serif;
+    letter-spacing: .26em;
+    margin-bottom: 12px;
+}
+#login h2 {
+    color: #ffdfa1;
+    font-size: clamp(24px, 3vw, 32px);
+    line-height: 1.15;
+    letter-spacing: .08em;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 18px #0c1712;
+}
+#login .login-intro {
+    max-width: none;
+    margin: 0 0 22px;
+    color: #d6dfd3;
+    font-size: 14px;
+    line-height: 1.5;
+}
+#login input {
+    width: 100%;
+    min-height: 42px;
+    padding: 11px 13px;
+    margin-bottom: 10px;
+    border: 1px solid #719082;
+    border-radius: 6px;
+    background: #0b1c1bed;
+    color: #f8f5e9;
+    font-size: 14px !important;
+    text-align: left;
+}
+#login input::placeholder { color: #a8bbb0; opacity: 1; }
+#login input:focus { border-color: #e2bb77; box-shadow: 0 0 0 3px #e2bb7733; }
+#login #loginStatus { color: #d7e4d4; margin: 8px 0 6px; font-size: 12px; }
+#login #loginError { font-size: 12px !important; color: #ffb2a5 !important; }
+#login button:not(.lang-btn) {
+    min-height: 43px;
+    border: 1px solid #f0d29a;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #e6bf79, #bf8b46);
+    color: #18221b;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .11em;
+    box-shadow: 0 4px 14px #0005;
+}
+#login button:not(.lang-btn):hover { background: linear-gradient(180deg, #ffe0a0, #d9a35a); }
+#login .opt { color: #c3cfc4; font-size: 11px; }
+#login .opt a { color: #cdd8c8 !important; text-decoration: underline !important; text-underline-offset: 3px; }
+#login .lang-btn { border-radius: 5px; background: #1b302c; color: #e2eadb; }
+#login .lang-btn.lang-active { border-color: #e4bd77; color: #ffe3a7; }
+#login :focus-visible, #gameWrapper :focus-visible { outline: 2px solid #f0c678; outline-offset: 2px; }
+@media (max-width: 900px) {
+    #gameWrapper { border-radius: 0; border-left: 0; border-right: 0; padding: 0; }
+    #gameContainer { border-radius: 0; }
+    #gameContainer canvas#canvas { border-radius: 0; }
+    body.touch.menu-open .sidebar { border-radius: 7px; margin: 6px; }
+    #login .box { max-height: calc(100dvh - 16px); padding: 16px 20px; }
+}
+@media (max-width: 900px) and (max-height: 440px) {
+    #login .box::before { margin-bottom: 3px; font-size: 8px; }
+    #login h2 { font-size: 19px; margin-bottom: 3px; }
+    #login .login-intro { font-size: 11px; margin-bottom: 7px; }
+    #login input { min-height: 32px; padding: 6px 10px; margin-bottom: 5px; }
+    #login button:not(.lang-btn) { min-height: 32px; }
+}
+
+/* Desktop 3D: the world occupies the screen. Existing systems remain in
+   drawers and the original classic layout remains a single click away. */
+.modern-hud, .modern-map, .modern-actions { display: none; }
+@media (min-width: 901px) {
+    body.modern-renderer-ready.layout-focus:not(.touch) {
+        padding: 0;
+        min-height: 100dvh;
+        overflow: hidden;
+        align-items: stretch;
+        --ui-world-reserve: 0px;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #title {
+        position: fixed; top: 11px; left: 22px; z-index: 31;
+        margin: 0; padding: 2px 0;
+        color: #f5dda9; font-size: 19px; letter-spacing: .26em;
+        pointer-events: none;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #connStatus {
+        position: fixed; top: 43px; left: 24px; z-index: 31;
+        margin: 0; letter-spacing: .12em; font-size: 10px;
+        pointer-events: none;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #displayControls {
+        position: fixed; z-index: 32; top: 10px; right: 16px;
+        width: auto; margin: 0; padding: 0;
+        gap: 5px; justify-content: flex-end;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #displayControls button {
+        min-height: 32px; padding: 5px 10px; font-size: 11px;
+        background: #14231fdb; border-color: #b6a47799;
+        backdrop-filter: blur(8px);
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #gameWrapper {
+        display: block; width: 100vw; height: 100dvh; max-width: none;
+        margin: 0; padding: 0; border: 0; border-radius: 0;
+        background: #172823; box-shadow: none;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #gameContainer {
+        display: block; position: relative;
+        width: 100vw !important; height: 100dvh;
+        min-width: 0; max-width: none;
+        margin: 0; padding: 0; border: 0; border-radius: 0;
+        box-shadow: none; overflow: hidden;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #gameContainer canvas#canvas {
+        display: block; width: 100vw !important; height: 100dvh !important;
+        min-width: 0; max-width: none; max-height: none !important;
+        aspect-ratio: auto !important; border-radius: 0;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #modernCanvas,
+    body.modern-renderer-ready.layout-focus:not(.touch) #modernLabels { border-radius: 0; }
+    body.modern-renderer-ready.layout-focus:not(.touch) #controls { display: none; }
+
+    /* Keep the complete original character panel available without reserving
+       permanent world width. Only the button inside the HUD receives input. */
+    body.modern-renderer-ready.layout-focus:not(.touch) #leftSidebar {
+        display: none; position: fixed; z-index: 88;
+        top: 67px; bottom: 18px; left: 18px;
+        width: min(310px, calc(100vw - 36px)); max-height: none;
+        height: auto !important; overflow-y: auto;
+        padding: 16px 17px; border: 1px solid #a5a47a;
+        background: #142723f5; backdrop-filter: blur(18px);
+        box-shadow: 0 20px 60px #04100dda;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch).modern-character-open #leftSidebar { display: block; }
+    body.modern-renderer-ready.layout-focus:not(.touch) #leftSidebar #minimap { width: 140px; height: 140px; }
+    body.modern-renderer-ready.layout-focus:not(.touch) #rightSidebar,
+    body.modern-renderer-ready.layout-focus:not(.touch) #invSidebar {
+        top: 67px; bottom: 18px; right: 18px;
+        width: min(330px, calc(100vw - 36px));
+        max-height: none; border-color: #a5a47a;
+        background: #142723f5; backdrop-filter: blur(18px);
+        box-shadow: 0 20px 60px #04100dda;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #chatPanel {
+        position: absolute; z-index: 28; left: 18px; bottom: 77px;
+        width: min(395px, 36vw) !important; min-width: 0 !important;
+        max-width: none; margin: 0;
+        border: 1px solid #8c9b7d77; border-radius: 8px;
+        background: #102320ce; box-shadow: 0 8px 30px #07150db8;
+        opacity: .89; backdrop-filter: blur(11px);
+        transition: opacity .18s;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #chatPanel:hover,
+    body.modern-renderer-ready.layout-focus:not(.touch) #chatPanel:focus-within { opacity: 1; }
+    body.modern-renderer-ready.layout-focus:not(.touch).chat-expanded #chatPanel { width: min(490px, 45vw) !important; }
+    body.modern-renderer-ready.layout-focus:not(.touch) #chatMessages,
+    body.modern-renderer-ready.layout-focus:not(.touch) #log { background: #091b18a8; }
+    body.modern-renderer-ready.layout-focus:not(.touch) #firstSteps:not([hidden]) {
+        top: 70px; left: 50%; right: auto; width: min(550px, 60vw);
+        transform: translateX(-50%); z-index: 40;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #recBtn {
+        top: 300px; right: 20px; z-index: 41;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #floorBadge {
+        top: 195px; left: 18px; right: auto;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) #journeyMobile:not([hidden]) {
+        top: 261px; right: 18px; left: auto; z-index: 42;
+        max-width: 158px; border-radius: 6px;
+        background: #132821eb; border-color: #a99a70;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch).journey-mobile-open > #journeyCard {
+        top: 293px; right: 18px; left: auto;
+        max-height: calc(100dvh - 310px);
+        border-color: #a99a70; background: #132821f5;
+    }
+    body.modern-renderer-ready.layout-focus:not(.touch) .modern-hud,
+    body.modern-renderer-ready.layout-focus:not(.touch) .modern-map,
+    body.modern-renderer-ready.layout-focus:not(.touch) .modern-actions { display: flex; }
+    body.modern-renderer-ready.layout-focus:not(.touch) .modern-hud {
+        position: absolute; z-index: 30; top: 72px; left: 18px;
+        flex-direction: column; width: 236px; gap: 5px;
+        padding: 10px 12px; border: 1px solid #b9a4758e;
+        border-radius: 9px; color: #f4eee0;
+        background: linear-gradient(145deg, #132722e8, #0b1b19ce);
+        box-shadow: 0 10px 28px #091812b8; backdrop-filter: blur(12px);
+        pointer-events: none;
+    }
+    .modern-hud__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .modern-hud__name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #ffe3a4; font: 700 14px Georgia, serif; }
+    .modern-hud__open {
+        flex: none; padding: 5px 7px; color: #edd7a7;
+        border: 1px solid #ab946779; border-radius: 5px;
+        background: #25382dd9; font: 700 10px system-ui, sans-serif;
+        cursor: pointer; pointer-events: auto;
+    }
+    .modern-hud__open:hover, .modern-hud__open[aria-expanded="true"] { background: #49634a; border-color: #edd19a; }
+    .modern-hud__row { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #d8dfd3; }
+    .modern-hud__label { width: 28px; flex: none; font-weight: 700; letter-spacing: .05em; }
+    .modern-hud__track { flex: 1; height: 6px; border-radius: 6px; background: #071412; overflow: hidden; }
+    .modern-hud__fill { display: block; height: 100%; border-radius: inherit; transition: width .15s; }
+    .modern-hud__fill--hp { background: linear-gradient(90deg, #a94b42, #e49576); }
+    .modern-hud__fill--mp { background: linear-gradient(90deg, #457caa, #84c9d7); }
+    .modern-hud__value { min-width: 49px; text-align: right; color: #f3e9d7; font-variant-numeric: tabular-nums; }
+    .modern-hud__bottom { display: flex; justify-content: space-between; gap: 8px; padding-top: 3px; border-top: 1px solid #ddd2a82b; font-size: 11px; }
+    .modern-hud__gold { color: #f5cb7b; font-weight: 700; }
+    .modern-hud__target { color: #e5d9bd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    body.modern-renderer-ready.layout-focus:not(.touch) .modern-map {
+        position: absolute; z-index: 30; top: 61px; right: 18px;
+        flex-direction: column; width: 158px; padding: 8px;
+        border: 1px solid #b9a4758e; border-radius: 9px;
+        background: #10211ddb; box-shadow: 0 10px 28px #091812b8;
+        backdrop-filter: blur(12px); pointer-events: none;
+    }
+    .modern-map__label { margin: 0 0 5px; color: #e9d7aa; font: 700 10px system-ui, sans-serif; letter-spacing: .15em; text-transform: uppercase; }
+    .modern-map canvas { width: 140px; height: 140px; border-radius: 4px; background: #0a1511; }
+    .modern-map__pos { margin-top: 5px; color: #e0e9d9; font: 11px ui-monospace, monospace; text-align: right; }
+    body.modern-renderer-ready.layout-focus:not(.touch) .modern-actions {
+        position: absolute; z-index: 38; bottom: 12px; left: 50%;
+        max-width: calc(100vw - 32px); padding: 6px;
+        transform: translateX(-50%); gap: 4px;
+        border: 1px solid #b8aa83a6; border-radius: 10px;
+        background: #0d201de8; box-shadow: 0 12px 35px #05130ecb;
+        backdrop-filter: blur(14px); overflow-x: auto; scrollbar-width: thin;
+        pointer-events: auto;
+    }
+    .modern-actions button {
+        flex: none; min-width: 56px; min-height: 48px;
+        padding: 4px 7px; border: 1px solid #5770648f;
+        border-radius: 6px; background: #26372fb3; color: #e7e5d8;
+        font: 600 10px system-ui, sans-serif; text-align: center;
+        cursor: pointer; pointer-events: auto;
+    }
+    .modern-actions__move {
+        display: flex; flex: none; flex-direction: column; align-items: center;
+        justify-content: center; min-width: 58px; color: #dfddca;
+        font: 600 10px system-ui, sans-serif; pointer-events: none;
+    }
+    .modern-actions__move strong { color: #e8c98e; font: 700 12px ui-monospace, monospace; letter-spacing: .06em; }
+    .modern-actions button:hover, .modern-actions button:focus-visible { background: #47634a; border-color: #e6c58c; color: #fff4d8; }
+    .modern-actions button[data-primary="true"] { background: #765b35db; border-color: #c4a876; color: #fff2d8; }
+    .modern-actions__symbol { display: block; margin-bottom: 1px; font: 18px Georgia, serif; }
+    .modern-actions__key { display: block; color: #c8b987; font: 9px ui-monospace, monospace; }
+}

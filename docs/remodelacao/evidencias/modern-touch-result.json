@@ -1,0 +1,47 @@
+{
+  "checks": [
+    "joystick touch moved authoritative player",
+    "mobile menu opens/closes",
+    "connection restored with same character",
+    "runtime failure leaves playable classic canvas",
+    "reload restores 3D and saved character"
+  ],
+  "before": {
+    "x": 49,
+    "y": 50,
+    "hp": 110
+  },
+  "moved": {
+    "x": 46,
+    "y": 50,
+    "hp": 110
+  },
+  "final": {
+    "name": "RemodelaTouch",
+    "diag": {
+      "ready": true,
+      "fps": 0,
+      "error": null,
+      "actors": {
+        "visible": 9,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      },
+      "world": {
+        "floor": 0,
+        "chunks": 9,
+        "chunkSize": 12,
+        "materials": 23,
+        "generated": 9,
+        "mapReady": true
+      },
+      "width": 453.453125,
+      "height": 332.53125,
+      "drawCalls": 320
+    }
+  },
+  "errors": []
+}

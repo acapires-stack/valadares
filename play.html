@@ -6,6 +6,7 @@
 <script src="/equipment-rules.js?v=1"></script>
 <script src="/game-audio.js?v=1"></script>
 <script src="/progression-content.js?v=2"></script>
+<script src="/modern-world.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
 <link rel="stylesheet" href="/transmutation.css?v=5">
     <meta charset="UTF-8">
@@ -1745,6 +1746,7 @@
     <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
     <link rel="stylesheet" href="/adventure-feedback.css?v=20261005b">
     <link rel="stylesheet" href="/journey.css?v=2">
+    <link rel="stylesheet" href="/modern/ui.css?v=1">
 </head>
 <body>
 
@@ -4662,7 +4664,7 @@ function genMap() {
 // M4: `map` agora é mutável — troca pro grid do andar ao descer a masmorra,
 // volta pro overworld ao subir. genMap() roda uma vez; o overworld fica
 // guardado em overworldMap pra restaurar.
-let map = genMap();
+let map = window.ValadaresWorld.apply(genMap(), T);
 let overworldMap = map;
 // Grid do andar da masmorra (gerado sob demanda, cacheado por floor). Sala de
 // caverna 100×100: anel CAVE_WALL + sala CAVE central. Determinístico — o mesmo
@@ -13152,7 +13154,8 @@ let attackPressed = false;
 document.addEventListener('keydown', e => {
     // Se está digitando num input/textarea (login, chat, etc), não dispara atalhos
     const t = e.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+        && !(e.key === 'Escape' && t.closest('[id$="Modal"]'))) return;
     ensureAudio();   // resume AudioContext na primeira tecla (gesture requirement)
     keys[e.key] = true;
     if (e.key===' ' && !attackPressed){ attackPressed = true; engage(); }
@@ -13205,7 +13208,7 @@ document.addEventListener('keydown', e => {
         document.getElementById('chatInput')?.focus();
     }
     if (e.key==='Tab'){ e.preventDefault(); const n = cycleBattleList(); log(n ? `<span class="${n.isPlayer?'log-dmg':'log-sys'}">Alvo: ${escapeHtml(n.name)}${n.isPlayer?' ☠':''} [AUTO]</span>` : '<span class="log-sys">Nenhum inimigo à vista.</span>'); }
-    if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); closeDungeonEnterModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); }
+    if (e.key==='Escape'){ if (player._spectate) endSpectate(); clearTarget(); closeChest(); closeCraft(); closeAltar(); closeTraining(); closeStats(); closeShop(); closeQuests(); closeChainDialog(); closeSettings(); closeTutorial(); closeMobileTut(); closeRanking(); closeFriends(); closeAchievements(); closeGoldShop(); closeGuildModal(); closeDungeonEnterModal(); if (_trade) cancelTradeOffer(); stopTraining('cancelado'); closeAllModals(); }
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('pointerdown', ensureAudio, {passive:true});
@@ -14800,7 +14803,8 @@ async function startRecording(){
                 recWindow = videoTracks.length > 0;
             } catch (e){ _recDisplayStream = null; }
         }
-        let tracks = recWindow ? videoTracks.slice() : canvas.captureStream(30).getVideoTracks();
+        const visual = window.ValadaresModern?.state === 'ready' ? window.ValadaresModern.renderer : null;
+        let tracks = recWindow ? videoTracks.slice() : (visual?.captureStream ? visual.captureStream(30) : canvas.captureStream(30)).getVideoTracks();
         try {
             if (audioCtx && masterGain){
                 _recAudioDest = audioCtx.createMediaStreamDestination();
@@ -14841,6 +14845,8 @@ function stopRecording(){
     if (_recorder && _recorder.state === 'recording'){ try { _recorder.stop(); } catch {} }
 }
 function finishRecording(){
+    // Stopping MediaRecorder flushes the clip but does not release its tracks.
+    try { _recorder?.stream?.getTracks().forEach(track => track.stop()); } catch {}
     if (_recTimer){ clearInterval(_recTimer); _recTimer = null; }
     const btn = document.getElementById('recBtn');
     if (btn){ btn.classList.remove('recording'); btn.textContent = '● REC'; }
@@ -16957,6 +16963,32 @@ function r3dBridge(){
     };
 }
 
+// A apresentação moderna consulta o estado existente; o jogo clássico continua
+// responsável pela simulação, pelas interações e pelo salvamento.
+window.ValadaresModernBridge = {
+    ...r3dBridge(),
+    getCanvas: () => canvas,
+    getStarted: () => started,
+    getItems: () => ITEMS,
+    getItemIcon: getItemIconURL,
+    getLanguage: () => LANG,
+    getMonsterTypes: () => MTYPE,
+    getProjectiles: () => projectiles,
+    getBuildings: () => window.ValadaresWorld.buildings,
+    getAuras: () => auraEffects,
+    getTrails: () => trails,
+    getStairs: () => (player.floor || 0) > 0 ? (dungeonStairs || {}) : { down: DUNGEON_STAIR_IN },
+    getFloor: () => player.floor || 0,
+    getTarget: () => ({ id: player.target, type: player.targetType }),
+    getPet: () => player.pet && player._petRX != null
+        ? { x: player._petRX, y: player._petRY, renderX: player._petRX,
+            renderY: player._petRY, dir: player.dir, pet: player.pet,
+            name: PET_DEFS[player.pet]?.name || 'Companheiro' }
+        : null,
+    getStatus: () => ({ connected: ws?.readyState === WebSocket.OPEN }),
+    getChatState: () => ({ open: document.getElementById('chatPanel')?.offsetHeight > 0 })
+};
+
 function loop(ts){
     if (!started) return;   // logout pausa o loop
     const dt = Math.min(ts-lastTs, 80); lastTs = ts;
@@ -17703,5 +17735,7 @@ function loop(ts){
 <script src="/enchanting-ui.js?v=1"></script>
 <script src="/transmutation-rules.js?v=5"></script>
 <script src="/transmutation-ui.js?v=5"></script>
+<script type="module" src="/modern/entry.js?v=1"></script>
+<script type="module" src="/modern/ui.js?v=1"></script>
 </body>
 </html>

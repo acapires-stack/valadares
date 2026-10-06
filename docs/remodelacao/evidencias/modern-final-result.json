@@ -1,0 +1,81 @@
+{
+  "town": {
+    "diag": {
+      "ready": true,
+      "fps": 60,
+      "error": null,
+      "actors": {
+        "visible": 16,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded",
+          "Barbarian",
+          "Skeleton_Warrior"
+        ]
+      },
+      "world": {
+        "floor": 0,
+        "chunks": 6,
+        "chunkSize": 12,
+        "materials": 24,
+        "generated": 6,
+        "mapReady": true
+      },
+      "width": 1600,
+      "height": 1000,
+      "drawCalls": 379
+    },
+    "player": {
+      "name": "TesteVal18",
+      "x": 50,
+      "y": 50
+    },
+    "models": [
+      {
+        "type": "RAT",
+        "animated": false
+      },
+      {
+        "type": "RAT",
+        "animated": false
+      },
+      {
+        "type": "RAT",
+        "animated": false
+      },
+      {
+        "type": "SPIDER",
+        "animated": false
+      },
+      {
+        "type": "RAT",
+        "animated": false
+      },
+      {
+        "type": "RAT",
+        "animated": false
+      },
+      {
+        "type": "RAT",
+        "animated": false
+      },
+      {
+        "type": "RAT",
+        "animated": false
+      }
+    ]
+  },
+  "fallback": {
+    "x": 50,
+    "y": 51,
+    "connected": true
+  },
+  "checks": [
+    "all five runtime models loaded in real game",
+    "final world and HUD render without page/asset errors",
+    "GPU context loss falls back to playable classic canvas while connection stays active"
+  ],
+  "errors": [],
+  "missing": []
+}

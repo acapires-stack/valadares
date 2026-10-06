@@ -1,0 +1,175 @@
+{
+  "before": {
+    "player": {
+      "x": 44,
+      "y": 48,
+      "hp": 166,
+      "target": 317,
+      "weapon": "MACHADO_MINO",
+      "stun": null
+    },
+    "monsters": [
+      {
+        "id": 317,
+        "type": "RAT",
+        "x": 43,
+        "y": 48,
+        "hp": 3,
+        "sx": 832.4137583175907,
+        "sy": 437.33064958668547
+      },
+      {
+        "id": 369,
+        "type": "RAT",
+        "x": 44,
+        "y": 47,
+        "hp": 18,
+        "sx": 891.9922633314272,
+        "sy": 386.85871225915616
+      },
+      {
+        "id": 368,
+        "type": "RAT",
+        "x": 43,
+        "y": 47,
+        "hp": 18,
+        "sx": 832.4137583175907,
+        "sy": 386.85871225915616
+      },
+      {
+        "id": 372,
+        "type": "SNAKE",
+        "x": 42,
+        "y": 48,
+        "hp": 35,
+        "sx": 772.8352533037541,
+        "sy": 437.33064958668547
+      },
+      {
+        "id": 394,
+        "type": "RAT",
+        "x": 40,
+        "y": 55,
+        "hp": 18,
+        "sx": 653.678243276081,
+        "sy": 790.6342108793906
+      }
+    ],
+    "keys": {
+      "Escape": false,
+      "a": false
+    },
+    "diag": {
+      "ready": true,
+      "fps": 46,
+      "error": null,
+      "actors": {
+        "visible": 10,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      },
+      "world": {
+        "floor": 0,
+        "chunks": 9,
+        "chunkSize": 12,
+        "materials": 23,
+        "generated": 12,
+        "mapReady": true
+      },
+      "width": 925.265625,
+      "height": 678.515625,
+      "drawCalls": 340
+    },
+    "log": "+10 HP máx, +5 MP máxConectando em ws://127.0.0.1:8097…Bem-vindo a Valadares, TesteVal18!Use WASD para mover, ESPAÇO para atacar.Defesa de Escudo +2+56 HP máx, +28 MP máx✦ Personagem restaurado do servidor.Sem flechas! Fabrique na bancada (C) ou colete (Aranha/Lobo/Orc dropam).Equipou Machado do MinotauroAlvo cancelado.Machado: -15 em Rato (18/18)Alvo cancelado."
+  },
+  "after": {
+    "player": {
+      "x": 44,
+      "y": 48,
+      "hp": 166,
+      "target": 393,
+      "weapon": "MACHADO_MINO",
+      "stun": null
+    },
+    "monsters": [
+      {
+        "id": 394,
+        "type": "RAT",
+        "x": 38,
+        "y": 53,
+        "hp": 18,
+        "sx": 534.521233248408,
+        "sy": 689.690336224332
+      },
+      {
+        "id": 349,
+        "type": "WOLF",
+        "x": 36,
+        "y": 47,
+        "hp": 80,
+        "sx": 415.36422322073486,
+        "sy": 386.85871225915616
+      },
+      {
+        "id": 393,
+        "type": "SNAKE",
+        "x": 37,
+        "y": 52,
+        "hp": 35,
+        "sx": 474.9427282345714,
+        "sy": 677.6671997252384
+      },
+      {
+        "id": 438,
+        "type": "RAT",
+        "x": 50,
+        "y": 41,
+        "hp": 18,
+        "sx": 1249.4632934144465,
+        "sy": 84.02708829398034
+      },
+      {
+        "id": 343,
+        "type": "RAT",
+        "x": 35,
+        "y": 44,
+        "hp": 18,
+        "sx": 355.7857182068983,
+        "sy": 235.44290027656825
+      }
+    ],
+    "keys": {
+      "Escape": false,
+      "a": false
+    },
+    "diag": {
+      "ready": true,
+      "fps": 60,
+      "error": null,
+      "actors": {
+        "visible": 7,
+        "models": [
+          "Knight",
+          "Mage",
+          "Rogue_Hooded"
+        ]
+      },
+      "world": {
+        "floor": 0,
+        "chunks": 9,
+        "chunkSize": 12,
+        "materials": 23,
+        "generated": 12,
+        "mapReady": true
+      },
+      "width": 925.265625,
+      "height": 678.515625,
+      "drawCalls": 295
+    },
+    "log": "+10 HP máx, +5 MP máxConectando em ws://127.0.0.1:8097…Bem-vindo a Valadares, TesteVal18!Use WASD para mover, ESPAÇO para atacar.Defesa de Escudo +2+56 HP máx, +28 MP máx✦ Personagem restaurado do servidor.Sem flechas! Fabrique na bancada (C) ou colete (Aranha/Lobo/Orc dropam).Equipou Machado do MinotauroAlvo cancelado.Machado: -15 em Rato (18/18)Alvo cancelado.Alvo: Rato [AUTO]Rato esquivou.Machado: -19 em Rato (3/18)🏆 Conquista desbloqueada: ⚔ Primeiro Sangue☠ Rato morreu! (+8 xp Machado)Pegou 1× Queijo★ Machado: -30 em Rato (18/18)☠ Rato morreu! (+8 xp Machado)Pegou 1× QueijoMachado: -18 em Rato (18/18)☠ Rato morreu! (+8 xp Machado)Pegou 1× QueijoMachado: -15 em Cobra (35/35)Machado: -18 em Cobra (20/35)★ Machado: -34 em Cobra (2/35)☠ Cobra morreu! (+18 xp Machado)Pegou 1× Ovo de cobra+4 ouro (12004)"
+  },
+  "errors": []
+}

@@ -1,0 +1,11 @@
+{
+  "name": "valadares-modern-client",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "vendor": "esbuild node_modules/playcanvas/build/playcanvas.mjs --bundle --minify --format=esm --outfile=vendor/playcanvas.mjs --legal-comments=eof"
+  },
+  "dependencies": {"playcanvas": "2.23.0"},
+  "devDependencies": {"esbuild": "0.25.12"}
+}

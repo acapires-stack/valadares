@@ -10,6 +10,7 @@ const equipmentRules = require('../equipment-rules');
 const trainingRules = require('../training-rules');
 const transmutationRules = require('../transmutation-rules');
 const progression = require('../progression-content');
+const modernWorld = require('../modern-world');
 const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
@@ -2174,7 +2175,7 @@ function genMap(){
     }
     return m;
 }
-const map = genMap();
+const map = modernWorld.apply(genMap(), T);
 function tileAt(x, y){
     if (x<0 || y<0 || x>=M_W || y>=M_H) return T.TREE;
     return map[y][x];
