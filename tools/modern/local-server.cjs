@@ -6,9 +6,9 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
 const root = path.resolve(__dirname, '../..');
-const local = path.join(__dirname, '.local');
-const webPort = 3337;
-const gamePort = 8097;
+const local = path.join(__dirname, process.env.VALADARES_QA === 'premium' ? '.local-premium' : '.local');
+const webPort = Number(process.env.LOCAL_WEB_PORT || 3337);
+const gamePort = Number(process.env.LOCAL_GAME_PORT || 8097);
 const fixtureName = 'TesteVal18';
 const fixturePassword = 'Valadares18!';
 const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json; charset=utf-8', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.svg':'image/svg+xml', '.woff2':'font/woff2', '.ico':'image/x-icon' };
@@ -21,7 +21,7 @@ function seedFixture() {
   const pwHash = `scrypt$${salt}$${crypto.scryptSync(clientHash, salt, 32, {N:16384,r:8,p:1}).toString('hex')}`;
   const skills = Object.fromEntries(['Punho','Espada','Machado','Clava','Distância','Escudo','Magia'].map(key => [key,{val:18,xp:0,xpNext:2400}]));
   const save = { v:2, x:50, y:50, skills, gold:12000,
-    inv:{MACHADO_MINO:1, ESPADA_ACO:1, POTION:30, POTION_MP:30, HAM:20, ESCAMA:6, CORACAO_HL:1, BESTA:1},
+    inv:{MACHADO_MINO:1, ESPADA_ACO:1, POTION:30, POTION_MP:30, HAM:20, ESCAMA:6, CORACAO_HL:1, BESTA:1, OSSO:20, ASA_MORCEGO:20},
     equipped:{weapon:'MACHADO_MINO',offhand:null,armor:null,head:null,feet:null,neck:null},
     chests:{b1:{},b2:{},b3:{},b4:{}}, quests:{active:{},completed:[],daily:null},
     stats:{mobKills:{},pkKills:0,pkDeaths:0,mobDeaths:0,bossKills:0,startedAt:Date.now()},
@@ -39,10 +39,10 @@ function serve(req, res) {
     res.writeHead(200, {'Content-Type':'application/json','Cache-Control':'no-store'});
     res.end(JSON.stringify({app:'ValadaresParalelo',root,pid:process.pid})); return;
   }
-  if (pathname === '/' || pathname === '/jogar') pathname = '/play.html';
+  if (pathname === '/' || pathname === '/jogar' || pathname === '/jogar3d') pathname = '/play.html';
   const segments = pathname.toLowerCase().split('/').filter(Boolean);
   // Serve the client assets, never local saves, source-control data or tools.
-  if (segments.some(s => s.startsWith('.') || s === 'node_modules') ||
+  if (segments.some(s => s.startsWith('.') || s === 'node_modules' || s === '_source') ||
       ['tools','server','docs','electron'].includes(segments[0]) ||
       !['.html','.js','.mjs','.css','.png','.jpg','.jpeg','.webp','.svg','.woff2','.ico','.glb','.mp3','.ogg','.wav','.json','.txt'].includes(path.extname(pathname).toLowerCase())) {
     res.writeHead(404); res.end(); return;

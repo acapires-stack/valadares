@@ -76,7 +76,6 @@ export async function createActors(pc,app,bridge){
   MINOTAUR:{model:'Barbarian',weapon:'axe',skin:'#936347',armor:'#644534',horns:true},
   SKELETON:{model:'Skeleton_Warrior',weapon:'sword',cape:'#4b4248'},
   CACADOR:{model:'Rogue_Hooded',weapon:'bow',skin:'#b1845a',armor:'#a25c29',cape:'#634329'},
-  SOMBRA:{model:'Rogue_Hooded',weapon:'sword',skin:'#51425e',armor:'#352541',cape:'#271b35',eyes:'#af78ef'},
   CARRASCO:{model:'Barbarian',weapon:'axe',skin:'#9c7464',armor:'#732838',cape:'#491c2a',mask:true},
   SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',skin:'#97719f',armor:'#592582',cape:'#331443',crown:'#b47bdf',eyes:'#e8a6ff'},
   SENHOR_VALADARES:{model:'Knight',weapon:'sword',armor:'#bf9839',cape:'#e9be55',crown:'#f4d26d'},
@@ -117,6 +116,60 @@ export async function createActors(pc,app,bridge){
   }
   if(cfg.eyes)for(const side of [-1,1])shape(entity,'sphere',[.055,.045,.035],[side*.16,1.85,.52],cfg.eyes);
   if(type==='ORC_LIDER'||type==='CARRASCO'||type==='TROLL')for(const side of [-1,1])shape(entity,'sphere',[.28,.19,.29],[side*.55,1.4,0],cfg.armor);
+  if(type==='ORC'||type==='ORC_LIDER'){
+   for(const side of [-1,1]){
+    shape(entity,'cone',[.065,.18,.07],[side*.19,1.57,.52],'#e8d6ad',[25,0,-side*12]);
+    shape(entity,'cone',[.12,.22,.1],[side*.38,1.81,.04],'#5c523c',[0,0,-side*34]);
+   }
+   if(type==='ORC_LIDER'){
+    shape(entity,'cylinder',[.045,1.7,.045],[.49,1.67,-.24],'#48362b');
+    shape(entity,'box',[.47,.7,.045],[.49,2.24,-.22],'#a93652');
+    shape(entity,'sphere',[.12,.12,.07],[.49,2.32,-.17],'#e7b867');
+   }
+  }
+  if(type==='TROLL'){
+   shape(entity,'sphere',[.51,.42,.38],[0,1.16,.22],'#4e6550');
+   for(const side of [-1,1]){
+    shape(entity,'sphere',[.31,.33,.29],[side*.64,.93,.23],'#647d60');
+    shape(entity,'cone',[.09,.22,.09],[side*.18,1.51,.55],'#d0bf9e',[25,0,0]);
+   }
+  }
+  if(type==='SKELETON'){
+   for(let i=0;i<3;i++)shape(entity,'capsule',[.33,.045,.06],[0,1.12-i*.13,.28],'#e0dccb');
+   shape(entity,'sphere',[.04,.04,.025],[-.14,1.82,.35],'#dd5954');shape(entity,'sphere',[.04,.04,.025],[.14,1.82,.35],'#dd5954');
+  }
+  if(type==='CACADOR'){
+   shape(entity,'cylinder',[.32,.1,.35],[0,2.06,0],'#583b27');
+   shape(entity,'box',[.09,.62,.1],[.37,.95,-.27],'#6a4324');
+   for(const side of [-1,1])shape(entity,'box',[.07,.23,.12],[side*.25,.76,.34],'#b07c3d');
+  }
+  if(type==='CARRASCO'){
+   shape(entity,'box',[.7,.11,.16],[0,1.54,.5],'#34232b');
+   for(const side of [-1,1])shape(entity,'cone',[.11,.3,.11],[side*.6,1.57,0],'#722832',[0,0,-side*35]);
+  }
+  if(type==='SENHOR_PROFUNDEZAS'){
+   for(const side of [-1,1]){
+    shape(entity,'cone',[.19,.74,.16],[side*.45,2.2,-.08],'#422058',[0,0,-side*32]);
+    shape(entity,'sphere',[.24,.3,.15],[side*.55,1.28,.08],'#8d44b7');
+    shape(entity,'sphere',[.09,.1,.08],[side*.62,1.3,.26],'#e4a2ff');
+   }
+   shape(entity,'sphere',[.26,.29,.16],[0,1.25,.42],'#bd78ec');
+  }
+  if(type==='SENHOR_VALADARES'){
+   for(const side of [-1,1]){
+    shape(entity,'box',[.3,.43,.2],[side*.55,1.38,-.05],'#d8ae45',[0,0,side*18]);
+    shape(entity,'cone',[.13,.47,.13],[side*.58,1.83,-.06],'#f4ce60',[0,0,-side*27]);
+   }
+   shape(entity,'sphere',[.23,.25,.13],[0,1.27,.39],'#f6df8b');
+   shape(entity,'cylinder',[.46,.08,.46],[0,2.44,0],'#f5d976');
+  }
+  if(type==='ARAUTO'){
+   for(const side of [-1,1]){
+    shape(entity,'cone',[.43,.86,.07],[side*.64,1.58,-.21],'#baa0dd',[0,0,-side*42]);
+    shape(entity,'sphere',[.14,.14,.09],[side*.68,1.53,-.12],'#eee0a7');
+   }
+   shape(entity,'sphere',[.23,.26,.13],[0,1.28,.41],'#d8c7ef');
+  }
   return {entity,kind,id,type,model:cfg.model,w:cfg.weapon,owned,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
  }
  function creature(e,kind,id){
@@ -144,6 +197,13 @@ export async function createActors(pc,app,bridge){
    for(const side of [-1,1])add('cone',cat?[.1,.22,.08]:lizard?[.055,.1,.06]:[.11,.24,.11],[side*.17,.72,.43],cat?'#27252c':c,[0,0,-side*14]);
    move('capsule',lizard?[.09,.62,.09]:cat?[.055,.52,.055]:[.16,.47,.16],[0,lizard?.32:.39,-.64],cat?'#29282e':c,[62,0,0],11);
    if(lizard)for(let i=0;i<4;i++)add('cone',[.075,.13,.065],[0,.57,-.29+i*.19],'#869c4b',[42,0,0]);
+   if(type==='WOLF'){
+    add('sphere',[.28,.24,.3],[0,.58,-.17],'#706d64');
+    for(const side of [-1,1]){
+     add('cone',[.08,.16,.07],[side*.11,.31,.83],'#e3d9c2',[90,0,0]);
+     add('sphere',[.07,.07,.04],[side*.16,.55,.8],'#e0a25d');
+    }
+   }
   }else if(type==='PET_TATU'){
    add('sphere',[.42,.31,.51],[0,.38,-.06],'#8c6836');
    for(let i=0;i<4;i++)add('sphere',[.36,.07,.11],[0,.62,-.39+i*.22],i%2?'#b58b43':'#c69b4e');
@@ -176,8 +236,9 @@ export async function createActors(pc,app,bridge){
   }else if(type==='BAT'){
    add('sphere',[.19,.28,.18],[0,.8,0],c);add('sphere',[.17,.15,.16],[0,1.02,.08],c);
    for(const side of [-1,1]){
-    move('cone',[.5,.52,.045],[side*.43,.87,-.02],'#50415b',[0,0,side*70],24);
-    add('cone',[.3,.32,.035],[side*.78,.74,-.04],'#50415b',[0,0,side*42]);
+    move('cone',[.66,.75,.045],[side*.51,.87,-.02],'#50415b',[0,0,side*70],24);
+    add('cone',[.36,.43,.035],[side*.9,.72,-.04],'#50415b',[0,0,side*42]);
+    for(let i=0;i<3;i++)add('capsule',[.023,.39,.023],[side*(.35+i*.21),.83-i*.1,.02],'#92819f',[0,0,side*(48+i*13)]);
     add('cone',[.075,.16,.07],[side*.12,1.18,.05],c,[0,0,-side*10]);
    }eyes(1.04,.23,.095,'#ec888e');
   }else if(type.startsWith('DRAKE')){
@@ -190,6 +251,14 @@ export async function createActors(pc,app,bridge){
    }
    move('capsule',[.16,.7,.16],[0,.39,-.85],c,[59,0,0],8);
    for(let i=0;i<4;i++)add('cone',[.085,.16,.09],[0,.95,-.48+i*.25],'#c2865e',[42,0,0]);
+   if(type==='DRAKE_LIDER'){
+    for(const side of [-1,1]){
+     move('cone',[.75,1.18,.06],[side*.95,1.13,-.27],'#a52d20',[0,0,-side*63],20);
+     add('cone',[.17,.47,.15],[side*.24,1.54,.55],'#edc18b',[0,0,-side*23]);
+    }
+    for(let i=0;i<5;i++)add('cone',[.13,.23,.12],[0,1.15,-.49+i*.25],'#efb35c',[42,0,0]);
+    add('sphere',[.22,.12,.28],[0,.83,1.19],'#f2a13b');
+   }
   }else if(type.startsWith('GOLEM')){
    const rock='#697883',seam='#415763';
    add('sphere',[.51,.59,.4],[0,.91,0],rock);add('sphere',[.38,.33,.32],[0,1.47,.07],rock);
@@ -200,7 +269,24 @@ export async function createActors(pc,app,bridge){
     add('sphere',[.09,.055,.04],[side*.13,1.52,.34],'#e9ba69');
    }
    for(let i=0;i<3;i++)add('capsule',[.045,.38,.045],[(i-1)*.18,.95,.35],seam,[0,0,33+i*12]);
-   if(type==='GOLEM_REI')for(const side of [-1,1])add('cone',[.12,.4,.12],[side*.24,1.86,.06],'#b2a37b',[0,0,side*25]);
+   if(type==='GOLEM_REI'){
+    for(const side of [-1,1]){
+     add('box',[.34,.45,.3],[side*.59,1.52,-.06],'#8b8176',[0,0,side*16]);
+     add('cone',[.16,.49,.15],[side*.6,1.91,-.06],'#d6be83',[0,0,side*20]);
+     add('sphere',[.15,.17,.08],[side*.16,1.05,.4],'#76d8d4');
+    }
+    add('box',[.39,.12,.32],[0,1.79,.04],'#9c8c69');
+    for(let i=-1;i<=1;i++)add('cone',[.1,.33,.1],[i*.27,2.02,.04],'#c9ad72');
+   }
+  }else if(type==='SOMBRA'){
+   add('cone',[.53,1.16,.48],[0,.68,0],'#2c1d3d',[0,0,180]);
+   add('sphere',[.36,.36,.32],[0,1.3,.08],'#241733');
+   for(const side of [-1,1]){
+    move('cone',[.19,.83,.15],[side*.49,.82,.04],'#462e59',[0,0,side*28],18);
+    add('sphere',[.09,.06,.035],[side*.16,1.37,.37],'#ce8aff');
+    move('cone',[.13,.55,.11],[side*.23,.18,-.24],'#674284',[0,0,side*16],10);
+   }
+   add('sphere',[.16,.18,.1],[0,.77,.42],'#8d5bb3');
   }else{
    const skeleton=type==='SKELETON',shadow=type==='SOMBRA',boss=/SENHOR|ARAUTO/.test(type),minotaur=type==='MINOTAUR';
    const body=skeleton?'#d1cbb6':c;
@@ -219,7 +305,7 @@ export async function createActors(pc,app,bridge){
    if(type==='TROLL')add('sphere',[.47,.25,.31],[0,.99,.28],'#617d5a');
    if(!shadow){const hand=new pc.Entity('arma inimiga');group.addChild(hand);hand.setLocalPosition(-.5,.87,.24);weapon(hand,skeleton||type==='CACADOR'?'sword':boss?'staff':'axe',false);}
   }
-  const s=kind==='pet' ? .48 : (def.size||1)*.73;group.setLocalScale(s,s,s);return rec;
+  const s=kind==='pet' ? .48 : (def.size||1);group.setLocalScale(s,s,s);return rec;
  }
  function signature(e,kind){
   if(kind==='mob'||kind==='pet')return e.type||kind;
@@ -243,9 +329,9 @@ export async function createActors(pc,app,bridge){
     if(state!==rec.state){rec.entity.anim.baseLayer.transition(state,.1);rec.state=state;}
     else if(newStrike&&attacking){rec.entity.anim.baseLayer.transition('Idle',0);rec.entity.anim.baseLayer.transition(state,.06);}
     rec.entity.anim.speed=attacking?1:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
-   }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;
+   }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type==='SOMBRA'?Math.sin(now*3)*.075:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;
     rec.entity.setLocalPosition(x,bob+(now<rec.strikeUntil?Math.sin((rec.strikeUntil-now)*20)*.035:0),z);
-    for(let i=0;i<rec.parts.length;i++){const {part,rot,swing}=rec.parts[i];const a=moving||rec.type==='BAT'?Math.sin(now*(rec.type==='BAT'?12:10)+i*Math.PI*.7)*swing:0;part.setLocalEulerAngles(rot[0]+(rec.type==='BAT'?0:a),rot[1],rot[2]+(rec.type==='BAT'?a:0));}
+    for(let i=0;i<rec.parts.length;i++){const {part,rot,swing}=rec.parts[i];const a=moving||rec.type==='BAT'||now<rec.strikeUntil?Math.sin(now*(rec.type==='BAT'?12:10)+i*Math.PI*.7)*swing:0;part.setLocalEulerAngles(rot[0]+(rec.type==='BAT'?0:a),rot[1],rot[2]+(rec.type==='BAT'?a:0));}
    }
    rec.lastX=x;rec.lastZ=z;rec.entity.enabled=true;
   };

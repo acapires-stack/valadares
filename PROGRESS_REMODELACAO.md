@@ -16,6 +16,25 @@ Alcione autorizou agora: "sobe ela para eu jogar com minha conta". O registro lo
 
 ## Fonte e isolamento
 
+## Atualização em trabalho: pacotes comprados, interiores e monstros
+
+- Alcione confirmou os sete downloads concluídos e autorizou integrar. Pediu também identidade visual dos monstros e melhorias úteis no mapa, preservando a liberdade de explorar.
+- Base publicada preservada: c2146a0; HEAD documental 3a61a2a. Recuperação desta atualização usa c2146a0 para cliente/servidor juntos, sem restaurar dados.
+- Arquivos originais ficam em Downloads, fora da publicação. Somente seleções convertidas entram em modern/assets; modern/_source é ignorado.
+- Escritores: áudio em game-audio.js/assets/audio; cenário em world.js/scenery.js/assets/scenery; interiores em modern-world.js/server.js; monstros em actors.js. Raiz integra cliente, ponte, HUD e build. Revisão independente do contrato dos interiores atribuída ao agente dos monstros após sua entrega visual.
+- Interiores opcionais: pousada porta (44,46), piso1000; oficina porta (52,45), piso1001; spawn (50,50), saída (50,51). Grid autoritativo, piso compartilhado, PvP desativado dentro, retorno à porta. Serviços externos preservados.
+- Integração concluída: 21 cenários GLB (936.868 bytes), 33 sons MP3 (682.571 bytes), 22 tipos de monstro diferenciados, minimapa com portas/marcos conhecidos e zoom interno. Portas por botão/clique/G e saída também andando. Música e controles de volume preservados.
+- QA integrado real local PASS: duas salas, movimento, proteção PvP, volta à porta, reentrada, saída andando, reload interno com equipamento preservado, recursos HTTP sem erro e botão funcionando em 844x390. Combate com rato e dano observado na captura bosque.png. Renderer sem erro; carregamento inicial amostrado em 42 FPS, bosque em 59 e interiores em 60 nesta máquina, sem garantia para celular físico.
+- QA servidor autoritativo com duas contas PASS: distância inválida, salas compartilhadas, reentrada imediata, PvP/masmorra/serviços externos/troca antiga separados por piso, save/relogin em PZ. Revisão cruzada identificou e motivou as correções de trade tardio e serviços por coordenadas sobrepostas. Cliente checkPzLock limitado ao overworld para não expulsar personagem para fora do grid interno.
+- Mapa compartilhado: 10.000 tiles iguais, 8.410 alcançáveis, 15 marcos, 5 prédios. Monstros: 22 tipos e quatro direções; orientação dos jogadores preservada. Áudio: CRC do ZIP, decodificação/hashes, mute, aba, saída/reentrada e fallback verificados.
+- Build público: 134 arquivos/10.924.145 bytes, sem ZIPs, WAVs, originais, ferramentas, saves ou documentos internos. Downloads originais preservados. Runner adicional 3338/8098 encerrado após QA; runner anterior 3337/8097 preservado.
+- Próximo: revisão final do contrato, commit e preparo de reversão para c2146a0; manutenção e publicação conjunta autorizadas. Ainda não reivindicar esta atualização como publicada.
+- Acréscimo pedido por Alcione concluído: bancada funcional na ferraria; templo na biblioteca (1002, porta57/49) e sala de treino no mercado (1003, porta43/53), altar/boneco funcionais. Serviços da praça preservados. QA integrado PASS nas quatro casas, criação com ouro/inventário, treino de Magia e físico com XP/custo, parada ao sair do ponto, reentrada, reload de volta ao overworld e viewport compacto. 104 carregamentos de recursos conferidos; nenhum erro JS/HTTP. Ao relogar, utiliza o último save de superfície; save efetuado dentro converte posição para PZ.
+- Revisão independente encerrada sem bloqueio no acréscimo. Custo de troca de magia continua a rotina preexistente do cliente; não foi convertido em nova operação autoritativa. O custo/XP de treinamento e a criação foram verificados no servidor e na interface.
+- Futuro solicitado: aparências masculinas e femininas com escolha estética livre, sem vincular a classe, atributos ou benefícios. Ainda não implementado; preservar compatibilidade com roupas/equipamentos/animações ao selecionar modelos.
+
+### Registro anterior de isolamento
+
 - Worktree: C:/claude/_worktrees/valadares-remodelacao-20261006.
 - Branch: remodelacao/novo-valadares-20261006; base e17408b6ac8fc490cbf904b7f98dc52611794945.
 - Base canônica preservada: C:/claude/_worktrees/valadares-retencao-20261006. Nada publicado ou alterado no site, contas, campanhas ou pagamentos de produção.

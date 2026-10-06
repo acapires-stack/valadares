@@ -6,7 +6,7 @@
 <script src="/equipment-rules.js?v=1"></script>
 <script src="/game-audio.js?v=1"></script>
 <script src="/progression-content.js?v=2"></script>
-<script src="/modern-world.js?v=1"></script>
+<script src="/modern-world.js?v=2"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
 <link rel="stylesheet" href="/transmutation.css?v=5">
     <meta charset="UTF-8">
@@ -1952,6 +1952,7 @@
     <!-- GAME -->
     <div id="gameContainer">
         <canvas id="canvas"></canvas>
+        <button id="worldDoor" type="button" hidden onclick="interactWorldPlace()" style="position:absolute;z-index:27;left:50%;transform:translateX(-50%);min-height:44px;padding:10px 18px;border:1px solid #d6bd87;border-radius:9px;background:#203c32f2;color:#fff0d0;font:600 14px system-ui;box-shadow:0 6px 20px #07120e99;cursor:pointer;white-space:nowrap"></button>
         <div id="firstSteps" role="status" aria-live="polite" hidden>
             <strong data-i18n="ui.first_title">Primeiros passos</strong>
             <span data-i18n="ui.first_body">Mova-se com WASD, use Espaço perto de um NPC para conversar e abra Q para ver as missões.</span>
@@ -4173,14 +4174,21 @@ const CRAFT_POS = { x: 51, y: 52 };
 // Altar de magias (centro-alto da PZ, entre os baús de cima)
 const ALTAR_POS = { x: 50, y: 49 };
 function atAltar(){
-    if ((player.floor || 0) !== 0) return false;   // M4: altar só na cidade
-    return Math.max(Math.abs(player.x - ALTAR_POS.x), Math.abs(player.y - ALTAR_POS.y)) <= 1;
+    return atWorldService('altar');
 }
 // Boneco de treino (2 tiles abaixo do Crupiê, canto inferior-esquerdo da PZ)
 const DUMMY_POS = { x: 49, y: 52 };
 function atDummy(){
-    if ((player.floor || 0) !== 0) return false;   // M4: treino só na cidade
-    return Math.max(Math.abs(player.x - DUMMY_POS.x), Math.abs(player.y - DUMMY_POS.y)) <= 1;
+    return atWorldService('dummy');
+}
+function servicePosition(kind){
+    const room = currentInterior();
+    if (room) return room.services?.find(service => service.kind === kind) || null;
+    return (player.floor || 0) === 0 ? ({craft:CRAFT_POS,altar:ALTAR_POS,dummy:DUMMY_POS})[kind] || null : null;
+}
+function atWorldService(kind){
+    const pos = servicePosition(kind);
+    return !!pos && Math.max(Math.abs(player.x-pos.x),Math.abs(player.y-pos.y)) <= 1;
 }
 // Corpos dos props da PZ, sem sombra/brilho/hint/barra: o render 2D chama daqui e o
 // ctx-gravador do 3D também (mesma regra do drawNpcBody) — assim os dois não divergem.
@@ -4419,8 +4427,7 @@ function interactNpc(npc){
 }
 const TRAINING_TIME = 2000;   // ms por sessão
 function atCraft(){
-    if ((player.floor || 0) !== 0) return false;   // M4: craft só na cidade
-    return Math.max(Math.abs(player.x - CRAFT_POS.x), Math.abs(player.y - CRAFT_POS.y)) <= 1;
+    return atWorldService('craft');
 }
 
 // Fórmula de custo em ouro. Os 3 melhores itens têm preço cravado (raros/endgame).
@@ -4523,7 +4530,7 @@ function inSafeZone(x, y){
 // M4: zona segura só vale na cidade (floor 0). Na masmorra as coords coincidem
 // com a PZ, mas lá é perigoso. Use onde a segurança depende de ONDE o player está.
 function playerInSafeZone(){
-    return (player.floor || 0) === 0 && inSafeZone(player.x, player.y);
+    return !!player._interior || ((player.floor || 0) === 0 && inSafeZone(player.x, player.y));
 }
 // Santuário dos NPCs de mundo (espelha SANCTUARY_* do server): zona segura 5×5 ao
 // redor de cada NPC de chain, pra ler o diálogo sem apanhar. Render pinta um tom
@@ -6483,6 +6490,7 @@ async function playerDie(){
     // logo depois, mas isto evita 1 frame renascendo colado no boss dentro do andar).
     if ((player.floor || 0) > 0){
         player.floor = 0;
+        player._interior = null;
         map = overworldMap;
         if (_overworldVisited){ player.visited = _overworldVisited; _overworldVisited = null; }
         monsters.length = 0;
@@ -6510,6 +6518,7 @@ let _overworldVisited = null;   // guarda o fog do overworld enquanto na masmorr
 function enterDungeonClient(msg){
     const fromFloor = (player.floor || 0);
     player.floor = msg.floor || 1;
+    player._interior = msg.interior || null;
     player._expedition = msg.expedition || null;
     player._expeditionExit = msg.expedition ? (msg.stairs?.spawn || msg.stairs?.up || null) : null;
     map = msg.grid ? applyDungeonGrid(msg.grid) : genDungeonFloor(player.floor);  // M4 3b: grid do server (fallback local)
@@ -6519,7 +6528,7 @@ function enterDungeonClient(msg){
     player.prevX = msg.x; player.prevY = msg.y;
     player.target = null; player.autoAttack = false;
     snapRender(player);
-    player.pvp = msg.expedition ? false : true;     // expedição solo não usa PvP das Profundezas
+    player.pvp = (msg.expedition || msg.interior) ? false : true;
     // Andar inteiro visível (sem fog). Guarda o fog do OVERWORLD só ao entrar dele
     // (0→andar); em troca de andar NÃO sobrescreve (senão perde o fog real da cidade).
     if (fromFloor === 0 && player.visited) _overworldVisited = player.visited;
@@ -6531,7 +6540,11 @@ function enterDungeonClient(msg){
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot não vaza entre andares
     if (Array.isArray(msg.groundDrops)) for (const d of msg.groundDrops){ if (ITEMS[d.type] || d.type === 'GOLD') groundItems.push({ id:d.id, x:d.x, y:d.y, type:d.type, qty:d.qty, owner:d.owner, ownerName:d.ownerName, ownerUntil:d.ownerUntil }); }
-    if (msg.expedition){
+    if (msg.interior){
+        const label = interiorLabel(currentInterior());
+        if (typeof showServerToast === 'function') showServerToast('event', label, null, 3500);
+        log(`<span class="log-sys">${escapeHtml(label)} · ${LANG === 'en' ? 'Safe area' : 'Zona segura'}</span>`);
+    } else if (msg.expedition){
         dungeonStairs = msg.stairs || null;
         const label = LANG === 'en' ? 'Ruins of the Forge · solo expedition' : 'Ruínas da Forja · expedição solo';
         if (typeof showServerToast === 'function') showServerToast('event', label, null, 4500);
@@ -6550,6 +6563,7 @@ function enterDungeonClient(msg){
 }
 function exitDungeonClient(msg){
     player.floor = 0;
+    player._interior = null;
     player._expedition = null;
     player._expeditionExit = null;
     map = overworldMap;                             // restaura o overworld
@@ -7936,6 +7950,7 @@ function handleMP(msg){
         window.ValadaresJourneyUI?.onServerState(msg);
         if (player._expedition) window.ValadaresJourneyUI?.onDungeonExit();
         player._expedition = null;
+        player._interior = null;
         player._expeditionExit = null;
         window.equipmentServerVersion = msg.equipmentVersion || 0;
         window.enchantToken = msg.enchantToken || null;
@@ -8481,6 +8496,8 @@ function handleMP(msg){
         // M4: voltou pra cidade. Restaura overworld, PvP anterior, players da cidade.
         exitDungeonClient(msg);
         window.ValadaresJourneyUI?.onDungeonExit(msg);
+    } else if (msg.t === 'interiorResult'){
+        if (msg.error) showServerToast('warn', LANG === 'en' ? 'Approach the door to enter or leave. Finish any active trade or duel first.' : 'Aproxime-se da porta para entrar ou sair. Encerre uma troca ou duelo em andamento primeiro.', null, 4000);
     } else if (msg.t === 'dungeonResult'){
         const errs = { not_at_entrance: tr('err.dg_not_entrance'), not_at_exit: tr('err.dg_not_exit') };
         if (msg.error && typeof showServerToast === 'function') showServerToast('warn', errs[msg.error] || tr('err.failed'), null, 4000);
@@ -10971,11 +10988,13 @@ function drawMinimap(){
     if (!mmCanvas) return;
     const mctx = mmCanvas.getContext('2d');
     const W = mmCanvas.width, H = mmCanvas.height;
-    const scale = W / M_W;
+    const room = currentInterior(), scale = W / (room ? 13 : M_W);
     mctx.imageSmoothingEnabled = false;
     // fundo
     mctx.fillStyle = '#050505';
     mctx.fillRect(0, 0, W, H);
+    mctx.save();
+    if (room) mctx.translate(-44*scale,-43*scale);
     const tileCol = {
         [T.GRASS]:'#2d5a1b', [T.DIRT]:'#8B6520', [T.TREE]:'#1a3010',
         [T.WATER]:'#1a4d8b', [T.STONE]:'#585858',
@@ -10992,12 +11011,26 @@ function drawMinimap(){
     }
     // PZ
     mctx.fillStyle = 'rgba(80,150,220,0.25)';
-    for (let dy=-SAFE_RADIUS; dy<=SAFE_RADIUS; dy++)
+    if ((player.floor || 0) === 0) for (let dy=-SAFE_RADIUS; dy<=SAFE_RADIUS; dy++)
         for (let dx=-SAFE_RADIUS; dx<=SAFE_RADIUS; dx++){
             const x = SAFE_CX+dx, y = SAFE_CY+dy;
             if (!player.visited[y*M_W + x]) continue;
             mctx.fillRect(x*scale, y*scale, scale, scale);
         }
+    // Village entrances and known landmarks do not reveal unexplored terrain.
+    if (!(player.floor || 0)){
+        for (const place of window.ValadaresWorld.interiors || []){
+            const {x,y} = place.door;
+            if (!player.visited[y*M_W+x]) continue;
+            mctx.fillStyle='#f3d38b'; mctx.fillRect(x*scale-2,y*scale-2,5,5);
+        }
+        for (const npc of NPCS){
+            if (!npc.sanctuary || !npcVisible(npc)) continue;
+            const {x,y} = npc.pos;
+            if (!player.visited[y*M_W+x]) continue;
+            mctx.fillStyle='#9adbd0'; mctx.beginPath();mctx.arc(x*scale,y*scale,2.5,0,Math.PI*2);mctx.fill();
+        }
+    }
     // monstros visíveis na tela
     const cam = getCamera();
     for (const m of monsters){
@@ -11022,6 +11055,7 @@ function drawMinimap(){
     const pulse = (Math.sin(performance.now()*0.005)+1) * 0.5;
     mctx.fillStyle = `rgba(255, 230, 100, ${0.7 + pulse*0.3})`;
     mctx.fillRect(player.x*scale - 1, player.y*scale - 1, scale+2, scale+2);
+    mctx.restore();
     // posição no label
     const pm = document.getElementById('posMini');
     if (pm) pm.textContent = `${player.x},${player.y}`;
@@ -11045,10 +11079,10 @@ function drawMinimap(){
         const f = player.floor || 0;
         if (f >= 1 && !player._arena){
             const txt = document.getElementById('floorBadgeText');
-            if (txt) txt.textContent = player._expedition
+            if (txt) txt.textContent = player._interior ? interiorLabel(currentInterior()) : player._expedition
                 ? (LANG === 'en' ? 'Ruins of the Forge · Solo' : 'Ruínas da Forja · Solo')
                 : tr('hud.floor', { floor: f });
-            if (player._expedition){
+            if (player._expedition || player._interior){
                 fb.style.borderColor = '#d89452';
                 fb.style.boxShadow = '0 2px 12px rgba(185,88,30,.45)';
                 if (fb.style.display === 'none') fb.style.display = '';
@@ -12867,6 +12901,10 @@ canvas.addEventListener('click', e => {
     const cam = getCamera();
     const tileX = Math.floor(cx / TS + cam.x);
     const tileY = Math.floor(cy / TS + cam.y);
+    const door = nearbyWorldDoor();
+    if (door && tileX === door.pos.x && tileY === door.pos.y){ interactWorldDoor(); return; }
+    const service = nearbyWorldService();
+    if (service && tileX === service.x && tileY === service.y){ interactWorldPlace(); return; }
     // Mob no tile → mira (fora da PZ, qualquer hora). Resolve "boss no meio da multidão".
     if (!playerInSafeZone()){
         // casa pela posição VISUAL (render): o mob é desenhado em renderX/Y e a posição lógica
@@ -13158,6 +13196,7 @@ document.addEventListener('keydown', e => {
         && !(e.key === 'Escape' && t.closest('[id$="Modal"]'))) return;
     ensureAudio();   // resume AudioContext na primeira tecla (gesture requirement)
     keys[e.key] = true;
+    if ((e.key === 'g' || e.key === 'G') && !e.repeat && started){ e.preventDefault(); interactWorldPlace(); }
     if (e.key===' ' && !attackPressed){ attackPressed = true; engage(); }
     if (e.key==='e' || e.key==='E') eatBestFood();
     if (e.key==='b' || e.key==='B') openChest();
@@ -13329,6 +13368,7 @@ function cycleBattleList(){
 // ESPAÇO: prioriza NPC adjacente. Caso contrário, anda pela Battle List (igual TAB) e,
 // se o novo alvo for um mob adjacente, já bate (sem alvo → pega o 1º = mais perto).
 function engage(){
+    if (nearbyWorldService()){ interactWorldPlace(); return; }
     const npc = npcAt(player.x, player.y);
     if (npc){ interactNpc(npc); return; }
     const next = cycleBattleList();
@@ -13781,6 +13821,7 @@ function drawDayNightTint(day){
     // M4 3b polish: na masmorra, banho de cor (roxo→vermelho) que cresce com o andar
     // — ignora o ciclo dia/noite (a masmorra não vê o céu).
     const dFloor = (player && player.floor) || 0;
+    if (player._interior) return;
     if (player._expedition){
         ctx.save(); ctx.fillStyle='rgba(126,58,23,0.10)';
         ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore();
@@ -13823,7 +13864,9 @@ function drawLighting(cam, day){
     let darkness = day.darkness;
     let baseR = 8, baseG = 10, baseB = 30;
     let lightScale = 1;
-    if (player._expedition){
+    if (player._interior){
+        darkness=0.14; baseR=30; baseG=20; baseB=12; lightScale=1.4;
+    } else if (player._expedition){
         darkness=0.52; baseR=42; baseG=20; baseB=12; lightScale=1.2;
     } else if (dFloor >= 1){
         // M4 3b polish: tonalidade por profundidade — andar 1 leve → andar 5
@@ -14374,6 +14417,7 @@ function pvpMults(){
 }
 
 function togglePvP(){
+    if (player._interior){ log(`<span class="log-sys">${LANG === 'en' ? 'You are in a safe area.' : 'Você está em uma zona segura.'}</span>`); return; }
     // Masmorra/arena: PvP é FORÇADO (o server agora ignora t:'pvp' fora do floor 0 —
     // sem este guard o toggle local dessincronizava do server).
     if ((player.floor || 0) !== 0){
@@ -14393,6 +14437,7 @@ function togglePvP(){
 // sem precisar do toggle P. Respeita o mesmo gate de ouro do togglePvP. AoE/EXORI NÃO chama isto
 // (só acerta mob). Retorna true se o PvP ficou (ou já estava) ligado; false se barrou (sem ouro).
 function enablePvpWhiteSkull(){
+    if (player._interior) return false;
     if (player.pvp) return true;
     if (player.gold < PVP_MIN_GOLD){
         log(tr('log.pvp_requires_attack', {req: PVP_MIN_GOLD, have: player.gold}));
@@ -14406,7 +14451,7 @@ function enablePvpWhiteSkull(){
 
 // Verifica se player está em PZ lock e força saída se for o caso
 function checkPzLock(){
-    if (Date.now() < player.pzLockUntil && playerInSafeZone()){
+    if (!(player.floor || 0) && Date.now() < player.pzLockUntil && playerInSafeZone()){
         // Empurra pra fora da PZ — escolhe direção sul (longe do spawn)
         log(tr('log.pz_locked_pk', {s: Math.ceil((player.pzLockUntil-Date.now())/1000)}));
         // teleporta pra borda da PZ + 1
@@ -14532,7 +14577,8 @@ function handleTrainingResult(result){
     if (result.ok !== true){ stopTraining(tr('training.reason_rejected')); return; }
     training.remaining--;
     training.lastTick = performance.now();
-    addFloat(DUMMY_POS.x, DUMMY_POS.y, `+ ${skillDisp(training.skill)}`, '#ffcc40');
+    const pos = servicePosition(training.location === 'altar' ? 'altar' : 'dummy');
+    if (pos) addFloat(pos.x, pos.y, `+ ${skillDisp(training.skill)}`, '#ffcc40');
     if (training.remaining <= 0){ playGameSound('trainingDone'); stopTraining('completo'); }
     if (document.getElementById('trainingModal').style.display === 'flex') renderTraining();
     if (document.getElementById('altarModal').style.display === 'flex') renderAltar();
@@ -14620,12 +14666,14 @@ function handleMovement(dt){
     player.moveTimer = dur;
     player.moveDuration = dur;
     player.moveProgress = 0;
+    const stepTile = map[ny][nx];
+    playGameSound('footstep', {material:player._interior === 'pousada' ? 'wood' : (player.floor || stepTile === T.STONE || stepTile === T.CAVE) ? 'stone' : stepTile === T.GRASS ? 'grass' : 'dirt'});
     // Trail cosmético — deixa rastro no tile que acabou de sair
     const trailCol = ITEMS[player.equipped.cosmetic]?.trail;
     if (trailCol) spawnTrailAt(player.prevX, player.prevY, trailCol);
     pickupAt(nx, ny);
-    checkDungeonStairs(nx, ny);
     if (ws && ws.readyState===1) ws.send(JSON.stringify({t:'pos', x:nx, y:ny, dir:player.dir}));
+    checkDungeonStairs(nx, ny);
 }
 
 // M4: pisar na escada dispara a transição de andar (server valida adjacência).
@@ -14645,11 +14693,73 @@ function dunStairUp(){   return (dungeonStairs && dungeonStairs.up)   || null; }
 function dunStairDown(){ return (dungeonStairs && dungeonStairs.down) || null; }
 function dunStairTown(){ return (dungeonStairs && dungeonStairs.town) || null; }
 let _lastStairTrigger = 0;
+function currentInterior(){
+    return (window.ValadaresWorld.interiors || []).find(room => room.id === player._interior) || null;
+}
+function interiorLabel(room){
+    if (!room) return LANG === 'en' ? 'Village interior' : 'Interior da vila';
+    return LANG === 'en' ? ({pousada:'Village tavern',oficina:'Village forge',biblioteca:'Temple',mercado:'Training hall'})[room.id] || room.label : room.label;
+}
+function nearbyWorldService(){
+    if (!started || !currentInterior()) return null;
+    return currentInterior().services?.find(service => atWorldService(service.kind)) || null;
+}
+function interactWorldPlace(){
+    const service = nearbyWorldService();
+    if (!service){ interactWorldDoor(); return; }
+    clearAllKeys();
+    if (service.kind === 'craft') openCraft();
+    else if (service.kind === 'altar') openAltar();
+    else if (service.kind === 'dummy') openTraining();
+}
+function nearbyWorldDoor(){
+    if (!started || player.hp <= 0) return null;
+    const inside = currentInterior();
+    if (inside){
+        const pos = dungeonStairs?.up;
+        return pos && Math.max(Math.abs(pos.x-player.x),Math.abs(pos.y-player.y)) <= 1 ? {room:inside,pos,exit:true} : null;
+    }
+    if (player.floor) return null;
+    const room = (window.ValadaresWorld.interiors || []).find(room => Math.max(Math.abs(room.door.x-player.x),Math.abs(room.door.y-player.y)) <= 1);
+    return room ? {room,pos:room.door,exit:false} : null;
+}
+let _lastDoorAction = -2000, _lastDoorPaint = 0;
+function interactWorldDoor(){
+    const door = nearbyWorldDoor(), now = performance.now();
+    if (!door || !ws || ws.readyState !== 1 || !_wsAuthed || now-_lastDoorAction < 800) return;
+    if (!door.exit && Date.now() < player.pzLockUntil){
+        const seconds = Math.ceil((player.pzLockUntil-Date.now())/1000);
+        showServerToast('warn', LANG === 'en' ? `Safe area entry available in ${seconds}s after PvP.` : `Entrada na zona segura disponível em ${seconds}s após o PvP.`, null, 3500);
+        return;
+    }
+    _lastDoorAction = now;
+    clearAllKeys();
+    ws.send(JSON.stringify(door.exit ? {t:'exitInterior'} : {t:'enterInterior',id:door.room.id}));
+}
+function updateWorldDoor(){
+    if (performance.now()-_lastDoorPaint < 150) return;
+    _lastDoorPaint = performance.now();
+    const button = document.getElementById('worldDoor'), door = nearbyWorldDoor(), service = nearbyWorldService();
+    if (!button) return;
+    button.hidden = (!door && !service) || document.getElementById('login')?.style.display !== 'none';
+    if (!door && !service) return;
+    const label = service ? (LANG === 'en' ? {craft:'Use workbench',altar:'Use altar',dummy:'Train'} : {craft:'Usar bancada',altar:'Usar altar',dummy:'Treinar'})[service.kind] : door.exit ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${interiorLabel(door.room)}`;
+    button.textContent = label + (document.body.classList.contains('touch') ? '' : ' [G]');
+    const parent = canvas.parentElement, bounds = canvas.getBoundingClientRect(), container = parent.getBoundingClientRect();
+    const actions = document.querySelector('.modern-actions'), actionBounds = actions?.getBoundingClientRect();
+    const bottom = actionBounds?.height > 0 ? Math.min(bounds.bottom-18,actionBounds.top-12) : bounds.bottom-20;
+    button.style.top = Math.max(70, bottom-44-container.top+parent.scrollTop-parent.clientTop) + 'px';
+}
 function checkDungeonStairs(x, y){
     if (!ws || ws.readyState !== 1 || !_wsAuthed) return;
     const now = performance.now();
     if (now - _lastStairTrigger < 1200) return;
     const f = (player.floor || 0);
+    if (player._interior){
+        const exit = dunStairUp();
+        if (exit && x === exit.x && y === exit.y){ _lastStairTrigger = now; interactWorldDoor(); }
+        return;
+    }
     if (f === 0){
         if (x === DUNGEON_STAIR_IN.x && y === DUNGEON_STAIR_IN.y){
             _lastStairTrigger = now;
@@ -14981,6 +15091,7 @@ function refreshAudioVolume(){
         ambient:settings.volAmbient,music:settings.volMusic});
 }
 function detectBiome(x, y){
+    if (player._interior) return 'pz';
     if ((player.floor || 0) > 0) return 'cave';
     if (typeof inSafeZone === 'function' && inSafeZone(x, y)) return 'pz';
     if (!map || !map[y]) return 'grass';
@@ -14995,7 +15106,7 @@ function updateAudioScene(){
     if (!audioEngine) return;
     const active = _audioGestureReady && started && !document.hidden &&
         document.getElementById('login')?.style.display === 'none';
-    audioEngine.setScene({biome:detectBiome(player.x,player.y),
+    audioEngine.setScene({biome:detectBiome(player.x,player.y),interior:!!player._interior,
         combat:!!(player.target || player.autoAttack || player.hurtTimer > 0),active:!!active});
 }
 function updateAmbient(){
@@ -16862,6 +16973,9 @@ function r3dPropSprite(kind, arg){
 }
 // Lista pronta pro 3D: posição + chave de cache + o que rasterizar.
 function r3dProps(){
+    const room = currentInterior();
+    if (room) return (room.services || []).map(service => ({...service,key:room.id+':'+service.kind,glow:service.kind==='altar'?'#9ee9dd':null}));
+    if (player.floor) return [];
     const out = [];
     for (const c of CHESTS) out.push({ key: 'c' + c.id, x: c.x, y: c.y, kind: 'chest', arg: c });
     // `glow` = a MESMA cor que o 2D usa na runa (muda com a magia equipada)
@@ -16932,7 +17046,7 @@ function r3dBridge(){
         getMonsters: () => monsters,
         getRemotePlayers: () => remotePlayers,
         // NPCs: tabela fixa, só os visíveis (o Vend. de Almas depende de flag)
-        getNpcs: () => NPCS.filter(npcVisible),
+        getNpcs: () => (player.floor || 0) === 0 ? NPCS.filter(npcVisible) : [],
         npcSprite: r3dNpcSprite,
         npcName,
         // Props da PZ: baús, altar, bancada, boneco de treino
@@ -16975,9 +17089,11 @@ window.ValadaresModernBridge = {
     getMonsterTypes: () => MTYPE,
     getProjectiles: () => projectiles,
     getBuildings: () => window.ValadaresWorld.buildings,
+    getInteriors: () => window.ValadaresWorld.interiors || [],
+    getInterior: currentInterior,
     getAuras: () => auraEffects,
     getTrails: () => trails,
-    getStairs: () => (player.floor || 0) > 0 ? (dungeonStairs || {}) : { down: DUNGEON_STAIR_IN },
+    getStairs: () => (player.floor || 0) > 0 ? {up:dungeonStairs?.up,down:dungeonStairs?.down,town:dungeonStairs?.town} : { down: DUNGEON_STAIR_IN },
     getFloor: () => player.floor || 0,
     getTarget: () => ({ id: player.target, type: player.targetType }),
     getPet: () => player.pet && player._petRX != null
@@ -16996,6 +17112,7 @@ function loop(ts){
     itemPulse += dt*0.005;
 
     handleMovement(dt);
+    updateWorldDoor();
     checkPzLock();
     tickRespawns(dt);
     tickSpellCooldowns(dt);
@@ -17174,9 +17291,10 @@ function loop(ts){
     }
 
     // Boneco de treino (só na cidade — não vaza pra masmorra)
-    if ((player.floor || 0) === 0 && DUMMY_POS.x >= cam.x-1 && DUMMY_POS.x < cam.x+VP_W+1 && DUMMY_POS.y >= cam.y-1 && DUMMY_POS.y < cam.y+VP_H+1){
-        const dpx = (DUMMY_POS.x - cam.x) * TS;
-        const dpy = (DUMMY_POS.y - cam.y) * TS;
+    const dummyPos = servicePosition('dummy');
+    if (dummyPos && dummyPos.x >= cam.x-1 && dummyPos.x < cam.x+VP_W+1 && dummyPos.y >= cam.y-1 && dummyPos.y < cam.y+VP_H+1){
+        const dpx = (dummyPos.x - cam.x) * TS;
+        const dpy = (dummyPos.y - cam.y) * TS;
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(dpx+TS/2, dpy+TS-4, 14, 4, 0, 0, Math.PI*2); ctx.fill();
@@ -17208,9 +17326,10 @@ function loop(ts){
     }
 
     // Altar de magias (só na cidade)
-    if ((player.floor || 0) === 0 && ALTAR_POS.x >= cam.x-1 && ALTAR_POS.x < cam.x+VP_W+1 && ALTAR_POS.y >= cam.y-1 && ALTAR_POS.y < cam.y+VP_H+1){
-        const apx = (ALTAR_POS.x - cam.x) * TS;
-        const apy = (ALTAR_POS.y - cam.y) * TS;
+    const altarPos = servicePosition('altar');
+    if (altarPos && altarPos.x >= cam.x-1 && altarPos.x < cam.x+VP_W+1 && altarPos.y >= cam.y-1 && altarPos.y < cam.y+VP_H+1){
+        const apx = (altarPos.x - cam.x) * TS;
+        const apy = (altarPos.y - cam.y) * TS;
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(apx+TS/2, apy+TS-4, 18, 5, 0, 0, Math.PI*2); ctx.fill();
@@ -17314,9 +17433,10 @@ function loop(ts){
     }
 
     // Bancada de craft (só na cidade)
-    if ((player.floor || 0) === 0 && CRAFT_POS.x >= cam.x-1 && CRAFT_POS.x < cam.x+VP_W+1 && CRAFT_POS.y >= cam.y-1 && CRAFT_POS.y < cam.y+VP_H+1){
-        const cpx = (CRAFT_POS.x - cam.x) * TS;
-        const cpy = (CRAFT_POS.y - cam.y) * TS;
+    const craftPos = servicePosition('craft');
+    if (craftPos && craftPos.x >= cam.x-1 && craftPos.x < cam.x+VP_W+1 && craftPos.y >= cam.y-1 && craftPos.y < cam.y+VP_H+1){
+        const cpx = (craftPos.x - cam.x) * TS;
+        const cpy = (craftPos.y - cam.y) * TS;
         // sombra
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.ellipse(cpx+TS/2, cpy+TS-4, 20, 4, 0, 0, Math.PI*2); ctx.fill();
@@ -17397,7 +17517,7 @@ function loop(ts){
             // Sem fundo: a escada de descida existe se o server mandou (stairs.down) —
             // o teto saiu do cliente. Rótulos via tr() (eram o último PT hardcoded da masmorra).
             const su = dunStairUp(), sd = dunStairDown();
-            if (su) drawStair(su, false, player._expedition
+            if (su) drawStair(su, false, player._interior ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : player._expedition
                 ? (LANG === 'en' ? 'Exit expedition' : 'Sair da expedição')
                 : onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
             if (sd) drawStair(sd, true, tr('stair.down'));

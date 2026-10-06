@@ -1,4 +1,5 @@
 node_modules/
+_source/
 assets/characters/Knight.glb
 assets/characters/Mage.glb
 assets/characters/Rogue_Hooded.glb

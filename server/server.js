@@ -1118,8 +1118,8 @@ function executeTransmutation(p, msg){
     }
     if (opId !== p.transmutationToken) return fail('stale_op');
     if (msg.version !== transmutationRules.VERSION || p.equipmentVersion !== equipmentRules.VERSION) return fail('update_required');
-    if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId ||
-        chebyshev(p.x,p.y,51,52) > 1) return fail('not_at_bench');
+    if (p.hp <= 0 || !nearCraftService(p) || p.duel || p.arena || p.tradeId)
+        return fail('not_at_bench');
     const quote = transmutationRules.quote(keys,p.transmutationPity,family);
     if (!quote.valid) return fail(quote.error);
     const quoted = {cost:quote.cost,tier:quote.tier};
@@ -1204,8 +1204,8 @@ function executeProgressionCraft(p, msg){
     if (p.equipmentVersion !== equipmentRules.VERSION) return fail('update_required');
     const recipe = Object.hasOwn(progression.recipes,key) ? progression.recipes[key] : null;
     if (!recipe) return fail('bad_recipe');
-    if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId ||
-        chebyshev(p.x,p.y,51,52) > 1) return fail('not_at_bench');
+    if (p.hp <= 0 || !nearCraftService(p) || p.duel || p.arena || p.tradeId)
+        return fail('not_at_bench');
     if (Object.entries(recipe.in).some(([input,qty]) => !hasInv(p,input,qty))) return fail('no_materials');
     if (!Number.isFinite(p.gold) || p.gold < recipe.gold) return fail('no_gold');
     const projected = {...p.inv};
@@ -1847,6 +1847,32 @@ const DUNGEON_ROOM = { x0: 40, y0: 40, x1: 60, y1: 60 };
 // geração sair pequena/desconexa, cai pra sala cheia (= Fase 1) — nunca quebra.
 const DUNGEON_REGION = DUNGEON_ROOM;     // região coberta pelo grid (40..60 = 21×21)
 const dungeonFloors = new Map();          // floor → { region, rows, walkable:Set, floorTiles:[], stairs }
+const interiorsById = new Map(modernWorld.interiors.map(room => [room.id, room]));
+const interiorsByFloor = new Map(modernWorld.interiors.map(room => [room.floor, room]));
+function isInteriorFloor(floor){ return interiorsByFloor.has(floor || 0); }
+function nearInteriorService(p,kind){
+    const room=interiorsByFloor.get(p.floor);
+    return !!room && room.services.some(s=>s.kind===kind && chebyshev(p.x,p.y,s.x,s.y)<=1);
+}
+function nearCraftService(p){
+    return ((p.floor || 0)===0 && chebyshev(p.x,p.y,51,52)<=1) || nearInteriorService(p,'craft');
+}
+// These handlers refer to NPCs, furniture or counters that exist only outdoors.
+const cityServiceMessages = new Set([
+    'invShop','invChest','questTurnIn','casinoSpin',
+    'auctionList','auctionCancel','auctionBuy','auctionBrowse','petBuy','dyeItem'
+]);
+for (const room of modernWorld.interiors){
+    const {region,rows}=room.grid, walkable=new Set(), floorTiles=[];
+    for (let y=region.y0;y<=region.y1;y++) for (let x=region.x0;x<=region.x1;x++){
+        if (rows[y-region.y0]?.[x-region.x0] !== '1') continue;
+        walkable.add(x+','+y); floorTiles.push({x,y});
+    }
+    dungeonFloors.set(room.floor,{
+        floor:room.floor,region,rows,walkable,floorTiles,
+        stairs:{spawn:room.spawn,up:room.exit,down:null,town:null,boss:null}
+    });
+}
 // PRNG determinístico (mulberry32) — seed pelo andar (+ tentativa de retry).
 function dungeonRng(seed){
     let s = (seed >>> 0) || 1;
@@ -2739,6 +2765,40 @@ function returnPlayerToTown(p, id){
         }));
     }
     broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+}
+
+function enterInterior(p,id,room){
+    broadcast(id,{t:'leave',id},0);
+    p._pvpBeforeDungeon=!!p.pvp;
+    p.pvp=false;
+    p.floor=room.floor;
+    p.x=room.spawn.x; p.y=room.spawn.y;
+    sendTo(id,{
+        t:'dungeonEnter',interior:room.id,floor:room.floor,dir:'down',
+        x:p.x,y:p.y,pvp:false,grid:room.grid,stairs:dungeonFloors.get(room.floor).stairs,
+        players:snapshotPlayers(room.floor).filter(sp=>sp.id!==id),
+        mobs:[],groundDrops:[]
+    });
+    broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,
+        pvp:false,hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,
+        cosmetic:p.cosmetic||null,pet:p.pet||null,badges:p.badges||[],
+        dyes:p.dyes||null,guild:findGuildOfPlayer(p.name)?.name||null}},room.floor);
+}
+function exitInterior(p,id,room){
+    broadcast(id,{t:'leave',id},room.floor);
+    p.floor=0;
+    p.x=room.door.x; p.y=room.door.y;
+    p.pvp=!!p._pvpBeforeDungeon;
+    p._pvpBeforeDungeon=undefined;
+    sendTo(id,{
+        t:'dungeonExit',interior:room.id,x:p.x,y:p.y,pvp:p.pvp,
+        players:snapshotPlayers(0).filter(sp=>sp.id!==id),
+        mobs:snapshotMobs(0),groundDrops:snapshotGroundDrops(0)
+    });
+    broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,
+        pvp:p.pvp,hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,
+        cosmetic:p.cosmetic||null,pet:p.pet||null,badges:p.badges||[],
+        dyes:p.dyes||null,guild:findGuildOfPlayer(p.name)?.name||null}},0);
 }
 
 // Respawn PvE server-autoritativo (fix do LOOP DE MORTE — 2026-06-03).
@@ -4553,7 +4613,7 @@ function tickImpostorBot(){
     // Persegue player mais próximo se algum tiver em raio 8; senão move random
     let target = null, bestD = 999;
     for (const pp of players.values()){
-        if (pp._isBot || pp.disconnected || (pp.hp ?? 100) <= 0) continue;
+        if (pp._isBot || pp.disconnected || (pp.hp ?? 100) <= 0 || (pp.floor || 0) !== 0) continue;
         const d = chebyshev(pp.x, pp.y, impostorBot.x, impostorBot.y);
         if (d < bestD){ bestD = d; target = pp; }
     }
@@ -5419,6 +5479,7 @@ function tickPlayerDots(){
     for (const p of players.values()){
         if (!p.dots || !p.dots.length) continue;
         if (!p.ws || p.ws.readyState !== 1) continue;
+        if (isInteriorFloor(p.floor)) continue; // pausa efeitos herdados da rua durante a visita
         if ((p._invulnUntil || 0) > now) continue;   // 🕯️ Segunda Chance: imunidade pós-revive — sem tick de DoT
         if ((p.hp ?? 100) <= 0){ p.dots.length = 0; continue; }
         let hpChanged = false;
@@ -6632,6 +6693,7 @@ wss.on('connection', (ws, request) => {
         // A conta autenticada ainda não é um personagem carregado. Impede que um
         // cliente recusado no join grave os defaults vazios sobre o save real.
         if (msg.t !== 'join' && !p.joined) return;
+        if (isInteriorFloor(p.floor) && cityServiceMessages.has(msg.t)) return;
 
         // ─── SAVE upload (snapshot do save do player) ─────────────────────
         if (msg.t === 'saveUpload') {
@@ -7202,7 +7264,7 @@ wss.on('connection', (ws, request) => {
             const r = RECIPES[idx];
             if (!r){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.bad_recipe') }); return; }
             // Tem que estar perto da bancada (51,52) — chebyshev ≤ 1
-            if (Math.max(Math.abs(p.x - 51), Math.abs(p.y - 52)) > 1){
+            if (!nearCraftService(p)){
                 sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.near_bench') }); return;
             }
             for (const [k, q] of Object.entries(r.in)){
@@ -7221,6 +7283,9 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'invForge') {
             const itemKey = itemKeyFromMessage(msg.itemKey);
             const rejectForge = error => sendInvUpdate(p,{forge:{ok:false,error,itemKey}});
+            if ((p.floor || 0)!==0 && !nearInteriorService(p,'craft')){
+                rejectForge('not_at_bench'); return;
+            }
             if (!itemKey){ rejectForge('bad_item'); return; }
             const tier = getUpgradeTier(itemKey);
             const baseMeta = itemMetaForKey(itemKey);
@@ -7310,7 +7375,7 @@ wss.on('connection', (ws, request) => {
             if (opId !== p.enchantToken){ reply({ok:false,error:'stale_op'}); return; }
             if (!ENCHANTING_ENABLED){ reply({ok:false,error:'disabled'}); return; }
             if (p.equipmentVersion !== equipmentRules.VERSION){ reply({ok:false,error:'update_required'}); return; }
-            if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId || chebyshev(p.x,p.y,51,52) > 1){
+            if (p.hp <= 0 || !nearCraftService(p) || p.duel || p.arena || p.tradeId){
                 reply({ok:false,error:'not_at_bench'}); return;
             }
             const meta = itemMetaForKey(itemKey), tier = getUpgradeTier(itemKey);
@@ -7578,6 +7643,7 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'pvpAttack') {
             const tgt = players.get(msg.targetId);
             if (!tgt) return;
+            if (isInteriorFloor(p.floor) || isInteriorFloor(tgt.floor)) return;
             // Mesmo-andar obrigatório (espelha o attackMob, audit 03/06): cidade fora da
             // PZ, andares da masmorra (40-60) e arena (44-56) COMPARTILHAM coordenadas —
             // sem isto, um frame forjado hitava player de OUTRO andar/superfície na mesma
@@ -7984,7 +8050,11 @@ wss.on('connection', (ws, request) => {
             const DUMMY = { x:49, y:52 };
             const ALTAR = { x:50, y:49 };
             const target = skill === 'Magia' ? ALTAR : DUMMY;
-            if (Math.max(Math.abs(p.x - target.x), Math.abs(p.y - target.y)) > 1){
+            const serviceKind=skill==='Magia' ? 'altar' : 'dummy';
+            const atService=(p.floor || 0)===0
+                ? chebyshev(p.x,p.y,target.x,target.y)<=1
+                : nearInteriorService(p,serviceKind);
+            if (!atService){
                 return reject(skill === 'Magia' ? 'not_at_altar' : 'not_at_dummy');
             }
             const sk = p.skills[skill];
@@ -8380,6 +8450,27 @@ wss.on('connection', (ws, request) => {
             sendExpeditionStatus(p);
             return;
         }
+        if (msg.t === 'enterInterior') {
+            const room=interiorsById.get(msg.id);
+            if (!room){ sendTo(id,{t:'interiorResult',ok:false,error:'unknown_interior'}); return; }
+            if (p.floor!==0 || !(p.hp>0) || p.duel || p.arena || p.expedition || p.tradeId){
+                sendTo(id,{t:'interiorResult',ok:false,error:'unavailable'}); return;
+            }
+            if (chebyshev(p.x,p.y,room.door.x,room.door.y)>1){
+                sendTo(id,{t:'interiorResult',ok:false,error:'not_at_door'}); return;
+            }
+            enterInterior(p,id,room);
+            return;
+        }
+        if (msg.t === 'exitInterior') {
+            const room=interiorsByFloor.get(p.floor);
+            if (!room){ sendTo(id,{t:'interiorResult',ok:false,error:'not_inside'}); return; }
+            if (chebyshev(p.x,p.y,room.exit.x,room.exit.y)>1){
+                sendTo(id,{t:'interiorResult',ok:false,error:'not_at_exit'}); return;
+            }
+            exitInterior(p,id,room);
+            return;
+        }
         // enterDungeon: overworld → andar 1 OU andar de banda desbloqueado por boss
         // (checkpoint — msg.floor validado contra p.dungeonUnlock). descendDungeon:
         // andar N → N+1 (escada de descida). exitDungeon: sobe 1 andar (andar 1 →
@@ -8414,7 +8505,7 @@ wss.on('connection', (ws, request) => {
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
-            if (cur < 1 || cur >= DUNGEON_FLOOR_HARD_CAP) return;   // precisa estar num andar (teto técnico 999)
+            if (!isDungeonFloor(cur) || cur >= DUNGEON_FLOOR_HARD_CAP) return;   // precisa estar na masmorra
             const sd = getDungeonFloor(cur).stairs.down;       // Fase 2: escada de descida do andar (procedural)
             if (!sd || chebyshev(p.x, p.y, sd.x, sd.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
@@ -8433,7 +8524,7 @@ wss.on('connection', (ws, request) => {
             p._lastFloorAt = p._lastFloorAt || 0;
             if (now - p._lastFloorAt < 600) return;
             const cur = p.floor || 0;
-            if (cur === 0) return;                      // já está na cidade
+            if (!isDungeonFloor(cur)) return;           // interiores e arena têm saída própria
             const su = getDungeonFloor(cur).stairs.up;          // Fase 2: escada de subida do andar (procedural)
             if (!su || chebyshev(p.x, p.y, su.x, su.y) > 1){
                 if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t:'dungeonResult', error:'not_at_exit' }));
@@ -8784,6 +8875,7 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'pkDeath') {
+            if (isInteriorFloor(p.floor)) return;
             // Server agora detecta morte PvP autonomamente em pvpAttack quando
             // hp zera. Se _pkServerHandled foi setado nos últimos 15s, ignora
             // essa msg (era a vítima reportando o que o server já processou).
@@ -8820,6 +8912,7 @@ wss.on('connection', (ws, request) => {
 
         // Duelo 1v1 — comandos via chat-like (consumido antes do broadcast normal)
         if (msg.t === 'duelInvite') {
+            if (isInteriorFloor(p.floor)) return;
             // Rate limit (audit 29/05): sem isso um player podia spamar
             // duelInvite pra outro 100×/seg → pop-up infinito de assédio.
             const now = Date.now();
@@ -8840,6 +8933,7 @@ wss.on('connection', (ws, request) => {
             }
             if (!target){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.not_online', {name: toName}) }); return; }
             if (target.duel){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.target_dueling', {name: target.name}) }); return; }
+            if (isInteriorFloor(target.floor)) return;
             if ((target.gold || 0) < amount){ sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.target_cant_cover', {name: target.name, g: amount}) }); return; }
             duelInvites.set(target.id, { fromId: id, fromName: p.name, amount, expiresAt: Date.now() + 30_000 });
             sendTo(target.id, { t:'duelInvite', fromId: id, fromName: p.name, amount });
@@ -8857,6 +8951,10 @@ wss.on('connection', (ws, request) => {
             if (!from || from.disconnected){
                 duelInvites.delete(id);
                 sendTo(id, { t:'serverMsg', level:'warn', text: trp(p, 'srv.challenger_left') });
+                return;
+            }
+            if (isInteriorFloor(p.floor) || isInteriorFloor(from.floor)){
+                duelInvites.delete(id);
                 return;
             }
             if (from.duel || p.duel){
@@ -9007,6 +9105,9 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'tradeAccept') {
             const initiator = players.get(msg.fromId);
             if (!initiator || initiator.disconnected) return;
+            // A oferta pode ter sido enviada antes de um dos dois mudar de piso.
+            // Revalida a PZ no aceite: salas e cidade reutilizam coordenadas.
+            if (!playerInSafe(p) || !playerInSafe(initiator)) return;
             if (initiator.tradeId || p.tradeId) return;
             if (chebyshev(p.x, p.y, initiator.x, initiator.y) > 3) return;
             const tradeId = 'tr_' + Date.now() + '_' + Math.floor(Math.random()*10000);

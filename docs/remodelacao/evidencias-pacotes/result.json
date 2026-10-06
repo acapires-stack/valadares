@@ -1,0 +1,1003 @@
+{
+  "checks": [
+    "pousada: entrar, caminhar, PvP protegido, sair na porta",
+    "bancada interna: criação real com recibo de ouro/inventário",
+    "oficina: entrar, caminhar, PvP protegido, sair na porta",
+    "biblioteca: treino real com XP/custo e parada ao sair do ponto",
+    "biblioteca: entrar, caminhar, PvP protegido, sair na porta",
+    "mercado: treino real com XP/custo e parada ao sair do ponto",
+    "mercado: entrar, caminhar, PvP protegido, sair na porta",
+    "pousada: segunda entrada e saída andando pela porta",
+    "reload dentro: reconexão na vila com equipamento preservado",
+    "recursos de cenário e áudio carregados sem erro",
+    "viewport 844x390: botão de porta acessível e interior aberto"
+  ],
+  "snapshots": [
+    {
+      "label": "vila",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 12007,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": true,
+      "mobs": 147,
+      "door": "",
+      "render": {
+        "ready": true,
+        "fps": 44,
+        "error": null,
+        "actors": {
+          "visible": 18,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 22,
+          "generated": 12,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 460
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "pousada",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 12007,
+      "weapon": "MACHADO_MINO",
+      "floor": 1000,
+      "interior": "pousada",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 59,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 1000,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 22,
+          "generated": 20,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 68
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "pousada saida",
+      "x": 44,
+      "y": 46,
+      "hp": 166,
+      "mp": 133,
+      "gold": 12007,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Entrar · Taverna da Pousada [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 16,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 24,
+          "generated": 29,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 68
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "oficina",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 12007,
+      "weapon": "MACHADO_MINO",
+      "floor": 1001,
+      "interior": "oficina",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 1001,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 25,
+          "generated": 38,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 64
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "oficina saida",
+      "x": 52,
+      "y": 45,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11963,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 22,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 25,
+          "generated": 47,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 64
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "biblioteca",
+      "x": 50,
+      "y": 50,
+      "hp": 165,
+      "mp": 133,
+      "gold": 11963,
+      "weapon": "MACHADO_MINO",
+      "floor": 1002,
+      "interior": "biblioteca",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 1002,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 25,
+          "generated": 53,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 56
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "biblioteca saida",
+      "x": 57,
+      "y": 49,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11927,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 19,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 25,
+          "generated": 59,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 401
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "mercado",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11927,
+      "weapon": "MACHADO_MINO",
+      "floor": 1003,
+      "interior": "mercado",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 1003,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 26,
+          "generated": 71,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 62
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "mercado saida",
+      "x": 43,
+      "y": 53,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Entrar · Sala de Treino do Mercado [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 16,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 26,
+          "generated": 80,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 473
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "reload dentro",
+      "x": 44,
+      "y": 46,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Entrar · Taverna da Pousada [G]",
+      "render": {
+        "ready": true,
+        "fps": 0,
+        "error": null,
+        "actors": {
+          "visible": 22,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 24,
+          "generated": 9,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 586
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "bosque",
+      "x": 40,
+      "y": 46,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Entrar · Taverna da Pousada [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 17,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 24,
+          "generated": 9,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 571
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "viewport compacto",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 1001,
+      "interior": "oficina",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior"
+          ]
+        },
+        "world": {
+          "floor": 1001,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 25,
+          "generated": 18,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 21,
+            "failed": 0,
+            "requested": 21
+          }
+        },
+        "width": 93.453125,
+        "height": 68.53125,
+        "drawCalls": 64
+      },
+      "audioContext": "running"
+    }
+  ],
+  "errors": [],
+  "assets": [
+    {
+      "path": "/modern/assets/scenery/forest/Tree_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_large.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_small_stack.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/crates_stacked.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chest.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/torch_mounted.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/wall_broken.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/rubble_half.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chair.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bartop_A_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bar_straight_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Knight-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Mage-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Rogue_Hooded-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Barbarian-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Skeleton_Warrior-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-pz.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-grass-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-forest.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-interior.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-wood-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-wood-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/damage.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/critical.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/kill.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-grass-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-pz.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_large.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_small_stack.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/crates_stacked.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chest.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/torch_mounted.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/wall_broken.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/rubble_half.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chair.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bartop_A_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bar_straight_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Knight-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Mage-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Barbarian-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Rogue_Hooded-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Skeleton_Warrior-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-forest.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-grass-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-forest.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_large.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_small_stack.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/crates_stacked.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chest.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/torch_mounted.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/wall_broken.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/rubble_half.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chair.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bar_straight_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bartop_A_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Mage-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Knight-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Rogue_Hooded-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Barbarian-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Skeleton_Warrior-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-pz.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-interior.mp3",
+      "status": 200
+    }
+  ],
+  "startedAt": "2026-10-06T17:55:36.767Z",
+  "pass": true,
+  "finishedAt": "2026-10-06T17:56:26.280Z"
+}

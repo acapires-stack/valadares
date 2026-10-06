@@ -134,7 +134,8 @@ function refresh() {
     set('modernGold', `${Math.floor(player.gold || 0).toLocaleString('pt-BR')} g`);
     byId('modernHpBar').style.width = `${fraction(player.hp, player.maxHp)}%`;
     byId('modernMpBar').style.width = `${fraction(player.mp, player.maxMp)}%`;
-    set('modernPos', `${Math.floor(player.x)}, ${Math.floor(player.y)}${bridge.getFloor?.() ? ` · ${bridge.getFloor()}` : ''}`);
+    const room=bridge.getInterior?.();
+    set('modernPos', room ? (bridge.getLanguage?.()==='en' ? ({pousada:'Village tavern',oficina:'Village forge',biblioteca:'Temple',mercado:'Training hall'})[room.id] || room.label : room.label) : `${Math.floor(player.x)}, ${Math.floor(player.y)}${bridge.getFloor?.() ? ` · ${bridge.getFloor()}` : ''}`);
     const target = bridge.getTarget?.();
     const targetNode = byId('modernTarget');
     if (target?.id != null) {

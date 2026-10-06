@@ -1,4 +1,4 @@
-/* Valadares audio: one shared Web Audio context, no external files or playback state. */
+/* Valadares audio: one shared Web Audio context with optional, lazy samples. */
 ((root, factory) => {
     const api = factory();
     if (typeof module === 'object' && module.exports) module.exports = api;
@@ -22,20 +22,28 @@
     const COOLDOWN = { melee: 75, ranged: 95, wand: 110, damage: 130, kill: 110,
         spell: 140, pickup: 120, critical: 160, rareLoot: 600, bossReward: 800,
         forgeSuccess: 600, forgeFailure: 600, forgeCancelled: 400,
-        trainingDone: 800, levelup: 800, death: 800 };
+        trainingDone: 800, levelup: 800, death: 800, footstep: 115 };
     const PRIORITY_SFX = new Set(['rareLoot', 'bossReward', 'forgeSuccess', 'forgeFailure',
         'forgeCancelled', 'trainingDone', 'levelup', 'death']);
+    const ASSET_BASE = '/modern/assets/audio/';
+    const SAMPLE_KIND = { wand: 'wand', damage: 'damage', kill: 'kill', pickup: 'pickup',
+        critical: 'critical', rareLoot: 'rare-loot', bossReward: 'boss-reward',
+        forgeSuccess: 'forge-success', forgeFailure: 'forge-failure',
+        forgeCancelled: 'forge-cancelled', trainingDone: 'training-done',
+        levelup: 'levelup', death: 'death' };
+    const AMBIENT_SAMPLE = { pz: 'ambient-pz', grass: 'ambient-forest', cave: 'ambient-cave' };
 
     function create(ctx){
         if (!ctx || typeof ctx.createGain !== 'function' || !ctx.destination)
             throw new TypeError('AudioContext required');
         let disposed = false;
         const volumes = { master: 60, effects: 65, ambient: 40, music: 35 };
-        const scene = { biome: 'pz', combat: false, active: false };
+        const scene = { biome: 'pz', interior: false, combat: false, active: false };
         const voices = new Set();
         const lastPlay = new Map();
+        const samples = new Map();
         let burstStart = 0, burstNormal = 0, burstPriority = 0;
-        let timer = null, noiseBuffer = null, impulse = null, bed = null;
+        let timer = null, noiseBuffer = null, impulse = null, bed = null, sampledBed = null;
         let scoreName = 'pz', scoreStep = 0, nextBeat = 0, nextDetail = 0;
 
         const masterGain = ctx.createGain();
@@ -58,7 +66,8 @@
         masterGain.connect(ctx.destination);
 
         function usable(){
-            return !disposed && scene.active && !(typeof document !== 'undefined' && document.hidden);
+            return !disposed && scene.active && volumes.master > 0 &&
+                !(typeof document !== 'undefined' && document.hidden);
         }
         function target(param, value, seconds = 0.04){
             const t = ctx.currentTime;
@@ -171,6 +180,50 @@
             }
         }
 
+        function sampleFor(kind, details, nowMs){
+            if (kind === 'melee' || kind === 'ranged') return kind + '-' + (Math.floor(nowMs / 97) % 2 + 1);
+            if (kind === 'spell'){
+                const spell = String(details && details.spell || '').toLowerCase();
+                if (/dark|shadow|poison|curse|sombr|veneno/.test(spell)) return 'spell-dark';
+                if (/fire|flame|fogo|meteor/.test(spell)) return 'spell-fire';
+                if (/ice|frost|gelo|cold|neve/.test(spell)) return 'spell-ice';
+                return 'spell-generic';
+            }
+            if (kind === 'footstep'){
+                const material = String(details && details.material || (scene.interior ? 'wood' : scene.biome)).toLowerCase();
+                const surface = /wood|interior|madeira/.test(material) ? 'wood' :
+                    /stone|rock|cave|concrete|pedra/.test(material) ? 'stone' :
+                    /grass|forest|floresta|grama/.test(material) ? 'grass' : 'dirt';
+                return 'foot-' + surface + '-' + (Math.floor(nowMs / 137) % 2 + 1);
+            }
+            return SAMPLE_KIND[kind] || null;
+        }
+        function loadSample(key){
+            if (!key || samples.has(key) || disposed || typeof fetch !== 'function' || typeof ctx.decodeAudioData !== 'function') return;
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            const entry = { buffer: null, controller };
+            samples.set(key, entry);
+            Promise.resolve().then(() => fetch(ASSET_BASE + key + '.mp3', controller ? { signal: controller.signal } : {}))
+                .then(response => {
+                    if (!response.ok) throw new Error('audio asset unavailable');
+                    return response.arrayBuffer();
+                })
+                .then(data => ctx.decodeAudioData(data))
+                .then(buffer => {
+                    if (disposed || !buffer) return;
+                    entry.buffer = buffer;
+                    if (key === ambientSampleKey() && usable()) syncAmbient();
+                })
+                .catch(() => { /* Synthesis remains the fallback for unavailable assets. */ });
+        }
+        function ambientSampleKey(){ return scene.interior ? 'ambient-interior' : AMBIENT_SAMPLE[scene.biome] || null; }
+        function playSample(voice, buffer, at){
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(voice.gain);
+            sourceIn(voice, source, at, at + buffer.duration + 0.01);
+        }
+
         function play(kind, details = {}){
             if (!usable() || volumes.master === 0 || volumes.effects === 0 || typeof kind !== 'string') return false;
             const nowMs = Date.now();
@@ -179,10 +232,22 @@
             if (priority ? burstPriority >= 3 : burstNormal >= 13) return false;
             if (nowMs - (lastPlay.get(kind) || 0) < (COOLDOWN[kind] || 60)) return false;
             const at = ctx.currentTime;
-            const v = newVoice(effectsGain, at, 0.75);
+            const key = sampleFor(kind, details, nowMs);
+            const buffer = key && samples.get(key)?.buffer;
+            if (key && !buffer) loadSample(key);
+            const v = newVoice(effectsGain, at, buffer ? (kind === 'footstep' ? 0.30 : 0.48) : 0.75);
             if (!v) return false;
+            if (buffer){
+                playSample(v, buffer, at);
+                lastPlay.set(kind, nowMs);
+                if (priority) burstPriority++;
+                else burstNormal++;
+                return true;
+            }
             const variant = (nowMs % 7) / 150;
             switch (kind){
+                case 'footstep':
+                    noise(v, at, 0.075, 0.085, scene.interior ? 1050 : 780); break;
                 case 'melee':
                     noise(v, at, 0.115, 0.17, 2100, true);
                     tone(v, 190 + variant * 300, at, 0.12, 0.095, 'triangle', 0.48); break;
@@ -283,6 +348,44 @@
                 old.src.disconnect(); old.filter.disconnect(); old.level.disconnect();
             };
         }
+        function stopSampledBed(){
+            if (!sampledBed) return;
+            const old = sampledBed;
+            sampledBed = null;
+            target(old.level.gain, 0, 0.045);
+            try { old.src.stop(ctx.currentTime + 0.22); } catch {}
+            old.src.onended = () => {
+                try { old.src.disconnect(); old.level.disconnect(); } catch {}
+            };
+        }
+        function syncAmbient(){
+            if (!usable()) return;
+            if (volumes.ambient === 0){
+                stopSampledBed();
+                stopBed();
+                return;
+            }
+            const key = ambientSampleKey();
+            const buffer = key && samples.get(key)?.buffer;
+            if (key && !buffer) loadSample(key);
+            if (!buffer){
+                stopSampledBed();
+                startBed();
+                return;
+            }
+            if (sampledBed?.key === key) return;
+            stopSampledBed();
+            const src = ctx.createBufferSource();
+            const level = ctx.createGain();
+            src.buffer = buffer;
+            src.loop = true;
+            level.gain.value = 0;
+            src.connect(level).connect(ambientGain);
+            src.start();
+            target(level.gain, 0.24, 0.35);
+            sampledBed = { key, src, level };
+            stopBed();
+        }
         function detail(at){
             if (voices.size >= 24) return;
             const p = BIOMES[scene.biome];
@@ -345,7 +448,7 @@
         function syncActivity(){
             syncGains();
             if (usable()){
-                startBed();
+                syncAmbient();
                 if (!timer){
                     nextBeat = ctx.currentTime + 0.06;
                     nextDetail = ctx.currentTime + 2.2;
@@ -355,6 +458,7 @@
             } else {
                 if (timer){ clearInterval(timer); timer = null; }
                 stopBed();
+                stopSampledBed();
                 stopVoices();
             }
         }
@@ -363,12 +467,13 @@
             for (const key of Object.keys(volumes)){
                 if (Number.isFinite(next[key])) volumes[key] = Math.max(0, Math.min(100, next[key]));
             }
-            syncGains();
+            syncActivity();
         }
         function setScene(next){
             if (disposed || !next || typeof next !== 'object') return;
             const previousBiome = scene.biome;
             if (typeof next.biome === 'string' && BIOMES[next.biome]) scene.biome = next.biome;
+            if (typeof next.interior === 'boolean') scene.interior = next.interior;
             if (typeof next.combat === 'boolean') scene.combat = next.combat;
             if (typeof next.active === 'boolean') scene.active = next.active;
             const chosen = chooseScore();
@@ -393,7 +498,10 @@
             if (timer){ clearInterval(timer); timer = null; }
             if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibility);
             stopBed();
+            stopSampledBed();
             stopVoices();
+            for (const entry of samples.values()) entry.controller?.abort();
+            samples.clear();
             masterGain.gain.setValueAtTime(0, ctx.currentTime);
             // Keep the injected AudioContext under the caller's ownership.
             for (const node of [masterGain, effectsGain, ambientGain, musicGain, reverbInput, convolver, reverbWet]){

@@ -1,0 +1,203 @@
+{
+  "source": "Gamemaster_Audio_Pro_Sound_Collection_v1.3_16bit_44.1k.zip",
+  "files": [
+    {
+      "name": "melee-1.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_01.wav",
+      "bytes": 4669,
+      "sha256": "d628bb26c91c5602347727a95389c161f54187e0aee4f1f14e287d1c29fdac6d"
+    },
+    {
+      "name": "melee-2.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_02.wav",
+      "bytes": 3833,
+      "sha256": "9d462734a21fe29958070688667be0e1534c9cbe2e3f964256598e226f97348a"
+    },
+    {
+      "name": "ranged-1.mp3",
+      "source": "Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_01.wav",
+      "bytes": 4201,
+      "sha256": "d45e474c5a165d1f3a5448d3e2bea3f17b7c0b28d14f321f0079490f85435fa5"
+    },
+    {
+      "name": "ranged-2.mp3",
+      "source": "Guns_Weapons/Bow_Arrow/bow_crossbow_arrow_shoot_type1_02.wav",
+      "bytes": 5455,
+      "sha256": "6b36c9d914572d81e448d9cac3b0d910cdddd4f775eb33cca982a3de06911e2d"
+    },
+    {
+      "name": "wand.mp3",
+      "source": "Magic_Spells/spell_harness_magic_01.wav",
+      "bytes": 9008,
+      "sha256": "410624609a0a07b73a69fafd2d05d28ef8ef4d6e905db3ef06e79b51bef7fc43"
+    },
+    {
+      "name": "damage.mp3",
+      "source": "Punches/punch_general_body_impact_01.wav",
+      "bytes": 4251,
+      "sha256": "802a06e2d835629cb7bdbdae31ef875a97d291ac430bcc3d560bc3ddc543cdd5"
+    },
+    {
+      "name": "kill.mp3",
+      "source": "Punches/punch_low_deep_impact_01.wav",
+      "bytes": 3833,
+      "sha256": "50589fdb080d6266a22912e94b74ca941b69f10875cf28ac42d74a6b7d919b06"
+    },
+    {
+      "name": "spell-generic.mp3",
+      "source": "Magic_Spells/whoosh_magic_spell_01.wav",
+      "bytes": 7754,
+      "sha256": "b41ae213346bee66c3cfd17018c1bdf2076a0f9b408eea468ec19711a2fd55f2"
+    },
+    {
+      "name": "spell-fire.mp3",
+      "source": "Magic_Spells/fireball_blast_projectile_spell_01.wav",
+      "bytes": 10471,
+      "sha256": "457994feaaf626a55b48e57e1f080ce24c94013ef7ba2d16cc9ddaf97b5fd641"
+    },
+    {
+      "name": "spell-ice.mp3",
+      "source": "Magic_Spells/ice_spell_freeze_small_01.wav",
+      "bytes": 7420,
+      "sha256": "54929b2ddb82f6ceb54aac45bce203561f5cd5f515f2cd78ee19168b14943a93"
+    },
+    {
+      "name": "spell-dark.mp3",
+      "source": "Magic_Spells/twinkle_glitter_dark_spell_01.wav",
+      "bytes": 10825,
+      "sha256": "ef42eece5f5e847b2dc9fc54b8ffe8ff19af7893e72c950d00504022e7262824"
+    },
+    {
+      "name": "pickup.mp3",
+      "source": "Collectibles_Items_Powerup/collect_item_01.wav",
+      "bytes": 6341,
+      "sha256": "a9457e97e6d67d67e101df8835a6c55d6f1e31dfc4b7d3f165a5f473ea97ebfb"
+    },
+    {
+      "name": "critical.mp3",
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_ringing_01.wav",
+      "bytes": 7177,
+      "sha256": "0e10927b7e28265b4abb87cce6f730f063125c0f75d31c7f5f60f76638b90a14"
+    },
+    {
+      "name": "rare-loot.mp3",
+      "source": "Magic_Spells/special_item_popup_01.wav",
+      "bytes": 10413,
+      "sha256": "b82497951e33d229c49ed2b7578af89811adec86fccf9233b97724e405700ecb"
+    },
+    {
+      "name": "boss-reward.mp3",
+      "source": "Collectibles_Items_Powerup/collectable_item_bonus_01.wav",
+      "bytes": 31209,
+      "sha256": "b025298b28376eef6479ca830d306d79dddacf320865d27e7d97bf03b4ca9fb3"
+    },
+    {
+      "name": "forge-success.mp3",
+      "source": "Collectibles_Items_Powerup/jingle_chime_01_positive.wav",
+      "bytes": 30583,
+      "sha256": "4a8ec8403577775624fd4d37c913d5c80ea5dabdf02a49836b7f7dda7929e6a7"
+    },
+    {
+      "name": "forge-failure.mp3",
+      "source": "Collectibles_Items_Powerup/jingle_chime_16_negative.wav",
+      "bytes": 18253,
+      "sha256": "d412719d47cd824d113ca364ed77c7174d12de11f8bdc8ca282f0170105e7657"
+    },
+    {
+      "name": "forge-cancelled.mp3",
+      "source": "Collectibles_Items_Powerup/collect_item_jingle_fail_02.wav",
+      "bytes": 14282,
+      "sha256": "db9772ed833c7bc556e986b369669348ba555aefa392e524217c2c81aa6ea315"
+    },
+    {
+      "name": "training-done.mp3",
+      "source": "Collectibles_Items_Powerup/chime_bell_positive_ring_01.wav",
+      "bytes": 8849,
+      "sha256": "a342a856400fad1727e8a5c884ce78f87b8699dabc2b433951137d93d277aec4"
+    },
+    {
+      "name": "levelup.mp3",
+      "source": "Collectibles_Items_Powerup/jingle_chime_03_positive.wav",
+      "bytes": 19298,
+      "sha256": "6cff048df83904abd5115b970d2f524dd008d8cee8d0b3b3bbc15cf7e86434e8"
+    },
+    {
+      "name": "death.mp3",
+      "source": "Collectibles_Items_Powerup/game_over_dark_bell_chime_01.wav",
+      "bytes": 41867,
+      "sha256": "7b07e3b962c94c31ba9f2d9731c00df73dd89b4ce6b61a50d0ec97d849da210b"
+    },
+    {
+      "name": "foot-grass-1.mp3",
+      "source": "Footsteps/footstep_grass_walk_01.wav",
+      "bytes": 5923,
+      "sha256": "70313a0e6344cd692c983b89f6acf0b3921d2fa9eaf067118e70f7f3227c9970"
+    },
+    {
+      "name": "foot-grass-2.mp3",
+      "source": "Footsteps/footstep_grass_walk_02.wav",
+      "bytes": 3833,
+      "sha256": "3f77fee5ad5e543f49c70b0261b090b086a6d1b39a96323b3ae22e80c9e4b2dd"
+    },
+    {
+      "name": "foot-dirt-1.mp3",
+      "source": "Footsteps/footstep_dirt_walk_run_01.wav",
+      "bytes": 2161,
+      "sha256": "531908f350f23684bdd4f6dbbb998490564cbd9c0af32945df29c251b4c7d28f"
+    },
+    {
+      "name": "foot-dirt-2.mp3",
+      "source": "Footsteps/footstep_dirt_walk_run_02.wav",
+      "bytes": 2370,
+      "sha256": "888f0e863c29022981d833bceb07a6c496335d3606845ef0d939fc9b3f74237a"
+    },
+    {
+      "name": "foot-stone-1.mp3",
+      "source": "Footsteps/footstep_concrete_walk_01.wav",
+      "bytes": 3206,
+      "sha256": "6822b5da71679f616c1a5c059e6cc14877fcc46c8c859d6e5545530579d0b10f"
+    },
+    {
+      "name": "foot-stone-2.mp3",
+      "source": "Footsteps/footstep_concrete_walk_02.wav",
+      "bytes": 3206,
+      "sha256": "dabf8e179390a399d0c6120e2ad71e5d3915793d1828701b91ebf261bfea8eb8"
+    },
+    {
+      "name": "foot-wood-1.mp3",
+      "source": "Footsteps/footstep_wood_walk_01.wav",
+      "bytes": 2579,
+      "sha256": "ef51053e3b6b8323269b9a7a9afc1afaeb4b4d91f8157703ed484012a710ba0a"
+    },
+    {
+      "name": "foot-wood-2.mp3",
+      "source": "Footsteps/footstep_wood_walk_02.wav",
+      "bytes": 2997,
+      "sha256": "0e4f85eb8f31f265aa90d412f9dc51ca7be5525ad2181817285ec2b88c51b744"
+    },
+    {
+      "name": "ambient-pz.mp3",
+      "source": "Backgrounds/background_quiet_urban_park_loop_01.wav",
+      "bytes": 125486,
+      "sha256": "2479a04e925295faf6828ae4098b0effd2ba20d35e923db2e7ca88b6d940cb6b"
+    },
+    {
+      "name": "ambient-forest.mp3",
+      "source": "Animals_Nature_Ambiences/fantasy_jungle_forrest_loop_01.wav",
+      "bytes": 116395,
+      "sha256": "53cb820763e1c73484e244a33cabf4939520a8e3cc53c594d1a6d6000258802d"
+    },
+    {
+      "name": "ambient-cave.mp3",
+      "source": "Animals_Nature_Ambiences/cave_ambience_loop_01.wav",
+      "bytes": 119687,
+      "sha256": "6283c4c68a31ea2a9b11da4f25e6924fe2bf64357b910872f071a84034797c48"
+    },
+    {
+      "name": "ambient-interior.mp3",
+      "source": "Backgrounds/background_room_tone_loop_01.wav",
+      "bytes": 34736,
+      "sha256": "d44280bfdf13d6ad7742bbae2ea11be606b783cfc1cd4d8d6344fafbc469c36f"
+    }
+  ]
+}
