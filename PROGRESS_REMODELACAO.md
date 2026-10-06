@@ -10,7 +10,7 @@ Alcione autorizou agora: "sobe ela para eu jogar com minha conta". O registro lo
 - Cinco footprints do mapa são compartilhados pelo cliente clássico, 3D e servidor. Colisões exigem a atualização conjunta.
 - Vercel publica dist-web gerado por tools/build-web.cjs, somente recursos do navegador. Docker inclui modern-world.js; Railway acompanha alterações deste módulo.
 - Revisão independente da publicação concluída: empacotamento, mapa, cache, manutenção e retorno à versão anterior conferidos.
-- Próxima ação: QA focal das duas entradas, commit local, manutenção /manutencao 1 uma única vez; confirmar maintenance:true antes do push. Depois verificar Railway, Vercel e sessão real em /jogar3d.
+- Publicação concluída: c2146a0 em main; Railway a52ca232-c7af-4406-bb1d-540ba2e21999 e Vercel 8CNabyBbiWt6fHMZRcPrpXSkQxE1 SUCCESS. Manutenção enviada uma vez e lock confirmado antes do push. Servidor carregou 36 contas; health OK. Cliente, módulos e cinco modelos públicos com hashes iguais ao commit. Conta claude online em /jogar3d, renderer ready, HP/mana/skills preservados, combate/XP/loot observados enquanto Alcione jogava. Próxima ação: incorporar o retorno de Alcione sobre o teste; sem publicação adicional pendente.
 - Recuperação: base e17408b6ac8fc490cbf904b7f98dc52611794945; Railway anterior 4857bba4-6625-4eb1-94fd-77edc8c8c798. Reverter cliente e servidor juntos durante manutenção, preservando volume /data e contas. Nenhum restore de saves ou mudança de credenciais.
 - Recibo final de publicação ficará em outputs/Novo-Valadares-publicado.md no workspace desta conversa.
 
