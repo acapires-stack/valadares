@@ -2,17 +2,19 @@
 
 Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
 
-## Revisão profissional — candidato validado, publicação ainda pendente
+## Revisão profissional — publicada em 06/10/2026 às 19h03
 
-Candidato de runtime preservado em `9c17edfe04f73979dd3539ed54138c06c31476dc`. Retorno para 81b618b preparado e validado em `C:/Users/Alcione/Documents/Codex/2026-10-06/valadare/work/rollback-profissional-81b618b.patch`, sem restore de contas. Publicação não iniciada: ferramenta não alcança a aba administrativa antiga (`Debugger unattached`), e aba nova abre normalmente, porém no login. Solicitado a Alcione entrar nessa aba e avisar; nenhuma senha pedida no chat, nenhum comando de manutenção/push enviado. Estado de acesso e próxima ação em `work/revisao-profissional/STATUS.md` da conversa.
+Cliente e servidor publicados juntos em `af8d955716a1ef2fac8e0cbbf218a5dd1baff07b`, incluindo o pedido posterior de reduzir rato/cobra/aranha para 50% do tamanho visual. Vercel `dpl_6HScKgonQ9dsmYZF1ZAop8MoRp3w` Ready, alias valadares.app.br; Railway `6d887bf0-6e89-4fda-b030-451997a86e55` SUCCESS, iniciado22:02:49Z, volume existente montado e 36 contas carregadas. Retorno de código para 81b618b preparado e validado em `C:/Users/Alcione/Documents/Codex/2026-10-06/valadare/work/rollback-profissional-81b618b.patch`, sem restore de contas.
+
+Ctrl+F5 de Alcione recuperou o acesso à aba existente. Comando `/manutencao 1` enviado uma vez, recibo e locktrue confirmados antes do push. Verificação pública final PASS:43 recursos/rotas iguais ao commit,0 diferenças,3 rotas privadas404,health200,maintenancefalse. Recibo `work/publicacao-profissional-receipt.json` da conversa. Após reinício, claude ONLINE observado na PZ50/50, HP1361/1361, MP724/724 e ouro354287; não foi feito ensaio com recursos da conta. Aba ainda precisava recarregar o frontend; informado a Alcione que o novo Ctrl+F5 carrega a revisão.
 
 Esta seção supera os estados de entrega abaixo, mantidos como histórico. Alcione reprovou a revisão como acabamento integral e pediu especialistas; após Ctrl+F5 confirmou melhora e manteve o pedido. Não declarar remodelação completa.
 
-Quatro especialistas encerrados, nenhum escritor de produto ativo. Sete trajes independentes da arma e persistentes, proporções corretas, Skeleton_Minion e Wolf completos, golpes/impacto/morte sincronizados, áudio com variantes, minimapa nos dois layouts e quatro interiores revistos. Evidências e limites em `docs/remodelacao/REVISAO-PROFISSIONAL-20261006.md`. Build público 223 arquivos; ensaio integrado final PASS, 88 recursos, zero erros HTTP/JS, foco/clássico/compacto. Produção permanece em 81b618b até recibo posterior.
+Quatro especialistas encerrados, nenhum escritor de produto ativo. Sete trajes independentes da arma e persistentes, proporções corretas, Skeleton_Minion e Wolf completos, golpes/impacto/morte sincronizados, áudio com variantes, minimapa nos dois layouts e quatro interiores revistos. Evidências e limites em `docs/remodelacao/REVISAO-PROFISSIONAL-20261006.md`. Build público 223 arquivos; ensaio integrado final após redução da fauna PASS,89 recursos,zero erros HTTP/JS,foco/clássico/compacto. Produção em af8d955.
 
 Ainda falta arte autoral para parte da fauna, minotauro e chefes, corda/flecha do arco, visual próprio da besta e personalização modular. Downloads Standard Quaternius não cobrem a composição pronta; nenhuma compra adicional ou encaixe improvisado. Apreciação auditiva não foi fingida por medições.
 
-Alcione esclareceu que a janela dos downloads é Salvar como e sairia em minutos. Arquivos necessários já salvos; não abrir novos downloads que dependam de clique nativo. Prévia adicional 3338/8098 ativa, sessão local 12262; 3337/8097 preservada. Próxima ação: commit/recuperação e publicação conjunta autorizada usando o acesso administrativo normal, seguida de conferência pública. Se a sessão não estiver acessível, registrar a causa concreta sem contornar autenticação.
+Alcione esclareceu que a janela dos downloads é Salvar como. Arquivos necessários já salvos; não abrir novos downloads que dependam de clique nativo. Prévia adicional 3338/8098 ativa, sessão local12262;3337/8097 preservada. Publicação desta revisão concluída. Personalização modular e arte autoral faltante permanecem escopo não concluído, com lacunas e recursos necessários documentados; não substituir esses itens por encaixes improvisados. Nenhuma compra adicional.
 
 ## Revisão integrada dos pacotes — publicada em 06/10/2026 às 15h56
 
