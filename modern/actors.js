@@ -1,5 +1,6 @@
 // Original real-time presentation; authoritative entities and timings stay in the game.
-const FORWARD={down:0,left:90,up:180,right:-90};
+// Models face +Z at rest; positive yaw turns that forward vector toward +X.
+const FORWARD={down:0,left:-90,up:180,right:90};
 export async function createActors(pc,app,bridge){
  const materials=new Map();
  const material=(hex,metal=0)=>{const key=hex+':'+metal;if(materials.has(key))return materials.get(key);const m=new pc.StandardMaterial();m.diffuse=new pc.Color().fromString(hex);m.metalness=metal;m.useMetalness=true;m.gloss=metal?0.45:0.15;m.update();materials.set(key,m);return m;};
@@ -233,7 +234,7 @@ export async function createActors(pc,app,bridge){
   const visible=e=>{const x=e.renderX??e.x??e.pos?.x,z=e.renderY??e.y??e.pos?.y;return Number.isFinite(x)&&x>=bounds.minX&&x<bounds.maxX&&z>=bounds.minY&&z<bounds.maxY;};
   const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id);if(rec&&rec.sig!==sig){dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);rec.sig=sig;entries.set(id,rec);}rec.data=e;
    const x=(e.renderX??e.x??e.pos?.x)+.5,z=(e.renderY??e.y??e.pos?.y)+.5;const distance=Number.isFinite(rec.lastX)?Math.hypot(x-rec.lastX,z-rec.lastZ):0;const moving=distance>.0008;rec.entity.setPosition(x,0,z);
-   let angle=FORWARD[e.dir]??(moving?Math.atan2(-(x-rec.lastX),z-rec.lastZ)*180/Math.PI:rec.angle||0);rec.angle=angle;rec.entity.setEulerAngles(0,angle,0);
+   let angle=FORWARD[e.dir]??(moving?Math.atan2(x-rec.lastX,z-rec.lastZ)*180/Math.PI:rec.angle||0);rec.angle=angle;rec.entity.setEulerAngles(0,angle,0);
    const timer=e.attackTimer||0,atk=e.atkAnim||0,hit=e.artAttackAt||0;
    const newStrike=timer>rec.previousTimer+60||(atk>0&&rec.previousAtkAnim<=0)||(hit>0&&hit!==rec.previousArtAttackAt);
    rec.previousTimer=timer;rec.previousAtkAnim=atk;rec.previousArtAttackAt=hit;
