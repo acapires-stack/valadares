@@ -2,11 +2,15 @@
 
 Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
 
-## Revisão integrada dos pacotes — preparada para publicação
+## Revisão integrada dos pacotes — publicada em 06/10/2026 às 15h56
 
 Alcione mudou a orientação de retoques isolados para revisar o conjunto, explorar ao máximo os pacotes e só então voltar a jogar. Escopo e evidência completos em `docs/remodelacao/REVISAO-INTEGRADA-20261006.md`. Inclui cenários por ambiente, armas e personagens selecionados da Series6, minimapa com descoberta preservada, músicas completas do acervo, loot sem sobreposição e protocolo de movimento confirmado.
 
-QA integrado passou: quatro interiores, bancada/treino/altar com efeitos reais na conta sintética, saída/reentrada/reload, viewport compacto, 196 recursos sem falha e zero erros JS. Proxy local de atraso900ms passou49 passos sem posCorrect. Limite: o relato original de recuo em produção não foi capturado; rede muito lenta ainda causa espera. Simulação reproduziu falha de rajada antiga e verificou a correção, inclusive respawn. Revisão independente concluída. Fonte pública anterior c1dc6f7, backend27cb454; contas preservadas. Próxima ação: fechar captura final de biblioteca, commit, reversão verificável e publicação conjunta cliente/servidor conforme autorização existente.
+QA integrado passou: quatro interiores, bancada/treino/altar com efeitos reais na conta sintética, saída/reentrada/reload, viewport compacto, 196 recursos sem falha e zero erros JS. Proxy local de atraso900ms passou49 passos sem posCorrect. Limite: o relato original de recuo em produção não foi capturado; rede muito lenta ainda causa espera. Simulação reproduziu falha de rajada antiga e verificou a correção, inclusive respawn. Revisão independente concluída. Ajuste final de composição da biblioteca recapturado em QA focal, corredor e altar preservados.
+
+Publicado cliente e servidor: `81b618b90a8949fe240670d5b62d8f0f5c99d01e`. Vercel `dpl_D6QiWSSZKwee9DRvQGsFrLgmy5kN` Ready com alias valadares.app.br; Railway `0093b654-4788-40dd-a9bd-e92b46db6c27` SUCCESS, iniciado18:56:08Z, 36contas carregadas e volume existente preservado. Manutenção1min enviada uma vez pela sessão administrativa existente e recibo recebido; locktrue confirmado antes do push. Verificação pública final PASS:58recursos/rotas correspondem ao commit,0diferenças,3rotas privadas404,health200,maintenancefalse. Recibo `C:/Users/Alcione/Documents/Codex/2026-10-06/valadare/work/publicacao-integracao-receipt.json`. Reversão para runtimec1dc6f7 preparada em `work/rollback-integracao-c1dc6f7.patch` nessa conversa, validada por gitapplycheck (sem restaurar contas). Preview adicional3338/8098 encerrada normalmente;3337/8097 preservada.
+
+Entrega integrada pronta para o teste de Alcione; recarregar /jogar3d aplica o novo cliente. Nenhuma compra, campanha ou publicação social foi feita. Avaliação auditiva e experiência no aparelho do usuário permanecem retorno de uso, não foram fingidas por testes técnicos. Sem escritores ou publicação pendente; eventual commit documental após81b618b não altera o runtime publicado.
 
 ## Estado atual: pacotes publicados em 06/10/2026
 
