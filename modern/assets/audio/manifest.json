@@ -75,9 +75,9 @@
     },
     {
       "name": "critical.mp3",
-      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_ringing_01.wav",
-      "bytes": 7177,
-      "sha256": "0e10927b7e28265b4abb87cce6f730f063125c0f75d31c7f5f60f76638b90a14"
+      "source": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_heavy_01.wav",
+      "bytes": 3624,
+      "sha256": "f5ea803579b9a4d799025b6bf869c1169192e86394793166098d8423cad1d345"
     },
     {
       "name": "rare-loot.mp3",

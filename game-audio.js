@@ -32,6 +32,8 @@
         forgeCancelled: 'forge-cancelled', trainingDone: 'training-done',
         levelup: 'levelup', death: 'death' };
     const AMBIENT_SAMPLE = { pz: 'ambient-pz', grass: 'ambient-forest', cave: 'ambient-cave' };
+    const COMMON_SAMPLES = ['melee-1', 'melee-2', 'ranged-1', 'ranged-2',
+        'wand', 'damage', 'kill', 'critical', 'pickup'];
 
     function create(ctx){
         if (!ctx || typeof ctx.createGain !== 'function' || !ctx.destination)
@@ -45,6 +47,7 @@
         let burstStart = 0, burstNormal = 0, burstPriority = 0;
         let timer = null, noiseBuffer = null, impulse = null, bed = null, sampledBed = null;
         let scoreName = 'pz', scoreStep = 0, nextBeat = 0, nextDetail = 0;
+        let commonSamplesStarted = false, combatMelodyUntil = 0;
 
         const masterGain = ctx.createGain();
         const effectsGain = ctx.createGain();
@@ -79,7 +82,7 @@
             target(masterGain.gain, usable() ? volumes.master / 100 : 0, 0.025);
             target(effectsGain.gain, volumes.effects / 100);
             target(ambientGain.gain, volumes.ambient / 100);
-            target(musicGain.gain, volumes.music / 100 * (scene.combat ? 0.68 : 1), 0.35);
+            target(musicGain.gain, volumes.music / 100 * (scene.combat ? 0.55 : 1), 0.35);
         }
         function makeNoise(){
             if (noiseBuffer) return noiseBuffer;
@@ -216,6 +219,11 @@
                 })
                 .catch(() => { /* Synthesis remains the fallback for unavailable assets. */ });
         }
+        function startCommonSamples(){
+            if (commonSamplesStarted || volumes.effects === 0 || typeof fetch !== 'function') return;
+            commonSamplesStarted = true;
+            for (const key of COMMON_SAMPLES) loadSample(key);
+        }
         function ambientSampleKey(){ return scene.interior ? 'ambient-interior' : AMBIENT_SAMPLE[scene.biome] || null; }
         function playSample(voice, buffer, at){
             const source = ctx.createBufferSource();
@@ -235,7 +243,9 @@
             const key = sampleFor(kind, details, nowMs);
             const buffer = key && samples.get(key)?.buffer;
             if (key && !buffer) loadSample(key);
-            const v = newVoice(effectsGain, at, buffer ? (kind === 'footstep' ? 0.30 : 0.48) : 0.75);
+            let amp = buffer ? (kind === 'footstep' ? 0.30 : 0.48) : 0.75;
+            if (kind === 'pickup' && scene.combat) amp *= 0.45;
+            const v = newVoice(effectsGain, at, amp);
             if (!v) return false;
             if (buffer){
                 playSample(v, buffer, at);
@@ -255,8 +265,8 @@
                     noise(v, at, 0.09, 0.10, 2900, true);
                     tone(v, 580, at, 0.13, 0.07, 'triangle', 0.55); break;
                 case 'wand':
-                    tone(v, 460, at, 0.19, 0.085, 'sine', 1.75, 0.18);
-                    tone(v, 920, at + 0.035, 0.15, 0.034, 'sine', 1.25); break;
+                    noise(v, at, 0.12, 0.075, 1350, true);
+                    tone(v, 310, at, 0.16, 0.06, 'triangle', 0.55, 0.08); break;
                 case 'damage':
                     noise(v, at, 0.11, 0.14, 1100);
                     tone(v, 155, at, 0.13, 0.10, 'triangle', 0.6); break;
@@ -281,8 +291,8 @@
                     noise(v, at, 0.32, 0.09, 560);
                     tone(v, 196, at, 0.54, 0.11, 'triangle', 0.43, 0.15); break;
                 case 'critical':
-                    noise(v, at, 0.09, 0.16, 3500, true);
-                    tone(v, 870, at, 0.21, 0.11, 'triangle', 1.3); break;
+                    noise(v, at, 0.09, 0.14, 950);
+                    tone(v, 170, at, 0.12, 0.10, 'triangle', 0.48); break;
                 case 'forgeSuccess':
                     noise(v, at, 0.08, 0.105, 2900, true);
                     [392, 494, 587, 784].forEach((hz, i) => tone(v, hz, at + i * 0.11, 0.38, 0.08, 'sine', 1, 0.20)); break;
@@ -415,7 +425,7 @@
                 tone(v, midi(root), at, score.beat * 2.4, 0.043, 'triangle', 1);
                 tone(v, midi(root + 7), at + 0.03, score.beat * 1.4, 0.020, 'sine', 1);
             }
-            if (melody !== null){
+            if (melody !== null && !scene.combat && at >= combatMelodyUntil){
                 tone(v, midi(melody), at + 0.025, score.beat * 0.95, 0.047, 'sine', 1, 0);
                 tone(v, midi(melody + 12), at + 0.03, score.beat * 0.48, 0.010, 'sine');
             }
@@ -448,6 +458,7 @@
         function syncActivity(){
             syncGains();
             if (usable()){
+                startCommonSamples();
                 syncAmbient();
                 if (!timer){
                     nextBeat = ctx.currentTime + 0.06;
@@ -474,7 +485,10 @@
             const previousBiome = scene.biome;
             if (typeof next.biome === 'string' && BIOMES[next.biome]) scene.biome = next.biome;
             if (typeof next.interior === 'boolean') scene.interior = next.interior;
-            if (typeof next.combat === 'boolean') scene.combat = next.combat;
+            if (typeof next.combat === 'boolean'){
+                scene.combat = next.combat;
+                if (scene.combat) combatMelodyUntil = ctx.currentTime + 1;
+            }
             if (typeof next.active === 'boolean') scene.active = next.active;
             const chosen = chooseScore();
             if (chosen !== scoreName){

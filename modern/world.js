@@ -12,6 +12,7 @@ const PAL = {
  leaf:['#315743','#40724c','#66835a'], pine:['#315753','#42665e'],
  cliff:['#64706b','#808b7f','#4e615e'], copper:['#a5603b','#bb7950'],
  ivory:['#dfd1ad','#f0dcaf'], wood:['#76533b','#60402f'], jade:['#5ba99a','#80c9b0'],
+ linen:['#d8c6a0','#eadbb9'], straw:['#cfac69','#e0c483'], teal:['#286e76','#358b91'], blue:['#294f70','#396788'],
  ember:['#f0a34c','#f8c065'], window:['#d8bc7d'], mortar:['#9e9683'],
  clay:['#b46b4c','#bd7654','#ad6246'], dark:['#302f35','#47444a'], roof:['#a65d40','#b46a49']
 };
@@ -105,7 +106,31 @@ export function createWorld(pc,app,bridge){
   if(p.kind==='chest'){g('wood',0).box(cx,.025,cz,.48,.31,.37);g('roof',0).box(cx,.34,cz,.52,.13,.4);const trim=g('copper',0);trim.box(cx-.17,.09,cz,.04,.48,.4);trim.box(cx+.17,.09,cz,.04,.48,.4);trim.box(cx,.24,cz+.205,.12,.09,.025);g('jade',0).box(cx,.26,cz+.226,.045,.045,.025);}
   if(p.kind==='altar'){const stone=g('ivory',0),jade=g('jade',0),gold=g('copper',0);stone.box(cx,.02,cz,.62,.18,.61);stone.box(cx,.22,cz,.43,.52,.43);jade.box(cx,.745,cz,.32,.035,.32);for(const a of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const px=cx+Math.cos(a)*.27,pz=cz+Math.sin(a)*.27;gold.cone(px,.75,pz,.05,.16,5);}}
   if(p.kind==='craft'){const wood=g('wood',0),iron=g('dark',0),fire=g('ember',0);if(!scenery.place('table',node,cx,.01,cz,.47)){for(const dx of [-.23,.23])for(const dz of [-.17,.17])wood.box(cx+dx,.01,cz+dz,.07,.4,.07);wood.box(cx,.39,cz,.61,.09,.44);}iron.box(cx+.12,.49,cz,.3,.07,.23);fire.cone(cx-.18,.48,cz,.09,.22,6);}
-  if(p.kind==='dummy'){const wood=g('wood',0),cloth=g('roof',0),iron=g('copper',0);wood.box(cx,.01,cz,.08,1.04,.08);cloth.box(cx,.46,cz,.35,.42,.19);wood.box(cx,.79,cz,.62,.07,.09);iron.box(cx,.41,cz+.107,.09,.09,.015);}
+  if(p.kind==='dummy'){
+   if(scenery.place('trainingDummy',node,cx,.01,cz,.7))return;
+   const timber=g('wood',0),linen=g('linen',0),seam=g('linen',1),straw=g('straw',0),strawLight=g('straw',1),belt=g('dark',0),teal=g('teal',0),ivory=g('ivory',1);
+   // The post and foot stay inside the original service tile; padding gives it a human silhouette.
+   timber.box(cx,.01,cz,.51,.08,.28);timber.box(cx,.06,cz,.09,1.28,.09);
+   timber.box(cx,.62,cz,.67,.07,.08);timber.box(cx,.1,cz,.08,.74,.08);
+   for(const side of [-1,1]){
+    const ax=cx+side*.4;straw.box(ax,.34,cz,.11,.12,.11);
+    linen.box(ax,.64,cz,.15,.43,.2,side*.18);seam.box(ax,.99,cz,.18,.065,.22,side*.18);
+    timber.box(cx+side*.18,.08,cz,.075,.28,.08);
+   }
+   linen.box(cx,.48,cz,.46,.54,.27);seam.box(cx,.99,cz,.43,.08,.27);
+   belt.box(cx,.53,cz+.143,.47,.075,.025);ivory.box(cx,.555,cz+.165,.075,.08,.018);
+   straw.box(cx,1.09,cz,.27,.26,.25);strawLight.cone(cx,1.34,cz,.155,.11,8);
+   teal.box(cx,1.19,cz+.132,.23,.055,.018);
+   // Concentric stitched rings face the approach from the room and the plaza.
+   for(const face of [-1,1]){
+    const front=cz+face*.148,cy=.79;
+    for(const [outer,inner,material] of [[.18,.135,teal],[.135,.082,ivory],[.082,.035,teal]])for(let i=0;i<16;i++){
+     const a=i*TAU/16,b=(i+1)*TAU/16,point=(r,t)=>[cx+Math.cos(t)*r,cy+Math.sin(t)*r,front];
+     material.quad(point(outer,a),point(outer,b),point(inner,b),point(inner,a));
+    }
+    strawLight.box(cx,cy-.024,front+face*.004,.055,.055,.012);
+   }
+  }
  }
  function house(groups,h,node){const g=(k,v=0)=>{const key=k+':'+v;let b=groups.get(key);if(!b){b=new Geometry();groups.set(key,b);}return b;};
   const x=h.x+h.w/2,z=h.y+h.h/2,w=h.w-.22,d=h.h-.22,front=z+d/2,wall=g('ivory',0),stone=g('stone',0),timber=g('wood',0),dark=g('dark',0),roof=g('roof',h.id==='oficina'?1:0),copper=g('copper',0),warm=g('ember',0),glass=g('window',0);
@@ -150,13 +175,19 @@ export function createWorld(pc,app,bridge){
   if(x<46||x>54||z<46||z>52)return;
   const g=(k,v=0)=>{const key=k+':'+v;let b=groups.get(key);if(!b){b=new Geometry();groups.set(key,b);}return b;};
   const tavern=floor===1000,temple=floor===1002,training=floor===1003,cx=x+.5,cz=z+.5;
-  const plank=tavern?g('wood',0):training?g('wood',1):temple?g('ivory',0):g('stone',0);
+  const plank=tavern?g('wood',0):training?g('stone',1):temple?g('ivory',0):g('stone',0);
   plank.quad([x,-.035,z],[x,-.035,z+1],[x+1,-.035,z+1],[x+1,-.035,z]);
-  if(tavern||training){for(let i=0;i<3;i++)g('mortar',0).box(cx,-.026,z+(i+1)/3,.98,.003,.009);}
+  if(tavern){for(let i=0;i<3;i++)g('mortar',0).box(cx,-.026,z+(i+1)/3,.98,.003,.009);}
+  else if(training){
+   const grout=g('mortar',0),wood=g('wood',0);
+   grout.box(cx,-.028,cz,.94,.003,.012);grout.box(cx,-.028,cz,.012,.003,.94);
+   if(x===47||x===53){wood.box(cx,-.026,cz,.79,.006,.94);for(const zz of [z+.27,z+.72])grout.box(cx,-.022,zz,.77,.003,.012);}
+   if((x===48||x===52)&&(z===48||z===50))wood.box(cx,-.025,cz,.17,.005,.17);
+  }
   else if((x+z)%2===0)g('mortar',0).box(cx,-.027,cz,.68,.003,.68);
   if(temple&&x>46&&x<54&&z>46&&z<52&&((x===48||x===52)||(z===48&&x!==50))){g('jade',0).box(cx,-.022,cz,.13,.004,.13);}
-  if(training&&x>46&&x<54&&z>46&&z<52&&x%2===0)g('copper',0).box(cx,-.024,z+.16,.35,.005,.014);
-  const wall=tavern||temple?g('ivory',0):training?g('wood',1):g('cliff',0),beam=g('wood',0),base=g(temple?'jade':'stone',0);
+  if(training&&x>46&&x<54&&z>46&&z<52&&x%2===0)g('teal',0).box(cx,-.024,z+.16,.35,.005,.014);
+  const wall=tavern||temple||training?g('ivory',0):g('cliff',0),beam=g('wood',0),base=g(temple?'jade':'stone',0);
   if(z===46){const recess=x===50&&floor!==1000,back=recess?z+.09:cz,depth=recess?.18:.86;wall.box(cx,0,back,.99,1.75,depth);base.box(cx,0,back,.99,.27,depth+.04);beam.box(cx,1.62,back,.99,.12,depth+.08);}
   if(z===52&&x!==50){wall.box(cx,0,cz,.99,.43,.82);base.box(cx,0,cz,.99,.15,.84);}
   if((x===46||x===54)&&z>46&&z<52){wall.box(cx,0,cz,.86,.85,.99);base.box(cx,0,cz,.88,.2,.99);}
@@ -195,12 +226,19 @@ export function createWorld(pc,app,bridge){
    jade.box(50.5,-.018,48.9,.1,.006,1.7);
    jade.box(50.5,-.018,50.55,.1,.006,.67);
   }else if(floor===1003){
-   const wood=g('wood',0),iron=g('dark',0),copper=g('copper',0);
+   const wood=g('wood',0),iron=g('dark',0),copper=g('copper',0),blue=g('blue',0),teal=g('teal',1),ivory=g('ivory',1);
    // A training rack and heraldry frame the target without occupying the lane.
    for(const x of [47.7,53.3]){wood.box(x,.02,47.55,.08,1.35,.08);copper.box(x,1.36,47.55,.21,.08,.16);}
    wood.box(48.25,.78,46.99,1.16,.08,.08);
    for(const x of [47.97,48.5]){iron.box(x,.45,47.04,.035,.82,.045);copper.box(x,.91,47.07,.19,.055,.07);}
-   scenery.place('banner',node,52.4,1.28,46.95,.2,0);
+   for(const x of [48.65,52.35]){
+    wood.box(x,1.56,46.965,.72,.055,.09);
+    blue.box(x,.83,47.015,.58,.71,.025);
+    teal.box(x,1.52,47.032,.58,.075,.029);
+    ivory.box(x,1.12,47.036,.075,.35,.012);
+    ivory.box(x,1.26,47.036,.31,.065,.012);
+    copper.box(x,.77,47.037,.18,.06,.024);
+   }
    scenery.place('barrel',node,53.28,0,49.6,.2,0);
   }
   for(const service of room?.services||[])if(['craft','altar','dummy'].includes(service.kind))prop(groups,service,node);

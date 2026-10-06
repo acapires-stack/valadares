@@ -5,8 +5,17 @@ export async function createActors(pc,app,bridge){
  const materials=new Map();
  const material=(hex,metal=0)=>{const key=hex+':'+metal;if(materials.has(key))return materials.get(key);const m=new pc.StandardMaterial();m.diffuse=new pc.Color().fromString(hex);m.metalness=metal;m.useMetalness=true;m.gloss=metal?0.45:0.15;m.update();materials.set(key,m);return m;};
  const shape=(parent,type,scale,pos,color,rotation)=>{const e=new pc.Entity(type);e.addComponent('render',{type,material:material(color),castShadows:Math.max(...scale)>.22,receiveShadows:true});e.setLocalScale(...scale);e.setLocalPosition(...pos);if(rotation)e.setLocalEulerAngles(...rotation);parent.addChild(e);return e;};
- const load=name=>new Promise((resolve,reject)=>app.assets.loadFromUrl(new URL(`./assets/characters/${name}-game.glb`,import.meta.url).href,'container',(err,a)=>err?reject(err):resolve(a)));
- const names=['Knight','Mage','Rogue_Hooded','Barbarian','Skeleton_Warrior'];const loaded=await Promise.all(names.map(load));const assets=Object.fromEntries(names.map((n,i)=>[n,loaded[i]]));
+ const legacyNames=['Knight','Mage','Rogue_Hooded','Barbarian','Skeleton_Warrior'];
+ const seriesNames=['Farmer_A','Farmer_B','Lorekeeper','Cleric','OrcBrute','Monstrosity'];
+ const rigNames=['Rig_Medium_General','Rig_Medium_MovementBasic','Rig_Large_General','Rig_Large_MovementBasic'];
+ const load=(name,series=false)=>new Promise((resolve,reject)=>app.assets.loadFromUrl(new URL(series?`./assets/characters-series6/${name}.glb`:`./assets/characters/${name}-game.glb`,import.meta.url).href,'container',(err,a)=>{if(err){if(a){a.unload();app.assets.remove(a);}reject(err);}else resolve(a);}));
+ const loaded=await Promise.all(legacyNames.map(n=>load(n)));
+ const assets=Object.fromEntries(legacyNames.map((n,i)=>[n,loaded[i]]));
+ const optional=await Promise.allSettled([...seriesNames,...rigNames].map(n=>load(n,true)));
+ const failedSeries=[];for(let i=0;i<optional.length;i++){const name=[...seriesNames,...rigNames][i];if(optional[i].status==='fulfilled'){assets[name]=optional[i].value;loaded.push(optional[i].value);}else failedSeries.push(name);}
+ const seriesRig=model=>model==='OrcBrute'||model==='Monstrosity'?'Rig_Large':seriesNames.includes(model)?'Rig_Medium':null;
+ const ready=(name,fallback)=>{const rig=seriesRig(name);return assets[name]&&assets[rig+'_General']&&assets[rig+'_MovementBasic']?name:fallback;};
+ function animate(entity,model){entity.addComponent('anim',{activate:true});const prefix=seriesRig(model);const clips=prefix?[...assets[prefix+'_General'].resource.animations,...assets[prefix+'_MovementBasic'].resource.animations,...assets[model].resource.animations]:assets[model].resource.animations;for(const a of clips)if(a.resource.name!=='T-Pose')entity.anim.assignAnimation(a.resource.name,a.resource,undefined,1,true);}
  const root=new pc.Entity('Atores');app.root.addChild(root);const entries=new Map();let now=0;
  function weaponKind(e){const it=bridge.getItems?.()[e.equipped?.weapon];if(!it)return 'unarmed';const s=(it.skill||'').toLowerCase(),key=(e.equipped.weapon||'').toLowerCase();if(s.includes('magia')||/staff|wand|cajad/.test(key))return 'staff';if(s.includes('dist')||it.ranged)return 'bow';if(s.includes('mach')||/axe/.test(key))return 'axe';if(s.includes('clav')||/mace|club/.test(key))return 'mace';if(it.meleeRange>1||/spear|lanc/.test(key))return 'spear';return 'sword';}
  function weapon(parent,kind,offhand,definition={}){
@@ -41,14 +50,17 @@ export async function createActors(pc,app,bridge){
   const look=kind==='npc'?null:appearance(e);
   const npcTools={eremita:'staff',domador:'staff',crepusculo:'staff',vohrim:'staff',vendedor:'staff',ferreiro:'mace',mineiro:'axe',cacadora:'bow',arena:'sword'};
   const w=kind==='npc'?(npcTools[e.id]||'unarmed'):weaponKind(e);
-  const model=kind==='npc'?(/tint|eremita|crepus|vohrim|vendedor/.test(id)?'Mage':/cacadora|leiloeiro|mercador|domador/.test(id)?'Rogue_Hooded':'Knight'):(w==='staff'?'Mage':w==='bow'?'Rogue_Hooded':'Knight');
+  const oldModel=kind==='npc'?(/tint|eremita|crepus|vohrim|vendedor/.test(id)?'Mage':/cacadora|leiloeiro|mercador|domador/.test(id)?'Rogue_Hooded':'Knight'):(w==='staff'?'Mage':w==='bow'?'Rogue_Hooded':'Knight');
+  const preferred=kind==='npc'?({eremita:'Lorekeeper',crepusculo:'Cleric',vohrim:'Lorekeeper',vendedor:'Cleric',tintureira:'Cleric',ferreiro:'Farmer_A',mineiro:'Farmer_B',mercador:'Farmer_A',leiloeiro:'Farmer_B',banqueiro:'Lorekeeper',atendente:'Farmer_A',crupie:'Farmer_B',domador:'Farmer_A'}[e.id]):null;
+  const model=preferred?ready(preferred,oldModel):oldModel;
   const entity=assets[model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);entity.setLocalScale(.42,.60,.42);
   const rigMeshes=entity.findComponents('render');for(const r of rigMeshes){const n=r.entity.name;
-   const modeled=/^(Knight|Mage|Rogue)_/.test(n),hat=/Knight_Helmet|Mage_Hat/.test(n),cape=/Cape/.test(n);
-   r.enabled=modeled&&(!hat||(kind==='npc'&&n==='Mage_Hat')||(kind!=='npc'&&!!look.eq.head&&!look.crown))&&(!cape||kind==='npc'||!!look.cape);
+   const isSeries=!!seriesRig(model),modeled=isSeries?/^(Farmer_|Farmer_[AB]_|Lorekeeper_|Cleric_)/.test(n):/^(Knight|Mage|Rogue)_/.test(n);
+   const hat=/Knight_Helmet|Mage_Hat/.test(n),cape=/Cape/.test(n),builtInTool=/HolyWater|Staff|Tome/.test(n);
+   r.enabled=modeled&&!builtInTool&&(!hat||(kind==='npc'&&n==='Mage_Hat')||(kind!=='npc'&&!!look.eq.head&&!look.crown))&&(!cape||kind==='npc'||!!look.cape);
    for(const mi of r.meshInstances)mi.castShadow=r.enabled;
   }
-  entity.addComponent('anim',{activate:true});for(const a of assets[model].resource.animations)entity.anim.assignAnimation(a.resource.name,a.resource,undefined,1,true);
+  animate(entity,model);
   const right=entity.findByName('handslot.r'),left=entity.findByName('handslot.l');
   if(right){const holder=new pc.Entity('Arma');right.addChild(holder);holder.setLocalEulerAngles(0,0,-90);weapon(holder,w,false,bridge.getItems?.()[e.equipped?.weapon]);}
   if(left&&e.equipped?.offhand){const holder=new pc.Entity('Escudo');left.addChild(holder);holder.setLocalEulerAngles(0,90,0);weapon(holder,'',true,bridge.getItems?.()[e.equipped.offhand]);}
@@ -70,9 +82,9 @@ export async function createActors(pc,app,bridge){
   return rec;
  }
  const RIGGED_MOBS={
-  ORC:{model:'Barbarian',weapon:'axe',skin:'#728a4f',armor:'#615342'},
-  ORC_LIDER:{model:'Barbarian',weapon:'axe',skin:'#78914e',armor:'#8a3659',cape:'#702b46',hat:true},
-  TROLL:{model:'Barbarian',weapon:'mace',skin:'#637f5b',armor:'#52634e'},
+  ORC:{model:ready('OrcBrute','Barbarian'),weapon:'axe',skin:'#728a4f',armor:'#615342'},
+  ORC_LIDER:{model:ready('OrcBrute','Barbarian'),weapon:'axe',skin:'#78914e',armor:'#8a3659',cape:'#702b46',hat:true},
+  TROLL:{model:ready('Monstrosity','Barbarian'),weapon:'mace',skin:'#637f5b',armor:'#52634e'},
   MINOTAUR:{model:'Barbarian',weapon:'axe',skin:'#936347',armor:'#644534',horns:true},
   SKELETON:{model:'Skeleton_Warrior',weapon:'sword',cape:'#4b4248'},
   CACADOR:{model:'Rogue_Hooded',weapon:'bow',skin:'#b1845a',armor:'#a25c29',cape:'#634329'},
@@ -85,11 +97,12 @@ export async function createActors(pc,app,bridge){
   const type=e.type,cfg=RIGGED_MOBS[type],def=bridge.getMonsterTypes?.()[type]||{};
   const entity=assets[cfg.model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);
   const size=Math.min(def.size||1,1.65),wide=type==='TROLL'||type==='MINOTAUR'?1.16:1;
-  entity.setLocalScale(.42*size*wide,.6*size,.42*size*wide);
+  const scale=seriesRig(cfg.model)? .29 : .42;
+  entity.setLocalScale(scale*size*wide,(seriesRig(cfg.model)? .34 : .6)*size,scale*size*wide);
   const owned=[];
   for(const r of entity.findComponents('render')){
    const n=r.entity.name,body=/Body/.test(n),head=/Head|Jaw|Eyes/.test(n),limb=/Arm|Leg/.test(n),cape=/Cape|Cloak/.test(n),hat=/Hat|Helmet/.test(n);
-   r.enabled=/^(Barbarian|Skeleton_Warrior|Knight|Mage|Rogue)_/.test(n)&&(body||head||limb||cape||hat)
+   r.enabled=/^(Barbarian|Skeleton_Warrior|Knight|Mage|Rogue|OrcBrute|Monstrosity)_/.test(n)&&(body||head||limb||cape||hat)
     &&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&(!/Barbarian_Head/.test(n)||type!=='MINOTAUR'&&type!=='CARRASCO');
    for(const mi of r.meshInstances){mi.castShadow=r.enabled;
     let color=cape?cfg.cape:body?cfg.armor:head||limb?cfg.skin:null;
@@ -97,7 +110,7 @@ export async function createActors(pc,app,bridge){
     if(!color)continue;const m=mi.material.clone();m.diffuse=new pc.Color().fromString(color);m.update();owned.push(m);mi.material=m;
    }
   }
-  entity.addComponent('anim',{activate:true});for(const a of assets[cfg.model].resource.animations)entity.anim.assignAnimation(a.resource.name,a.resource,undefined,1,true);
+  animate(entity,cfg.model);
   const hand=entity.findByName('handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);weapon(holder,cfg.weapon,false,{color:type==='SENHOR_VALADARES'?'#f8d46f':type==='SENHOR_PROFUNDEZAS'?'#b778e2':undefined});}
   if(cfg.crown)crown(entity,cfg.crown,type==='SENHOR_VALADARES');
   if(cfg.horns){
@@ -325,9 +338,9 @@ export async function createActors(pc,app,bridge){
    const newStrike=timer>rec.previousTimer+60||(atk>0&&rec.previousAtkAnim<=0)||(hit>0&&hit!==rec.previousArtAttackAt);
    rec.previousTimer=timer;rec.previousAtkAnim=atk;rec.previousArtAttackAt=hit;
    if(newStrike&&now-rec.lastStrikeAt>.14){rec.strikeUntil=now+.34;rec.lastStrikeAt=now;}
-   if(rec.model){const attacking=now<rec.strikeUntil;let state=e.hp<=0?'Death_A':attacking?(rec.w==='staff'?'Spellcast_Shoot':rec.w==='bow'?'2H_Ranged_Shoot':rec.w==='unarmed'?'Unarmed_Melee_Attack_Punch_A':'1H_Melee_Attack_Chop'):moving?'Running_A':'Idle';
+   if(rec.model){const attacking=now<rec.strikeUntil,series=!!seriesRig(rec.model);let state=e.hp<=0?'Death_A':attacking?(series?(seriesRig(rec.model)==='Rig_Large'?'1H_Melee_Attack_Chop':'Use_Item'):(rec.w==='staff'?'Spellcast_Shoot':rec.w==='bow'?'2H_Ranged_Shoot':rec.w==='unarmed'?'Unarmed_Melee_Attack_Punch_A':'1H_Melee_Attack_Chop')):moving?'Running_A':series?'Idle_A':'Idle';
     if(state!==rec.state){rec.entity.anim.baseLayer.transition(state,.1);rec.state=state;}
-    else if(newStrike&&attacking){rec.entity.anim.baseLayer.transition('Idle',0);rec.entity.anim.baseLayer.transition(state,.06);}
+    else if(newStrike&&attacking){rec.entity.anim.baseLayer.transition(series?'Idle_A':'Idle',0);rec.entity.anim.baseLayer.transition(state,.06);}
     rec.entity.anim.speed=attacking?1:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
    }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type==='SOMBRA'?Math.sin(now*3)*.075:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;
     rec.entity.setLocalPosition(x,bob+(now<rec.strikeUntil?Math.sin((rec.strikeUntil-now)*20)*.035:0),z);
@@ -341,5 +354,5 @@ export async function createActors(pc,app,bridge){
   for(const [id,rec]of entries)if(!seen.has(id)){dispose(rec);entries.delete(id);}
  }
  function dispose(rec){rec.entity.destroy();for(const m of rec.owned)m.destroy();}
- return {update,entries,diagnostics:()=>({visible:entries.size,models:names}),destroy(){for(const rec of entries.values())dispose(rec);entries.clear();root.destroy();for(const m of materials.values())m.destroy();for(const a of loaded){a.unload();app.assets.remove(a);}}};
+ return {update,entries,diagnostics:()=>({visible:entries.size,models:Object.keys(assets),failedSeries}),destroy(){for(const rec of entries.values())dispose(rec);entries.clear();root.destroy();for(const m of materials.values())m.destroy();for(const a of loaded){a.unload();app.assets.remove(a);}}};
 }

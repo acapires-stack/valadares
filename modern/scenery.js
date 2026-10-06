@@ -20,7 +20,8 @@ const MODELS = {
  table: 'dungeon/table_medium.glb',
  chair: 'dungeon/chair.glb',
  counter: 'dungeon/bar_straight_A.glb',
- counterTop: 'dungeon/bartop_A_medium.glb'
+ counterTop: 'dungeon/bartop_A_medium.glb',
+ trainingDummy: 'series6/training-dummy.glb'
 };
 
 export const INTERIOR_ASSETS = Object.freeze({

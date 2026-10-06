@@ -28,7 +28,7 @@ FILES = {
     "spell-ice": "Magic_Spells/ice_spell_freeze_small_01.wav",
     "spell-dark": "Magic_Spells/twinkle_glitter_dark_spell_01.wav",
     "pickup": "Collectibles_Items_Powerup/collect_item_01.wav",
-    "critical": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_ringing_01.wav",
+    "critical": "Guns_Weapons/Knife_Sword_Pick/sword_hit_impact_heavy_01.wav",
     "rare-loot": "Magic_Spells/special_item_popup_01.wav",
     "boss-reward": "Collectibles_Items_Powerup/collectable_item_bonus_01.wav",
     "forge-success": "Collectibles_Items_Powerup/jingle_chime_01_positive.wav",
@@ -51,7 +51,7 @@ FILES = {
     "ambient-interior": "Backgrounds/background_room_tone_loop_01.wav",
 }
 TRIM_SECONDS = {"wand": 1.0, "spell-dark": 1.25, "spell-fire": 1.2,
-                "spell-generic": 0.85, "pickup": 0.7, "critical": 0.8}
+                "spell-generic": 0.85, "pickup": 0.7, "critical": 0.35}
 
 
 def digest(path):

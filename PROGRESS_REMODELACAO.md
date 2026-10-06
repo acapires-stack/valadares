@@ -2,6 +2,26 @@
 
 Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
 
+## Estado atual: pacotes publicados em 06/10/2026
+
+- Alcione autorizou a publicação para jogar com sua conta. Cliente e servidor dos pacotes estão publicados juntos no commit `27cb45460dce981b5cab4586c6ff1d54fc4d0981`: Railway `73aea5a2-feb6-4f3f-bf46-4a5a4dc8c8bd` SUCCESS (log: 36 contas carregadas) e Vercel `dpl_2PMppwGssWKzE7ZvFZmXyY1rMEUm`. Entrada: https://valadares.app.br/jogar3d; a entrada clássica e os serviços externos continuam.
+- Recibo público: 68 recursos retornaram 200 e corresponderam aos arquivos publicados; três rotas privadas retornaram 404. O `/health` respondeu 502 durante o corte. Nova verificação direta da raiz em `2026-10-06T18:04:03.2713289Z` confirmou `/health` 200 com `{ok:true}` e `/api/status` com `maintenance:false`, `minClientVersion:"1.0.7"` e `clientDownloadUrl:"https://valadares.app.br/#download"`. O 502 fica preservado no histórico do recibo; estado final da publicação: PASS.
+- Quatro interiores opcionais: pousada com taverna; oficina com bancada de criação (C); biblioteca com altar (M); mercado com treino (T). Portas usam G; há saída, reentrada e retorno ao mundo. O pacote também inclui 21 cenários, 33 sons e 22 tipos de monstro diferenciados.
+- QA integrado PASS nas quatro salas: criação real com custo em ouro, treino real com custo e XP, saída/reentrada/reload, viewport compacto emulado e zero erros JavaScript. Viewport emulado não comprova uso em celular físico. Conta claude observada online após o deploy com HP1329/1329, MP724/724 e ouro314256, inicialmente com cliente anterior ainda carregado; reload confirmou modern-world.js?v=2. Em nova observação Alcione já jogava no cliente atualizado, com portas rotuladas e recursos comprados visíveis. Inventário completo não foi revisado.
+- Reversão de código preparada em `C:/Users/Alcione/Documents/Codex/2026-10-06/valadare/work/rollback-pacotes-c2146a0.patch`, com `git apply --check` aprovado. Reverter cliente e servidor juntos para `c2146a0`, sem restaurar contas.
+- Aparências masculinas/femininas e história adicional permanecem ideias para exploração futura. Recibo detalhado em `C:/Users/Alcione/Documents/Codex/2026-10-06/valadare/outputs/Novo-Valadares-pacotes-publicados.md`.
+
+### Retorno de Alcione após jogar — em execução
+
+- Compra Series6 confirmada pelo itch.io em06/10/2026, US$19,99; download recuperado pelo fluxo normal do site após recarregar a página e acompanhar o evento antes do clique. ZIP `C:/Users/Alcione/Downloads/KayKit_Mystery_Monthly_Series_6_(1.1).zip`,41650373bytes, CRC integral OK. Original preservado; URL privada de compra não registrada nem publicada.
+- Pedidos: reduzir sons agudos repetidos nas batalhas; melhorar sala de treino muito marrom e boneco; melhorar personagens em geral. Integração visual/audio autorizada, sem alterar regras ou contas. Áudio e sala/atores têm escritores separados; raiz integra e publica frontend após QA. Nenhum reinício do servidor é necessário para esses arquivos.
+- Melhoria de conteúdo/história continua proposta; importação visual selecionada da Series6 substitui aparência de tipos/papéis existentes, não cria novas regras nem escolha de gênero.
+- Candidato final do retorno: sala de treino com pedra clara/reboco/estandartes azuis e boneco KayKit completo; seis modelos Series6 selecionados para moradores, orcs e trolls. Ataque dos dois monstros remapeado do clipe CC0 existente, com movimento do braço comprovado no Chrome. Aparência base do jogador permanece a mesma neste lote.
+- Áudio: melodia aguda e oitava deixam de tocar no combate, com retorno após intervalo; crítico seco de0,35s substitui metal prolongado; nove efeitos comuns são pré-carregados após ativação, e efeitos sintetizados de reserva ficam menos agudos. QA de áudio com WebAudio real e análise espectral passou; apreciação auditiva final depende do retorno de Alcione.
+- QA integrado do retorno PASS: login, carregamento dos modelos novos, entrada na sala, aproximação do boneco, abertura do treino e saída andando;55recursosHTTPsemfalha e0errosJS. Captura real do cliente de teste em docs/remodelacao/evidencias-revisao/sala-treino-em-jogo.png. Build148arquivos/18113302bytes. Nenhum arquivo do backend ou acompanhado pelo Railway mudou; publicação é somente frontend. Préviaextra3338/8098 encerrada;3337/8097 preservada.
+
+As seções abaixo preservam o histórico das etapas anteriores e suas limitações na data em que foram escritas.
+
 ## Atualização: publicação autorizada
 
 Alcione autorizou agora: "sobe ela para eu jogar com minha conta". O registro local abaixo documenta a entrega anterior; sua restrição a publicação foi superada por este pedido.

@@ -7,7 +7,8 @@
     "KayKit_Dungeon_Pack_1.1_SOURCE.zip",
     "KayKit_Forest_Nature_Pack_1.0_FREE.zip",
     "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
-    "KayKit_Forest_Nature_Pack_1.0_SOURCE.zip"
+    "KayKit_Forest_Nature_Pack_1.0_SOURCE.zip",
+    "KayKit_Mystery_Monthly_Series_6_(1.1).zip"
   ],
   "assets": [
     {
@@ -177,7 +178,15 @@
       "runtime": "dungeon/bartop_A_medium.glb",
       "bytes": 34316,
       "sha256": "e1f49d267dad404f3130d6f26246914413c010c3733b0594bcf4d11ae9affd59"
+    },
+    {
+      "pack": "series6",
+      "archive": "KayKit_Mystery_Monthly_Series_6_(1.1).zip",
+      "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/Trainingdummy_Base.gltf",
+      "runtime": "series6/training-dummy.glb",
+      "bytes": 115164,
+      "sha256": "fda03782fc76ada931617f79c81043bf44899136f50d631e96f7ad9d5d0fefc4"
     }
   ],
-  "runtime_bytes": 936868
+  "runtime_bytes": 1052032
 }
