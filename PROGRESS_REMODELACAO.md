@@ -2,6 +2,18 @@
 
 Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
 
+## Atualização: publicação autorizada
+
+Alcione autorizou agora: "sobe ela para eu jogar com minha conta". O registro local abaixo documenta a entrega anterior; sua restrição a publicação foi superada por este pedido.
+
+- Entrada nova: https://valadares.app.br/jogar3d. Entrada clássica /jogar preservada. Ambas usam o mesmo backend e contas reais; não há migração de dados.
+- Cinco footprints do mapa são compartilhados pelo cliente clássico, 3D e servidor. Colisões exigem a atualização conjunta.
+- Vercel publica dist-web gerado por tools/build-web.cjs, somente recursos do navegador. Docker inclui modern-world.js; Railway acompanha alterações deste módulo.
+- Revisão independente da publicação concluída: empacotamento, mapa, cache, manutenção e retorno à versão anterior conferidos.
+- Próxima ação: QA focal das duas entradas, commit local, manutenção /manutencao 1 uma única vez; confirmar maintenance:true antes do push. Depois verificar Railway, Vercel e sessão real em /jogar3d.
+- Recuperação: base e17408b6ac8fc490cbf904b7f98dc52611794945; Railway anterior 4857bba4-6625-4eb1-94fd-77edc8c8c798. Reverter cliente e servidor juntos durante manutenção, preservando volume /data e contas. Nenhum restore de saves ou mudança de credenciais.
+- Recibo final de publicação ficará em outputs/Novo-Valadares-publicado.md no workspace desta conversa.
+
 ## Fonte e isolamento
 
 - Worktree: C:/claude/_worktrees/valadares-remodelacao-20261006.

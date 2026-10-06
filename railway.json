@@ -9,6 +9,7 @@
       "training-rules.js",
       "transmutation-rules.js",
       "progression-content.js",
+      "modern-world.js",
       "package.json",
       "package-lock.json",
       "Dockerfile",

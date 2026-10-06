@@ -12,3 +12,4 @@ electron/dist/
 .env
 *.env
 server/.env
+dist-web/

@@ -1746,7 +1746,7 @@
     <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
     <link rel="stylesheet" href="/adventure-feedback.css?v=20261005b">
     <link rel="stylesheet" href="/journey.css?v=2">
-    <link rel="stylesheet" href="/modern/ui.css?v=1">
+    <script src="/modern/boot.js?v=20261006"></script>
 </head>
 <body>
 
@@ -17735,7 +17735,11 @@ function loop(ts){
 <script src="/enchanting-ui.js?v=1"></script>
 <script src="/transmutation-rules.js?v=5"></script>
 <script src="/transmutation-ui.js?v=5"></script>
-<script type="module" src="/modern/entry.js?v=1"></script>
-<script type="module" src="/modern/ui.js?v=1"></script>
+<script type="module">
+if (window.VALADARES_MODERN) {
+    await import('/modern/entry.js?v=20261006');
+    await import('/modern/ui.js?v=20261006');
+}
+</script>
 </body>
 </html>

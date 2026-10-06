@@ -1,4 +1,7 @@
 {
+  "buildCommand": "node tools/build-web.cjs",
+  "outputDirectory": "dist-web",
+  "installCommand": "",
   "redirects": [
     {
       "source": "/(.*)",
@@ -9,6 +12,7 @@
   ],
   "rewrites": [
     { "source": "/jogar", "destination": "/play.html" },
+    { "source": "/jogar3d", "destination": "/play.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/ranking", "destination": "/ranking.html" },
@@ -18,6 +22,18 @@
     { "source": "/devlog/:slug", "destination": "/devlog/:slug.html" }
   ],
   "headers": [
+    {
+      "source": "/jogar3d",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
+      "source": "/modern-world.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
+      "source": "/modern/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
     {
       "source": "/transmutation-rules.js",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]

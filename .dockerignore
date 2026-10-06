@@ -13,3 +13,7 @@ nixpacks.toml
 .vercel/
 state.json
 accounts.json
+modern/
+docs/
+tools/
+dist-web/
