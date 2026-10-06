@@ -6,6 +6,7 @@
 
 - Sete personagens completos e cinco paletas, escolhidos livremente pelo botão Personagem ou V. Trocar a arma não muda o corpo. Aparência salva pelo servidor, preservada no relogin e no cliente clássico. Sábio, Clérigo e Maga arcana aproveitam o Series6 comprado.
 - Escalas uniformes preservam proporções. Skeleton_Minion substitui o esqueleto pesado. Wolf oficial Quaternius, CC0, usa seus próprios clipes. Removidos volumes improvisados sobre personagens e chefes.
+- Pedido posterior de Alcione: rato, cobra e aranha reduzidos a 50% do tamanho visual da revisão. Proporções, solo, rótulos e seleção conferidos na prévia; demais tipos e regras intactos. Evidência em fauna-metade/result.json e imagens antes/depois.
 - Preparação, contato e retorno dos golpes acompanham a cadência. Dano continua autoritativo e imediato. A vítima morta sai imediatamente da seleção; apenas sua representação aguarda brevemente o contato antes de morrer/desaparecer. Confirmações antigas não usam o golpe seguinte. Troca de arma, cancelamento, piso e desconexão limpam efeitos pendentes.
 - Sons de lançamento e impacto separados; variantes sem repetição imediata, volumes ajustados e cache atualizado. A música comprada permanece. Efeitos de morte por dano contínuo não aparecem no piso errado; recompensas continuam preservadas.
 - Minimapa moderno nos layouts foco e clássico da versão 3D, inclusive menu de toque. Painéis e escolha de aparência cabem na tela compacta. Quatro interiores percorridos, serviços acessíveis, colisões e sala de treino corrigidos.
