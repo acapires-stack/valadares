@@ -4,9 +4,10 @@
 <!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
 <script src="/equipment-rules.js?v=1"></script>
-<script src="/game-audio.js?v=2"></script>
+<script src="/game-audio.js?v=3"></script>
 <script src="/progression-content.js?v=2"></script>
 <script src="/modern-world.js?v=2"></script>
+<script src="/movement-sync.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
 <link rel="stylesheet" href="/transmutation.css?v=5">
     <meta charset="UTF-8">
@@ -6446,7 +6447,7 @@ function applyBlessingRevive(){
     player.x = spawn.x; player.y = spawn.y;
     player.target = null; player.autoAttack = false;
     snapRender(player);
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
+    sendRespawnPosition();
     log(tr('log.blessing_saved'));
     if (typeof showServerToast === 'function') showServerToast('event', tr('toast.blessing'));
     if (typeof sndLevelUp === 'function') sndLevelUp();
@@ -6502,7 +6503,7 @@ async function playerDie(){
     player.target = null;
     player.autoAttack = false;
     snapRender(player);   // sem lerp ao morrer/teleportar
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({t:'pos', x:player.x, y:player.y, dir:player.dir}));
+    sendRespawnPosition();
     // Spectator: segue o último atacante (mob) por 15s, se ainda visível
     if (typeof _lastHitBy !== 'undefined' && _lastHitBy && _lastHitBy.kind === 'mob'){
         startSpectate(_lastHitBy.id, _lastHitBy.name, 'mob');
@@ -7709,6 +7710,12 @@ function armorHpRegenBonus(){
 // MULTIPLAYER
 // ═══════════════════════════════════════════════════════════════════════════
 let ws = null;
+const movementSync = new window.ValadaresMovementSync.MovementSync();
+function sendRespawnPosition(){
+    if (!ws || ws.readyState !== 1) return;
+    const step = movementSync.step(player.x, player.y, player.dir, player.floor, true);
+    if (step) ws.send(JSON.stringify(step));
+}
 let _wsAuthed = false;        // true após authOk do server (save server-side liberado)
 let _authPwHash = null;       // transporte FORTE (SHA-256) da senha pro auth ao (re)conectar
 let _authPwHashLegacy = null; // transporte LEGADO (djb2) — migração dual-format no server
@@ -7758,6 +7765,7 @@ function connectMP(){
         return;
     }
     ws.onopen = () => {
+        movementSync.disconnect();
         _wsAuthed = false;   // reseta a cada reconexão
         document.getElementById('connStatus').textContent = '● ONLINE';
         document.getElementById('connStatus').className = 'online';
@@ -7804,6 +7812,7 @@ function connectMP(){
         }
     };
     ws.onclose = (ev) => {
+        movementSync.disconnect();
         if (training) stopTraining(tr('training.reason_disconnect'));
         trainingRequestPending = null;
         resetCasinoOnDisconnect();
@@ -7861,13 +7870,15 @@ function connectMP(){
 function sendJoinNow(){
     if (!ws || ws.readyState !== 1) return;
     try {
-        ws.send(JSON.stringify({t:'join', equipmentVersion:1, name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
+        ws.send(JSON.stringify({t:'join', movementVersion:1, equipmentVersion:1, name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
                                 hp:player.hp, maxHp:player.maxHp, equipped:player.equipped,
                                 badges: (player.equippedBadges || []).slice(0, 2)}));
     } catch {}
 }
 
 function handleMP(msg){
+    if (msg.t === 'posAck') { movementSync.ack(msg); return; }
+    if (['state','dungeonEnter','dungeonExit','forceTeleport'].includes(msg.t)) movementSync.reset(msg.movement);
     if (msg.t === 'authOk'){
         _wsAuthed = true;
         document.body.classList.add('game-active');
@@ -8075,14 +8086,14 @@ function handleMP(msg){
             }
         }
     } else if (msg.t === 'posCorrect'){
-        // Server recusou um movimento (anti-teleporte) e devolve a posição autoritativa.
-        // Em jogo limpo NUNCA dispara (cada passo = 1 tile pra tile caminhável, mesmo
-        // grid do server). Snap sem lerp pra não "escorregar" de volta.
+        // Reconcile once; replies for already discarded movement generations cannot
+        // pull the character back again after it has resumed walking.
+        if (!movementSync.correct(msg)) return;
         if (typeof msg.x === 'number' && isFinite(msg.x)) player.x = msg.x;
         if (typeof msg.y === 'number' && isFinite(msg.y)) player.y = msg.y;
         if (typeof msg.dir === 'string') player.dir = msg.dir;
         snapRender(player);
-        player.moveTimer = 0;
+        player.moveTimer = Math.max(player.moveTimer, playerMoveDelay());
     } else if (msg.t === 'pvp'){
         if (remotePlayers[msg.id]){
             remotePlayers[msg.id].pvp = msg.pvp;
@@ -11161,6 +11172,7 @@ async function pkDeathBy(killerId, killerName){
     player.x = spawn.x; player.y = spawn.y;
     player.target = null; player.autoAttack = false;
     snapRender(player);
+    sendRespawnPosition();
     // Spectator: câmera segue o killer por 15s
     startSpectate(killerId, killerName, 'player');
     saveState();
@@ -14642,6 +14654,7 @@ function handleMovement(dt){
     if      (keys['ArrowLeft']|| keys['a'] || keys['A']) dx=-1;
     else if (keys['ArrowRight']||keys['d'] || keys['D']) dx=1;
     if (dx===0 && dy===0) return;
+    if (!movementSync.canMove()) return;
 
     // Direção para sprite: prioriza horizontal nas diagonais
     if      (dx<0) player.dir = 'left';
@@ -14672,7 +14685,10 @@ function handleMovement(dt){
     const trailCol = ITEMS[player.equipped.cosmetic]?.trail;
     if (trailCol) spawnTrailAt(player.prevX, player.prevY, trailCol);
     pickupAt(nx, ny);
-    if (ws && ws.readyState===1) ws.send(JSON.stringify({t:'pos', x:nx, y:ny, dir:player.dir}));
+    if (ws && ws.readyState===1) {
+        const step = movementSync.step(nx, ny, player.dir, player.floor);
+        if (step) ws.send(JSON.stringify(step));
+    }
     checkDungeonStairs(nx, ny);
 }
 
@@ -17102,6 +17118,8 @@ window.ValadaresModernBridge = {
             name: PET_DEFS[player.pet]?.name || 'Companheiro' }
         : null,
     getStatus: () => ({ connected: ws?.readyState === WebSocket.OPEN }),
+    getMovementStatus: () => movementSync.diagnostics(),
+    isPartyMate: name => isPartyMate(name),
     getChatState: () => ({ open: document.getElementById('chatPanel')?.offsetHeight > 0 })
 };
 

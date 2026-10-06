@@ -198,6 +198,30 @@
       "source": "Backgrounds/background_room_tone_loop_01.wav",
       "bytes": 34736,
       "sha256": "d44280bfdf13d6ad7742bbae2ea11be606b783cfc1cd4d8d6344fafbc469c36f"
+    },
+    {
+      "name": "music-pz-tree.mp3",
+      "source": "zz_Bonus_Music_zz/music_calm_tree_of_life.wav",
+      "bytes": 1731677,
+      "sha256": "ac7cdd35e46470ab2b215faa4781c6fe2fbeb4ffdf6f70e74fdb7458b7f2af6a"
+    },
+    {
+      "name": "music-pz-lake.mp3",
+      "source": "zz_Bonus_Music_zz/music_calm_green_lake_serenade.wav",
+      "bytes": 1106933,
+      "sha256": "72e65899cb5b7f2f4e1fd3a4d522a3064c64a240525f90df64b8865e981eedf8"
+    },
+    {
+      "name": "music-field.mp3",
+      "source": "zz_Bonus_Music_zz/music_misty_woods_calling.wav",
+      "bytes": 1667416,
+      "sha256": "f6414b83b410bba8e54782434485c411deeb0825cc7508ac2b3ddfdab3f9cb2e"
+    },
+    {
+      "name": "music-cave.mp3",
+      "source": "zz_Bonus_Music_zz/music_epic_orchestral_bg_underscore.wav",
+      "bytes": 1446734,
+      "sha256": "03a569d2c20641cdfbb13ea88cb37dfe3b1a13b4239313684d275b4636858224"
     }
   ]
 }

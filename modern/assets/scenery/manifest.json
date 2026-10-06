@@ -38,6 +38,14 @@
     {
       "pack": "forest",
       "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Tree_4_A_Color1.gltf",
+      "runtime": "forest/Tree_4_A_Color1.glb",
+      "bytes": 38068,
+      "sha256": "9a6d21f9849169ad8e522ee8f8848df1b0d43dd5f6aed54dd2f120ee3d117b95"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
       "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Tree_5_A_Color1.gltf",
       "runtime": "forest/Tree_5_A_Color1.glb",
       "bytes": 44188,
@@ -50,6 +58,38 @@
       "runtime": "forest/Tree_6_A_Color1.glb",
       "bytes": 45244,
       "sha256": "699b40a11f476fd845964bad6de30357e2ebeff3d6d0ec02ef6c3bf0fd223440"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Tree_7_A_Color1.gltf",
+      "runtime": "forest/Tree_7_A_Color1.glb",
+      "bytes": 41428,
+      "sha256": "b7c418983dcffd60f277c3120dbdfa1ee384b7069e42eb09f90cae8fa855b33b"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Tree_Bare_1_A_Color1.gltf",
+      "runtime": "forest/Tree_Bare_1_A_Color1.glb",
+      "bytes": 37244,
+      "sha256": "510371dd44e3c8bb64a9a441208bfe8a46873a625835b81bb3bf6cf46f5d3486"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color2/Tree_5_B_Color2.gltf",
+      "runtime": "forest/Tree_5_B_Color2.glb",
+      "bytes": 50732,
+      "sha256": "907c9e44aed06cdce266853e59982c1bfb0f36b3a55f3996cb283dac08c4e752"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color2/Tree_6_B_Color2.gltf",
+      "runtime": "forest/Tree_6_B_Color2.glb",
+      "bytes": 51168,
+      "sha256": "73f3328bba9488d86a40ba6c65c3b4de291f40367d485385c1aefde285b803dd"
     },
     {
       "pack": "forest",
@@ -70,6 +110,30 @@
     {
       "pack": "forest",
       "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Rock_3_A_Color1.gltf",
+      "runtime": "forest/Rock_3_A_Color1.glb",
+      "bytes": 29936,
+      "sha256": "2ec363b0f21ba2d446ecc3a058d53d27aa6a86d895545d6a4db7ecf0e8bb507a"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Rock_5_A_Color1.gltf",
+      "runtime": "forest/Rock_5_A_Color1.glb",
+      "bytes": 27248,
+      "sha256": "a17330735711081d49303894f181e1a64d29aa13b5259347149c549d5da8525e"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Rock_6_A_Color1.gltf",
+      "runtime": "forest/Rock_6_A_Color1.glb",
+      "bytes": 27672,
+      "sha256": "8d202c370385c9e9c6ebc9582a228cde9e52464f18f002be277c1c603b6ce1f1"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
       "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Bush_1_A_Color1.gltf",
       "runtime": "forest/Bush_1_A_Color1.glb",
       "bytes": 27844,
@@ -82,6 +146,22 @@
       "runtime": "forest/Bush_2_A_Color1.glb",
       "bytes": 26520,
       "sha256": "330b59055bbfc1df76d7ff65ce4671b552d072f3b263d524bcc6b1e81b43aea6"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Bush_3_A_Color1.gltf",
+      "runtime": "forest/Bush_3_A_Color1.glb",
+      "bytes": 30744,
+      "sha256": "85fbae8ab7ca35f804540ac4eb9b52b267cb621e83e7a6e3e0c50e1baba5c2eb"
+    },
+    {
+      "pack": "forest",
+      "archive": "KayKit_Forest_Nature_Pack_1.0_EXTRA.zip",
+      "source": "KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf/Color1/Bush_4_A_Color1.gltf",
+      "runtime": "forest/Bush_4_A_Color1.glb",
+      "bytes": 26520,
+      "sha256": "14027ffed9c4168da0e28de42c6ebbab5e26a8b720075587dd192235f0aead52"
     },
     {
       "pack": "dungeon",
@@ -180,13 +260,174 @@
       "sha256": "e1f49d267dad404f3130d6f26246914413c010c3733b0594bcf4d11ae9affd59"
     },
     {
-      "pack": "series6",
-      "archive": "KayKit_Mystery_Monthly_Series_6_(1.1).zip",
-      "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/Trainingdummy_Base.gltf",
-      "runtime": "series6/training-dummy.glb",
-      "bytes": 115164,
-      "sha256": "fda03782fc76ada931617f79c81043bf44899136f50d631e96f7ad9d5d0fefc4"
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/bed_A_single.gltf",
+      "runtime": "dungeon/bed_A_single.glb",
+      "bytes": 45952,
+      "sha256": "c394cb94f8c4f0891c4245096893c971eba0989d6971fb5e8502363b057aa702"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/bookcase_double_decoratedA.gltf",
+      "runtime": "dungeon/bookcase_double_decoratedA.glb",
+      "bytes": 157384,
+      "sha256": "aa41ba0f1bc33a2307d9e55e8bc7f40c5eb3006459f3a5bc5ee4dde52be14b7c"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/bookcase_single_decoratedB.gltf",
+      "runtime": "dungeon/bookcase_single_decoratedB.glb",
+      "bytes": 97212,
+      "sha256": "c9a53a108f8c485e4449a6598c55149e42f15ca77f8802d5fb10de8519058cf4"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/shelf_small_books.gltf",
+      "runtime": "dungeon/shelf_small_books.glb",
+      "bytes": 32076,
+      "sha256": "e8563a71640005993b14cdbaae379858cbc05f250d947480f17efaf75130b7ca"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/candle_lit.gltf",
+      "runtime": "dungeon/candle_lit.glb",
+      "bytes": 22980,
+      "sha256": "939728790e4686e5d0eb81b5b0c810427268d9492beed845549e35de0c517e41"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/table_round_small.gltf",
+      "runtime": "dungeon/table_round_small.glb",
+      "bytes": 40584,
+      "sha256": "2c67019b3eb1df5d0a5b8f6102deb626d2ce4e1b9b9506fe6182af4e5c1dfdd7"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/table_long.gltf",
+      "runtime": "dungeon/table_long.glb",
+      "bytes": 35300,
+      "sha256": "03dc3eeab9fb351933f0893cfb99eae67f973b0dd051b1dd7f86bfa57ef534ca"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/bottle_A_green.gltf",
+      "runtime": "dungeon/bottle_A_green.glb",
+      "bytes": 26704,
+      "sha256": "65e373bd84db0f5eafc6368ad006265c0fede1c7d2050660f30c8ca681d12d8c"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/plate_food_A.gltf",
+      "runtime": "dungeon/plate_food_A.glb",
+      "bytes": 39588,
+      "sha256": "fc8b432d2feeed3b215f23ff37c4326b5c0ed3075403af2fc6b09aa529cd7dd4"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/bucket_pickaxes.gltf",
+      "runtime": "dungeon/bucket_pickaxes.glb",
+      "bytes": 45812,
+      "sha256": "2b43fd55d68b7a2601ec658967ca54502ff31d5ec6e37b116a7a74a354faf9a4"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/pickaxe.gltf",
+      "runtime": "dungeon/pickaxe.glb",
+      "bytes": 24352,
+      "sha256": "5fa70ae01b251da7c1c1acdb5e68841def22a0298a19f724374352f9fa245a7b"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/scaffold_frame_small.gltf",
+      "runtime": "dungeon/scaffold_frame_small.glb",
+      "bytes": 27376,
+      "sha256": "9e99f4d4fffcc07a76c68f2ad12ff2244e4a1586a64f7c7ae9d331f98f0583aa"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/rocks_gold.gltf",
+      "runtime": "dungeon/rocks_gold.glb",
+      "bytes": 41224,
+      "sha256": "79e03a40f9b7245a6d394b6d1cb9cc00b9633b046de1f516f9bc7aabed4059e3"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/pillar_decorated.gltf",
+      "runtime": "dungeon/pillar_decorated.glb",
+      "bytes": 62384,
+      "sha256": "8001c9c9dfc4498cc8a6a6289804c1ec1283b4e57430f122f1cd470e8b1a08a0"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/torch_lit.gltf",
+      "runtime": "dungeon/torch_lit.glb",
+      "bytes": 30200,
+      "sha256": "47b30983605ae77984c6c6e77ea59d89e89a7b34223c3276e4e62608cbe3d19b"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/sword_shield.gltf",
+      "runtime": "dungeon/sword_shield.glb",
+      "bytes": 47332,
+      "sha256": "1a2bae0e80ea769ffe73d26cd23511d3e17f7db20fe1226f549523dfd3e4b5d2"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/wall_cracked.gltf",
+      "runtime": "dungeon/wall_cracked.glb",
+      "bytes": 121648,
+      "sha256": "9ef5fa8a5e4c420b80370a19960bbcb9866d4eb73d38d1a91963220b62fd8802"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/wall_inset_candles.gltf",
+      "runtime": "dungeon/wall_inset_candles.glb",
+      "bytes": 77276,
+      "sha256": "99f0956b6330a24e7b318c9b2064a1040663201706157117db2a88c9014247af"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/banner_blue.gltf",
+      "runtime": "dungeon/banner_blue.glb",
+      "bytes": 25004,
+      "sha256": "0820260b67553ed17e5d08a7be34c79f285e57069463cf8e2e0d73e22e80dda0"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/stool_round.gltf",
+      "runtime": "dungeon/stool_round.glb",
+      "bytes": 32848,
+      "sha256": "63b6862af4a1b86101a52cbbf5137c824ace49c48bc215a4a744393835a9bd58"
+    },
+    {
+      "pack": "dungeon",
+      "archive": "KayKit_Dungeon_Pack_1.1_EXTRA.zip",
+      "source": "KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf/shelves_decorated.gltf",
+      "runtime": "dungeon/shelves_decorated.glb",
+      "bytes": 87272,
+      "sha256": "194dd0b950f244e035d26e5b76acfca9be88990dd6a08ed8006f832dbcadd0f3"
     }
   ],
-  "runtime_bytes": 1052032
+  "archive_validation_note": "CRC integral herdado do manifesto anterior; esta sele\u00e7\u00e3o leu apenas as entradas utilizadas",
+  "runtime_bytes": 2418136
 }

@@ -2525,6 +2525,18 @@ function sendTo(id, msg){
     const p = players.get(id);
     if (p && p.ws.readyState === 1) p.ws.send(JSON.stringify(msg));
 }
+function movementSnapshot(p, reset = false){
+    if (p.movementVersion !== 1) return undefined;
+    if (reset || !p._movementEpoch){
+        p._movementEpoch = (p._movementEpoch || 0) + 1;
+        p._movementSeq = 0;
+    }
+    return { v:1, epoch:p._movementEpoch, window:4 };
+}
+function correctMovement(p, reason){
+    sendTo(p.id, {t:'posCorrect', x:p.x, y:p.y, dir:p.dir, reason,
+        movement:movementSnapshot(p, true)});
+}
 function snapshotPlayers(floor){
     return Array.from(players.values())
       .filter(p => floor === undefined || (p.floor || 0) === floor)
@@ -2729,7 +2741,7 @@ function enterDungeonFloor(p, id, floor, dir){
     spawnDungeonMobs();
     if (p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
-            t:'dungeonEnter', floor, dir: dir || 'down', x: p.x, y: p.y,
+            t:'dungeonEnter', movement:movementSnapshot(p,true), floor, dir: dir || 'down', x: p.x, y: p.y,
             grid: { region: g.region, rows: g.rows },   // M4 3b: cliente desenha ESTE grid
             stairs: g.stairs,
             players: snapshotPlayers(floor).filter(sp => sp.id !== id),
@@ -2758,7 +2770,7 @@ function returnPlayerToTown(p, id){
     p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
     if (p.ws && p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
-            t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
+            t:'dungeonExit', movement:movementSnapshot(p,true), x: p.x, y: p.y, pvp: p.pvp,
             players: snapshotPlayers(0).filter(sp => sp.id !== id),
             mobs: snapshotMobs(0),
             groundDrops: snapshotGroundDrops(0),
@@ -2774,7 +2786,7 @@ function enterInterior(p,id,room){
     p.floor=room.floor;
     p.x=room.spawn.x; p.y=room.spawn.y;
     sendTo(id,{
-        t:'dungeonEnter',interior:room.id,floor:room.floor,dir:'down',
+        t:'dungeonEnter',movement:movementSnapshot(p,true),interior:room.id,floor:room.floor,dir:'down',
         x:p.x,y:p.y,pvp:false,grid:room.grid,stairs:dungeonFloors.get(room.floor).stairs,
         players:snapshotPlayers(room.floor).filter(sp=>sp.id!==id),
         mobs:[],groundDrops:[]
@@ -2791,7 +2803,7 @@ function exitInterior(p,id,room){
     p.pvp=!!p._pvpBeforeDungeon;
     p._pvpBeforeDungeon=undefined;
     sendTo(id,{
-        t:'dungeonExit',interior:room.id,x:p.x,y:p.y,pvp:p.pvp,
+        t:'dungeonExit',movement:movementSnapshot(p,true),interior:room.id,x:p.x,y:p.y,pvp:p.pvp,
         players:snapshotPlayers(0).filter(sp=>sp.id!==id),
         mobs:snapshotMobs(0),groundDrops:snapshotGroundDrops(0)
     });
@@ -4208,7 +4220,7 @@ function adminResetUser(rawName){
                 pp.ws.send(JSON.stringify({ t:'serverMsg', level:'info', text: trp(pp, 'srv.admin_reset_pos') }));
                 broadcastPstatsAll(pp);
                 // Força o client teleportar (server manda pstats + cliente recarrega)
-                pp.ws.send(JSON.stringify({ t:'forceTeleport', x:50, y:50 }));
+                pp.ws.send(JSON.stringify({ t:'forceTeleport', movement:movementSnapshot(pp,true), x:50, y:50 }));
             }
             break;
         }
@@ -5920,7 +5932,7 @@ function enterExpedition(p){
     p._pvpBeforeDungeon=!!p.pvp;
     p.pvp=false;
     p.floor=floor;p.x=g.stairs.spawn.x;p.y=g.stairs.spawn.y;
-    sendTo(p.id,{t:'dungeonEnter',floor,dir:'down',x:p.x,y:p.y,
+    sendTo(p.id,{t:'dungeonEnter',movement:movementSnapshot(p,true),floor,dir:'down',x:p.x,y:p.y,
         grid:{region:g.region,rows:g.rows},stairs:g.stairs,expedition:progression.expedition.id,
         expeditionLayout:'forge_ruins_v1',
         pvp:false,players:[],mobs:snapshotMobs(floor),groundDrops:[]});
@@ -5996,7 +6008,7 @@ function enterArenaFloor(p, id, floor, spawn, opponentName){
     p.x = spawn.x; p.y = spawn.y;
     if (p.ws && p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
-            t:'dungeonEnter', floor, dir:'down', x:p.x, y:p.y,
+            t:'dungeonEnter', movement:movementSnapshot(p,true), floor, dir:'down', x:p.x, y:p.y,
             grid: { region: g.region, rows: g.rows },
             stairs: g.stairs,
             players: snapshotPlayers(floor).filter(sp => sp.id !== id),
@@ -6017,7 +6029,7 @@ function returnFromArena(p, id){
     p.x = ret.x; p.y = ret.y;
     if (p.ws && p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
-            t:'dungeonExit', x: p.x, y: p.y, pvp: p.pvp,
+            t:'dungeonExit', movement:movementSnapshot(p,true), x: p.x, y: p.y, pvp: p.pvp,
             players: snapshotPlayers(0).filter(sp => sp.id !== id),
             mobs: snapshotMobs(0),
             groundDrops: snapshotGroundDrops(0),
@@ -6879,6 +6891,7 @@ wss.on('connection', (ws, request) => {
             // Nunca confiar em msg.name: era o vetor de impersonate e de admin sem
             // senha (join com name='alcione'). (audit 2026-06-03)
             p.name = p.authedName;
+            p.movementVersion = msg.movementVersion === 1 ? 1 : 0;
             p.lang = (msg.lang === 'en') ? 'en' : 'pt';   // i18n Opção B: idioma do player p/ serverMsg (fallback PT)
             // Posição AUTORITATIVA (audit 2026-06-03): ignora msg.x/msg.y (era teleporte p/
             // qualquer tile do overworld + fuga de PvP por reconexão). Default = spawn seguro;
@@ -7033,6 +7046,7 @@ wss.on('connection', (ws, request) => {
             p.joined = true;
             ws.send(JSON.stringify({
                 t:'state', you: id,
+                movement:movementSnapshot(p, true),
                 weaponDotsAuthoritative: true,
                 equipmentVersion: equipmentRules.VERSION,
                 enchantingEnabled: ENCHANTING_ENABLED,
@@ -7075,6 +7089,15 @@ wss.on('connection', (ws, request) => {
         }
 
         if (msg.t === 'pos') {
+            if (p.movementVersion === 1){
+                // Old in-flight positions after correction/teleport are obsolete.
+                // Never trust sequence metadata as permission to move.
+                if (msg.epoch !== p._movementEpoch) return;
+                if (!Number.isSafeInteger(msg.seq) || msg.seq !== p._movementSeq + 1 || msg.floor !== (p.floor || 0)){
+                    correctMovement(p, 'sequence');
+                    return;
+                }
+            }
             // Rate-limit anti-flood em TOKEN BUCKET: média 1 movimento/70ms (cliente
             // legítimo anda no máx 1 tile/80ms — piso do playerMoveDelay) com rajada de
             // até 5. O gate antigo (drop SILENCIOSO se <40ms) dessincronizava em rede com
@@ -7089,9 +7112,9 @@ wss.on('connection', (ws, request) => {
             p._posTokensAt = _now;
             if (p._posTokens < 1){
                 // Sem token: snap-back (não silencioso), throttled pra não amplificar flood.
-                if (!p._posCorrAt || _now - p._posCorrAt > 300){
+                if (p.movementVersion === 1 || !p._posCorrAt || _now - p._posCorrAt > 300){
                     p._posCorrAt = _now;
-                    sendTo(id, { t:'posCorrect', x: p.x, y: p.y, dir: p.dir });
+                    correctMovement(p, 'rate');
                 }
                 return;
             }
@@ -7110,16 +7133,23 @@ wss.on('connection', (ws, request) => {
             // (morte/bênção) teleporta pro spawn — _posGraceUntil (setado nos sites de
             // morte) libera UM pos não-adjacente. Como só nasce APÓS morrer de verdade, o
             // player vivo não foge nem rusha por aqui (e o morto já pagou a penalidade).
-            if (p._posGraceUntil && _now < p._posGraceUntil){
+            const respawnStep = p.movementVersion === 1
+                ? msg.respawn === true && nx === SAFE_CX && ny === SAFE_CY
+                : chebyshev(p.x, p.y, nx, ny) > 1;
+            if (p._posGraceUntil && _now < p._posGraceUntil && respawnStep){
                 p._posGraceUntil = 0;   // one-shot
                 p.x = nx; p.y = ny;
             } else if (chebyshev(p.x, p.y, nx, ny) <= 1 && playerTileWalkable(p, nx, ny)){
                 p.x = nx; p.y = ny;
             } else {
-                sendTo(id, { t:'posCorrect', x: p.x, y: p.y, dir: p.dir });
+                correctMovement(p, chebyshev(p.x, p.y, nx, ny) > 1 ? 'distance' : 'terrain');
                 return;
             }
             p.dir = (typeof msg.dir === 'string' && msg.dir.length < 8) ? msg.dir : p.dir;
+            if (p.movementVersion === 1){
+                p._movementSeq = msg.seq;
+                sendTo(id, {t:'posAck', epoch:p._movementEpoch, seq:p._movementSeq});
+            }
             if ((p.floor || 0) === 0) creditQuestVisit(p, p.x, p.y);   // Lote 1b: visita de quest server-auth
             // Lockdown N3: hp/maxHp são server-authoritative. msg.hp/msg.maxHp do
             // cliente NUNCA são aceitos aqui (F12 `{t:'pos',hp:99999}` virava invencível).

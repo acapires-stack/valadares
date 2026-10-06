@@ -50,6 +50,12 @@ FILES = {
     "ambient-cave": "Animals_Nature_Ambiences/cave_ambience_loop_01.wav",
     "ambient-interior": "Backgrounds/background_room_tone_loop_01.wav",
 }
+MUSIC = {
+    "music-pz-tree": "zz_Bonus_Music_zz/music_calm_tree_of_life.wav",
+    "music-pz-lake": "zz_Bonus_Music_zz/music_calm_green_lake_serenade.wav",
+    "music-field": "zz_Bonus_Music_zz/music_misty_woods_calling.wav",
+    "music-cave": "zz_Bonus_Music_zz/music_epic_orchestral_bg_underscore.wav",
+}
 TRIM_SECONDS = {"wand": 1.0, "spell-dark": 1.25, "spell-fire": 1.2,
                 "spell-generic": 0.85, "pickup": 0.7, "critical": 0.35}
 
@@ -72,14 +78,14 @@ def main():
         for item in manifest["files"]:
             path = DEST / item["name"]
             assert path.is_file() and path.stat().st_size == item["bytes"] and digest(path) == item["sha256"], path
-        assert {item["name"] for item in manifest["files"]} == {f"{key}.mp3" for key in FILES}
+        assert {item["name"] for item in manifest["files"]} == {f"{key}.mp3" for key in FILES | MUSIC}
         print(f"OK: {len(manifest['files'])} arquivos, {sum(i['bytes'] for i in manifest['files'])} bytes")
         return
 
     with zipfile.ZipFile(args.zip) as archive:
         names = archive.namelist()
         members = {}
-        for key, suffix in FILES.items():
+        for key, suffix in (FILES | MUSIC).items():
             found = [name for name in names if name.endswith("/" + suffix)]
             if len(found) != 1:
                 raise ValueError(f"Fonte ausente/ambígua: {suffix}")
@@ -93,12 +99,13 @@ def main():
                 # zipfile validates each selected member's CRC while reading it.
                 source.write_bytes(archive.read(info))
                 target = DEST / f"{key}.mp3"
-                bitrate = "48k" if key.startswith("ambient-") else "64k"
+                bitrate = "96k" if key in MUSIC else "48k" if key.startswith("ambient-") else "64k"
                 command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(source)]
                 if key in TRIM_SECONDS:
                     end = TRIM_SECONDS[key]
                     command += ["-af", f"atrim=end={end},afade=t=out:st={end - 0.2}:d=0.2"]
-                command += ["-ac", "1", "-ar", "22050", "-codec:a", "libmp3lame",
+                command += ["-ac", "2" if key in MUSIC else "1",
+                            "-ar", "44100" if key in MUSIC else "22050", "-codec:a", "libmp3lame",
                             "-b:a", bitrate, str(target)]
                 proc = subprocess.run(command,
                                       capture_output=True, text=True)

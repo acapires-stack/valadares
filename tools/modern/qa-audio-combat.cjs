@@ -1,4 +1,4 @@
-// Focused browser check for combat music and the nine common audio samples.
+// Focused browser check for combat effects and the nine common audio samples.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -50,25 +50,6 @@ const common = new Set(['melee-1', 'melee-2', 'ranged-1', 'ranged-2',
         assert(decoded.every(([, seconds]) => seconds > 0 && seconds < 1.1), 'impact and wand MP3 must decode');
 
         const levels = await page.evaluate(async () => {
-            async function render(combat){
-                const ctx = new OfflineAudioContext(1, 44100, 44100);
-                const engine = ValadaresAudio.create(ctx);
-                engine.setVolumes({ master: 100, effects: 0, ambient: 0, music: 100 });
-                engine.setScene({ active: true, biome: 'grass', combat });
-                const buffer = await ctx.startRendering();
-                engine.dispose();
-                const pcm = buffer.getChannelData(0);
-                function magnitude(hz){
-                    let real = 0, imag = 0;
-                    for (let i = 4410; i < 17640; i++){
-                        const angle = 2 * Math.PI * hz * i / 44100;
-                        real += pcm[i] * Math.cos(angle);
-                        imag += pcm[i] * Math.sin(angle);
-                    }
-                    return Math.hypot(real, imag);
-                }
-                return { root220: magnitude(220), melody440: magnitude(440) };
-            }
             async function fallback(kind){
                 const ctx = new OfflineAudioContext(1, 22050, 44100);
                 const engine = ValadaresAudio.create(ctx);
@@ -91,12 +72,8 @@ const common = new Set(['melee-1', 'melee-2', 'ranged-1', 'ranged-2',
                 }
                 return { low, high };
             }
-            return { calm: await render(false), combat: await render(true),
-                criticalFallback: await fallback('critical'), wandFallback: await fallback('wand') };
+            return { criticalFallback: await fallback('critical'), wandFallback: await fallback('wand') };
         });
-        assert(levels.calm.melody440 > levels.combat.melody440 * 5,
-            `combat melody should be suppressed: ${JSON.stringify(levels)}`);
-        assert(levels.combat.root220 > 1, `combat root should remain: ${JSON.stringify(levels)}`);
         assert(levels.criticalFallback.low > levels.criticalFallback.high,
             `critical fallback should favor low frequencies: ${JSON.stringify(levels)}`);
         await page.evaluate(async () => { qaEngine.dispose(); await qaContext.close(); });

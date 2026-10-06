@@ -7,8 +7,8 @@ import {createWorld} from '../../modern/world.js';
 const app=new pc.Application(document.getElementById('view'),{graphicsDeviceOptions:{alpha:false,antialias:true,deviceTypes:['webgl2']}});
 app.scene.ambientLight=new pc.Color(.43,.48,.47);app.scene.toneMapping=pc.TONEMAP_ACES;app.scene.exposure=1.1;
 const camera=new pc.Entity('Camera');camera.addComponent('camera',{projection:pc.PROJECTION_ORTHOGRAPHIC,orthoHeight:8,clearColor:new pc.Color(.13,.18,.17)});app.root.addChild(camera);
-const sun=new pc.Entity('Sun');sun.addComponent('light',{type:'directional',color:new pc.Color(1,.91,.74),intensity:1.4,castShadows:true,shadowResolution:1024});sun.setEulerAngles(52,-35,0);app.root.addChild(sun);
-const fill=new pc.Entity('Fill');fill.addComponent('light',{type:'directional',color:new pc.Color(.5,.7,.88),intensity:.45});fill.setEulerAngles(55,145,0);app.root.addChild(fill);
+const sun=new pc.Entity('Sun');sun.addComponent('light',{type:'directional',color:new pc.Color(1,.91,.74),intensity:1.4,castShadows:true,shadowResolution:2048,shadowDistance:45,shadowBias:.15,normalOffsetBias:.04,shadowType:pc.SHADOW_PCF3_32F});sun.setEulerAngles(52,-35,0);app.root.addChild(sun);
+const fill=new pc.Entity('Fill');fill.addComponent('light',{type:'directional',color:new pc.Color(.5,.7,.88),intensity:.45,castShadows:false});fill.setEulerAngles(55,145,0);app.root.addChild(fill);
 const floor=Number(new URLSearchParams(location.search).get('floor')||0),scene=new URLSearchParams(location.search).get('scene')||'village';
 const houses=[{id:'pousada',x:43,y:43,w:3,h:3},{id:'oficina',x:50,y:42,w:4,h:3}];
 const map=Array.from({length:100},()=>new Uint8Array(100));
@@ -21,10 +21,11 @@ if(floor===0){
  for(let z=56;z<61;z++)for(let x=43;x<49;x++)map[z][x]=5;
  for(let z=55;z<62;z++){map[z][42]=6;map[z][49]=6;}
 }else{for(let y=46;y<=52;y++)for(let x=46;x<=54;x++)map[y][x]=x===46||x===54||y===46||y===52?6:5;}
-let center=scene==='forest'?{x:59,z:42}:scene==='ruins'?{x:46,z:58}:{x:49,z:47};
-const bridge={M_W:100,M_H:100,VP_W:15,VP_H:11,getMap:()=>map,getFloor:()=>floor,getPlayer:()=>({x:center.x,y:center.z,floor}),getCamera:()=>({x:center.x-7.5,y:center.z-5.5}),getViewBounds:()=>({minX:center.x-11,maxX:center.x+11,minY:center.z-11,maxY:center.z+11}),getBuildings:()=>houses,getProps:()=>[]};
+let center=floor>0?{x:50,z:49}:scene==='forest'?{x:59,z:42}:scene==='ruins'?{x:46,z:58}:{x:49,z:47};
+const rooms=[1000,1001,1002,1003].map(level=>({floor:level,services:level===1000?[]:[{kind:({1001:'craft',1002:'altar',1003:'dummy'})[level],x:50,y:46}]}));
+const bridge={M_W:100,M_H:100,VP_W:15,VP_H:11,getMap:()=>map,getFloor:()=>floor,getPlayer:()=>({x:center.x,y:center.z,floor}),getCamera:()=>({x:center.x-7.5,y:center.z-5.5}),getViewBounds:()=>({minX:center.x-11,maxX:center.x+11,minY:center.z-11,maxY:center.z+11}),getBuildings:()=>houses,getProps:()=>[],getInteriors:()=>rooms};
 const world=createWorld(pc,app,bridge);let frames=0,elapsed=0;
-function resize(){app.resizeCanvas(innerWidth,innerHeight);camera.camera.orthoHeight=floor?5.7:8;}
+function resize(){app.resizeCanvas(innerWidth,innerHeight);camera.camera.orthoHeight=floor?4.4:8;}
 window.addEventListener('resize',resize);resize();
 app.on('update',dt=>{world.update(dt);frames++;elapsed+=dt;camera.setPosition(center.x,16,center.z+10);camera.lookAt(center.x,0,center.z);});
 app.start();

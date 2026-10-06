@@ -42,6 +42,18 @@
       "bytes": 1181844,
       "sha256": "f722816c7a2abdc5572100d15572e9d0679c777cdf3108b0900ba93d06f00984"
     },
+    "Hoarder.glb": {
+      "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/8 - February 2026 - Hoarder/characters/Hoarder.glb",
+      "sourceSha256": "7d46b93dd2e0e3bb2579177e0ce98e208029b0e4fc8d246e9150e4c68f5778c5",
+      "bytes": 1214164,
+      "sha256": "7d46b93dd2e0e3bb2579177e0ce98e208029b0e4fc8d246e9150e4c68f5778c5"
+    },
+    "MagicalGirl.glb": {
+      "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/11 - May 2026 - Magical Girl/characters/MagicalGirl.glb",
+      "sourceSha256": "e4f21e110e9c1c74aa1f3f468585bb2cf489dda856c4e1e1ad5425fa72b10612",
+      "bytes": 437752,
+      "sha256": "e4f21e110e9c1c74aa1f3f468585bb2cf489dda856c4e1e1ad5425fa72b10612"
+    },
     "Rig_Medium_General.glb": {
       "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
       "sourceSha256": "5f725c0f745f36078c7238968cd5c04843cbc6260689eb6e7f5e2bbd7ffdd7ad",
@@ -65,6 +77,104 @@
       "sourceSha256": "2798a62b6f2a1f0f73b8481468fc0aeb7dd3118ceeb1be7db2fc947b7a1221ad",
       "bytes": 584676,
       "sha256": "2798a62b6f2a1f0f73b8481468fc0aeb7dd3118ceeb1be7db2fc947b7a1221ad"
+    },
+    "AvianSwordsman_Sword.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/AvianSwordsman_Sword.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/AvianSwordsman_Sword.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/avianswordsman_texture.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/AvianSwordsman_Sword.gltf": "f6b839dfca625799be8ad52ab8b4f1606011ca961aefefa6fb9ff7aad2616d56",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/AvianSwordsman_Sword.bin": "1b7935d2a5c1a41e98fa88e3c363806b1b4a9140b7c0a570de9dfa7b519cfb14",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/9 - March 2026 - Avian Swordsman/assets/gltf/avianswordsman_texture.png": "4c48211c4d3b30c933dc64a15c6e45dc932afa219e411cf01bd6cefd6bcaa596"
+      },
+      "bytes": 34468,
+      "sha256": "9d2a0f94b53ab1fce05562916452a273a015e1bc14c2f99684afee7605574e5d"
+    },
+    "Orc_Axe.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/2 - August 2025 - Orc Brute/assets/gltf/Orc_Axe.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/2 - August 2025 - Orc Brute/assets/gltf/Orc_Axe.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/2 - August 2025 - Orc Brute/assets/gltf/orcbrute_texture_A.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/2 - August 2025 - Orc Brute/assets/gltf/Orc_Axe.gltf": "60855aa3ceae33ae2734a1be3d7070bd9fb523befa23f5c32de86cf269ca9928",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/2 - August 2025 - Orc Brute/assets/gltf/Orc_Axe.bin": "6015e14220481a44ef8a1925a3da7656b7e4afa6a55081237d8e0e7ef7e8b4d1",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/2 - August 2025 - Orc Brute/assets/gltf/orcbrute_texture_A.png": "584993e1cd8192dd60cb2861a65069750da0eede65ea4978e460063144eca0b3"
+      },
+      "bytes": 37136,
+      "sha256": "a9dbb6d342b9b73e9c84288c2f1cdeaf57e775decedf73b3b1f83b2ca2b34f2a"
+    },
+    "Cleric_Mace.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Mace.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Mace.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/cleric_texture.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Mace.gltf": "b6c39d860a0fcb0eaff2955ac25f24f2db62de14a9e38dbbda2f2793b00371a1",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Mace.bin": "9fd2fd82bb51818dbe81f12443fc9ca97d19ebf15e541f527f2ce632719d89e5",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/cleric_texture.png": "54cd45f6048dc8e4f971c94c33f63177bf31c1acfd736ba266cad87796bd4eb3"
+      },
+      "bytes": 43404,
+      "sha256": "eec7796bcdb7f4392d2e7d58d54c9832f6a28678ec4e2bce2e64ff08d3e17eac"
+    },
+    "PlantWarrior_Spear.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Spear.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Spear.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/plantcreatures_texture.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Spear.gltf": "cc4e4fcfde79c60173d532980e2643d4d173be6dacfba4531ef1d734cb555251",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Spear.bin": "8805bbf40ded64bca7142912c1b31e2e88ff718647e8292b799a47d1cce35625",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/plantcreatures_texture.png": "12ea6cd207720dbe27ad14a727916b8eb0ff26203542860bbe1546be56ae4882"
+      },
+      "bytes": 69720,
+      "sha256": "5e3470f4b4607d06ef1360eee786883f4690601197523760cc8ae22710f79f6c"
+    },
+    "Lorekeeper_Staff.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/1 - July 2025 - Lorekeeper/assets/gltf/Lorekeeper_Staff.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/1 - July 2025 - Lorekeeper/assets/gltf/Lorekeeper_Staff.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/1 - July 2025 - Lorekeeper/assets/gltf/lorekeeper_texture.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/1 - July 2025 - Lorekeeper/assets/gltf/Lorekeeper_Staff.gltf": "7e18e381a5fdc38299c56cae78405ca99ebf710525d2a854cebfd80596a3c10e",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/1 - July 2025 - Lorekeeper/assets/gltf/Lorekeeper_Staff.bin": "98b41cac5f50f05e7b6205b3d1b196d072eddf52d632d2db72972efc3ec25926",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/1 - July 2025 - Lorekeeper/assets/gltf/lorekeeper_texture.png": "9843bbccfe102aadccc1868f62c820f6cd485602aead37ac246daff95756cbbd"
+      },
+      "bytes": 50620,
+      "sha256": "bfef7d4cf2607772f1f6d320c5e56867d2527f07fe57bd26b97b7e0bb47ad15a"
+    },
+    "PlantWarrior_Bow_withString.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Bow_withString.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Bow_withString.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/plantcreatures_texture.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Bow_withString.gltf": "2f34e2438036101cdc57d8fd05b2054799bf0dfb858a4000815865d26ed8bd61",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Bow_withString.bin": "5e410285abc3b9b0e9fbe18500d813206d2f155574929f3fe50584f1392a585e",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/plantcreatures_texture.png": "12ea6cd207720dbe27ad14a727916b8eb0ff26203542860bbe1546be56ae4882"
+      },
+      "bytes": 77896,
+      "sha256": "3d21fb93be7c9a84e645cf0df8befc383a3c05a2e2d269283ebe805b21b55a81"
+    },
+    "Cleric_Shield.glb": {
+      "source": [
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Shield.gltf",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Shield.bin",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/cleric_texture.png"
+      ],
+      "sourceSha256": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Shield.gltf": "14f303678e3d1990316dc937874b5f77391facfc8333c421eda3549143a7e97b",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/Cleric_Shield.bin": "f4a78504b3e02693de92e9db0bf4d861b00ae1893f59c8706f011be1d7926b89",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/3 - September 2025 - Cleric/assets/gltf/cleric_texture.png": "54cd45f6048dc8e4f971c94c33f63177bf31c1acfd736ba266cad87796bd4eb3"
+      },
+      "bytes": 45456,
+      "sha256": "dc4e5ca11b26dfd86de52a4bb21e4bd5406662f1d56ebc44841f2b71bbcfe14c"
     },
     "LICENSE.txt": {
       "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/License.txt",

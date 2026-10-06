@@ -8,8 +8,9 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 ZIP = Path(r"C:\Users\Alcione\Downloads\KayKit_Mystery_Monthly_Series_6_(1.1).zip")
 DEST = ROOT / "modern/assets/characters-series6"
-NAMES = ("Farmer_A", "Farmer_B", "Lorekeeper", "Cleric", "OrcBrute", "Monstrosity")
+NAMES = ("Farmer_A", "Farmer_B", "Lorekeeper", "Cleric", "OrcBrute", "Monstrosity", "Hoarder", "MagicalGirl")
 RIGS = ("Rig_Medium_General", "Rig_Medium_MovementBasic", "Rig_Large_General", "Rig_Large_MovementBasic")
+PROPS = ("AvianSwordsman_Sword", "Orc_Axe", "Cleric_Mace", "PlantWarrior_Spear", "Lorekeeper_Staff", "PlantWarrior_Bow_withString", "Cleric_Shield")
 
 
 def parse_glb(data):
@@ -76,6 +77,28 @@ def add_attack(data, source):
     doc["buffers"][0]["byteLength"] = len(binary) + len(old_binary)
     return pack_glb(doc, binary + old_binary)
 
+
+def pack_prop(archive, gltf_path):
+    """Embed the purchased glTF's binary and PNG in a single loadable GLB."""
+    doc = json.loads(archive.read(gltf_path))
+    folder = gltf_path.rsplit("/", 1)[0] + "/"
+    if len(doc.get("buffers", [])) != 1:
+        raise ValueError(f"Expected one buffer for {gltf_path}")
+    binary_path = folder + doc["buffers"][0]["uri"]
+    binary = archive.read(binary_path)
+    source_files = [gltf_path, binary_path]
+    del doc["buffers"][0]["uri"]
+    for image in doc.get("images", []):
+        image_path = folder + image.pop("uri")
+        source_files.append(image_path)
+        binary += b"\0" * (-len(binary) % 4)
+        image_data = archive.read(image_path)
+        image["bufferView"] = len(doc["bufferViews"])
+        doc["bufferViews"].append({"buffer": 0, "byteOffset": len(binary), "byteLength": len(image_data)})
+        binary += image_data
+    doc["buffers"][0]["byteLength"] = len(binary)
+    return pack_glb(doc, binary), source_files
+
 with zipfile.ZipFile(ZIP) as archive:
     if archive.testzip() is not None:
         raise ValueError("Series 6 ZIP failed CRC validation")
@@ -93,10 +116,17 @@ with zipfile.ZipFile(ZIP) as archive:
         DEST.mkdir(parents=True, exist_ok=True)
         (DEST / (name + ".glb")).write_bytes(data)
         files[name + ".glb"] = {"source": matches[0], "sourceSha256": source_sha, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    for name in PROPS:
+        matches = [p for p in archive.namelist() if p.endswith("/assets/gltf/" + name + ".gltf")]
+        if len(matches) != 1:
+            raise ValueError(f"Expected one glTF for {name}, found {len(matches)}")
+        data, source_files = pack_prop(archive, matches[0])
+        (DEST / (name + ".glb")).write_bytes(data)
+        files[name + ".glb"] = {"source": source_files, "sourceSha256": {p: hashlib.sha256(archive.read(p)).hexdigest() for p in source_files}, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     license_path = next(p for p in archive.namelist() if p.endswith("/License.txt"))
     license_bytes = archive.read(license_path)
     (DEST / "LICENSE.txt").write_bytes(license_bytes)
     files["LICENSE.txt"] = {"source": license_path, "bytes": len(license_bytes), "sha256": hashlib.sha256(license_bytes).hexdigest()}
     manifest = {"pack": "KayKit Monthly Mystery Characters Series 6 (1.1)", "author": "Kay Lousberg", "license": "CC0 1.0", "archive": ZIP.name, "derivedAttack": "CC0 Barbarian-game.glb 1H_Melee_Attack_Chop rotations retargeted by bone name to OrcBrute and Monstrosity", "derivedAttackSourceSha256": hashlib.sha256(old_attack_source).hexdigest(), "files": files}
     (DEST / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-print(f"Prepared {len(NAMES)} characters and {len(RIGS)} animation packs in {DEST}")
+print(f"Prepared {len(NAMES)} characters, {len(RIGS)} animation packs and {len(PROPS)} props in {DEST}")

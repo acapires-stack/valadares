@@ -1,0 +1,21 @@
+{
+  "scenes": [
+    {
+      "name": "biblioteca",
+      "floor": 1002,
+      "drawCalls": 58,
+      "chunks": 9,
+      "scenery": {
+        "loaded": 7,
+        "failed": 0,
+        "requested": 7,
+        "catalog": 53,
+        "pending": 0
+      },
+      "png": "catalogo-biblioteca.png"
+    }
+  ],
+  "errors": [],
+  "pass": true,
+  "finishedAt": "2026-10-06T18:51:10.518Z"
+}

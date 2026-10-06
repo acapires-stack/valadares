@@ -2,6 +2,12 @@
 
 Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
 
+## Revisão integrada dos pacotes — preparada para publicação
+
+Alcione mudou a orientação de retoques isolados para revisar o conjunto, explorar ao máximo os pacotes e só então voltar a jogar. Escopo e evidência completos em `docs/remodelacao/REVISAO-INTEGRADA-20261006.md`. Inclui cenários por ambiente, armas e personagens selecionados da Series6, minimapa com descoberta preservada, músicas completas do acervo, loot sem sobreposição e protocolo de movimento confirmado.
+
+QA integrado passou: quatro interiores, bancada/treino/altar com efeitos reais na conta sintética, saída/reentrada/reload, viewport compacto, 196 recursos sem falha e zero erros JS. Proxy local de atraso900ms passou49 passos sem posCorrect. Limite: o relato original de recuo em produção não foi capturado; rede muito lenta ainda causa espera. Simulação reproduziu falha de rajada antiga e verificou a correção, inclusive respawn. Revisão independente concluída. Fonte pública anterior c1dc6f7, backend27cb454; contas preservadas. Próxima ação: fechar captura final de biblioteca, commit, reversão verificável e publicação conjunta cliente/servidor conforme autorização existente.
+
 ## Estado atual: pacotes publicados em 06/10/2026
 
 - Alcione autorizou a publicação para jogar com sua conta. Cliente e servidor dos pacotes estão publicados juntos no commit `27cb45460dce981b5cab4586c6ff1d54fc4d0981`: Railway `73aea5a2-feb6-4f3f-bf46-4a5a4dc8c8bd` SUCCESS (log: 36 contas carregadas) e Vercel `dpl_2PMppwGssWKzE7ZvFZmXyY1rMEUm`. Entrada: https://valadares.app.br/jogar3d; a entrada clássica e os serviços externos continuam.

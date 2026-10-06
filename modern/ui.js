@@ -1,5 +1,6 @@
 // The modern HUD observes the classic client. Every action still travels
 // through its existing controls and keyboard handler.
+import { createMinimap } from './minimap.js';
 document.body.classList.add('modern-ui');
 const body = document.body;
 const bridge = window.ValadaresModernBridge;
@@ -37,10 +38,10 @@ container.append(hud);
 const mapCard = document.createElement('section');
 mapCard.className = 'modern-map';
 mapCard.setAttribute('aria-label', 'Mapa');
-mapCard.innerHTML = '<span class="modern-map__label">Mapa</span><canvas id="modernMiniMap" width="140" height="140" aria-label="Mini mapa"></canvas><span class="modern-map__pos" id="modernPos">—</span>';
+mapCard.innerHTML = '<span class="modern-map__label">Mapa</span><canvas id="modernMiniMap" width="140" height="140" role="img" aria-label="Mini mapa"></canvas><span class="modern-map__legend" id="modernMapLegend">—</span><span class="modern-map__pos" id="modernPos">—</span>';
 container.append(mapCard);
 const miniMap = byId('modernMiniMap');
-const miniContext = miniMap.getContext('2d');
+const minimap = createMinimap(miniMap, byId('modernMapLegend'), bridge);
 
 const actions = [
     [' ', '⚔', 'Atacar', 'ESP', true],
@@ -145,10 +146,6 @@ function refresh() {
         targetNode.hidden = false;
         set('modernTarget', entity?.name || bridge.getMonsterTypes?.()[entity?.type]?.name || 'Alvo');
     } else targetNode.hidden = true;
-    const source = byId('minimap');
-    if (source?.width && source.height) {
-        miniContext.clearRect(0, 0, 140, 140);
-        miniContext.drawImage(source, 0, 0, 140, 140);
-    }
+    minimap.draw();
 }
 setInterval(refresh, 100);

@@ -1,0 +1,1540 @@
+{
+  "checks": [
+    "pousada: entrar, caminhar, PvP protegido, sair na porta",
+    "bancada interna: criação real com recibo de ouro/inventário",
+    "oficina: entrar, caminhar, PvP protegido, sair na porta",
+    "biblioteca: treino real com XP/custo e parada ao sair do ponto",
+    "biblioteca: entrar, caminhar, PvP protegido, sair na porta",
+    "mercado: treino real com XP/custo e parada ao sair do ponto",
+    "mercado: entrar, caminhar, PvP protegido, sair na porta",
+    "pousada: segunda entrada e saída andando pela porta",
+    "reload dentro: reconexão na vila com equipamento preservado",
+    "recursos de cenário e áudio carregados sem erro",
+    "viewport 844x390: botão de porta acessível e interior aberto"
+  ],
+  "snapshots": [
+    {
+      "label": "vila",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": true,
+      "mobs": 147,
+      "door": "",
+      "render": {
+        "ready": true,
+        "fps": 27,
+        "error": null,
+        "actors": {
+          "visible": 16,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 30,
+          "generated": 12,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 17,
+            "failed": 0,
+            "requested": 17,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 441
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "pousada",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 1000,
+      "interior": "pousada",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 59,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 1000,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 30,
+          "generated": 26,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 27,
+            "failed": 0,
+            "requested": 27,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 77
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "pousada saida",
+      "x": 44,
+      "y": 46,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Entrar · Taverna da Pousada [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 17,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 39,
+          "generated": 35,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 27,
+            "failed": 0,
+            "requested": 34,
+            "catalog": 53,
+            "pending": 7
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 517
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "oficina",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11891,
+      "weapon": "MACHADO_MINO",
+      "floor": 1001,
+      "interior": "oficina",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 1001,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 39,
+          "generated": 59,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 38,
+            "failed": 0,
+            "requested": 38,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 71
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "oficina saida",
+      "x": 52,
+      "y": 45,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11855,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 20,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 39,
+          "generated": 68,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 38,
+            "failed": 0,
+            "requested": 38,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 71
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "biblioteca",
+      "x": 50,
+      "y": 50,
+      "hp": 163,
+      "mp": 133,
+      "gold": 11855,
+      "weapon": "MACHADO_MINO",
+      "floor": 1002,
+      "interior": "biblioteca",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 1002,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 39,
+          "generated": 80,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 42,
+            "failed": 0,
+            "requested": 42,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 70
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "biblioteca saida",
+      "x": 57,
+      "y": 49,
+      "hp": 164,
+      "mp": 133,
+      "gold": 11819,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 21,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 39,
+          "generated": 86,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 42,
+            "failed": 0,
+            "requested": 42,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 70
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "mercado",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11819,
+      "weapon": "MACHADO_MINO",
+      "floor": 1003,
+      "interior": "mercado",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 1003,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 42,
+          "generated": 104,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 45,
+            "failed": 0,
+            "requested": 45,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 93
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "mercado saida",
+      "x": 43,
+      "y": 53,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11783,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 15,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Farmer_A",
+            "Lorekeeper",
+            "Farmer_B",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "MagicalGirl",
+            "Hoarder",
+            "Orc_Axe"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 42,
+          "generated": 113,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 45,
+            "failed": 0,
+            "requested": 45,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 93
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "reload dentro",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11783,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": true,
+      "mobs": 147,
+      "door": "",
+      "render": {
+        "ready": true,
+        "fps": 0,
+        "error": null,
+        "actors": {
+          "visible": 16,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic"
+          ],
+          "pending": [
+            "Orc_Axe",
+            "Hoarder",
+            "Farmer_B",
+            "Lorekeeper",
+            "Farmer_A",
+            "MagicalGirl",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword"
+          ],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 30,
+          "generated": 6,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 0,
+            "failed": 0,
+            "requested": 17,
+            "catalog": 53,
+            "pending": 17
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 421
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "bosque",
+      "x": 40,
+      "y": 46,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11783,
+      "weapon": "MACHADO_MINO",
+      "floor": 0,
+      "interior": null,
+      "pvp": false,
+      "safe": false,
+      "mobs": 147,
+      "door": "Entrar · Taverna da Pousada [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 13,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Orc_Axe",
+            "Farmer_B",
+            "Lorekeeper",
+            "Farmer_A",
+            "MagicalGirl",
+            "Lorekeeper_Staff",
+            "AvianSwordsman_Sword",
+            "Hoarder"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 0,
+          "chunks": 9,
+          "chunkSize": 12,
+          "materials": 38,
+          "generated": 36,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 24,
+            "failed": 0,
+            "requested": 24,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 1600,
+        "height": 950,
+        "drawCalls": 507
+      },
+      "audioContext": "running"
+    },
+    {
+      "label": "viewport compacto",
+      "x": 50,
+      "y": 50,
+      "hp": 166,
+      "mp": 133,
+      "gold": 11783,
+      "weapon": "MACHADO_MINO",
+      "floor": 1001,
+      "interior": "oficina",
+      "pvp": false,
+      "safe": true,
+      "mobs": 0,
+      "door": "Sair para a vila [G]",
+      "render": {
+        "ready": true,
+        "fps": 60,
+        "error": null,
+        "actors": {
+          "visible": 1,
+          "models": [
+            "Knight",
+            "Mage",
+            "Rogue_Hooded",
+            "Barbarian",
+            "Skeleton_Warrior",
+            "Rig_Medium_General",
+            "Rig_Medium_MovementBasic",
+            "Orc_Axe",
+            "Farmer_A",
+            "Farmer_B",
+            "AvianSwordsman_Sword",
+            "Lorekeeper",
+            "MagicalGirl",
+            "Lorekeeper_Staff",
+            "Hoarder"
+          ],
+          "pending": [],
+          "failedSeries": []
+        },
+        "world": {
+          "floor": 1001,
+          "chunks": 6,
+          "chunkSize": 12,
+          "materials": 37,
+          "generated": 36,
+          "mapReady": true,
+          "scenery": {
+            "loaded": 28,
+            "failed": 0,
+            "requested": 28,
+            "catalog": 53,
+            "pending": 0
+          }
+        },
+        "width": 93.453125,
+        "height": 68.53125,
+        "drawCalls": 71
+      },
+      "audioContext": "running"
+    }
+  ],
+  "errors": [],
+  "assets": [
+    {
+      "path": "/modern/assets/characters/Knight-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Mage-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Rogue_Hooded-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Barbarian-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Skeleton_Warrior-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ranged-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ranged-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/wand.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/damage.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/kill.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/critical.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/pickup.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-pz.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_Bare_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_large.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/crates_stacked.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_4_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_4_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chest.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/candle_lit.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/series6/training-dummy.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/pickaxe.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Hoarder.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Rig_Medium_General.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Rig_Medium_MovementBasic.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Farmer_B.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Lorekeeper.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Farmer_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/MagicalGirl.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Lorekeeper_Staff.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/AvianSwordsman_Sword.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/music-pz-tree.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Orc_Axe.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-grass-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-grass-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chair.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bar_straight_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bartop_A_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_small_stack.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bed_A_single.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/torch_mounted.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_round_small.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/stool_round.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/plate_food_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bottle_A_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-wood-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-wood-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-interior.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_7_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_B_Color2.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_B_Color2.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bucket_pickaxes.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/rocks_gold.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/scaffold_frame_small.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/shelves_decorated.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bookcase_double_decoratedA.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bookcase_single_decoratedB.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/shelf_small_books.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_blue.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/sword_shield.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_long.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/pillar_decorated.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-forest.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/music-field.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ranged-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ranged-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/wand.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/damage.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/critical.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/kill.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/pickup.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-pz.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/music-pz-tree.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Knight-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Mage-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Rogue_Hooded-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Barbarian-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Skeleton_Warrior-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_Bare_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_large.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/crates_stacked.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_4_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_4_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chest.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/candle_lit.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/pickaxe.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/series6/training-dummy.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Orc_Axe.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Hoarder.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Rig_Medium_General.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Rig_Medium_MovementBasic.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Farmer_B.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Lorekeeper.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Farmer_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/MagicalGirl.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Lorekeeper_Staff.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/AvianSwordsman_Sword.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_B_Color2.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_B_Color2.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_7_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-grass-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/melee-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ranged-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ranged-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/wand.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/damage.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/kill.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/critical.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/pickup.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-forest.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/music-field.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Knight-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Mage-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Rogue_Hooded-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Skeleton_Warrior-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters/Barbarian-game.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_3_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_Bare_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/barrel_large.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/crates_stacked.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/banner_green.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_2_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_4_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Bush_4_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/chest.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/candle_lit.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/series6/training-dummy.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/table_medium.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/pickaxe.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Orc_Axe.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Hoarder.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Rig_Medium_General.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Rig_Medium_MovementBasic.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Farmer_B.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Lorekeeper.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Farmer_A.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/MagicalGirl.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/Lorekeeper_Staff.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/characters-series6/AvianSwordsman_Sword.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-stone-1.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/foot-dirt-2.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Rock_1_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_B_Color2.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_5_B_Color2.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_6_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/forest/Tree_7_A_Color1.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/ambient-pz.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/audio/music-pz-tree.mp3",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/torch_mounted.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/bucket_pickaxes.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/rocks_gold.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/scaffold_frame_small.glb",
+      "status": 200
+    },
+    {
+      "path": "/modern/assets/scenery/dungeon/shelves_decorated.glb",
+      "status": 200
+    }
+  ],
+  "startedAt": "2026-10-06T18:48:37.645Z",
+  "pass": true,
+  "finishedAt": "2026-10-06T18:49:29.834Z"
+}

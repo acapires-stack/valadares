@@ -71,27 +71,30 @@ export function createWorld(pc,app,bridge){
   // The paving is drawn by one world-aligned irregular stone texture; raised
   // squares at every tile made the plaza read as a repeated board.
   if(t===0){const nearRoad=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dz])=>[1,4].includes(get(map,x+dx,z+dz))),roll=hash(x,z,9);
-   if(!isDungeon&&roll>.978)scenery.place(hash(x,z,2)>.5?'bush':'bushAlt',node,cx,-.015,cz,1.55,hash(x,z,3)*360,false);
+   if(!isDungeon&&roll>.978)scenery.place(['bush','bushAlt','bushSmall','bushWide'][Math.floor(hash(x,z,2)*4)],node,cx,-.015,cz,1.4,hash(x,z,3)*360,false);
    if(roll>(nearRoad?.69:.91)){const px=x+.22+hash(x,z,10)*.55,pz=z+.22+hash(x,z,11)*.55,leaf=g('leaf',1);for(let i=0;i<3;i++){const a=i*TAU/3+hash(x,z,12);leaf.cone(px+Math.cos(a)*.07,-.018,pz+Math.sin(a)*.07,.115,.16,5,a);}if(hash(x,z,13)>.54){const bloom=g('ivory',0),heart=g('copper',0);for(let i=0;i<4;i++){const a=i*TAU/4;bloom.cone(px+Math.cos(a)*.036,.12,pz+Math.sin(a)*.036,.032,.052,5);}heart.cone(px,.13,pz,.018,.045,5);}}
    else if(hash(x,z,14)>.68){const turf=g('leaf',0),px=x+.18+hash(x,z,15)*.64,pz=z+.18+hash(x,z,16)*.64;turf.cone(px,-.012,pz,.055,.08,5);}
   }
   if((t===7||t===8)&&hash(x,z,9)>.77){const p=g(t===7?'snow':'sand',0),px=x+.2+hash(x,z,10)*.6,pz=z+.2+hash(x,z,13)*.6;p.cone(px,-.012,pz,.11,.035,5,hash(x,z,14)*TAU);}
   if(t===1&&hash(x,z,7)>.88){g('stone',0).rock(x+.25+hash(x,z,1)*.5,0,z+.25+hash(x,z,3)*.5,.05,.02,x+z);}
-  if(t===2&&!house){const tree=z<33?(hash(x,z,3)>.5?'treePine':'treePineAlt'):(['treeOak','treeTall','treeRound'][v]);
+  if(t===2&&!house){const tree=z<33?['treePine','treePineAlt','treePineDense','treePineBlue','treePineBlueAlt'][Math.floor(hash(x,z,3)*5)]:['treeOak','treeTall','treeRound','treeBroad','treeBare'][Math.floor(hash(x,z,3)*5)];
    const placed=!isDungeon&&scenery.place(tree,node,cx,-.005,cz,.49+(hash(x,z,5)-.5)*.07,hash(x,z,6)*360,hash(x,z,18)>.65);
    if(!placed){const trunk=g('bark',0),leaves=g(z<33?'pine':'leaf',v),tilt=(hash(x,z,2)-.5)*.14;trunk.box(cx+tilt,0,cz,.2,1.45,.19,tilt);
    if(z<33){for(let i=0;i<3;i++)leaves.cone(cx+tilt,1.05+i*.39,cz,.69-i*.13,.76,8,hash(x,z,i+6));}
    else{leaves.crown(cx+tilt,1.12,cz,.72,1.26,x*101+z);if(hash(x,z,8)>.35){leaves.crown(cx+tilt-.42,1.35,cz+.22,.44,.83,z*41+x);leaves.crown(cx+tilt+.4,1.42,cz-.14,.42,.79,x*17+z);}}}
   }
   if(t===3&&hash(x,z,7)>.78){const line=g('foam',0),zz=z+.24+hash(x,z,2)*.5,xx=x+.12+hash(x,z,3)*.44;line.box(xx,.008,zz,.18,.003,.012,(hash(x,z,5)-.5)*.38);}
-  if(t===5&&hash(x,z,7)>.35&&!scenery.place('rockAlt',node,cx+(hash(x,z,8)-.5)*.5,-.01,cz+(hash(x,z,9)-.5)*.5,.17,hash(x,z,10)*360)){const r=g('cliff',v);r.rock(cx+(hash(x,z,8)-.5)*.5,-.02,cz+(hash(x,z,9)-.5)*.5,.08,.035,x+z);}
-  if(t===6){const placed=scenery.place(hash(x,z,7)>.48?'rock':'rockAlt',node,cx,-.025,cz,2.15+(hash(x,z,5)-.5)*.35,hash(x,z,6)*360);
+  if(t===5&&hash(x,z,7)>.35&&!scenery.place(['rockAlt','rockRuin','rockCave'][Math.floor(hash(x,z,8)*3)],node,cx+(hash(x,z,8)-.5)*.5,-.01,cz+(hash(x,z,9)-.5)*.5,.17,hash(x,z,10)*360)){const r=g('cliff',v);r.rock(cx+(hash(x,z,8)-.5)*.5,-.02,cz+(hash(x,z,9)-.5)*.5,.08,.035,x+z);}
+  if(t===6){const cliffStyle=['rock','rockAlt','rockLarge','rockRuin','rockCave'][Math.floor(hash(x,z,7)*5)],placed=scenery.place(cliffStyle,node,cx,-.025,cz,2.15+(hash(x,z,5)-.5)*.35,hash(x,z,6)*360);
    if(!placed){const stone=g('cliff',v),accent=g('dark',v%2);stone.rock(cx,-.025,cz,.48,1.05+hash(x,z,5)*.45,x*97+z);accent.rock(cx+.13,.53,cz-.09,.19,.55,z*53+x);if(hash(x,z,11)>.87){const moss=g('leaf',v);moss.cone(cx,.96,cz,.16,.14,5);}}
    if(!isDungeon&&hash(x,z,22)>.994)scenery.place('ruinedWall',node,cx,0,cz,.32,hash(x,z,23)*360);
+   if(isDungeon&&hash(x,z,24)>.968)scenery.place(['pillar','scaffold','rubble'][Math.floor(hash(x,z,25)*3)],node,cx,0,cz,.22,hash(x,z,26)*360);
+   if(isDungeon&&hash(x,z,27)>.82){const edge=[[0,1,0],[1,0,90],[0,-1,180],[-1,0,270]].find(([dx,dz])=>get(map,x+dx,z+dz)===5);if(edge)scenery.place(hash(x,z,28)>.5?'crackedWall':'candleWall',node,cx,0,cz,.27,edge[2]);}
+   if(isDungeon&&hash(x,z,29)>.981)scenery.place('ore',node,cx+.12,0,cz-.12,.17,hash(x,z,30)*360);
   }
   if(t===7&&hash(x,z,12)>.77&&!scenery.place('rock',node,cx,-.02,cz,.35,hash(x,z,13)*360)){const rock=g('cliff',v);rock.rock(cx,-.02,cz,.14,.12,x+z);}
   if(t===8&&hash(x,z,12)>.85){const scrub=g('leaf',v);scrub.cone(cx,-.01,cz,.09,.19,5);}
-  if(isDungeon&&t===5){if((x===42||x===50||x===58)&&(z===42||z===50||z===58)&&!(x===50&&z===50)){const base=g('dark',0),fire=g('ember',0);base.box(cx,.005,cz,.19,.42,.19);fire.cone(cx,.43,cz,.11,.27,6);}}
+  if(isDungeon&&t===5){if((x===42||x===50||x===58)&&(z===42||z===50||z===58)&&!(x===50&&z===50)){if(!scenery.place('litTorch',node,cx,.01,cz,.27,0)){const base=g('dark',0),fire=g('ember',0);base.box(cx,.005,cz,.19,.42,.19);fire.cone(cx,.43,cz,.11,.27,6);}}}
  }
  function seam(groups,map,x,z,axis){const tx=x+(axis==='x'),tz=z+(axis==='z');if(tx>=bridge.M_W||tz>=bridge.M_H)return;const a=get(map,x,z),b=get(map,tx,tz),ka=kind[a],kb=kind[b];if(ka===kb)return;
   const water=a===3||b===3,land=a===3?kb:ka,material=water?(land==='grass'||land==='dirt'?'sand':land==='cave'?'cliff':land):ka,key=material+':0';let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}const y=water?.013:-.014;
@@ -104,8 +107,8 @@ export function createWorld(pc,app,bridge){
  function prop(groups,p,node){const x=Number(p.x),z=Number(p.y);if(!Number.isFinite(x)||!Number.isFinite(z))return;const cx=x+.5,cz=z+.5,g=(k,v=0)=>{const key=k+':'+v;let b=groups.get(key);if(!b){b=new Geometry();groups.set(key,b);}return b;};
   if(p.kind==='chest'&&scenery.place('chest',node,cx,.02,cz,.32))return;
   if(p.kind==='chest'){g('wood',0).box(cx,.025,cz,.48,.31,.37);g('roof',0).box(cx,.34,cz,.52,.13,.4);const trim=g('copper',0);trim.box(cx-.17,.09,cz,.04,.48,.4);trim.box(cx+.17,.09,cz,.04,.48,.4);trim.box(cx,.24,cz+.205,.12,.09,.025);g('jade',0).box(cx,.26,cz+.226,.045,.045,.025);}
-  if(p.kind==='altar'){const stone=g('ivory',0),jade=g('jade',0),gold=g('copper',0);stone.box(cx,.02,cz,.62,.18,.61);stone.box(cx,.22,cz,.43,.52,.43);jade.box(cx,.745,cz,.32,.035,.32);for(const a of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const px=cx+Math.cos(a)*.27,pz=cz+Math.sin(a)*.27;gold.cone(px,.75,pz,.05,.16,5);}}
-  if(p.kind==='craft'){const wood=g('wood',0),iron=g('dark',0),fire=g('ember',0);if(!scenery.place('table',node,cx,.01,cz,.47)){for(const dx of [-.23,.23])for(const dz of [-.17,.17])wood.box(cx+dx,.01,cz+dz,.07,.4,.07);wood.box(cx,.39,cz,.61,.09,.44);}iron.box(cx+.12,.49,cz,.3,.07,.23);fire.cone(cx-.18,.48,cz,.09,.22,6);}
+  if(p.kind==='altar'){const stone=g('ivory',0),jade=g('jade',0),gold=g('copper',0);stone.box(cx,.02,cz,.62,.18,.61);stone.box(cx,.22,cz,.43,.52,.43);jade.box(cx,.745,cz,.32,.035,.32);for(const a of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const px=cx+Math.cos(a)*.27,pz=cz+Math.sin(a)*.27;gold.cone(px,.75,pz,.05,.16,5);}for(const dx of [-.36,.36])scenery.place('candle',node,cx+dx,.66,cz-.12,.15,0,false);}
+  if(p.kind==='craft'){const wood=g('wood',0),iron=g('dark',0),fire=g('ember',0);if(!scenery.place('table',node,cx,.01,cz,.47)){for(const dx of [-.23,.23])for(const dz of [-.17,.17])wood.box(cx+dx,.01,cz+dz,.07,.4,.07);wood.box(cx,.39,cz,.61,.09,.44);}iron.box(cx+.12,.49,cz,.3,.07,.23);fire.cone(cx-.18,.48,cz,.09,.22,6);scenery.place('pickaxe',node,cx-.25,.47,cz-.13,.18,65,false);}
   if(p.kind==='dummy'){
    if(scenery.place('trainingDummy',node,cx,.01,cz,.7))return;
    const timber=g('wood',0),linen=g('linen',0),seam=g('linen',1),straw=g('straw',0),strawLight=g('straw',1),belt=g('dark',0),teal=g('teal',0),ivory=g('ivory',1);
@@ -205,6 +208,13 @@ export function createWorld(pc,app,bridge){
    scenery.place('counterTop',node,53.15,.31,48.3,.29,90);
    scenery.place('barrelStack',node,53.22,0,50.4,.24,0);
    scenery.place('torch',node,47.05,1.08,47.55,.28,90);
+   scenery.place('bed',node,47.75,0,50.7,.3,90);
+   scenery.place('bed',node,48.25,0,51.5,.3,90);
+   scenery.place('roundTable',node,52.65,0,50.45,.26,0);
+   scenery.place('roundStool',node,52.25,0,50.75,.23,0);
+   scenery.place('food',node,48.3,.37,48.35,.15,0,false);
+   scenery.place('bottle',node,53.15,.43,48.3,.2,0,false);
+   scenery.place('candle',node,53.4,.43,48.3,.18,0,false);
    g('ember',0).box(53.26,.68,47.23,.11,.28,.08);
   }else if(floor===1001){
    // Furnace glow and anvil silhouette are composed from the existing materials.
@@ -218,11 +228,23 @@ export function createWorld(pc,app,bridge){
    scenery.place('barrel',node,47.56,0,50.2,.25,0);
    scenery.place('crates',node,53.24,0,50.33,.16,30);
    scenery.place('torch',node,47.06,1.08,47.56,.28,90);
+   scenery.place('pickaxeBucket',node,47.6,0,49.4,.3,20);
+   scenery.place('ore',node,53.45,0,49.4,.22,0);
+   scenery.place('scaffold',node,47.25,0,48.8,.25,90);
+   scenery.place('decoratedShelves',node,53.4,0,51.3,.28,270);
   }else if(floor===1002){
    // The active altar is placed below from room.services, on the north wall.
    const jade=g('jade',0),ivory=g('ivory',0),copper=g('copper',0);
    for(const x of [47.45,53.55]){ivory.box(x,.02,47.52,.24,.91,.24);copper.box(x,.94,47.52,.33,.1,.33);jade.box(x,1.04,47.52,.17,.16,.17);}
    for(const x of [48.2,52.8])scenery.place('banner',node,x,1.23,46.95,.17,0);
+   for(const x of [48.15,52.85])scenery.place('bookcase',node,x,0,47.35,.3,0);
+   for(const x of [47.9,53.1])scenery.place('bookcaseSmall',node,x,0,50.6,.24,0);
+   scenery.place('roundTable',node,48.4,0,49.5,.22,0);
+   scenery.place('roundTable',node,52.6,0,49.5,.22,0);
+   scenery.place('bookShelf',node,48.0,.85,46.95,.22,0);
+   scenery.place('blueBanner',node,52.4,1.25,46.95,.17,0);
+   scenery.place('candle',node,48.4,.35,49.5,.13,0,false);
+   scenery.place('candle',node,52.6,.35,49.5,.13,0,false);
    jade.box(50.5,-.018,48.9,.1,.006,1.7);
    jade.box(50.5,-.018,50.55,.1,.006,.67);
   }else if(floor===1003){
@@ -240,6 +262,9 @@ export function createWorld(pc,app,bridge){
     copper.box(x,.77,47.037,.18,.06,.024);
    }
    scenery.place('barrel',node,53.28,0,49.6,.2,0);
+   scenery.place('swordShield',node,47.05,1.0,49.15,.23,90,false);
+   scenery.place('longTable',node,53.1,0,50.55,.28,90);
+   scenery.place('pillar',node,47.45,0,50.7,.18,0);
   }
   for(const service of room?.services||[])if(['craft','altar','dummy'].includes(service.kind))prop(groups,service,node);
  }

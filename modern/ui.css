@@ -323,6 +323,9 @@ body {
         max-width: 158px; border-radius: 6px;
         background: #132821eb; border-color: #a99a70;
     }
+    body.modern-renderer-ready.layout-focus:not(.touch):has(.modern-map__legend:not(:empty)) #journeyMobile:not([hidden]) {
+        right: 202px;
+    }
     body.modern-renderer-ready.layout-focus:not(.touch).journey-mobile-open > #journeyCard {
         top: 293px; right: 18px; left: auto;
         max-height: calc(100dvh - 310px);
@@ -359,6 +362,10 @@ body {
     .modern-hud__bottom { display: flex; justify-content: space-between; gap: 8px; padding-top: 3px; border-top: 1px solid #ddd2a82b; font-size: 11px; }
     .modern-hud__gold { color: #f5cb7b; font-weight: 700; }
     .modern-hud__target { color: #e5d9bd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* The loot notice shares the legacy top-left origin with the character HUD. */
+    body.modern-renderer-ready.layout-focus:not(.touch) #gameContainer .adventure-feedback {
+        top: 72px; left: 294px; z-index: 31;
+    }
     body.modern-renderer-ready.layout-focus:not(.touch) .modern-map {
         position: absolute; z-index: 30; top: 61px; right: 18px;
         flex-direction: column; width: 158px; padding: 8px;
@@ -368,6 +375,12 @@ body {
     }
     .modern-map__label { margin: 0 0 5px; color: #e9d7aa; font: 700 10px system-ui, sans-serif; letter-spacing: .15em; text-transform: uppercase; }
     .modern-map canvas { width: 140px; height: 140px; border-radius: 4px; background: #0a1511; }
+    .modern-map__legend {
+        display: -webkit-box; max-width: 140px; margin-top: 5px;
+        overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+        color: #d9e5d4; font: 10px/1.25 system-ui, sans-serif;
+    }
+    .modern-map__legend:empty { display: none; }
     .modern-map__pos { margin-top: 5px; color: #e0e9d9; font: 11px ui-monospace, monospace; text-align: right; }
     body.modern-renderer-ready.layout-focus:not(.touch) .modern-actions {
         position: absolute; z-index: 38; bottom: 12px; left: 50%;

@@ -1,4 +1,4 @@
-/* Valadares audio: one shared Web Audio context with optional, lazy samples. */
+/* Valadares audio: one shared Web Audio context, lazy effects and streamed music. */
 ((root, factory) => {
     const api = factory();
     if (typeof module === 'object' && module.exports) module.exports = api;
@@ -14,10 +14,10 @@
         cave:   { freq: 280, q: 0.72, level: 0.023, detail: 'drop' },
         water:  { freq: 660, q: 0.38, level: 0.034, detail: 'water' }
     };
-    const SCORES = {
-        pz: { roots: [60, 57, 53, 55], melody: [72, 76, 79, 76, 72, 69, 67, null], beat: 0.70 },
-        field: { roots: [57, 53, 60, 55], melody: [69, 72, 76, 72, 69, null, 67, 64], beat: 0.65 },
-        dungeon: { roots: [50, 46, 48, 45], melody: [62, null, 65, 63, 62, null, 58, 60], beat: 0.75 }
+    const MUSIC = {
+        pz: ['music-pz-tree', 'music-pz-lake'],
+        field: ['music-field'],
+        dungeon: ['music-cave']
     };
     const COOLDOWN = { melee: 75, ranged: 95, wand: 110, damage: 130, kill: 110,
         spell: 140, pickup: 120, critical: 160, rareLoot: 600, bossReward: 800,
@@ -46,8 +46,9 @@
         const samples = new Map();
         let burstStart = 0, burstNormal = 0, burstPriority = 0;
         let timer = null, noiseBuffer = null, impulse = null, bed = null, sampledBed = null;
-        let scoreName = 'pz', scoreStep = 0, nextBeat = 0, nextDetail = 0;
-        let commonSamplesStarted = false, combatMelodyUntil = 0;
+        let scoreName = 'pz', nextDetail = 0, nextMusicAt = 0, musicSlot = null;
+        let fadingMusic = null, musicPending = null, musicIndex = { pz: 0, field: 0, dungeon: 0 };
+        let commonSamplesStarted = false, combatReleaseAt = 0;
 
         const masterGain = ctx.createGain();
         const effectsGain = ctx.createGain();
@@ -174,7 +175,6 @@
             src.connect(filter).connect(env).connect(voice.gain);
             sourceIn(voice, src, at, at + duration + 0.01, [filter, env]);
         }
-        function midi(note){ return 440 * Math.pow(2, (note - 69) / 12); }
         function refreshBurst(nowMs){
             if (nowMs - burstStart >= 1000){
                 burstStart = nowMs;
@@ -352,8 +352,11 @@
             if (!bed) return;
             const old = bed;
             bed = null;
-            target(old.level.gain, 0, 0.04);
-            try { old.src.stop(ctx.currentTime + 0.22); } catch {}
+            const t = ctx.currentTime;
+            old.level.gain.cancelScheduledValues(t);
+            old.level.gain.setValueAtTime(old.level.gain.value, t);
+            old.level.gain.linearRampToValueAtTime(0, t + 2.5);
+            try { old.src.stop(t + 2.55); } catch {}
             old.src.onended = () => {
                 old.src.disconnect(); old.filter.disconnect(); old.level.disconnect();
             };
@@ -362,8 +365,11 @@
             if (!sampledBed) return;
             const old = sampledBed;
             sampledBed = null;
-            target(old.level.gain, 0, 0.045);
-            try { old.src.stop(ctx.currentTime + 0.22); } catch {}
+            const t = ctx.currentTime;
+            old.level.gain.cancelScheduledValues(t);
+            old.level.gain.setValueAtTime(old.level.gain.value, t);
+            old.level.gain.linearRampToValueAtTime(0, t + 2.5);
+            try { old.src.stop(t + 2.55); } catch {}
             old.src.onended = () => {
                 try { old.src.disconnect(); old.level.disconnect(); } catch {}
             };
@@ -392,7 +398,7 @@
             level.gain.value = 0;
             src.connect(level).connect(ambientGain);
             src.start();
-            target(level.gain, 0.24, 0.35);
+            level.gain.linearRampToValueAtTime(0.24, ctx.currentTime + 2.5);
             sampledBed = { key, src, level };
             stopBed();
         }
@@ -412,36 +418,92 @@
                 noise(v, at, 0.68, 0.022, p.detail === 'wind' ? 440 : 850);
             }
         }
-        function note(at){
-            if (volumes.music === 0) return;
-            const score = SCORES[scoreName];
-            const i = scoreStep++;
-            const root = score.roots[Math.floor(i / 8) % score.roots.length];
-            const melody = score.melody[i % score.melody.length];
-            const v = newVoice(musicGain, at, 0.7, 24);
-            if (!v) return;
-            // Sparse harp/bell phrase over a soft sustained root. No sampled assets.
-            if (i % 2 === 0){
-                tone(v, midi(root), at, score.beat * 2.4, 0.043, 'triangle', 1);
-                tone(v, midi(root + 7), at + 0.03, score.beat * 1.4, 0.020, 'sine', 1);
+        function discardMusic(slot){
+            if (!slot) return;
+            slot.media.onended = null;
+            slot.media.onerror = null;
+            slot.media.pause();
+            slot.media.removeAttribute('src');
+            slot.media.load();
+            try { slot.source.disconnect(); slot.gain.disconnect(); } catch {}
+            if (musicSlot === slot) musicSlot = null;
+            if (fadingMusic === slot) fadingMusic = null;
+        }
+        function finishMusic(slot, failed = false){
+            if (musicSlot !== slot) return;
+            discardMusic(slot);
+            // An entire piece is followed by room for the world to breathe.
+            nextMusicAt = ctx.currentTime + (failed ? 45 : 30 + Math.random() * 60);
+        }
+        function startMusic(){
+            if (!usable() || volumes.music === 0 || musicSlot ||
+                typeof Audio !== 'function' || typeof ctx.createMediaElementSource !== 'function') return;
+            const tracks = MUSIC[scoreName];
+            const key = tracks[musicIndex[scoreName]++ % tracks.length];
+            let media, source, gain;
+            try {
+                media = new Audio();
+                media.preload = 'none';
+                media.src = ASSET_BASE + key + '.mp3';
+                source = ctx.createMediaElementSource(media);
+                gain = ctx.createGain();
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                source.connect(gain).connect(musicGain);
+            } catch {
+                try { source?.disconnect(); gain?.disconnect(); } catch {}
+                nextMusicAt = ctx.currentTime + 45;
+                return;
             }
-            if (melody !== null && !scene.combat && at >= combatMelodyUntil){
-                tone(v, midi(melody), at + 0.025, score.beat * 0.95, 0.047, 'sine', 1, 0);
-                tone(v, midi(melody + 12), at + 0.03, score.beat * 0.48, 0.010, 'sine');
+            const slot = { media, source, gain, key, pausedByPolicy: false };
+            musicSlot = slot;
+            gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 2.5);
+            media.onended = () => finishMusic(slot);
+            media.onerror = () => finishMusic(slot, true);
+            try { Promise.resolve(media.play()).catch(() => finishMusic(slot, true)); }
+            catch { finishMusic(slot, true); }
+        }
+        function transitionMusic(){
+            if (fadingMusic) discardMusic(fadingMusic);
+            if (musicSlot){
+                const old = musicSlot;
+                musicSlot = null;
+                fadingMusic = old;
+                old.media.onended = null;
+                old.media.onerror = null;
+                const t = ctx.currentTime;
+                old.gain.gain.cancelScheduledValues(t);
+                old.gain.gain.setValueAtTime(old.gain.gain.value, t);
+                old.gain.gain.linearRampToValueAtTime(0, t + 2.5);
+                old.releaseAt = t + 2.55;
             }
-            if (v.pending === 0){ voices.delete(v); v.gain.disconnect(); }
+            nextMusicAt = ctx.currentTime;
+            startMusic();
+        }
+        function syncMusic(){
+            if (fadingMusic && (!usable() || volumes.music === 0)) discardMusic(fadingMusic);
+            if (!usable() || volumes.music === 0){
+                if (musicSlot){ musicSlot.media.pause(); musicSlot.pausedByPolicy = true; }
+                return;
+            }
+            if (musicSlot?.pausedByPolicy){
+                const slot = musicSlot;
+                slot.pausedByPolicy = false;
+                try { Promise.resolve(slot.media.play()).catch(() => finishMusic(slot, true)); }
+                catch { finishMusic(slot, true); }
+            } else if (!musicSlot && ctx.currentTime >= nextMusicAt) startMusic();
         }
         function chooseScore(){
             return scene.biome === 'pz' ? 'pz' : scene.biome === 'cave' ? 'dungeon' : 'field';
         }
         function tick(){
             if (!usable()) return;
-            const horizon = ctx.currentTime + 0.30;
-            let guard = 0;
-            while (nextBeat < horizon && guard++ < 2){
-                note(Math.max(ctx.currentTime + 0.012, nextBeat));
-                nextBeat += SCORES[scoreName].beat;
+            if (scene.combat && ctx.currentTime >= combatReleaseAt){
+                scene.combat = false;
+                syncGains();
             }
+            const horizon = ctx.currentTime + 0.30;
+            if (fadingMusic && ctx.currentTime >= fadingMusic.releaseAt) discardMusic(fadingMusic);
+            syncMusic();
             if (nextDetail < horizon){
                 if (volumes.ambient > 0) detail(Math.max(ctx.currentTime + 0.012, nextDetail));
                 nextDetail = ctx.currentTime + 3.5 + Math.random() * 4.5;
@@ -460,8 +522,8 @@
             if (usable()){
                 startCommonSamples();
                 syncAmbient();
+                syncMusic();
                 if (!timer){
-                    nextBeat = ctx.currentTime + 0.06;
                     nextDetail = ctx.currentTime + 2.2;
                     timer = setInterval(tick, 100);
                     tick();
@@ -471,6 +533,7 @@
                 stopBed();
                 stopSampledBed();
                 stopVoices();
+                syncMusic();
             }
         }
         function setVolumes(next){
@@ -482,19 +545,28 @@
         }
         function setScene(next){
             if (disposed || !next || typeof next !== 'object') return;
+            const wasActive = scene.active;
             const previousBiome = scene.biome;
-            if (typeof next.biome === 'string' && BIOMES[next.biome]) scene.biome = next.biome;
-            if (typeof next.interior === 'boolean') scene.interior = next.interior;
+            const wantedBiome = typeof next.biome === 'string' && BIOMES[next.biome] ? next.biome : scene.biome;
+            const wantedInterior = typeof next.interior === 'boolean' ? next.interior : scene.interior;
+            if (wantedBiome !== scene.biome || wantedInterior !== scene.interior){
+                if (!musicPending || musicPending.biome !== wantedBiome || musicPending.interior !== wantedInterior)
+                    musicPending = { biome: wantedBiome, interior: wantedInterior, at: ctx.currentTime };
+                if (!wasActive || ctx.currentTime - musicPending.at >= 2){
+                    scene.biome = wantedBiome;
+                    scene.interior = wantedInterior;
+                    musicPending = null;
+                }
+            } else musicPending = null;
             if (typeof next.combat === 'boolean'){
-                scene.combat = next.combat;
-                if (scene.combat) combatMelodyUntil = ctx.currentTime + 1;
+                if (next.combat) combatReleaseAt = ctx.currentTime + 3;
+                scene.combat = next.combat || ctx.currentTime < combatReleaseAt;
             }
             if (typeof next.active === 'boolean') scene.active = next.active;
             const chosen = chooseScore();
             if (chosen !== scoreName){
                 scoreName = chosen;
-                scoreStep = 0;
-                nextBeat = ctx.currentTime + 0.18;
+                transitionMusic();
             }
             if (scene.biome !== previousBiome && bed){
                 const p = BIOMES[scene.biome];
@@ -513,6 +585,8 @@
             if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibility);
             stopBed();
             stopSampledBed();
+            discardMusic(musicSlot);
+            discardMusic(fadingMusic);
             stopVoices();
             for (const entry of samples.values()) entry.controller?.abort();
             samples.clear();

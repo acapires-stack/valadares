@@ -1,7 +1,8 @@
 // Real local client/server flows. Synthetic fixture only; no production account.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('C:/Users/Alcione/Documents/Codex/2026-10-03/da-u/work/node_modules/playwright');
-const out=path.resolve(__dirname,'../../docs/remodelacao/evidencias-pacotes');fs.mkdirSync(out,{recursive:true});
+const out=path.resolve(__dirname,process.env.QA_OUTPUT||'../../docs/remodelacao/evidencias-pacotes');fs.mkdirSync(out,{recursive:true});
+const webPort=Number(process.env.QA_WEB_PORT||3338),wsPort=Number(process.env.QA_WS_PORT||8098),gamePath=process.env.QA_GAME_PATH||(webPort===3337?'jogar':'jogar3d');
 const result={checks:[],snapshots:[],errors:[],assets:[],startedAt:new Date().toISOString()};
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});let page;
@@ -12,7 +13,7 @@ try{
  const login=async()=>{await page.locator('#charInput').fill('TesteVal18');await page.locator('#pwdInput').fill('Valadares18!');await page.locator('button[onclick="tryLogin(true)"]').click();await page.waitForFunction(()=>window.ValadaresModern?.state==='ready'&&ValadaresModernBridge.getStarted(),null,{timeout:35000});
  if(await page.getByRole('button',{name:'Recusar',exact:true}).isVisible())await page.getByRole('button',{name:'Recusar',exact:true}).click();
  if(await page.locator('#firstStepsDismiss').isVisible())await page.locator('#firstStepsDismiss').click();await page.keyboard.press('Escape');};
- await page.goto('http://127.0.0.1:3338/jogar3d?ws=ws://127.0.0.1:8098');await login();
+ await page.goto(`http://127.0.0.1:${webPort}/${gamePath}?ws=ws://127.0.0.1:${wsPort}`);await login();
  const snap=()=>page.evaluate(()=>{const b=ValadaresModernBridge,p=b.getPlayer();return {x:p.x,y:p.y,hp:p.hp,mp:p.mp,gold:p.gold,weapon:p.equipped.weapon,floor:p.floor||0,interior:p._interior||null,pvp:p.pvp,safe:playerInSafeZone(),mobs:b.getMonsters().length,door:document.querySelector('#worldDoor').textContent,render:ValadaresModern.diagnostics(),audioContext:audioCtx?.state};});
  const record=async label=>{const state=await snap();result.snapshots.push({label,...state});fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(result,null,2));return state;};
  async function walk(x,y){const startFloor=(await snap()).floor;for(let i=0;i<160;i++){
