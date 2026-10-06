@@ -1741,10 +1741,10 @@
         .lang-btn:hover { opacity: 0.9; }
         .lang-btn.lang-active { opacity: 1; outline: 2px solid #ffd060; color: #ffd060; box-shadow: 0 0 6px rgba(255,208,96,.4); }
     </style>
-    <link rel="stylesheet" href="/ui-polish.css?v=20261004c">
+    <link rel="stylesheet" href="/ui-polish.css?v=20261006a">
     <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
     <link rel="stylesheet" href="/adventure-feedback.css?v=20261005b">
-    <link rel="stylesheet" href="/journey.css?v=1">
+    <link rel="stylesheet" href="/journey.css?v=2">
 </head>
 <body>
 
@@ -2027,6 +2027,7 @@
         </div>
         <div id="inventory" style="font-size:11px;color:#aaa" data-i18n="hud.empty">vazio</div>
     </div>
+    <aside class="sidebar" id="journeySidebar" hidden></aside>
 </div>
 
 
@@ -12793,7 +12794,7 @@ function syncChatHeightNow(updateSidebar){
         log.style.height = height + 'px';
         chat.style.height = height + 'px';
         if (updateSidebar){
-            for (const el of [document.getElementById('leftSidebar'), document.getElementById('rightSidebar'), document.getElementById('invSidebar')]){
+            for (const el of [document.getElementById('leftSidebar'), document.getElementById('rightSidebar'), document.getElementById('invSidebar'), document.getElementById('journeySidebar')]){
                 if (el) el.style.height = '';
             }
         }
@@ -12811,7 +12812,7 @@ function syncChatHeightNow(updateSidebar){
     // Overhead = tudo acima do wrapper (title bar do Electron, margens) +
     // ~80px pra footer keybindings + folga inferior.
     const wrapperRect = wrapper.getBoundingClientRect();
-    const topGap    = Math.max(0, wrapperRect.top);
+    const topGap    = Math.max(0, wrapperRect.top + window.scrollY);
     const bottomGap = 52;   // footer, bordas e folga pra evitar scroll da página
     const available = window.innerHeight - topGap - bottomGap;
     const target = Math.max(72, available - canvasH - TABS_H - INPUT_H);
@@ -12821,7 +12822,8 @@ function syncChatHeightNow(updateSidebar){
         const left = document.getElementById('leftSidebar');
         const right = document.getElementById('rightSidebar');
         const inv = document.getElementById('invSidebar');
-        for (const el of [left, right, inv]) if (el) el.style.height = '';
+        const journey = document.getElementById('journeySidebar');
+        for (const el of [left, right, inv, journey]) if (el) el.style.height = '';
         // Deixa o navegador aplicar estas escritas antes de medir a altura final.
         if (sidebarFrame) cancelAnimationFrame(sidebarFrame);
         sidebarFrame = requestAnimationFrame(() => {
@@ -12830,15 +12832,16 @@ function syncChatHeightNow(updateSidebar){
             const leftH = left.getBoundingClientRect().height;
             const game = document.getElementById('gameContainer');
             const gameH = game ? game.getBoundingClientRect().height : 0;
-            const height = Math.max(leftH, gameH) + 'px';
+            const height = (gameH || leftH) + 'px';
             left.style.height = height;
             inv.style.height = height;
             if (right) right.style.height = height;
+            if (journey) journey.style.height = height;
         });
     }
 }
 
-// Alinha altura das 3 sidebars laterais com o game container (canvas + chatPanel)
+// Alinha as colunas laterais com o game container (canvas + chatPanel).
 function syncInvHeight(){
     layoutNeedsSidebar = true;
     syncChatHeight();
@@ -17694,7 +17697,7 @@ function loop(ts){
 <script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
 <script src="/adventure-guide.js?v=20261006a"></script>
-<script src="/journey-ui.js?v=2"></script>
+<script src="/journey-ui.js?v=3"></script>
 <script src="/adventure-feedback.js?v=20261005b"></script>
 <script src="/training-rules.js?v=1"></script>
 <script src="/enchanting-ui.js?v=1"></script>

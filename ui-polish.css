@@ -24,6 +24,7 @@ body.layout-focus #gameContainer {
 #gameContainer { flex: 0 1 auto; }
 .sidebar { width: 174px; flex: none; font-size: 12px; line-height: 1.35; }
 #leftSidebar { max-height: none; overflow: visible; }
+body:not(.touch) #leftSidebar { overflow-y:auto; overscroll-behavior-y:contain; scrollbar-width:thin; scrollbar-color:#8c6b32 #0a0805; }
 /* A lista encolhe dentro da coluna; a quantidade de itens não define a altura do jogo. */
 #inventory { min-height: 0; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: #8c6b32 #0a0805; }
 /* Mantém os atributos à vista nas janelas com barras do navegador abertas. */

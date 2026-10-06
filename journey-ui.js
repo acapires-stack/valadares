@@ -1,7 +1,7 @@
 /* Jornada: lê o estado confirmado do jogo; ações enviam intenção ao servidor. */
 (() => {
     'use strict';
-    const host = document.getElementById('leftSidebar');
+    const host = document.getElementById('journeySidebar');
     if (!host) return;
     const section = document.createElement('section');
     section.id = 'journeyCard';
@@ -12,7 +12,7 @@
         '<div id="journeyReward"></div><div class="journey-actions"><button id="journeyAction" type="button"></button>' +
         '<button id="journeyRoutes" type="button"></button><button id="journeyExpedition" type="button"></button></div>' +
         '<div id="journeyMore" hidden></div></div>';
-    host.insertBefore(section, host.children[1] || null);
+    host.appendChild(section);
     const $ = id => section.querySelector('#' + id);
     const mobile = document.createElement('button');
     mobile.id = 'journeyMobile';
@@ -149,9 +149,11 @@
         }
     }
     function render() {
-        const floating = document.body.classList.contains('touch') && document.body.classList.contains('journey-mobile-open');
+        const compact = document.body.classList.contains('touch') || document.body.classList.contains('layout-focus') || window.innerWidth < 1200;
+        const floating = compact && document.body.classList.contains('journey-mobile-open');
         if (floating && section.parentNode!==document.body) document.body.appendChild(section);
-        if (!floating && section.parentNode!==host) host.insertBefore(section,host.children[1]||null);
+        if (!floating && section.parentNode!==host) host.appendChild(section);
+        host.hidden = !gameReady() || compact;
         if (!gameReady()) { section.hidden=true;mobile.hidden=true;return; }
         if (currentName!==player.name) { currentName=player.name;lastExp=null;extra='';pendingAction='';progressionToken=null;
             try{
@@ -162,7 +164,7 @@
             }catch{open=true;pendingOpId='';pendingCraftKey='';}
             if(online()){send('expeditionStatus');if(pendingOpId)send('progressionCraftStatus',{opId:pendingOpId});}
         }
-        section.hidden=false; mobile.hidden=false;
+        section.hidden=false; mobile.hidden=!compact;
         // O guia da primeira caçada é opcional. Quando aberto, a Jornada mostra
         // apenas a navegação para que os dois painéis não repitam o objetivo.
         const guideVisible=!document.getElementById('adventureGuidePanel')?.hidden || !document.getElementById('agMoment')?.hidden;
@@ -191,7 +193,7 @@
         action.disabled=!!pendingAction||exitTooFar||(!online()&&o.action!=='quests');
         $('journeyRoutes').textContent=say('Rotas de armas','Weapon paths');
         $('journeyExpedition').textContent=say('Expedição solo','Solo expedition');
-        mobile.textContent=say('Objetivo: ','Objective: ')+o.title;
+        mobile.textContent=say('Jornada: ','Journey: ')+o.title;
         mobile.setAttribute('aria-expanded',String(document.body.classList.contains('journey-mobile-open')));
         renderMore();
     }
@@ -244,6 +246,7 @@
         const row=messages[code];return row ? row[english()?1:0] : say('Operação não concluída.','Operation not completed.');
     }
     window.ValadaresJourneyUI={refresh:()=>{lastSignature='';render();},result,onServerState,onCraftResult,onQuestResult,onDungeonEnter,onDungeonExit,onLogout,errorText};
+    window.addEventListener('resize',render);
     setInterval(()=>{
         if(pendingAction&&Date.now()-pendingAt>6000){
             if((pendingAction==='craft'||pendingAction==='status')&&pendingOpId)send('progressionCraftStatus',{opId:pendingOpId});
