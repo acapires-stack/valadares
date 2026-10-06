@@ -13,7 +13,7 @@ const server=http.createServer((req,res)=>{
 });
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
- for(const name of ['appearance-rules.js','appearance-ui.js','appearance-ui.css','modern/assets/animals/Wolf-game.glb','modern/assets/characters/Skeleton_Minion-game.glb'])assert(fs.existsSync(path.join(built,name)),`Missing public dependency: ${name}`);
+ for(const name of ['appearance-rules.js','appearance-ui.js','appearance-ui.css','modern/player-visibility.js','modern/assets/animals/Wolf-game.glb','modern/assets/characters/Skeleton_Minion-game.glb'])assert(fs.existsSync(path.join(built,name)),`Missing public dependency: ${name}`);
  for(const name of ['server','tools','.git','modern/_source'])assert(!fs.existsSync(path.join(built,name)),`Private path in public build: ${name}`);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const base='http://127.0.0.1:'+server.address().port,errors=[],failures=[],models=[];
@@ -48,8 +48,13 @@ const server=http.createServer((req,res)=>{
   await page.screenshot({path:path.join(out,'build-compacto.png')});await page.keyboard.press('Escape');
   const assets=await page.evaluate(()=>performance.getEntriesByType('resource').filter(e=>e.name.includes('/modern/')).map(e=>new URL(e.name).pathname));
   assert.deepEqual(errors,[]);assert.deepEqual(failures,[]);
+  await page.waitForFunction(()=>ValadaresModern.renderer.visibility?.diagnostics().active);
+  const visibilityBefore=await page.evaluate(()=>ValadaresModern.renderer.visibility.diagnostics());
+  assert(visibilityBefore.available&&visibilityBefore.copies>0);
   await page.evaluate(()=>logout());
-  const report={at:new Date().toISOString(),pass:true,source:'dist-web served locally; isolated backend8098',models,modernResources:[...new Set(assets)].length,errors,failures,checks:['public dependencies','private data excluded','fresh login','three purchased character previews','focus/classic return','seven options and Save visible in compact viewport','single renderer']};
+  await page.waitForFunction(()=>!ValadaresModern.renderer.visibility.diagnostics().active&&ValadaresModern.renderer.visibility.diagnostics().copies===0);
+  const visibilityAfter=await page.evaluate(()=>ValadaresModern.renderer.visibility.diagnostics());
+  const report={at:new Date().toISOString(),pass:true,source:'dist-web served locally; isolated backend8098',models,modernResources:[...new Set(assets)].length,visibilityBefore,visibilityAfter,errors,failures,checks:['public dependencies','private data excluded','fresh login','three purchased character previews','focus/classic return','seven options and Save visible in compact viewport','single renderer','occluded body active and cleared on logout']};
   fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }finally{await browser.close();server.close();}
 })().catch(error=>{server.close();console.error(error);process.exitCode=1;});

@@ -1,6 +1,7 @@
 import * as pc from './vendor/playcanvas.mjs';
 import {createWorld} from './world.js';
 import {createActors} from './actors.js';
+import {createPlayerVisibility} from './player-visibility.js';
 
 export async function createRenderer(bridge){
  const host=bridge.getCanvas(),parent=host.parentElement;
@@ -27,6 +28,7 @@ export async function createRenderer(bridge){
  const presentation=Object.create(bridge);presentation.getViewBounds=()=>viewBounds;
  const world=createWorld(pc,app,presentation);let actors;
  try{actors=await createActors(pc,app,presentation);}catch(error){observer.disconnect();window.removeEventListener('resize',resize);world.destroy();app.destroy();canvas.remove();overlay.remove();throw error;}
+ const visibility=createPlayerVisibility(pc,app,camera);
  const project=(x,y,z)=>{const v=camera.camera.worldToScreen(new pc.Vec3(x,y,z));return{x:v.x,y:v.y,z:v.z};};
  const text=(label,x,y,color='#f3ebcf',size=12)=>{ctx.font=`600 ${size}px system-ui, sans-serif`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(10,18,19,.82)';ctx.strokeText(label,x,y);ctx.fillStyle=color;ctx.fillText(label,x,y);};
  function labels(){ctx.clearRect(0,0,width,height);const player=bridge.getPlayer(),target=bridge.getTarget?.()||{id:player.target,type:player.targetType};
@@ -64,22 +66,32 @@ export async function createRenderer(bridge){
   for(const p of bridge.getTrails?.()||[]){const pos=project(p.x+.5,.02,p.y+.5);ctx.globalAlpha=Math.max(0,Math.min(.35,p.life/(p.maxLife||500)));ctx.fillStyle=p.color||'#85c2b6';ctx.beginPath();ctx.ellipse(pos.x,pos.y,6,3,0,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
  }
  function input(event){if(!bridge.getStarted?.())return;event.preventDefault();const rect=canvas.getBoundingClientRect(),sx=event.clientX-rect.left,sy=event.clientY-rect.top;const cam=bridge.getCamera();let tile=null,best=Infinity;
-  for(const r of actors.entries.values()){if(event.type==='contextmenu'&&r.kind!=='remote')continue;if(event.type==='click'&&!['mob','remote'].includes(r.kind))continue;const e=r.data;const q=project((e.renderX??e.x)+.5,.6,(e.renderY??e.y)+.5);const distance=Math.hypot(q.x-sx,q.y-sy);if(distance<32*width/720&&distance<best){best=distance;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}
-  if(!tile){const near=camera.camera.screenToWorld(sx,sy,.1),far=camera.camera.screenToWorld(sx,sy,80);const t=-near.y/(far.y-near.y);tile={x:Math.floor(near.x+(far.x-near.x)*t),y:Math.floor(near.z+(far.z-near.z)*t)};}
+  const near=camera.camera.screenToWorld(sx,sy,.1),far=camera.camera.screenToWorld(sx,sy,80),ray=new pc.Ray(near,far.clone().sub(near).normalize()),hit=new pc.Vec3();
+  const eligible=Array.from(actors.entries.values()).filter(r=>r.entity.enabled&&(event.type==='contextmenu'?r.kind==='remote':['mob','remote'].includes(r.kind)))
+   .map(r=>({actor:r,meshes:r.entity.findComponents('render').filter(render=>render.enabled&&render.entity.enabled).flatMap(render=>render.meshInstances.filter(mesh=>mesh.visible))})).filter(r=>r.meshes.length);
+  // Tall heads and wide wings can sit far from the ground anchor. Pick visible
+  // body-part bounds first; nearest depth resolves overlapping actors. No physics
+  // collider or gameplay reach changes. Hidden parts must not become click targets.
+  for(const {actor,meshes} of eligible){
+   for(const mesh of meshes){if(!mesh.aabb.intersectsRay(ray,hit))continue;const distance=hit.distanceSq(near);if(distance<best){best=distance;const e=actor.data;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}
+  }
+  // Preserve generous selection around small creatures when no visible part was hit.
+  if(!tile){best=Infinity;for(const {actor} of eligible){const e=actor.data,q=project((e.renderX??e.x)+.5,.6,(e.renderY??e.y)+.5),distance=Math.hypot(q.x-sx,q.y-sy);if(distance<32*width/720&&distance<best){best=distance;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}}
+  if(!tile){const t=-near.y/(far.y-near.y);tile={x:Math.floor(near.x+(far.x-near.x)*t),y:Math.floor(near.z+(far.z-near.z)*t)};}
   const hr=host.getBoundingClientRect();host.dispatchEvent(new MouseEvent(event.type,{bubbles:true,cancelable:true,button:event.button,buttons:event.buttons,clientX:hr.left+(tile.x+.5-cam.x)/bridge.VP_W*hr.width,clientY:hr.top+(tile.y+.5-cam.y)/bridge.VP_H*hr.height}));
   if(event.type==='contextmenu'){const menu=document.getElementById('playerCtxMenu');if(menu){menu.style.left=Math.min(event.clientX,window.innerWidth-menu.offsetWidth-8)+'px';menu.style.top=Math.min(event.clientY,window.innerHeight-menu.offsetHeight-8)+'px';}}
  }
  canvas.addEventListener('click',input);canvas.addEventListener('contextmenu',input);
  function recover(error){
   if(failed)return;
-  failed=true;ready=false;lastError=String(error);canvas.style.display='none';overlay.style.display='none';app.autoRender=false;app.renderNextFrame=false;
+  failed=true;ready=false;lastError=String(error);visibility.update(null);canvas.style.display='none';overlay.style.display='none';app.autoRender=false;app.renderNextFrame=false;
   document.body.classList.remove('modern-renderer-ready');console.error('[Valadares moderno]',error);
   document.dispatchEvent(new CustomEvent('valadares:modern-error',{detail:{message:lastError}}));
  }
  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();recover(new Error('Contexto gráfico interrompido'));});
  app.on('update',dt=>{
   if(failed)return;
-  const started=bridge.getStarted?.();canvas.style.display=started?'block':'none';overlay.style.display=started?'block':'none';if(!started)return;
+  const started=bridge.getStarted?.();canvas.style.display=started?'block':'none';overlay.style.display=started?'block':'none';if(!started){visibility.update(null);return;}
   try{
    const p=bridge.getPlayer(),cam=bridge.getCamera(),cx=cam.x+bridge.VP_W/2,cz=cam.y+bridge.VP_H/2;
    const halfX=camera.camera.orthoHeight*width/height,halfZ=camera.camera.orthoHeight*Math.hypot(16,10)/16;
@@ -88,10 +100,10 @@ export async function createRenderer(bridge){
    const underground=(p.floor||0)>0||bridge.inCave?.(p.x,p.y),dark=Math.max(0,Math.min(1,bridge.getDayPhase?.().darkness||0));
    const interior=!!bridge.getInterior?.();
    sun.light.intensity=interior?.95:underground?.46:1.4-dark*.95;fill.light.intensity=interior?.38:underground?.23:.45-dark*.1;lamp.light.intensity=interior?1.15:underground?2.1:.3+dark*.8;
-   world.update(dt);actors.update(dt);labels();frames++;elapsed+=dt;if(elapsed>=1){fps=frames/elapsed;frames=0;elapsed=0;}
+   world.update(dt);actors.update(dt);visibility.update(actors.entries.get('self'));labels();frames++;elapsed+=dt;if(elapsed>=1){fps=frames/elapsed;frames=0;elapsed=0;}
   }catch(error){recover(error);}
  });
  function captureStream(rate=30){const output=document.createElement('canvas');output.width=canvas.width;output.height=canvas.height;const capture=output.getContext('2d'),stream=output.captureStream(rate);const paint=()=>{capture.drawImage(canvas,0,0,output.width,output.height);capture.drawImage(overlay,0,0,output.width,output.height);};app.on('postrender',paint);const timer=setInterval(()=>{if(stream.getVideoTracks().every(t=>t.readyState==='ended')){clearInterval(timer);app.off('postrender',paint);}},500);return stream;}
  app.start();ready=true;document.body.classList.add('modern-renderer-ready');
- return {app,world,actors,camera,canvas,bridge,project,captureStream,diagnostics:()=>({ready,fps:Math.round(fps),error:lastError,actors:actors.diagnostics(),world:world.diagnostics(),width,height,drawCalls:app.stats.drawCalls.total}),destroy(){observer.disconnect();window.removeEventListener('resize',resize);actors.destroy();world.destroy();app.destroy();canvas.remove();overlay.remove();}};
+ return {app,world,actors,camera,canvas,visibility,bridge,project,captureStream,diagnostics:()=>({ready,fps:Math.round(fps),error:lastError,actors:actors.diagnostics(),world:world.diagnostics(),visibility:visibility.diagnostics(),width,height,drawCalls:app.stats.drawCalls.total}),destroy(){observer.disconnect();window.removeEventListener('resize',resize);visibility.destroy();actors.destroy();world.destroy();app.destroy();canvas.remove();overlay.remove();}};
 }

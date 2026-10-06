@@ -41,6 +41,10 @@ export async function createActors(pc,app,bridge){
   for(const r of entity.findComponents('render'))if(r.enabled&&/_(Body|Head|Arm|Leg|Jaw)/.test(r.entity.name))for(const mi of r.meshInstances){const b=mi.aabb;low=Math.min(low,b.center.y-b.halfExtents.y);high=Math.max(high,b.center.y+b.halfExtents.y);}
   const authored=high-low,scale=Number.isFinite(authored)&&authored>.1?height/authored:.6;entity.setLocalScale(scale,scale,scale);return height;
  }
+ function limitVisualTop(entity,height){
+  let top=0;for(const r of entity.findComponents('render'))if(r.enabled)for(const mi of r.meshInstances)top=Math.max(top,mi.aabb.center.y+mi.aabb.halfExtents.y);
+  if(top>height){const s=entity.getLocalScale().clone().mulScalar(height/top);entity.setLocalScale(s);return height;}return top;
+ }
  function attachAuthored(parent,boneName,child){
   const bone=parent.findByName(boneName);if(!bone)return;const position=child.getPosition().clone(),rotation=child.getRotation().clone(),scale=child.getLocalScale().clone();
   child.reparent(bone);child.setPosition(position);child.setRotation(rotation);child.setLocalScale(scale);
@@ -112,7 +116,7 @@ export async function createActors(pc,app,bridge){
   const entity=assets[model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);
   const rigMeshes=entity.findComponents('render');for(const r of rigMeshes){const n=r.entity.name;
    const isSeries=!!seriesRig(model),modeled=isSeries?/^(Farmer_|Lorekeeper_|Cleric_|Hoarder_|MagicalGirl_)/.test(n):/^(Knight|Mage|Rogue|Barbarian)_/.test(n);
-   const hat=/Knight_Helmet|Mage_Hat|Barbarian_Hat/.test(n),cape=/Cape/.test(n),builtInTool=/HolyWater|Staff|Tome/.test(n);
+   const hat=/Knight_Helmet|Mage_Hat|Barbarian_Hat/.test(n),cape=/Cape/.test(n),builtInTool=/HolyWater|Staff|Tome|Shield/.test(n);
    r.enabled=modeled&&!builtInTool&&(!hat||(kind==='npc'&&n==='Mage_Hat')||(kind!=='npc'&&!!look.eq.head&&!look.crown))&&(!cape||kind==='npc'||!!look.cape);
    for(const mi of r.meshInstances)mi.castShadow=r.enabled;
   }
@@ -140,33 +144,35 @@ export async function createActors(pc,app,bridge){
   ORC:{model:'Barbarian',preferred:'OrcBrute',weapon:'axe',height:1.65},
   ORC_LIDER:{model:'Barbarian',preferred:'OrcBrute',weapon:'axe',height:1.65,armor:'#d7acac'},
   TROLL:{model:'Barbarian',preferred:'Monstrosity',weapon:'mace',height:1.75},
-  MINOTAUR:{model:'Barbarian',weapon:'axe',height:1.62,armor:'#b79773',horns:true},
+  MINOTAUR:{model:'Barbarian',weapon:'axe',height:1.62,visualLimit:2.05,armor:'#b79773',horns:true},
   SKELETON:{model:'Skeleton_Minion',weapon:'sword',height:1.38},
   CACADOR:{model:'Rogue_Hooded',weapon:'bow',height:1.35,armor:'#c8bb9e',cape:'#baaa80'},
-  CARRASCO:{model:'Barbarian',weapon:'axe',height:1.48,armor:'#a56e75',cape:'#935569',hat:true},
-  SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',height:1.4,armor:'#b691cb',cape:'#86639e',hat:true},
+  CARRASCO:{model:'Barbarian',weapon:'axe',height:1.3,armor:'#87525c',cape:'#863e50'},
+  SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',height:1.4,visualLimit:2.1,armor:'#b691cb',cape:'#86639e',hat:true},
   SENHOR_VALADARES:{model:'Knight',weapon:'sword',height:1.35,armor:'#efce8c',cape:'#d9b86f',hat:true},
-  ARAUTO:{model:'Mage',weapon:'staff',height:1.4,armor:'#c4bce2',cape:'#e3d09d'}
+  ARAUTO:{model:'Mage',preferred:'Cleric',weapon:'staff',height:1.2,armor:'#c4bce2',cape:'#e3d09d'}
  };
  function enemyHumanoid(e,kind,id){
   const type=e.type,base=RIGGED_MOBS[type],cfg={...base,model:ready(base.preferred,base.model)},def=bridge.getMonsterTypes?.()[type]||{};
   const entity=assets[cfg.model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);const owned=[];
   for(const r of entity.findComponents('render')){
    const n=r.entity.name,cape=/Cape|Cloak/.test(n),hat=/Hat|Helmet/.test(n);
-   r.enabled=/^(Barbarian|Skeleton_Minion|Knight|Mage|Rogue|OrcBrute|Monstrosity)_/.test(n)&&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&!(cfg.horns&&/Barbarian_Head/.test(n));
+   r.enabled=/^(Barbarian|Skeleton_Minion|Knight|Mage|Rogue|OrcBrute|Monstrosity|Cleric)_/.test(n)&&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&!/Shield|HolyWater|Staff|Tome/.test(n);
    // Keep the purchased creature's skin, eyes, teeth and armor details intact.
    const color=cape?cfg.cape:/Body|Shoulderpad|LegArmor/.test(n)?cfg.armor:null;
    for(const mi of r.meshInstances){mi.castShadow=r.enabled;if(color){const m=mi.material.clone();m.diffuse=new pc.Color().fromString(color);m.update();owned.push(m);mi.material=m;}}
   }
-  const visualHeight=sizeBody(entity,cfg.height*Math.min(def.size||1,1.9)),clips=animate(entity,cfg.model);
-  const hand=entity.findByName(cfg.weapon==='bow'?'handslot.l':'handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,cfg.weapon,false,{},owned);}
+  // Measure the complete authored body before hiding a head replaced by a creature part.
+  let visualHeight=sizeBody(entity,cfg.height*Math.min(def.size||1,1.9));const clips=animate(entity,cfg.model);
   // This legacy approximation remains until an authored minotaur is available.
   // Unlike the former root-space add-ons, these parts follow the head bone.
-  if(cfg.horns){const head=new pc.Entity('Cabeca minotauro');entity.addChild(head);
+  if(cfg.horns){for(const r of entity.findComponents('render'))if(/Barbarian_Head/.test(r.entity.name))r.enabled=false;const head=new pc.Entity('Cabeca minotauro');entity.addChild(head);
    shape(head,'sphere',[.48,.43,.43],[0,1.94,.13],'#8c6349');shape(head,'sphere',[.38,.24,.36],[0,1.8,.4],'#ad805d');
    for(const side of [-1,1]){shape(head,'cone',[.15,.46,.15],[side*.32,2.19,.06],'#dfcfad',[0,0,-side*48]);shape(head,'sphere',[.055,.05,.035],[side*.17,2.01,.35],'#171914');shape(head,'sphere',[.06,.04,.035],[side*.1,1.8,.58],'#4a3429');}
    attachAuthored(entity,'head',head);
   }
+  if(cfg.visualLimit)visualHeight=limitVisualTop(entity,cfg.visualLimit);
+  const hand=entity.findByName(cfg.weapon==='bow'?'handslot.l':'handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,cfg.weapon,false,{},owned);}
   return {entity,kind,id,type,model:cfg.model,w:cfg.weapon,owned,visualHeight,clips,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
  }
 
@@ -183,26 +189,31 @@ export async function createActors(pc,app,bridge){
   const group=new pc.Entity(id);root.addChild(group);
   const type=e.type||'RAT',def=bridge.getMonsterTypes?.()[type]||{},c=def.color||'#687f66';
   const rec={entity:group,kind,id,type,parts:[],owned:[],lastX:NaN,lastZ:NaN,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1};
-  // Creature sphere dimensions were authored as radii; PlayCanvas spheres use unit diameter.
-  const add=(form,size,at,color=c,rot)=>shape(group,form,form==='sphere'?size.map(v=>v*2):size,at,color,rot);
+  // Per-family mass is a visual choice, not a universal radius correction.
+  const sphereFactor=type.startsWith('DRAKE')?1.4:type.startsWith('GOLEM')?1.5:2;
+  const add=(form,size,at,color=c,rot)=>shape(group,form,form==='sphere'?size.map(v=>v*sphereFactor):size,at,color,rot);
   const move=(form,size,at,color=c,rot=[0,0,0],swing=12)=>{const part=add(form,size,at,color,rot);rec.parts.push({part,rot,swing});return part;};
+  // Render capsules have native height 2. Place endpoints explicitly so joints meet.
+  const link=(parent,from,to,radius,color)=>{const a=new pc.Vec3(...from),b=new pc.Vec3(...to),delta=b.clone().sub(a);const part=shape(parent,'capsule',[radius*2,delta.length()/2,radius*2],a.clone().add(b).mulScalar(.5).toArray(),color);part.setLocalRotation(new pc.Quat().setFromDirections(pc.Vec3.UP,delta.normalize()));return part;};
+  const leg=(from,knee,foot,radius,color,swing=10)=>{const pivot=new pc.Entity('Perna articulada');group.addChild(pivot);pivot.setLocalPosition(...from);const local=p=>p.map((v,i)=>v-from[i]);if(knee){link(pivot,[0,0,0],local(knee),radius,color);link(pivot,local(knee),local(foot),radius*.85,color);}else link(pivot,[0,0,0],local(foot),radius,color);rec.parts.push({part:pivot,rot:[0,0,0],swing});return pivot;};
+  const wing=(side,anchor,width,height,angle,color,swing)=>{const pivot=new pc.Entity('Raiz da asa');group.addChild(pivot);pivot.setLocalPosition(side*anchor[0],anchor[1],anchor[2]);const rad=angle*Math.PI/180;shape(pivot,'cone',[width,height,.045],[side*Math.sin(rad)*height/2,Math.cos(rad)*height/2,0],color,[0,0,-side*angle]);rec.parts.push({part:pivot,rot:[0,0,0],swing:side*swing,axis:'z'});};
   const eyes=(y,z,span=.12,col='#e5ce92')=>{for(const side of [-1,1])add('sphere',[.035,.034,.026],[side*span,y,z],col);};
   const quadruped=(body,head,legs)=>{
    add('sphere',body,[0,.39,-.07],c);add('sphere',head,[0,.45,.43],c);
-   for(const side of [-1,1])for(const z of [-.31,.31])move('capsule',legs,[side*.23,.18,z],c,[0,0,side*8],16);
+   for(const side of [-1,1])for(const z of [-.31,.31]){if(type==='PET_GATO')move('capsule',legs,[side*.23,.18,z],c,[0,0,side*8],16);else leg([side*.18,.36,z],null,[side*.26,.03,z],legs[0]/2,c,12);}
   };
   if(type==='RAT'){
    quadruped([.34,.24,.47],[.22,.19,.27],[.068,.17,.07]);
    add('sphere',[.11,.075,.16],[0,.38,.69],'#b98a79');eyes(.49,.65,.115,'#161514');
    for(const side of [-1,1])add('sphere',[.11,.13,.045],[side*.16,.58,.38],'#a37670',[0,side*20,0]);
-   move('capsule',[.035,.51,.035],[0,.27,-.62],'#ae8b83',[65,0,0],9);
+   leg([0,.35,-.36],null,[0,.12,-1.05],.0175,'#ae8b83',9);
   }else if(type==='WOLF'||type==='LIZARD'||type==='PET_GATO'){
    const cat=type==='PET_GATO',lizard=type==='LIZARD';
    quadruped(cat?[.29,.25,.43]:lizard?[.33,.21,.55]:[.37,.3,.57],cat?[.24,.23,.24]:lizard?[.21,.15,.38]:[.28,.28,.31],[cat?.075:lizard?.09:.12,.23,.09]);
    add('sphere',lizard?[.14,.085,.29]:[.17,.13,.24],[0,lizard?.39:.38,lizard?.77:.66],lizard?c:cat?'#4a464c':'#a8a39a');
    eyes(lizard?.52:.55,lizard?.8:.76,.15,cat?'#c8a452':lizard?'#f0ba48':'#edcf9c');
    for(const side of [-1,1])add('cone',cat?[.1,.22,.08]:lizard?[.055,.1,.06]:[.11,.24,.11],[side*.17,.72,.43],cat?'#27252c':c,[0,0,-side*14]);
-   move('capsule',lizard?[.09,.62,.09]:cat?[.055,.52,.055]:[.16,.47,.16],[0,lizard?.32:.39,-.64],cat?'#29282e':c,[62,0,0],11);
+   if(lizard)leg([0,.34,-.5],null,[0,.13,-1.3],.045,c,8);else move('capsule',cat?[.055,.52,.055]:[.16,.47,.16],[0,.39,-.64],cat?'#29282e':c,[62,0,0],11);
    if(lizard)for(let i=0;i<4;i++)add('cone',[.075,.13,.065],[0,.57,-.29+i*.19],'#869c4b',[42,0,0]);
    if(type==='WOLF'){
     add('sphere',[.28,.24,.3],[0,.58,-.17],'#706d64');
@@ -227,18 +238,17 @@ export async function createActors(pc,app,bridge){
    eyes(.78,.31,.11,'#287d78');add('sphere',[.13,.07,.13],[0,1.08,.02],'#d1fff2');
    for(const side of [-1,1])add('sphere',[.12,.24,.11],[side*.34,.5,-.04],'#79d3c7',[0,0,side*30]);
   }else if(type==='SNAKE'){
-   for(let i=0;i<7;i++)move('sphere',[.16-i*.011,.14-i*.009,.22],[Math.sin(i*1.1)*.19,.12,-.07-i*.14],i%2?'#477938':c,[0,0,0],3);
-   add('capsule',[.16,.42,.16],[0,.37,.29],c,[18,0,0]);add('sphere',[.24,.14,.26],[0,.56,.49],c);
+   for(let i=0;i<7;i++)move('sphere',[.16-i*.011,.14-i*.009,.22],[Math.sin(i*1.1)*.08,.14,-.07-i*.14],i%2?'#477938':c,[0,0,0],3);
+   link(group,[0,.17,-.02],[0,.5,.43],.095,c);add('sphere',[.24,.14,.26],[0,.56,.49],c);
    add('sphere',[.28,.13,.08],[0,.58,.34],'#62943d');eyes(.63,.66,.16,'#f8c85c');add('cone',[.025,.19,.025],[0,.49,.75],'#cc6265',[90,0,0]);
   }else if(type==='SPIDER'||type==='SCORPION'){
    const scorpion=type==='SCORPION',shell=scorpion?'#80361e':'#2b172c';
    add('sphere',[.39,.22,.42],[0,.32,-.12],c);add('sphere',[.24,.18,.26],[0,.29,.35],shell);eyes(.37,.57,.11,scorpion?'#ffbc58':'#d65d69');
    for(const side of [-1,1])for(let i=0;i<4;i++){
-    const z=-.32+i*.2;move('capsule',[.055,.42,.055],[side*.37,.36,z],shell,[15,0,side*54],10);
-    add('capsule',[.045,.31,.045],[side*.64,.17,z+(i-1.5)*.055],shell,[0,0,-side*32]);
+    const z=-.32+i*.2;leg([side*.23,.31,z],[side*.56,.43,z+(i-1.5)*.025],[side*.73,.025,z+(i-1.5)*.055],.025,shell,7);
    }
-   if(scorpion){for(let i=0;i<3;i++)add('sphere',[.11,.12,.14],[0,.43+i*.16,-.49-i*.11],c);add('cone',[.1,.26,.09],[0,.87,-.81],'#d19a47',[35,0,0]);
-    for(const side of [-1,1])add('sphere',[.14,.1,.15],[side*.32,.27,.58],c);}
+   if(scorpion){for(let i=0;i<3;i++){const at=[0,.43+i*.16,-.49-i*.11];add('sphere',[.11,.12,.14],at,c);if(i)link(group,[0,.43+(i-1)*.16,-.49-(i-1)*.11],at,.06,c);}add('cone',[.1,.26,.09],[0,.87,-.81],'#d19a47',[35,0,0]);
+    for(const side of [-1,1]){link(group,[side*.16,.29,.35],[side*.32,.27,.58],.035,c);add('sphere',[.14,.1,.15],[side*.32,.27,.58],c);}}
    else add('sphere',[.25,.08,.27],[0,.43,-.13],'#533354');
   }else if(type==='BAT'){
    add('sphere',[.19,.28,.18],[0,.8,0],c);add('sphere',[.17,.15,.16],[0,1.02,.08],c);
@@ -252,15 +262,15 @@ export async function createActors(pc,app,bridge){
    add('sphere',[.49,.39,.72],[0,.55,-.12],c);add('capsule',[.28,.5,.3],[0,.85,.45],c,[38,0,0]);
    add('sphere',[.32,.22,.38],[0,1.02,.74],c);add('sphere',[.27,.11,.31],[0,.88,.96],'#b86b4a');eyes(1.1,.9,.2,'#ffcc72');
    for(const side of [-1,1]){
-    for(const z of [-.47,.35])move('capsule',[.18,.43,.19],[side*.35,.23,z],c,[0,0,side*18],12);
-    move('cone',[.58,.82,.045],[side*.65,.86,-.17],'#753a35',[0,0,-side*50],13);
+    for(const z of [-.4,.22])leg([side*.2,.55,z],null,[side*.38,.04,z],.09,c,12);
+    wing(side,[.27,.68,-.17],.58,.82,50,'#753a35',13);
     add('cone',[.1,.28,.1],[side*.22,1.31,.62],'#dfad80',[0,0,-side*22]);
    }
-   move('capsule',[.16,.7,.16],[0,.39,-.85],c,[59,0,0],8);
+   leg([0,.5,-.4],null,[0,.25,-1.44],.08,c,8);
    for(let i=0;i<4;i++)add('cone',[.085,.16,.09],[0,.95,-.48+i*.25],'#c2865e',[42,0,0]);
    if(type==='DRAKE_LIDER'){
     for(const side of [-1,1]){
-     move('cone',[.75,1.18,.06],[side*.95,1.13,-.27],'#a52d20',[0,0,-side*63],20);
+     wing(side,[.3,.75,-.27],.75,1.18,63,'#a52d20',16);
      add('cone',[.17,.47,.15],[side*.24,1.54,.55],'#edc18b',[0,0,-side*23]);
     }
     for(let i=0;i<5;i++)add('cone',[.13,.23,.12],[0,1.15,-.49+i*.25],'#efb35c',[42,0,0]);
@@ -272,7 +282,7 @@ export async function createActors(pc,app,bridge){
    for(const side of [-1,1]){
     add('sphere',[.33,.31,.3],[side*.53,1.23,0],rock);
     move('capsule',[.23,.58,.23],[side*.62,.79,.05],rock,[0,0,side*13],12);
-    move('capsule',[.28,.65,.28],[side*.26,.32,0],rock,[0,0,side*7],9);
+    leg([side*.25,.64,0],null,[side*.29,.035,0],.14,rock,9);
     add('sphere',[.09,.055,.04],[side*.13,1.52,.34],'#e9ba69');
    }
    for(let i=0;i<3;i++)add('capsule',[.045,.38,.045],[(i-1)*.18,.95,.35],seam,[0,0,33+i*12]);
@@ -280,7 +290,7 @@ export async function createActors(pc,app,bridge){
     for(const side of [-1,1]){
      add('box',[.34,.45,.3],[side*.59,1.52,-.06],'#8b8176',[0,0,side*16]);
      add('cone',[.16,.49,.15],[side*.6,1.91,-.06],'#d6be83',[0,0,side*20]);
-     add('sphere',[.15,.17,.08],[side*.16,1.05,.4],'#76d8d4');
+     add('sphere',[.065,.08,.035],[side*.16,1.05,.31],'#76d8d4');
     }
     add('box',[.39,.12,.32],[0,1.79,.04],'#9c8c69');
     for(let i=-1;i<=1;i++)add('cone',[.1,.33,.1],[i*.27,2.02,.04],'#c9ad72');
@@ -291,7 +301,7 @@ export async function createActors(pc,app,bridge){
    for(const side of [-1,1]){
     move('cone',[.19,.83,.15],[side*.49,.82,.04],'#462e59',[0,0,side*28],18);
     add('sphere',[.09,.06,.035],[side*.16,1.37,.37],'#ce8aff');
-    move('cone',[.13,.55,.11],[side*.23,.18,-.24],'#674284',[0,0,side*16],10);
+    move('cone',[.13,.55,.11],[side*.23,.4,-.24],'#674284',[0,0,side*16],10);
    }
    add('sphere',[.16,.18,.1],[0,.77,.42],'#8d5bb3');
   }else{
@@ -312,7 +322,7 @@ export async function createActors(pc,app,bridge){
    if(type==='TROLL')add('sphere',[.47,.25,.31],[0,.99,.28],'#617d5a');
    if(!shadow){const hand=new pc.Entity('arma inimiga');group.addChild(hand);hand.setLocalPosition(-.5,.87,.24);weapon(hand,skeleton||type==='CACADOR'?'sword':boss?'staff':'axe',false);}
   }
-  const visualSize=['RAT','SNAKE','SPIDER','SCORPION','LIZARD'].includes(type)?.5:1;
+  const visualSize=['RAT','SNAKE','SPIDER','SCORPION','LIZARD'].includes(type)?.5:type==='DRAKE_LIDER'||type==='GOLEM_REI'?.8:1;
   const s=(kind==='pet' ? .48 : (def.size||1))*visualSize;group.setLocalScale(s,s,s);rec.visualHeight=Math.max(.1,...group.findComponents('render').flatMap(r=>r.meshInstances.map(mi=>mi.aabb.center.y+mi.aabb.halfExtents.y)));return rec;
  }
  // Confirmed death presentation is separate from authoritative monsters and selectable entries.
@@ -381,8 +391,8 @@ export async function createActors(pc,app,bridge){
     if(state!==rec.state||strikeStarted&&attacking){rec.entity.anim.baseLayer.transition(state,strikeStarted?.035:.1,0);rec.state=state;}
     rec.entity.anim.speed=attacking?rec.attackSpeed:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
    }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type==='SOMBRA'?Math.sin(now*3)*.075:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;
-    rec.entity.setLocalPosition(x,bob+(now<rec.strikeUntil?Math.sin((rec.strikeUntil-now)*20)*.035:0),z);
-    for(let i=0;i<rec.parts.length;i++){const {part,rot,swing}=rec.parts[i];const a=moving||rec.type==='BAT'||now<rec.strikeUntil?Math.sin(now*(rec.type==='BAT'?12:10)+i*Math.PI*.7)*swing:0;part.setLocalEulerAngles(rot[0]+(rec.type==='BAT'?0:a),rot[1],rot[2]+(rec.type==='BAT'?a:0));}
+    rec.entity.setLocalPosition(x,bob+(now<rec.strikeUntil?Math.max(0,Math.sin((rec.strikeUntil-now)*20))*.035:0),z);
+    for(let i=0;i<rec.parts.length;i++){const {part,rot,swing,axis}=rec.parts[i];const a=moving||rec.type==='BAT'||now<rec.strikeUntil?Math.sin(now*(rec.type==='BAT'?12:10)+i*Math.PI*.7)*swing:0,zAxis=rec.type==='BAT'||axis==='z';part.setLocalEulerAngles(rot[0]+(zAxis?0:a),rot[1],rot[2]+(zAxis?a:0));}
    }
    rec.lastX=x;rec.lastZ=z;rec.entity.enabled=true;
   };

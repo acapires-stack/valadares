@@ -24,9 +24,10 @@ const hexColor=(pc,hex)=>new pc.Color().fromString(hex);
 class Geometry {
  constructor(){this.p=[];this.n=[];this.uv=[];this.i=[];}
   quad(a,b,c,d,uv=1){const base=this.p.length/3;const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];let nx=u[1]*v[2]-u[2]*v[1],ny=u[2]*v[0]-u[0]*v[2],nz=u[0]*v[1]-u[1]*v[0],l=Math.hypot(nx,ny,nz)||1;nx/=l;ny/=l;nz/=l;for(const p of [a,b,c,d]){this.p.push(...p);this.n.push(nx,ny,nz);}this.uv.push(...(Array.isArray(uv)?uv:[0,0,uv,0,uv,uv,0,uv]));this.i.push(base,base+1,base+2,base,base+2,base+3);}
- box(x,y,z,w,h,d,rotation=0){const c=Math.cos(rotation),s=Math.sin(rotation),corner=(a,b,Y)=>[x+a*c-b*s,Y,z+a*s+b*c],X=w/2,Z=d/2;
+ box(x,y,z,w,h,d,rotation=0,worldUv=false){const c=Math.cos(rotation),s=Math.sin(rotation),corner=(a,b,Y)=>[x+a*c-b*s,Y,z+a*s+b*c],X=w/2,Z=d/2;
   const a=corner(-X,-Z,y),b=corner(X,-Z,y),c0=corner(X,Z,y),d0=corner(-X,Z,y),A=corner(-X,-Z,y+h),B=corner(X,-Z,y+h),C=corner(X,Z,y+h),D=corner(-X,Z,y+h);
-  this.quad(A,D,C,B);this.quad(d0,a,b,c0);this.quad(a,A,B,b);this.quad(b,B,C,c0);this.quad(c0,C,D,d0);this.quad(d0,D,A,a);
+  const uv=(u,v)=>worldUv?[0,0,u,0,u,v,0,v]:1;
+  this.quad(A,D,C,B,uv(d,w));this.quad(d0,a,b,c0,uv(d,w));this.quad(a,A,B,b,uv(h,w));this.quad(b,B,C,c0,uv(h,d));this.quad(c0,C,D,d0,uv(h,w));this.quad(d0,D,A,a,uv(h,d));
  }
  cone(x,y,z,r,h,sides=6,offset=0){const top=[x,y+h,z],center=[x,y,z];for(let i=0;i<sides;i++){const t=offset+i*TAU/sides,t2=offset+(i+1)*TAU/sides,p=[x+Math.cos(t)*r,y,z+Math.sin(t)*r],q=[x+Math.cos(t2)*r,y,z+Math.sin(t2)*r];this.quad(p,top,q,q);this.quad(center,q,p,p);}}
   crown(x,y,z,r,h,seed=0){const n=7,rings=[];for(let row=0;row<4;row++){const yy=y+h*[0,.28,.73,1][row],rr=r*[.58,1,.85,.28][row],ring=[];for(let i=0;i<n;i++){const a=i*TAU/n,wiggle=.86+hash(seed+i,row,17)*.22;ring.push([x+Math.cos(a)*rr*wiggle,yy+(hash(seed,i,row)-.5)*.1,z+Math.sin(a)*rr*wiggle]);}rings.push(ring);}for(let row=0;row<3;row++)for(let i=0;i<n;i++){const j=(i+1)%n;this.quad(rings[row][i],rings[row+1][i],rings[row+1][j],rings[row][j]);}const top=[x,y+h+.05,z];for(let i=0;i<n;i++)this.quad(rings[3][i],top,rings[3][(i+1)%n],rings[3][(i+1)%n]);}
@@ -137,17 +138,25 @@ export function createWorld(pc,app,bridge){
  }
  function house(groups,h,node){const g=(k,v=0)=>{const key=k+':'+v;let b=groups.get(key);if(!b){b=new Geometry();groups.set(key,b);}return b;};
   const x=h.x+h.w/2,z=h.y+h.h/2,w=h.w-.22,d=h.h-.22,front=z+d/2,wall=g('ivory',0),stone=g('stone',0),timber=g('wood',0),dark=g('dark',0),roof=g('roof',h.id==='oficina'?1:0),copper=g('copper',0),warm=g('ember',0),glass=g('window',0);
-  stone.box(x,.005,z,w+.08,.33,d+.08);wall.box(x,.33,z,w,1.44,d);
+  // The enlarged portal fits the existing gable. Raising the eaves hid actors
+  // behind the rear corners, so preserve the original roof and footprint.
+  const eave=1.77,ridge=2.58,room=(bridge.getInteriors?.()||[]).find(r=>r.id===h.id),doorX=room?room.door.x+.5:x;
+  stone.box(x,.005,z,w+.08,.33,d+.08,0,true);wall.box(x,.33,z,w,eave-.33,d,0,true);
   const mortar=g('mortar',0);
   for(const yy of [.12,.225,.325]){mortar.box(x,yy,front+.042,w+.08,.012,.012);for(const side of [-1,1])mortar.box(x+side*(w/2+.042),yy,z,.012,.012,d+.08);}
   for(let row=0;row<2;row++){const count=Math.floor(w/.31),step=w/count;for(let col=1;col<count;col++){const px=x-w/2+col*step+(row?.08:0);if(px<x+w/2-.08)mortar.box(px,.045+row*.11,front+.049,.012,.092,.012);}}
-  // Timber frame, courses of pale stone, and a continuous high copper roof.
-  for(const sx of [-1,1])for(const sz of [-1,1])timber.box(x+sx*(w/2-.07),.34,z+sz*(d/2-.07),.095,1.43,.095);
-  for(const y of [.67,1.22,1.69]){timber.box(x,y,front+.012,w,.045,.045);timber.box(x,y,z-d/2-.012,w,.045,.045);}
-  const half=w/2+.16,depth=d/2+.2,eave=1.77,ridge=2.58;
+  // Front rails stop before the stone portal; none crosses its arch or leaf.
+  for(const sx of [-1,1])for(const sz of [-1,1])timber.box(x+sx*(w/2-.07),.34,z+sz*(d/2-.07),.095,eave-.34,.095);
+  for(const y of [.67,1.30,eave-.08]){
+   const left=x-w/2,right=x+w/2,stopLeft=doorX-.68,stopRight=doorX+.68;
+   if(stopLeft>left)timber.box((left+stopLeft)/2,y,front+.012,stopLeft-left,.045,.045);
+   if(right>stopRight)timber.box((right+stopRight)/2,y,front+.012,right-stopRight,.045,.045);
+   timber.box(x,y,z-d/2-.012,w,.045,.045);
+  }
+  const half=w/2+.16,depth=d/2+.2;
   roof.quad([x-half,eave,z-depth],[x-half,eave,z+depth],[x,ridge,z+depth],[x,ridge,z-depth]);
   roof.quad([x,ridge,z-depth],[x,ridge,z+depth],[x+half,eave,z+depth],[x+half,eave,z-depth]);
-  const rows=9,columns=Math.ceil(depth*2/.28),tileDepth=depth*2/columns;
+  const rows=Math.ceil(Math.hypot(half,ridge-eave)/.2),columns=Math.ceil(depth*2/.28),tileDepth=depth*2/columns;
   for(const side of [-1,1])for(let row=0;row<rows;row++)for(let col=-1;col<=columns;col++){
    const za=Math.max(z-depth+.018,z-depth+col*tileDepth+(row%2)*tileDepth/2+.011),zb=Math.min(z+depth-.018,z-depth+(col+1)*tileDepth+(row%2)*tileDepth/2-.015);if(zb<=za)continue;
    const t0=(row+.065)/rows,t1=(row+.92)/rows,rise=t=>ridge-(ridge-eave)*t+.02,p=(t,zz)=>[x+side*half*t,rise(t),zz],shade=Math.floor(hash(col+20,row+20,h.x+h.y)*3),tile=g('clay',shade);
@@ -156,23 +165,34 @@ export function createWorld(pc,app,bridge){
   wall.quad([x-w/2,eave,front],[x+w/2,eave,front],[x,ridge-.05,front],[x,ridge-.05,front]);
   wall.quad([x+w/2,eave,z-d/2],[x-w/2,eave,z-d/2],[x,ridge-.05,z-d/2],[x,ridge-.05,z-d/2]);
   copper.box(x,ridge-.012,z,.09,.06,d+.43);
-  const face=front+.04,door=g('wood',1);dark.box(x,.25,face,.7,1.12,.065);door.box(x,.25,face+.039,.57,1.1,.046);copper.box(x+.19,.73,face+.069,.04,.05,.026);
-  for(const dx of [-.18,0,.18])timber.box(x+dx,.26,face+.067,.015,1.07,.015);
-  for(const yy of [.48,1.16])copper.box(x,yy,face+.073,.58,.025,.017);
-  const archY=1.34,inner=.32,outer=.425,archFace=face+.09;
-  for(let i=0;i<9;i++){const a=i*Math.PI/9,b=(i+1)*Math.PI/9,innerA=[x+Math.cos(a)*inner,archY+Math.sin(a)*inner,archFace],innerB=[x+Math.cos(b)*inner,archY+Math.sin(b)*inner,archFace],outerA=[x+Math.cos(a)*outer,archY+Math.sin(a)*outer,archFace],outerB=[x+Math.cos(b)*outer,archY+Math.sin(b)*outer,archFace];dark.quad([x,archY,archFace-.005],innerA,innerB,innerB);stone.quad(innerA,outerA,outerB,innerB);}
-  for(const dx of [-.38,.38])stone.box(x+dx,.27,archFace,.1,1.09,.08);
-  stone.box(x,.02,front+.005,.88,.12,.31);
-  for(const dx of [-w*.32,w*.32]){dark.box(x+dx,.91,face,.49,.54,.07);glass.box(x+dx,.97,face+.041,.31,.34,.021);timber.box(x+dx,.95,face+.066,.032,.41,.026);timber.box(x+dx,.97,face+.068,.38,.027,.026);for(const side of [-1,1])timber.box(x+dx+side*.275,.9,face+.064,.1,.48,.045);stone.box(x+dx,1.44,face+.075,.56,.065,.09);}
-  for(const side of [-1,1]){const px=x+side*(w/2+.013),pz=z-.28;dark.box(px,.95,pz,.06,.48,.48);glass.box(px+side*.037,1.01,pz,.022,.33,.3);}
-  // Forge-like lanterns and jade hanging cloth mark the usable entrance.
-  for(const side of [-1,1]){const lx=x+side*.49;timber.box(lx,1.38,face+.08,.04,.29,.05);copper.box(lx,1.34,face+.115,.16,.14,.14);warm.box(lx,1.365,face+.202,.085,.09,.02);}
-  const jade=g('jade',0);jade.box(x-w*.34,1.13,face+.085,.22,.5,.026);copper.box(x-w*.34,1.63,face+.1,.28,.045,.06);
+  const face=front+.04,door=g('wood',1),bottom=.14,archY=1.40,inner=.55,outer=.65,leaf=.525,archFace=face+.095;
+  dark.box(doorX,bottom,face,inner*2,archY-bottom,.065);
+  door.box(doorX,bottom+.005,face+.067,leaf*2,archY-bottom,.046,0,true);
+  for(let i=0;i<12;i++){
+   const a=i*Math.PI/12,b=(i+1)*Math.PI/12,point=(r,t,depth=archFace)=>[doorX+Math.cos(t)*r,archY+Math.sin(t)*r,depth];
+   dark.quad([doorX,archY,archFace-.012],point(inner,a,archFace-.012),point(inner,b,archFace-.012),point(inner,b,archFace-.012));
+   door.quad([doorX,archY,archFace-.005],point(leaf,a,archFace-.005),point(leaf,b,archFace-.005),point(leaf,b,archFace-.005));
+   stone.quad(point(inner,a),point(outer,a),point(outer,b),point(inner,b));
+  }
+  for(const dx of [-.35,-.175,0,.175,.35])timber.box(doorX+dx,bottom+.01,face+.102,.012,archY+Math.sqrt(leaf*leaf-dx*dx)-bottom-.035,.009);
+  for(const yy of [.49,1.19])copper.box(doorX,yy,face+.11,1.03,.025,.017);
+  copper.box(doorX+.34,.91,face+.125,.045,.06,.035);
+  for(const dx of [-.60,.60])stone.box(doorX+dx,bottom,archFace,.10,archY-bottom,.08);
+  stone.box(doorX,.02,front+.005,1.33,.12,.31);
+  // Windows fit the actual remaining bays, including the offset forge door.
+  for(const [a,b]of [[x-w/2+.14,doorX-.68],[doorX+.68,x+w/2-.14]]){
+   const wx=(a+b)/2,ww=Math.min(.54,b-a-.12);if(ww<.25)continue;
+   dark.box(wx,.96,face,ww,.64,.07);glass.box(wx,1.01,face+.041,ww-.10,.52,.021);
+   timber.box(wx,.98,face+.066,.025,.60,.026);timber.box(wx,1.26,face+.068,ww,.025,.026);
+   for(const side of [-1,1])timber.box(wx+side*(ww/2+.025),.96,face+.064,.045,.64,.045);
+   stone.box(wx,1.61,face+.075,ww+.10,.065,.09);
+  }
+  for(const side of [-1,1]){const px=x+side*(w/2+.013),pz=z-.28;dark.box(px,1.1,pz,.06,.56,.48);glass.box(px+side*.037,1.16,pz,.022,.42,.3);}
+  for(const side of [-1,1]){const lx=doorX+side*.77;timber.box(lx,1.79,face+.08,.04,.28,.05);copper.box(lx,1.76,face+.115,.16,.16,.14);warm.box(lx,1.79,face+.202,.085,.10,.02);}
   const chimneyX=x-w*.27,chimneyZ=z-d*.21;stone.box(chimneyX,1.42,chimneyZ,.4,1.42,.39);copper.box(chimneyX,2.82,chimneyZ,.51,.11,.5);
-  // Small purchased details hug the facade; the doorway and its approach stay clear.
-  scenery.place('barrel',node,x+w*.37,.02,front+.20,.17,hash(h.x,h.y,7)*360);
-  scenery.place('crates',node,x-w*.38,.02,front+.17,.13,hash(h.x,h.y,8)*360);
-  scenery.place('banner',node,x-w*.35,1.37,front+.11,.19,0);
+  scenery.place('banner',node,x,2.025,front+.11,.12,0);
+  // Ground props here were miniature; enlarging them would occupy walkable
+  // approach tiles without server collision. Keep the frontage clear instead.
  }
  function interiorTile(groups,x,z){
   if(x<46||x>54||z<46||z>52)return;
@@ -205,10 +225,10 @@ export function createWorld(pc,app,bridge){
    scenery.place('counter',node,53.5,0,48.5,.55,90);
    scenery.place('barrelStack',node,53.35,0,50.4,.32,0);
    scenery.place('torch',node,47.05,1.08,47.55,.28,90);
-   scenery.place('bed',node,47.7,0,50.45,.45,90);
-   scenery.place('bed',node,48.25,0,51.5,.45,90);
-   scenery.place('roundTable',node,52.65,0,50.45,.52,0);
-   scenery.place('roundStool',node,52.2,0,50.95,.35,0);
+   scenery.place('bed',node,47.75,0,50.5,.50,90);
+   scenery.place('bed',node,48.25,0,51.5,.50,90);
+   scenery.place('roundTable',node,52.77,0,50.45,.52,0);
+   scenery.place('roundStool',node,52.24,0,50.74,.60,0);
    scenery.place('food',node,48.25,.61,48.4,.15,0,false);
    scenery.place('bottle',node,53.5,.56,48.3,.2,0,false);
    scenery.place('candle',node,53.5,.56,48.7,.18,0,false);
