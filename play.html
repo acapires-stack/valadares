@@ -4,10 +4,10 @@
 <!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
 <script src="/equipment-rules.js?v=1"></script>
-<script src="/appearance-rules.js?v=1"></script>
-<link rel="stylesheet" href="/appearance-ui.css?v=1">
+<script src="/appearance-rules.js?v=2"></script>
+<link rel="stylesheet" href="/appearance-ui.css?v=2">
 <script src="/game-audio.js?v=4"></script>
-<script src="/progression-content.js?v=2"></script>
+<script src="/progression-content.js?v=3"></script>
 <script src="/modern-world.js?v=2"></script>
 <script src="/movement-sync.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
@@ -4490,7 +4490,7 @@ const RECIPES = [
     { out:'LANCA',          in:{ OSSO:3, SILK:1 },                           name:'Lança' },
     { out:'LANCA_LONGA',    in:{ OSSO:4, CHIFRE:1, SILK:2 },                 name:'Lança longa' },
     // clavas variadas
-    { out:'PORRETE',        in:{ OSSO:2 },                                   name:'Porrete' },
+    { out:'PORRETE',        in:{ OSSO:2 },                                   name:'Martelo Rústico' },
     { out:'MACA',           in:{ CLAVA:1, OSSO:3, CHIFRE:1 },                name:'Maça' },
     { out:'MARRETA',        in:{ MARTELO:1, OSSO:6, CHIFRE:2 },              name:'Marreta 2H' },
     { out:'MACA_GIGANTE',   in:{ MACA:1, OSSO:8, CHIFRE:3 },                         name:'Maça gigante 2H' },
@@ -4499,9 +4499,9 @@ const RECIPES = [
     { out:'ESPADA_DRACO',   in:{ ESPADA_LONGA:1, ESCAMA:6 },                          name:'Espada Dracônica 2H' },
     { out:'ELMO_DRACO',     in:{ ELMO_CHIFRES:1, ESCAMA:3 },                          name:'Elmo Dracônico' },
     { out:'ARMADURA_ESCAMA',in:{ ARMADURA_OSSO:1, ESCAMA:5 },                         name:'Armadura de escamas' },
-    // crafts do Golem (requer Pedra do Golem)
-    { out:'BORDAO',         in:{ CLAVA:1, PEDRA_GOLEM:2, OSSO:2 },                    name:'Bordão de pedra' },
-    { out:'MARTELO_GOLEM',  in:{ MARTELO:1, PEDRA_GOLEM:6 },                          name:'Martelo do Golem 2H' },
+    // crafts do Golem (requer Fragmento Abissal)
+    { out:'BORDAO',         in:{ CLAVA:1, PEDRA_GOLEM:2, OSSO:2 },                    name:'Bordão Ferrado' },
+    { out:'MARTELO_GOLEM',  in:{ MARTELO:1, PEDRA_GOLEM:6 },                          name:'Martelo Abissal 2H' },
     { out:'ESCUDO_PEDRA',   in:{ ESCUDO_FERRO:1, PEDRA_GOLEM:5 },                     name:'Escudo de pedra' },
     // ★ Crafts lendários (requer Coração do Highlander — drop raro de bosses/HL morto)
     { out:'ESPADA_HL',      in:{ ESPADA_DRACO:1, CORACAO_HL:3, ESCAMA:5, PEDRA_GOLEM:5 }, name:'Espada do Highlander ★' },
@@ -4520,7 +4520,7 @@ const CAVES = [
     { name:'Santuário da Mata',    x:82, y:18, r:8, types:['BAT','MINOTAUR','MINOTAUR','SKELETON'], target:12 },
     { name:'Cripta dos Mortos',    x:18, y:18, r:6, types:['SKELETON','SKELETON','BAT'], target:10 },
     { name:'Covil do Drake',       x:82, y:80, r:8, types:['DRAKE','DRAKE','DRAKE','BAT'], target:14 },
-    { name:'Abismo do Golem',      x:70, y:90, r:7, types:['GOLEM','GOLEM','SKELETON'], target:10 },
+    { name:'Abismo da Mina',      x:70, y:90, r:7, types:['GOLEM','GOLEM','SKELETON'], target:10 },
 ];
 function inCave(x, y){
     for (const c of CAVES) if (Math.max(Math.abs(x-c.x), Math.abs(y-c.y)) <= c.r) return c;
@@ -5059,7 +5059,7 @@ function drawWeaponSprite(px, py, weapon, opts){
             return;
         }
         if (weapon === 'MARTELO_GOLEM'){
-            // Martelo do Golem — cabeça pétrea com gema laranja
+            // Martelo Abissal — cabeça pétrea com gema laranja
             ctx.fillStyle = '#5a4828'; ctx.fillRect(wx, py+8, 3, 32);  // cabo madeira
             // cabeça quadrada grande
             ctx.fillStyle = def.color || '#7a6850';
@@ -5642,12 +5642,12 @@ const MTYPE = {
     DRAKE:      { name:'Drake',        hp:130, dmg:15, speed:340, xp:150, color:'#8a2818', size:1.1,  dodge:0.08, crit:0.16, intel:2 },
     DRAKE_LIDER:{ name:'Drake Ancião', hp:700, dmg:25, speed:360, xp:800, color:'#cc2010', size:1.6,  dodge:0.12, crit:0.28, unique:true, intel:3 },
     // caverna Golem
-    GOLEM:      { name:'Golem',        hp:200, dmg:13, speed:460, xp:180, color:'#707888', size:1.2,  dodge:0.02, crit:0.08, intel:2 },
-    GOLEM_REI:  { name:'Golem Rei',    hp:900, dmg:20, speed:490, xp:700, color:'#4a5868', size:1.55, dodge:0.03, crit:0.15, unique:true, intel:3 },
+    GOLEM:      { name:'Demônio da Mina',        hp:200, dmg:13, speed:460, xp:180, color:'#707888', size:1.2,  dodge:0.02, crit:0.08, intel:2 },
+    GOLEM_REI:  { name:'Tirano da Mina',    hp:900, dmg:20, speed:490, xp:700, color:'#4a5868', size:1.55, dodge:0.03, crit:0.15, unique:true, intel:3 },
     // caçadores do Highlander Hunt
     CACADOR:    { name:'Caçador de Recompensa', hp:350, dmg:18, speed:320, xp:0, color:'#ff8c20', size:1.2, dodge:0.12, crit:0.22, intel:3 },
     // ─── M4 Masmorra "As Profundezas" — mobs exclusivos do andar ───
-    SOMBRA:     { name:'Sombra Errante', hp:230, dmg:22, speed:300, xp:220, color:'#2a1838', size:1.0,  dodge:0.22, crit:0.18, intel:2 },
+    SOMBRA:     { name:'Assassino Ossudo', hp:230, dmg:22, speed:300, xp:220, color:'#2a1838', size:1.0,  dodge:0.22, crit:0.18, intel:2 },
     CARRASCO:   { name:'Carrasco Abissal', hp:480, dmg:38, speed:500, xp:420, color:'#5a1020', size:1.35, dodge:0.04, crit:0.20, intel:2 },
     SENHOR_PROFUNDEZAS: { name:'O Senhor das Profundezas ★', hp:5000, dmg:110, speed:340, xp:3000, color:'#6a18a8', size:1.8, dodge:0.06, crit:0.30, unique:true, intel:3 },
     // ★★ MEGA RAID BOSS — Senhor de Valadares (spawna quando 3 bosses Lv10)
@@ -5665,8 +5665,8 @@ const MTYPE_EN = {
     RAT:'Rat', SNAKE:'Snake', SPIDER:'Spider', WOLF:'Wolf', ORC:'Orc', ORC_LIDER:'Orc Leader',
     BAT:'Bat', MINOTAUR:'Woodland Guardian', SKELETON:'Skeleton', TROLL:'Troll', LIZARD:'Lizard', SCORPION:'Scorpion',
     FORGE_SENTRY:'Forge Sentry', FORGE_CONSTRUCT:'Forgotten Construct', FORGE_WARDEN:'Forge Warden',
-    DRAKE:'Drake', DRAKE_LIDER:'Elder Drake', GOLEM:'Golem', GOLEM_REI:'Golem King',
-    CACADOR:'Bounty Hunter', SOMBRA:'Wandering Shadow', CARRASCO:'Abyssal Executioner',
+    DRAKE:'Drake', DRAKE_LIDER:'Elder Drake', GOLEM:'Mine Demon', GOLEM_REI:'Mine Tyrant',
+    CACADOR:'Bounty Hunter', SOMBRA:'Skeletal Assassin', CARRASCO:'Abyssal Executioner',
     SENHOR_PROFUNDEZAS:'The Lord of the Depths ★', SENHOR_VALADARES:'The Lord of Valadares ★★', ARAUTO:'The Herald',
 };
 function mobName(type){ return (LANG === 'en' && MTYPE_EN[type]) || (MTYPE[type] && MTYPE[type].name) || type; }
@@ -5705,8 +5705,8 @@ const ITEMS = new Proxy({
     // armas — hand: '1h' permite escudo, '2h' bloqueia. base=ataque, def=bloqueio da arma.
     ADAGA:        { name:'Adaga',         color:'#b0b0c0', kind:'weapon', hand:'1h', skill:'Espada',  base:3, def:1 },
     ESPADA:       { name:'Espada',        color:'#ccccdd', kind:'weapon', hand:'1h', skill:'Espada',  base:4, def:2 },
-    PORRETE:      { name:'Porrete',       color:'#6a4a20', kind:'weapon', hand:'1h', skill:'Clava',   base:3, def:1 },
-    CLAVA:        { name:'Clava',         color:'#8a6030', kind:'weapon', hand:'1h', skill:'Clava',   base:4, def:1 },
+    PORRETE:      { name:'Martelo Rústico',       color:'#6a4a20', kind:'weapon', hand:'1h', skill:'Clava',   base:3, def:1 },
+    CLAVA:        { name:'Maça de Ferro',         color:'#8a6030', kind:'weapon', hand:'1h', skill:'Clava',   base:4, def:1 },
     MACA:         { name:'Maça',          color:'#a0a0b0', kind:'weapon', hand:'1h', skill:'Clava',   base:5, def:2 },
     MACHADO:      { name:'Machado 2H',    color:'#a08060', kind:'weapon', hand:'2h', skill:'Machado', base:8, def:3 },
     ESPADA_LONGA: { name:'Espada Longa',  color:'#ddddee', kind:'weapon', hand:'2h', skill:'Espada',  base:7, def:4 },
@@ -5747,18 +5747,18 @@ const ITEMS = new Proxy({
     GARRA:         { name:'Garra de Lagarto', color:'#70a030', kind:'mat' },
     CARNE_LAGARTO: { name:'Carne de lagarto', color:'#708040', heal:35, kind:'food' },
     // materiais do Golem
-    PEDRA_GOLEM:   { name:'Pedra do Golem',   color:'#8090a0', kind:'mat' },
+    PEDRA_GOLEM:   { name:'Fragmento Abissal',   color:'#8090a0', kind:'mat' },
     // armas novas — 1H
     SABRE:         { name:'Sabre',            color:'#c0d0a0', kind:'weapon', hand:'1h', skill:'Espada',  base:6, def:2 },
-    ADAGA_DUPLA:   { name:'Adaga dupla',      color:'#d0c8b0', kind:'weapon', hand:'1h', skill:'Espada',  base:5, def:1 },
-    BORDAO:        { name:'Bordão de pedra',  color:'#9090a8', kind:'weapon', hand:'1h', skill:'Clava',   base:6, def:2 },
+    ADAGA_DUPLA:   { name:'Adaga de Aço',      color:'#d0c8b0', kind:'weapon', hand:'1h', skill:'Espada',  base:5, def:1 },
+    BORDAO:        { name:'Bordão Ferrado',  color:'#9090a8', kind:'weapon', hand:'1h', skill:'Clava',   base:6, def:2 },
     // 1H de tier médio/alto pra build de escudo (sempre < a 2H de tier equivalente)
     ESPADA_ACO:      { name:'Espada de Aço',        color:'#b8c4d8', kind:'weapon', hand:'1h', skill:'Espada', base:9,  def:3 },
     LAMINA_DRACO_1H: { name:'Lâmina Dracônica',     color:'#e87850', kind:'weapon', hand:'1h', skill:'Espada', base:12, def:4 },
     ESPADA_GUARDIAO: { name:'Espada do Guardião ★', color:'#e8d878', kind:'weapon', hand:'1h', skill:'Espada', base:16, def:6 },
     // armas novas — 2H endgame
     ESPADA_DRACO:  { name:'Espada Dracônica', color:'#ff6040', kind:'weapon', hand:'2h', skill:'Espada',  base:14, def:5 },
-    MARTELO_GOLEM: { name:'Martelo do Golem', color:'#6888a8', kind:'weapon', hand:'2h', skill:'Clava',   base:13, def:6 },
+    MARTELO_GOLEM: { name:'Martelo Abissal', color:'#6888a8', kind:'weapon', hand:'2h', skill:'Clava',   base:13, def:6 },
     // ★ Lendárias (custo: Coração do Highlander)
     ESPADA_HL:     { name:'Espada do Highlander ★', color:'#ffd040', kind:'weapon', hand:'2h', skill:'Espada', base:20, def:8 },
     ARMADURA_TRONO:{ name:'Armadura do Trono ★',    color:'#ffcc40', kind:'armor',   def:14 },
@@ -5816,7 +5816,7 @@ const ITEM_EN = {
     COROA_SOMBRIA:{name:'Dark Crown', desc:'Sinister purple aura. Mark of those who pact with the Ambassador.'},
     MANTO_JUSTO:{name:'Mantle of the Just', desc:'White cape with a golden glow. Mark of those who exposed the betrayal.'},
     GOLD:{name:'Gold'}, SILK:{name:'Silk'},
-    ADAGA:{name:'Dagger'}, ESPADA:{name:'Sword'}, PORRETE:{name:'Cudgel'}, CLAVA:{name:'Club'}, MACA:{name:'Mace'},
+    ADAGA:{name:'Dagger'}, ESPADA:{name:'Sword'}, PORRETE:{name:'Rustic Hammer'}, CLAVA:{name:'Iron Mace'}, MACA:{name:'Mace'},
     MACHADO:{name:'Axe 2H'}, ESPADA_LONGA:{name:'Longsword'}, MARTELO:{name:'Hammer 2H'}, MARRETA:{name:'Sledgehammer 2H'}, MACA_GIGANTE:{name:'Giant Mace'},
     ARCO:{name:'Bow'}, ARCO_CACA:{name:'Hunting Bow'}, BESTA:{name:'Crossbow'},
     LANCA:{name:'Spear'}, LANCA_LONGA:{name:'Long Spear'},
@@ -5826,10 +5826,10 @@ const ITEM_EN = {
     ESPADA_OSSO:{name:'Bone Sword'}, MACHADO_MINO:{name:'Woodland Axe'},
     ARMADURA_OSSO:{name:'Bone Armor'}, ELMO_CHIFRES:{name:'Horned Helmet'}, ESCUDO_OSSO:{name:'Bone Shield'},
     BOTAS_COURO:{name:'Leather Boots'}, BOTAS_VENTO:{name:'Wind Boots'}, BOTAS_RAPIDA:{name:'Swift Boots'},
-    ESCAMA:{name:'Drake Scale'}, GARRA:{name:'Lizard Claw'}, CARNE_LAGARTO:{name:'Lizard Meat'}, PEDRA_GOLEM:{name:'Golem Stone'},
-    SABRE:{name:'Saber'}, ADAGA_DUPLA:{name:'Twin Daggers'}, BORDAO:{name:'Stone Staff'},
+    ESCAMA:{name:'Drake Scale'}, GARRA:{name:'Lizard Claw'}, CARNE_LAGARTO:{name:'Lizard Meat'}, PEDRA_GOLEM:{name:'Abyssal Fragment'},
+    SABRE:{name:'Saber'}, ADAGA_DUPLA:{name:'Steel Dagger'}, BORDAO:{name:'Iron-bound Staff'},
     ESPADA_ACO:{name:'Steel Sword'}, LAMINA_DRACO_1H:{name:'Draconic Blade'}, ESPADA_GUARDIAO:{name:"Guardian's Sword ★"},
-    ESPADA_DRACO:{name:'Draconic Sword'}, MARTELO_GOLEM:{name:'Golem Hammer'},
+    ESPADA_DRACO:{name:'Draconic Sword'}, MARTELO_GOLEM:{name:'Abyssal Hammer'},
     ESPADA_HL:{name:"Highlander's Sword ★"}, ARMADURA_TRONO:{name:'Throne Armor ★'}, COROA_VENDEDOR:{name:"Soul Seller's Crown ★"},
     ESPADA_ETERNA:{name:'Eternal Sword ★★'}, COROA_VALADARES:{name:'Crown of Valadares ★★'}, ESSENCIA:{name:'Essence of Valadares'},
     ESPADA_INFINITA:{name:'Sword of Infinity ★★★'}, COROA_CELESTIAL:{name:'Celestial Crown ★★★'}, CAJADO_ASTRAL:{name:'Astral Staff ★★★'},
@@ -6245,6 +6245,7 @@ const spawn = { x: Math.floor(M_W/2), y: Math.floor(M_H/2) };
 const player = {
     name: 'Aventureiro',
     appearance: AppearanceRules.normalizarAppearance(null),
+    appearanceOwned: [],
     x: spawn.x, y: spawn.y,
     renderX: spawn.x, renderY: spawn.y,    // posição interpolada p/ render
     prevX: spawn.x, prevY: spawn.y,        // posição anterior
@@ -7992,6 +7993,7 @@ function handleMP(msg){
         return;
     }
     if (msg.t === 'state'){
+        if ('appearanceOwned' in msg) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(msg.appearanceOwned);
         window.ValadaresJourneyUI?.onServerState(msg);
         if (player._expedition) window.ValadaresJourneyUI?.onDungeonExit();
         player._expedition = null;
@@ -8057,6 +8059,7 @@ function handleMP(msg){
                 }
                 if ('guild' in p) player.guild = p.guild;
                 player.appearance = AppearanceRules.normalizarAppearance(p.appearance);
+                if ('appearanceOwned' in p) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(p.appearanceOwned);
                 if ('dyes' in p) player.dyes = (p.dyes && typeof p.dyes === 'object') ? p.dyes : {};
             }
         });
@@ -8077,6 +8080,7 @@ function handleMP(msg){
         }
     } else if (msg.t === 'appearanceResult'){
         if (AppearanceRules.isValidAppearance(msg.appearance)) player.appearance = AppearanceRules.normalizarAppearance(msg.appearance);
+        if ('appearanceOwned' in msg) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(msg.appearanceOwned);
         window.ValadaresAppearanceUI?.onResult(msg);
     } else if (msg.t === 'groundSpawn'){
         // Novos drops aparecem (mob morto por outro player, etc)
@@ -8147,6 +8151,7 @@ function handleMP(msg){
         if (msg.id === myWsId){
             if (msg.regen) player.regen = msg.regen;
             if ('appearance' in msg) player.appearance = AppearanceRules.normalizarAppearance(msg.appearance);
+            if ('appearanceOwned' in msg) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(msg.appearanceOwned);
             const wasAlive = (player.hp ?? 100) > 0;
             if (typeof msg.hp === 'number') player.hp = msg.hp;
             if (typeof msg.maxHp === 'number') player.maxHp = msg.maxHp;
@@ -8200,6 +8205,7 @@ function handleMP(msg){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
+        if ('appearanceOwned' in msg) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(msg.appearanceOwned);
         // M6 Pet: estado autoritativo do server (posse/nível) + equipado persistido.
         if (msg.pets && typeof msg.pets === 'object') player.pets = msg.pets;
         if ('pet' in msg) player.pet = msg.pet || null;
@@ -10115,11 +10121,11 @@ const QUEST_CHAINS = {
     forja: {
         npc:'ferreiro', name:'A Forja Esquecida',
         stages: [
-            { id:'fj1', name:'Materiais raros', desc:'Traga 5 Pedras do Golem e 5 Chifres.',
+            { id:'fj1', name:'Materiais raros', desc:'Traga 5 Fragmentos Abissais e 5 Chifres.',
               kind:'multiItem', items:{ PEDRA_GOLEM:5, CHIFRE:5 }, reward:{ gold:300 } },
             { id:'fj2', name:'O Fole', desc:'Traga 10 Sedas (pra alimentar o fole).',
               kind:'item', type:'SILK', count:10, reward:{ gold:250 } },
-            { id:'fj3', name:'A Forja Final', desc:'Mate 5 Golems (testando o metal contra eles).',
+            { id:'fj3', name:'A Forja Final', desc:'Derrote 5 Demônios da Mina e teste a resistência do metal.',
               kind:'mob', type:'GOLEM', count:5, reward:{ gold:600, item:{MACHADO_MINO:1}, xp:{Machado:200} } },
         ],
     },
@@ -10142,7 +10148,7 @@ const QUEST_CHAINS = {
               kind:'multiItem', items:{ HAM:3, POTION:3 }, reward:{ gold:200, xp:{Punho:50} } },
             { id:'mn2', name:'Limpeza', desc:'Mate 10 Morcegos perto do Abismo.',
               kind:'mob', type:'BAT', count:10, reward:{ gold:300, xp:{Distância:100} } },
-            { id:'mn3', name:'O Golem Rei', desc:'Mate o Golem Rei pra abrir caminho.',
+            { id:'mn3', name:'O Tirano da Mina', desc:'Mate o Tirano da Mina pra abrir caminho.',
               kind:'mob', type:'GOLEM_REI', count:1,
               reward:{ gold:1500, item:{PEDRA_GOLEM:10}, xp:{Clava:250} } },
         ],
@@ -10185,7 +10191,7 @@ const QUEST_CHAINS = {
               desc:'Madame Crepúsculo pede provas de coragem básica: mate 25 Cobras pra abrir o ritual.',
               kind:'mob', type:'SNAKE', count:25, reward:{ gold:150, xp:{Espada:80} } },
             { id:'cp2', name:'Cristais do Inverno',
-              desc:'Traga 5 Escamas de Drake e 3 Pedras do Golem — o ritual exige sangue antigo.',
+              desc:'Traga 5 Escamas de Drake e 3 Fragmentos Abissais — o ritual exige sangue antigo.',
               kind:'multiItem', items:{ ESCAMA:5, PEDRA_GOLEM:3 },
               reward:{ gold:400, xp:{Magia:120} } },
             { id:'cp3', name:'O Olho do Predador',
@@ -10247,9 +10253,9 @@ const CHAIN_EN = {
     forja: {
         name:'The Forgotten Forge',
         stages: {
-            fj1: { name:'Rare Materials', desc:'Bring 5 Golem Stones and 5 Horns.' },
+            fj1: { name:'Rare Materials', desc:'Bring 5 Abyssal Fragments and 5 Horns.' },
             fj2: { name:'The Bellows',    desc:'Bring 10 Silks (to feed the bellows).' },
-            fj3: { name:'The Final Forge',desc:'Kill 5 Golems (testing the metal against them).' },
+            fj3: { name:'The Final Forge',desc:'Defeat 5 Mine Demons and test the strength of the metal.' },
         },
     },
     drake: {
@@ -10265,7 +10271,7 @@ const CHAIN_EN = {
         stages: {
             mn1: { name:'Supplies',       desc:'Bring 3 Hams and 3 Health Potions.' },
             mn2: { name:'Cleanup',        desc:'Kill 10 Bats near the Abyss.' },
-            mn3: { name:'The Golem King', desc:'Kill the Golem King to clear the way.' },
+            mn3: { name:'The Mine Tyrant', desc:'Kill the Mine Tyrant to clear the way.' },
         },
     },
     vohrim: {
@@ -10283,7 +10289,7 @@ const CHAIN_EN = {
         name:'The Mirror of Fate',
         stages: {
             cp1: { name:'The Reflections of Dawn', desc:'Madame Twilight asks for basic proof of courage: kill 25 Snakes to open the ritual.' },
-            cp2: { name:'Crystals of Winter',      desc:'Bring 5 Drake Scales and 3 Golem Stones — the ritual demands ancient blood.' },
+            cp2: { name:'Crystals of Winter',      desc:'Bring 5 Drake Scales and 3 Abyssal Fragments — the ritual demands ancient blood.' },
             cp3: { name:"The Predator's Eye",      desc:'Prove your sight: kill 3 Drakes (not the Elder).' },
             cp4: { name:'The Final Vision',        desc:'The mirror awakens. Madame Twilight offers two truths — only one can be accepted.',
                    choices:["Accept the Vision — Seer's Aura + 5% permanent dodge", "Refuse the Vision — Skeptic's Cape + 3000g"] },
@@ -11755,7 +11761,7 @@ function renderBossesWidget(){
     const list = [
         { type:'ORC_LIDER',   name:'Orc Líder',     deathT: (typeof bossDeathTime!=='undefined'?bossDeathTime:null),         respawn: BOSS_RESPAWN_MS },
         { type:'DRAKE_LIDER', name:'Drake Ancião',  deathT: (typeof drakeBossDeathTime!=='undefined'?drakeBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
-        { type:'GOLEM_REI',   name:'Golem Rei',     deathT: (typeof golemBossDeathTime!=='undefined'?golemBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
+        { type:'GOLEM_REI',   name:'Tirano da Mina',     deathT: (typeof golemBossDeathTime!=='undefined'?golemBossDeathTime:null), respawn: DUNGEON_BOSS_RESPAWN_MS },
     ];
     const html = list.map(b => {
         const aliveMob = monsters.find(m => m.type === b.type);
@@ -14803,6 +14809,9 @@ function nearbyWorldDoor(){
         return pos && Math.max(Math.abs(pos.x-player.x),Math.abs(pos.y-player.y)) <= 1 ? {room:inside,pos,exit:true} : null;
     }
     if (player.floor) return null;
+    const expedition = window.ValadaresProgression?.robotExpedition;
+    if (expedition && Math.max(Math.abs(expedition.npc.x-player.x),Math.abs(expedition.npc.y-player.y)) <= 2)
+        return {expedition,pos:expedition.npc,exit:false};
     const room = (window.ValadaresWorld.interiors || []).find(room => Math.max(Math.abs(room.door.x-player.x),Math.abs(room.door.y-player.y)) <= 1);
     return room ? {room,pos:room.door,exit:false} : null;
 }
@@ -14810,6 +14819,12 @@ let _lastDoorAction = -2000, _lastDoorPaint = 0;
 function interactWorldDoor(){
     const door = nearbyWorldDoor(), now = performance.now();
     if (!door || !ws || ws.readyState !== 1 || !_wsAuthed || now-_lastDoorAction < 800) return;
+    if (door.expedition){
+        _lastDoorAction = now;
+        clearAllKeys();
+        ws.send(JSON.stringify({t:'expeditionEnter',expedition:door.expedition.id}));
+        return;
+    }
     if (!door.exit && Date.now() < player.pzLockUntil){
         const seconds = Math.ceil((player.pzLockUntil-Date.now())/1000);
         showServerToast('warn', LANG === 'en' ? `Safe area entry available in ${seconds}s after PvP.` : `Entrada na zona segura disponível em ${seconds}s após o PvP.`, null, 3500);
@@ -14826,7 +14841,7 @@ function updateWorldDoor(){
     if (!button) return;
     button.hidden = (!door && !service) || document.getElementById('login')?.style.display !== 'none';
     if (!door && !service) return;
-    const label = service ? (LANG === 'en' ? {craft:'Use workbench',altar:'Use altar',dummy:'Train'} : {craft:'Usar bancada',altar:'Usar altar',dummy:'Treinar'})[service.kind] : door.exit ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${interiorLabel(door.room)}`;
+    const label = service ? (LANG === 'en' ? {craft:'Use workbench',altar:'Use altar',dummy:'Train'} : {craft:'Usar bancada',altar:'Usar altar',dummy:'Treinar'})[service.kind] : door.expedition ? `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${LANG === 'en' ? door.expedition.nameEn : door.expedition.name}` : door.exit ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${interiorLabel(door.room)}`;
     button.textContent = label + (document.body.classList.contains('touch') ? '' : ' [G]');
     const parent = canvas.parentElement, bounds = canvas.getBoundingClientRect(), container = parent.getBoundingClientRect();
     const actions = document.querySelector('.modern-actions'), actionBounds = actions?.getBoundingClientRect();
@@ -16546,6 +16561,7 @@ function logout(){
         target: null, autoAttack: false,
         weapon: null,
         appearance: AppearanceRules.normalizarAppearance(null),
+        appearanceOwned: [],
         equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null },
         pet: null, pets: {},   // M6: pet equipado (flat) + mapa {key:{lvl,xp}} autoritativo do server
         inv: {}, chests: { b1:{}, b2:{}, b3:{}, b4:{} }, gold: 0,
@@ -16876,6 +16892,7 @@ function saveState(){
     const data = {
         v: 2,
         appearance: AppearanceRules.normalizarAppearance(player.appearance),
+        appearanceOwned: AppearanceRules.normalizarAppearanceOwned(player.appearanceOwned),
         skills: player.skills,
         equipped: player.equipped,
         weapon: player.weapon,
@@ -16953,6 +16970,7 @@ function applySaveData(d){
     try {
         if (!d || typeof d !== 'object') return false;
         player.appearance = AppearanceRules.normalizarAppearance(d.appearance);
+        player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(d.appearanceOwned);
         if (d.skills)   Object.assign(player.skills, d.skills);
         if (d.equipped) Object.assign(player.equipped, d.equipped);
         if (d.weapon !== undefined) player.weapon = d.weapon;
@@ -17271,6 +17289,7 @@ window.ValadaresModernBridge = {
     getProjectiles: () => projectiles,
     getBuildings: () => window.ValadaresWorld.buildings,
     getInteriors: () => window.ValadaresWorld.interiors || [],
+    getExpeditionEntrances: () => window.ValadaresProgression?.robotExpedition ? [window.ValadaresProgression.robotExpedition] : [],
     getInterior: currentInterior,
     getAuras: () => auraEffects,
     getTrails: () => trails,
@@ -17697,6 +17716,8 @@ function loop(ts){
         };
         if (onFloor === 0){
             drawStair(DUNGEON_STAIR_IN, true, tr('stair.enter'));
+            const forge = window.ValadaresProgression?.robotExpedition;
+            if (forge) drawStair(forge.npc, true, LANG === 'en' ? forge.nameEn : forge.name);
         } else {
             // Sem fundo: a escada de descida existe se o server mandou (stairs.down) —
             // o teto saiu do cliente. Rótulos via tr() (eram o último PT hardcoded da masmorra).
@@ -18041,7 +18062,7 @@ function loop(ts){
 <script src="/enchanting-ui.js?v=1"></script>
 <script src="/transmutation-rules.js?v=5"></script>
 <script src="/transmutation-ui.js?v=5"></script>
-<script src="/appearance-ui.js?v=1"></script>
+<script src="/appearance-ui.js?v=2"></script>
 <script type="module">
 if (window.VALADARES_MODERN) {
     await import('/modern/entry.js?v=20261006');

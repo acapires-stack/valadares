@@ -1,6 +1,6 @@
 # Forja Esquecida — rota adicional
 
-A expedição **Ruínas da Forja** permanece disponível com `id: ruinas_forja`, seus orcs, golems, chefe e apresentação originais. A **Forja Esquecida** acrescenta uma segunda rota na Jornada, pela mesma entrada do Velho Ferreiro em (78, 22). A oficina abandonada mistura metal antigo, ruína e vegetação. O nível 18 é sugestão, sem barreira de entrada.
+A expedição **Ruínas da Forja** permanece disponível com `id: ruinas_forja`, pela entrada do Velho Ferreiro em (78, 22). A **Forja Esquecida** tem um portal próprio em **(75, 33)**, identificado no cenário, minimapa e Jornada. Aproxime-se do portal e use **Entrar · Forja Esquecida [G]**; a saída voluntária retorna ao mesmo portal. A entrada das Profundezas permanece em (83, 17), e morte continua retornando à zona segura. A oficina abandonada mistura metal antigo, ruína e vegetação. O nível 18 é sugestão, sem barreira de entrada.
 
 | Rota | Pedido `expeditionEnter.expedition` | Layout | Encontros |
 | --- | --- | --- | --- |

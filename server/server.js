@@ -717,7 +717,7 @@ const CAVES = [
     { name:'Santuário da Mata',    x:82, y:18, r:8, types:['BAT','MINOTAUR','MINOTAUR','SKELETON'], target:12 },
     { name:'Cripta dos Mortos',    x:18, y:18, r:6, types:['SKELETON','SKELETON','BAT'], target:10 },
     { name:'Covil do Drake',       x:82, y:80, r:8, types:['DRAKE','DRAKE','DRAKE','BAT'], target:14 },
-    { name:'Abismo do Golem',      x:70, y:90, r:7, types:['GOLEM','GOLEM','SKELETON'], target:10 },
+    { name:'Abismo da Mina',      x:70, y:90, r:7, types:['GOLEM','GOLEM','SKELETON'], target:10 },
 ];
 
 const BIOME_SPAWNS = [
@@ -1073,6 +1073,7 @@ function updateEnchantSave(p){
         expeditionClears:p.expeditionClears,expeditionPending:p.expeditionPending,
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
         permaBuffs:p.permaBuffs,appearance:appearanceRules.normalizarAppearance(p.appearance),
+        appearanceOwned:appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
         appearanceOps:p.appearanceOps || [],
         hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
@@ -1268,6 +1269,7 @@ function hasInv(p, key, qty){
 function sendInvUpdate(p, extra){
     if (!p || p.ws.readyState !== 1) return;
     const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null,
+        appearanceOwned:appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
         enchantToken:p.enchantToken || null,
         transmutationVersion:transmutationRules.VERSION, transmutationToken:p.transmutationToken || null,
         transmutationPity:p.transmutationPity || 0,
@@ -2784,7 +2786,9 @@ function enterDungeonFloor(p, id, floor, dir){
 // (players/mobs/loot). Usado ao sair pela escada (andar 1) E ao MORRER na masmorra
 // — sem isto a morte só teleportava x/y pra (50,50) mantendo p.floor no andar, então
 // o player renascia DENTRO da masmorra colado no boss e o AI do andar seguia batendo. (#5)
-function returnPlayerToTown(p, id){
+function returnPlayerToTown(p, id, returnToExpeditionEntrance=false){
+    const returnPoint=returnToExpeditionEntrance && p.expedition?.id===progression.robotExpedition.id
+        ? progression.robotExpedition.npc : DUNGEON_RETURN;
     if ((p.floor || 0) > 0) broadcast(id, { t:'leave', id }, p.floor);   // some do andar
     if (p.expedition){
         const floor=p.expedition.floor;
@@ -2794,7 +2798,7 @@ function returnPlayerToTown(p, id){
     }
     p.pvp = !!p._pvpBeforeDungeon;
     p.floor = 0;
-    p.x = DUNGEON_RETURN.x; p.y = DUNGEON_RETURN.y;
+    p.x = returnPoint.x; p.y = returnPoint.y;
     if (p.ws && p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
             t:'dungeonExit', movement:movementSnapshot(p,true), x: p.x, y: p.y, pvp: p.pvp,
@@ -2872,7 +2876,7 @@ function tickRespawns(){
             if (now - deathAt >= b.respawn){
                 const mob = spawnMob(b.type, b.x, b.y);
                 bossDeath.delete(b.type);
-                const baseName = b.type === 'ORC_LIDER' ? 'O Orc Líder' : b.type === 'DRAKE_LIDER' ? 'O Drake Ancião' : 'O Golem Rei';
+                const baseName = b.type === 'ORC_LIDER' ? 'O Orc Líder' : b.type === 'DRAKE_LIDER' ? 'O Drake Ancião' : 'O Tirano da Mina';
                 const lvlTag = mob && mob.level > 1 ? ` ★ Lv${mob.level}` : '';
                 broadcastMsg('event', `⚔ ${baseName}${lvlTag} reapareceu!`);
             }
@@ -4383,10 +4387,23 @@ function setPlayerSave(name, data){
     data.appearance = appearanceRules.normalizarAppearance(a.save?.appearance);
     // Recibos são autoritativos como a aparência; uploads não os podem apagar.
     data.appearanceOps = appearanceService.normalizeReceipts(a.save?.appearanceOps,appearanceRules);
+    data.appearanceOwned = appearanceService.ownedForAccount(a,appearanceRules);
     a.save = data;
     a.savedAt = Date.now();
     queueSaveAccounts();
     return true;
+}
+function ensureAppearanceOwnership(account){
+    if (!account?.save) return;
+    const owned=appearanceService.ownedForAccount(account,appearanceRules);
+    if (JSON.stringify(account.appearanceOwned)===JSON.stringify(owned) &&
+        JSON.stringify(account.save.appearanceOwned)===JSON.stringify(owned)) return;
+    account.appearanceOwned=owned;
+    account.save={...account.save,appearanceOwned:owned};
+    // This is a projection of already trusted save/receipt evidence, not a new
+    // purchase. A temporary disk failure must not lock the player out; retry
+    // the mirror later while keeping the recomputed ownership in this session.
+    if (!flushAccounts()) queueSaveAccounts();
 }
 let _accountsSaveTimer = null;
 // ─── Persistência robusta do accounts.json (rede de segurança — incidente 30/05) ───
@@ -5412,6 +5429,7 @@ function broadcastPstatsAll(p){
         t:'pstats', id:p.id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp,
         regen,
         cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance),
+        appearanceOwned:appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
         scReadyAt: p.scReadyAt || 0   // 🕯️ Segunda Chance: cliente mostra cooldown no modal
     });
     const f = p.floor || 0;   // M4: só players do mesmo andar veem os stats
@@ -6696,6 +6714,7 @@ wss.on('connection', (ws, request) => {
             const finishAuth = (acc, isNew) => {
                 p._authPending = false;
                 if (!ws || ws.readyState !== 1) return;   // socket fechou durante o scrypt → aborta
+                ensureAppearanceOwnership(acc);
                 // Auth ok — limpa contador
                 p._authAttempts = [];
                 p.authed = true;
@@ -6843,6 +6862,7 @@ wss.on('connection', (ws, request) => {
             data.dyes = p.dyes || {};
             data.appearance = appearanceRules.normalizarAppearance(p.appearance);
             data.appearanceOps = p.appearanceOps || [];
+            data.appearanceOwned = appearanceRules.normalizarAppearanceOwned(p.appearanceOwned);
             // ★ LOCKDOWN N3 — ENFORCEMENT (antes era só comentário!). setPlayerSave faz
             // `a.save = data` as-is, e o join re-hidrata p.gold/inv/skills/equipped/chests
             // desse save. Sem sobrescrever aqui pelos valores VIVOS do server, um cliente
@@ -6925,6 +6945,7 @@ wss.on('connection', (ws, request) => {
             data.expeditionPending = p.expeditionPending || null;
             data.appearance = appearanceRules.normalizarAppearance(p.appearance);
             data.appearanceOps = p.appearanceOps || [];
+            data.appearanceOwned = appearanceRules.normalizarAppearanceOwned(p.appearanceOwned);
             acc.save = data;
             acc.savedAt = Date.now();
             acc._restoreUntil = 0;
@@ -6965,6 +6986,7 @@ wss.on('connection', (ws, request) => {
             p.equipmentVersion = msg.equipmentVersion === equipmentRules.VERSION ? equipmentRules.VERSION : 0;
             p.appearance = appearanceRules.normalizarAppearance(acc?.save?.appearance);
             p.appearanceOps = appearanceService.normalizeReceipts(acc?.save?.appearanceOps,appearanceRules);
+            p.appearanceOwned = appearanceService.ownedForAccount(acc,appearanceRules);
             p.enchantToken = typeof acc?.save?.enchantToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.enchantToken)
                 ? acc.save.enchantToken : crypto.randomUUID();
             p.transmutationToken = typeof acc?.save?.transmutationToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.transmutationToken)
@@ -7116,6 +7138,7 @@ wss.on('connection', (ws, request) => {
                 progressionToken: p.progressionToken,
                 expeditionClears: p.expeditionClears,
                 expeditionPending: p.expeditionPending,
+                appearanceOwned: appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
@@ -7223,10 +7246,9 @@ wss.on('connection', (ws, request) => {
         if (msg.t === 'appearanceSet') {
             if (!p.joined) return;
             const account = getAccount(p.authedName);
-            const nearPaid=(p.floor||0)===0 && chebyshev(p.x,p.y,53,53)<=2;
             const change=appearanceService.applyAppearanceChange({player:p,account,
                 appearance:msg.appearance,requestId:msg.requestId,rules:appearanceRules,
-                nearPaid,flush:flushAccounts});
+                flush:flushAccounts});
             sendTo(id,{t:'appearanceResult',...change.result});
             if(change.changed){
                 if(change.result.costGold>0){
@@ -8556,7 +8578,7 @@ wss.on('connection', (ws, request) => {
             if (!p.expedition.cleared && (!g || chebyshev(p.x,p.y,g.stairs.spawn.x,g.stairs.spawn.y)>1)){
                 sendTo(id,{t:'expeditionResult',ok:false,error:'not_at_exit'});return;
             }
-            returnPlayerToTown(p,id);
+            returnPlayerToTown(p,id,true);
             sendExpeditionStatus(p);
             return;
         }

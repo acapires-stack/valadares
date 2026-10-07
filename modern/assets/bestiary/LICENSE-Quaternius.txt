@@ -1,0 +1,16 @@
+Quaternius Ultimate Monsters — source and license record
+
+Creator: Quaternius
+Pack page: https://quaternius.com/packs/ultimatemonsters.html
+Official download: https://drive.google.com/drive/folders/18m4KpzpEzhC9wl7jzr6dUc0N8Jozr79C
+Files selected: Big/glTF/Demon.gltf, Big/glTF/BlueDemon.gltf,
+                Flying/glTF/Dragon.gltf, Flying/glTF/Dragon_Evolved.gltf.
+Downloaded: 2026-10-07. Exact file IDs and SHA-256 values are in SOURCE.json.
+
+The Ultimate Monsters pack page labels this pack CC0. The creator's current
+general license page (https://quaternius.com/license.html) displays the
+Quaternius Asset License v1.0, updated 2026-08-28. That page says license
+changes do not apply retroactively to assets obtained under an earlier version.
+Both pages permit incorporation into a game, including commercial distribution.
+The GLBs here only pack the original glTF data into a single file; geometry,
+materials, rig and animations are unchanged.

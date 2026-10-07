@@ -3,18 +3,18 @@
     const R=root.AppearanceRules;
     let bridge=null, dialog=null, draft=null, pending=null, timer=null, retry=false;
     const copy={
-        pt:{title:'Sua aparência',intro:'Experimente um traje. Os básicos são gratuitos; os extras custam gold a cada troca. Sua aparência não altera atributos nem limita suas armas.',
+        pt:{title:'Sua aparência',intro:'Experimente um traje. Os básicos são gratuitos. Compre uma skin extra uma vez e troque para ela quando quiser, sem pagar novamente. Sua aparência não altera atributos nem limita suas armas.',
             body:'Traje completo',palette:'Paleta',save:'Salvar aparência',close:'Fechar',saving:'Salvando…',saved:'Aparência salva na sua conta.',
             modern:'A prévia aparece no seu personagem. Suas armas continuam as mesmas.',classic:'Sua escolha fica salva para o visual 3D. O clássico mantém seus próprios sprites.',
             unavailable:'Reconecte ao jogo para salvar.',failed:'Não foi possível salvar. Sua aparência anterior foi mantida.',
             timeout:'A confirmação ainda não chegou. Verifique a mesma troca antes de escolher outra.',too_fast:'Aguarde um instante antes de salvar novamente.',
-            free:'Grátis',current:'Em uso',paid:'gold por troca',retry:'Verificar troca',no_gold:'Você não tem gold suficiente.',not_at_npc:'Visite a Tintureira na praça para trocar para este traje.',change:'Trocar por',balance:'Seu gold',cost:'Custo desta troca',charged:'gold descontados. Sua aparência foi salva.'},
-        en:{title:'Your appearance',intro:'Try an outfit. Basic outfits are free; extras cost gold each time you switch. Appearance does not change stats or restrict weapons.',
+            free:'Grátis',current:'Em uso',owned:'Desbloqueada',paid:'gold · compra única',retry:'Verificar troca',no_gold:'Gold insuficiente. Nenhum gold foi descontado; sua escolha continua na prévia.',not_at_npc:'Reconecte ao jogo para atualizar a loja. Nenhum gold foi descontado.',change:'Comprar e usar por',balance:'Seu gold',cost:'Custo agora',charged:'gold descontados. Skin desbloqueada; próximas trocas são grátis.'},
+        en:{title:'Your appearance',intro:'Try an outfit. Basic outfits are free. Buy an extra skin once and switch to it whenever you like at no further cost. Appearance does not change stats or restrict weapons.',
             body:'Full outfit',palette:'Palette',save:'Save appearance',close:'Close',saving:'Saving…',saved:'Appearance saved to your account.',
             modern:'Preview shown on your character. Your weapons stay the same.',classic:'Your choice is saved for 3D visuals. Classic mode keeps its own sprites.',
             unavailable:'Reconnect to the game to save.',failed:'Could not save. Your previous appearance was kept.',
             timeout:'Confirmation has not arrived. Check the same change before choosing another.',too_fast:'Wait a moment before saving again.',
-            free:'Free',current:'Equipped',paid:'gold per change',retry:'Check change',no_gold:'You do not have enough gold.',not_at_npc:'Visit the Dyer in the square to change into this outfit.',change:'Change for',balance:'Your gold',cost:'Cost of this change',charged:'gold spent. Your appearance was saved.'}
+            free:'Free',current:'Equipped',owned:'Unlocked',paid:'gold · buy once',retry:'Check change',no_gold:'Not enough gold. No gold was spent; your choice remains in the preview.',not_at_npc:'Reconnect to update the shop. No gold was spent.',change:'Buy and equip for',balance:'Your gold',cost:'Cost now',charged:'gold spent. Skin unlocked; future changes are free.'}
     };
     const bodyEn={knight:'Knight',mage:'Mage',rogue:'Wanderer',barbarian:'Barbarian',lorekeeper:'Lorekeeper',cleric:'Cleric',magicalgirl:'Arcane mage'};
     const paletteEn={original:'Original',ocean:'Blue',forest:'Green',wine:'Wine',sand:'Sand'};
@@ -24,14 +24,14 @@
     function cost(){
         const current=R.normalizarAppearance(bridge.getPlayer().appearance);
         const body=R.APPEARANCE_BODIES.find(b=>b.id===draft?.body);
-        return draft?.body!==current.body && Number.isSafeInteger(body?.priceGold)?body.priceGold:0;
+        return draft?.body!==current.body && !bridge.getPlayer().appearanceOwned?.includes(draft?.body) && Number.isSafeInteger(body?.priceGold)?body.priceGold:0;
     }
     function prices(){
         const current=R.normalizarAppearance(bridge.getPlayer().appearance);
         R.APPEARANCE_BODIES.forEach(b=>{
             const button=dialog.querySelector(`[data-body="${b.id}"]`);
             button.querySelector('span').textContent=lang()==='en'?(b.labelEn||bodyEn[b.id]||b.label):b.label;
-            button.querySelector('small').textContent=current.body===b.id?tr('current'):b.priceGold?`${number(b.priceGold)} ${tr('paid')}`:tr('free');
+            button.querySelector('small').textContent=current.body===b.id?tr('current'):bridge.getPlayer().appearanceOwned?.includes(b.id)?tr('owned'):b.priceGold?`${number(b.priceGold)} ${tr('paid')}`:tr('free');
         });
         dialog.querySelector('[data-cost]').textContent=`${tr('cost')}: ${cost()?number(cost())+' gold':tr('free')} · ${tr('balance')}: ${number(bridge.getPlayer().gold)}`;
         dialog.querySelector('[data-save]').textContent=pending&&!retry?tr('saving'):retry?tr('retry'):cost()?`${tr('change')} ${number(cost())} gold`:tr('save');
@@ -121,9 +121,11 @@
     }
     function onResult(message){
         if(!pending||message.requestId!==pending.requestId)return;
+        const attempted=pending.appearance;
         clearTimeout(timer);pending=null;retry=false;
         if(Number.isFinite(message.gold))bridge.getPlayer().gold=message.gold;
-        draft=R.normalizarAppearance(message.appearance);
+        if(Array.isArray(message.appearanceOwned))bridge.getPlayer().appearanceOwned=R.normalizarAppearanceOwned(message.appearanceOwned);
+        draft=R.normalizarAppearance(message.ok?message.appearance:attempted);
         busy(false);
         if(dialog.open)preview();else delete bridge.getPlayer()._appearancePreview;
         status(message.ok?(message.costGold?`${number(message.costGold)} ${tr('charged')}`:tr('saved')):tr(['too_fast','no_gold','not_at_npc'].includes(message.error)?message.error:'failed'));

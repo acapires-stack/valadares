@@ -1,0 +1,77 @@
+{
+  "licenseNotes": {
+    "kaykit": "CC0 1.0 (official GitHub repository LICENSE.txt)",
+    "quaternius": "Ultimate Monsters pack page says CC0; current general Quaternius license page says QAL v1.0. See adjacent LICENSE-Quaternius.txt."
+  },
+  "kaykit": {
+    "Skeleton_Rogue": {
+      "author": "Kay Lousberg",
+      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0/15b62b9bad122f72926c10fb14d622c73819fa54/addons/kaykit_character_pack_skeletons/Characters/gltf/Skeleton_Rogue.glb",
+      "sourceSha256": "4003f2b77891bb56f7e0de7d555abcb497aebbcaee35b614211f16275f9ccae3",
+      "assetSha256": "a85cfc90d90cbd549af31535d97e033020cff7ccaa063a21fa92fbd1e8b210c3",
+      "clips": [
+        "Idle",
+        "Running_A",
+        "Walking_A",
+        "Death_A",
+        "Hit_A",
+        "1H_Melee_Attack_Chop",
+        "1H_Melee_Attack_Slice_Horizontal"
+      ],
+      "change": "Unused animation clips and buffer views removed; meshes and materials preserved."
+    },
+    "Skeleton_Warrior": {
+      "author": "Kay Lousberg",
+      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0/15b62b9bad122f72926c10fb14d622c73819fa54/addons/kaykit_character_pack_skeletons/Characters/gltf/Skeleton_Warrior.glb",
+      "sourceSha256": "178b6fda810b814c250d8a2010c24dfd9b458b9006dd323353e620b7ff118bbe",
+      "assetSha256": "bcadec23aed41d766654e6a867137e989fd973d6c187a688646c1fc1abab5b63",
+      "asset": "../characters/Skeleton_Warrior-game.glb",
+      "change": "Pre-existing game asset; original mesh, armor and helmet used as a visual variant."
+    },
+    "Skeleton_Axe": {
+      "author": "Kay Lousberg",
+      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0/15b62b9bad122f72926c10fb14d622c73819fa54/addons/kaykit_character_pack_skeletons/Assets/gltf/Skeleton_Axe.gltf",
+      "sourceSha256": {
+        "Skeleton_Axe.gltf": "44c8b65942cbb573c99dc14c2a188fad8c47e29ad9764d27b47e6f57bb7e4ebd",
+        "Skeleton_Axe.bin": "f994f9e1b3297961a2b27120adb81ccc61ef7a901586b584fa53fdba8b962cc7",
+        "skeleton_texture.png": "15741a25c53e04fa9bf3beac3bc0de442359404b1ff9be863b892cb551ad3657"
+      },
+      "assetSha256": "a5489c834bda6a7d421b53451af621d6a5deb7268d834f688df6d4c9e9cf8e20",
+      "change": "Original mesh and texture packed into one GLB; no geometry or color edits."
+    }
+  },
+  "quaternius": {
+    "Big_Demon": {
+      "author": "Quaternius",
+      "source": "https://drive.google.com/file/d/1XhBLnR6tjqIrFy0AUfRlqKf-hYmVwIR4/view",
+      "pack": "https://quaternius.com/packs/ultimatemonsters.html",
+      "sourceSha256": "9ce361b41a0e80d42a70f6325169b9c70a6e3304b8d856b8344a2b7f185067af",
+      "assetSha256": "4c33cdf67540cabe01817a9020c4f6b5df07af05a3a676c37e44944071038c53",
+      "change": "Self-contained glTF packed to GLB; meshes, materials, rig and animations unchanged."
+    },
+    "Big_BlueDemon": {
+      "author": "Quaternius",
+      "source": "https://drive.google.com/file/d/1mcxtHj9Aw1uu1FWYhl1rfPenuq3My-Z4/view",
+      "pack": "https://quaternius.com/packs/ultimatemonsters.html",
+      "sourceSha256": "9eb899fc619dff9a973669e0962452990c8ec44d4501dd41fe4f4fe5afd631f4",
+      "assetSha256": "9e1fc084e5b1c5c99e38a877391b43fbed8fe6e134846e44cd4ce8e993175870",
+      "change": "Self-contained glTF packed to GLB; meshes, materials, rig and animations unchanged."
+    },
+    "Dragon": {
+      "author": "Quaternius",
+      "source": "https://drive.google.com/file/d/1-mQSm6_oGt7-EEQfNj1dFWYgPQy4AdPC/view",
+      "pack": "https://quaternius.com/packs/ultimatemonsters.html",
+      "sourceSha256": "d219a29b5e928da26c24218a64284bbf999b88484a508ac6c01e0edad9f1f56c",
+      "assetSha256": "2acdb52f1c13fec9511c827801f25b45242ca0a7d4be6dba8a0fa74746ba161b",
+      "change": "Self-contained glTF packed to GLB; meshes, materials, rig and animations unchanged."
+    },
+    "Dragon_Evolved": {
+      "author": "Quaternius",
+      "source": "https://drive.google.com/file/d/1Mcfuavq7F4itG9xhqc-20_IL257ZY2_3/view",
+      "pack": "https://quaternius.com/packs/ultimatemonsters.html",
+      "sourceSha256": "39ba6ea24b5f27acf68bbf4c19fe80ba070dbec167ff14bbe933453303426f5c",
+      "assetSha256": "bb936113f2e359c13487e1e40fc83349505b801bb958ad17935c1d5abe83f188",
+      "change": "Self-contained glTF packed to GLB; meshes, materials, rig and animations unchanged."
+    }
+  }
+}

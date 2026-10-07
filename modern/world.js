@@ -58,7 +58,7 @@ export function createWorld(pc,app,bridge){
  const root=new pc.Entity('Terreno de Valadares');app.root.addChild(root);
  const scenery=createScenery(pc,app);
  const houses=bridge.getBuildings?.()||[];
- const materials=new Map(),textures=[],chunks=new Map();let mapRef=null,floor=-1,propSignature='',expeditionTheme=null,created=0,waterClock=0,sceneryVersion=-1;
+ const materials=new Map(),textures=[],chunks=new Map();let mapRef=null,floor=-1,propSignature='',expeditionTheme=null,entrancePosition=null,created=0,waterClock=0,sceneryVersion=-1;
  function mat(name,variant=0){const key=name+':'+variant;if(materials.has(key))return materials.get(key);const colors=PAL[name]||PAL.stone,hex=colors[variant%colors.length],m=new pc.StandardMaterial(),textured=['grass','dirt','stone','cave','snow','sand','cliff','roof','water','forgeFloor'].includes(name);m.diffuse=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.ambient=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.gloss=(name==='water'||name==='jade')?.45:.1;m.useMetalness=true;m.metalness=name==='copper'?.55:name==='forgeSteel'?.35:0;
   if(textured){const tex=noiseTexture(pc,app.graphicsDevice,hex,name);textures.push(tex);m.diffuseMap=tex;}
    if(name==='ember'||name==='jade'||name==='window'||name==='forgeGlow'){m.emissive=hexColor(pc,hex);m.emissiveIntensity=name==='ember'?1.6:name==='forgeGlow'?1.15:name==='window'?.32:.45;}
@@ -114,19 +114,22 @@ export function createWorld(pc,app,bridge){
   }
   if((t===7||t===8)&&hash(x,z,9)>.77){const p=g(t===7?'snow':'sand',0),px=x+.2+hash(x,z,10)*.6,pz=z+.2+hash(x,z,13)*.6;p.cone(px,-.012,pz,.11,.035,5,hash(x,z,14)*TAU);}
   if(t===1&&hash(x,z,7)>.88){g('stone',0).rock(x+.25+hash(x,z,1)*.5,0,z+.25+hash(x,z,3)*.5,.05,.02,x+z);}
-  if(t===2&&!house){const tree=z<33?['treePine','treePineAlt','treePineDense','treePineBlue','treePineBlueAlt'][Math.floor(hash(x,z,3)*5)]:['treeOak','treeTall','treeRound','treeBroad','treeBare'][Math.floor(hash(x,z,3)*5)];
-   const placed=!isDungeon&&scenery.place(tree,node,cx,-.005,cz,.49+(hash(x,z,5)-.5)*.07,hash(x,z,6)*360,hash(x,z,18)>.65);
-   if(!placed){const trunk=g('bark',0),leaves=g(z<33?'pine':'leaf',v),tilt=(hash(x,z,2)-.5)*.14;trunk.box(cx+tilt,0,cz,.2,1.45,.19,tilt);
-   if(z<33){for(let i=0;i<3;i++)leaves.cone(cx+tilt,1.05+i*.39,cz,.69-i*.13,.76,8,hash(x,z,i+6));}
-   else{leaves.crown(cx+tilt,1.12,cz,.72,1.26,x*101+z);if(hash(x,z,8)>.35){leaves.crown(cx+tilt-.42,1.35,cz+.22,.44,.83,z*41+x);leaves.crown(cx+tilt+.4,1.42,cz-.14,.42,.79,x*17+z);}}}
+  if(t===2&&!house){const pine=hash(x,z,31)<(z<30?.9:z<42?.42:.11),tx=cx+(hash(x,z,32)-.5)*.18,tz=cz+(hash(x,z,33)-.5)*.18;
+   const tree=pine?['treePine','treePineAlt','treePineDense','treePineBlue','treePineBlueAlt'][Math.floor(hash(x,z,3)*5)]:['treeOak','treeTall','treeRound','treeBroad','treeBare'][Math.floor(hash(x,z,3)*5)];
+   const placed=!isDungeon&&scenery.place(tree,node,tx,-.005,tz,.49+(hash(x,z,5)-.5)*.07,hash(x,z,6)*360,hash(x,z,18)>.65);
+   if(!placed){const trunk=g('bark',0),leaves=g(pine?'pine':'leaf',v),tilt=(hash(x,z,2)-.5)*.14;trunk.box(tx+tilt,0,tz,.2,1.45,.19,tilt);
+   if(pine){for(let i=0;i<3;i++)leaves.cone(tx+tilt,1.05+i*.39,tz,.69-i*.13,.76,8,hash(x,z,i+6));}
+   else{leaves.crown(tx+tilt,1.12,tz,.72,1.26,x*101+z);if(hash(x,z,8)>.35){leaves.crown(tx+tilt-.42,1.35,tz+.22,.44,.83,z*41+x);leaves.crown(tx+tilt+.4,1.42,tz-.14,.42,.79,x*17+z);}}}
+   if(!isDungeon&&hash(x,z,34)>.86)scenery.place(['bushSmall','bushWide'][Math.floor(hash(x,z,35)*2)],node,cx+(hash(x,z,36)-.5)*.42,-.015,cz+(hash(x,z,37)-.5)*.42,.43,hash(x,z,38)*360,false);
   }
   if(t===3&&hash(x,z,7)>.78){const line=g('foam',0),zz=z+.24+hash(x,z,2)*.5,xx=x+.12+hash(x,z,3)*.44;line.box(xx,.008,zz,.18,.003,.012,(hash(x,z,5)-.5)*.38);}
-  if(t===5&&hash(x,z,7)>.35&&!scenery.place(['rockAlt','rockRuin','rockCave'][Math.floor(hash(x,z,8)*3)],node,cx+(hash(x,z,8)-.5)*.5,-.01,cz+(hash(x,z,9)-.5)*.5,.17,hash(x,z,10)*360)){const r=g('cliff',v);r.rock(cx+(hash(x,z,8)-.5)*.5,-.02,cz+(hash(x,z,9)-.5)*.5,.08,.035,x+z);}
-  if(t===6){const cliffStyle=['rock','rockAlt','rockLarge','rockRuin','rockCave'][Math.floor(hash(x,z,7)*5)],placed=scenery.place(cliffStyle,node,cx,-.025,cz,2.15+(hash(x,z,5)-.5)*.35,hash(x,z,6)*360);
+  if(t===5&&hash(x,z,7)>(isDungeon?.94:.78)&&!scenery.place(['rockAlt','rockRuin','rockCave'][Math.floor(hash(x,z,8)*3)],node,cx+(hash(x,z,8)-.5)*.5,-.01,cz+(hash(x,z,9)-.5)*.5,.17,hash(x,z,10)*360)){const r=g('cliff',v);r.rock(cx+(hash(x,z,8)-.5)*.5,-.02,cz+(hash(x,z,9)-.5)*.5,.08,.035,x+z);}
+  if(t===6){const styles=isDungeon?['rockCave','rockRuin','rockLarge']:['rock','rockAlt','rockLarge','rockRuin','rockCave'],cliffStyle=styles[Math.floor(hash(x,z,7)*styles.length)],placed=scenery.place(cliffStyle,node,cx,-.025,cz,(isDungeon?1.8:2.05)+(hash(x,z,5)-.5)*.65,hash(x,z,6)*360);
    if(!placed){const stone=g('cliff',v),accent=g('dark',v%2);stone.rock(cx,-.025,cz,.48,1.05+hash(x,z,5)*.45,x*97+z);accent.rock(cx+.13,.53,cz-.09,.19,.55,z*53+x);if(hash(x,z,11)>.87){const moss=g('leaf',v);moss.cone(cx,.96,cz,.16,.14,5);}}
-   if(!isDungeon&&hash(x,z,22)>.994)scenery.place('ruinedWall',node,cx,0,cz,.32,hash(x,z,23)*360);
+   const caveEdge=[[0,1,0],[1,0,90],[0,-1,180],[-1,0,270]].find(([dx,dz])=>get(map,x+dx,z+dz)===5);
+   if(!isDungeon&&caveEdge&&hash(x,z,22)>.72)scenery.place(hash(x,z,23)>.35?'ruinedWall':'rubble',node,cx,.01,cz,.26,caveEdge[2],false);
    if(isDungeon&&hash(x,z,24)>.968)scenery.place(['pillar','scaffold','rubble'][Math.floor(hash(x,z,25)*3)],node,cx,0,cz,.22,hash(x,z,26)*360);
-   if(isDungeon&&hash(x,z,27)>.82){const edge=[[0,1,0],[1,0,90],[0,-1,180],[-1,0,270]].find(([dx,dz])=>get(map,x+dx,z+dz)===5);if(edge)scenery.place(hash(x,z,28)>.5?'crackedWall':'candleWall',node,cx,0,cz,.27,edge[2]);}
+   if(isDungeon&&caveEdge&&hash(x,z,27)>.9)scenery.place(hash(x,z,28)>.5?'crackedWall':'candleWall',node,cx,0,cz,.27,caveEdge[2]);
    if(isDungeon&&hash(x,z,29)>.981)scenery.place('ore',node,cx+.12,0,cz-.12,.17,hash(x,z,30)*360);
   }
   if(t===7&&hash(x,z,12)>.77&&!scenery.place('rock',node,cx,-.02,cz,.35,hash(x,z,13)*360)){const rock=g('cliff',v);rock.rock(cx,-.02,cz,.14,.12,x+z);}
@@ -361,6 +364,33 @@ export function createWorld(pc,app,bridge){
    light('Nucleo do guardiao',70.5,48.5,'#eab67d',.54,6.4);
   }
  }
+ function forgeEntrance(groups,node,tileX,tileY){
+  // The visual door occupies the north edge of its authoritative entrance. The full tile remains
+  // walkable, and the server alone decides whether interaction can enter it.
+  const x=tileX+.5,z=tileY+.13,g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
+  const stone=g('forgeFloor',0),iron=g('forgeSteel',0),copper=g('copper',0),dark=g('dark',0),glow=g('forgeGlow',0);
+  // Flush threshold and metal inlays point to the opening without lifting the floor.
+  stone.box(x,-.025,tileY+.53,.90,.009,.80);
+  for(const side of [-1,1]){
+   copper.box(x+side*.38,-.012,tileY+.53,.026,.004,.65);
+   iron.box(x+side*.51,-.018,z,.16,.11,.25);
+   iron.box(x+side*.51,.09,z,.115,1.31,.16);
+   copper.box(x+side*.51,.22,z+.085,.13,.035,.018);
+   copper.box(x+side*.51,1.11,z+.085,.13,.035,.018);
+   glow.box(x+side*.51,1.25,z+.093,.07,.08,.025);
+  }
+  iron.box(x,1.35,z,1.16,.16,.19);
+  dark.box(x,1.53,z,1.42,.29,.24);
+  copper.box(x,1.53,z+.129,1.38,.035,.026);
+  glow.box(x,1.30,z+.102,.61,.025,.017);
+  // A hammer crest stays crisp at gameplay zoom; the localized name is in the HUD.
+  const crest=g('forgeGlow',0);
+  crest.box(x,1.65,z+.14,.42,.055,.028);
+  crest.box(x,1.57,z+.14,.065,.16,.028);
+  copper.box(x,1.54,z+.141,.61,.025,.029);
+  const light=new pc.Entity('Luz da entrada da Forja');light.addComponent('light',{type:'omni',color:hexColor(pc,'#f0a36b'),intensity:.35,range:2.7,castShadows:false});
+  light.setPosition(x,1.25,z+.32);node.addChild(light);
+ }
  function build(cx,cz,map){const groups=new Map(),node=new pc.Entity(`Setor ${cx},${cz}`),props=floor===0?(bridge.getProps?.()||[]):[];node._worldMeshes=[];
   const valid=floor===0?houses.filter(h=>{for(let z=h.y;z<h.y+h.h;z++)for(let x=h.x;x<h.x+h.w;x++)if(get(map,x,z)!==2)return false;return true;}):[];
   for(let z=cz*CHUNK;z<(cz+1)*CHUNK;z++)for(let x=cx*CHUNK;x<(cx+1)*CHUNK;x++){if(x<0||z<0||x>=bridge.M_W||z>=bridge.M_H)continue;
@@ -368,13 +398,15 @@ export function createWorld(pc,app,bridge){
    const underHouse=valid.some(h=>x>=h.x&&x<h.x+h.w&&z>=h.y&&z<h.y+h.h);drawTile(groups,map,x,z,floor>0,underHouse,node);seam(groups,map,x,z,'x');seam(groups,map,x,z,'z');}
   if(floor>=1000&&floor<=1003&&cx===4&&cz===4)interiorFurnishings(groups,node,interiorRoom());
   if(forgotten())forgottenFeatures(groups,node,cx,cz);
+  if(floor===0&&entrancePosition&&cx===Math.floor(entrancePosition.x/CHUNK)&&cz===Math.floor(entrancePosition.y/CHUNK))forgeEntrance(groups,node,entrancePosition.x,entrancePosition.y);
   for(const h of valid)if(Math.floor((h.x+h.w/2)/CHUNK)===cx&&Math.floor((h.y+h.h/2)/CHUNK)===cz)house(groups,h,node);
   for(const p of props)if(Math.floor(p.x/CHUNK)===cx&&Math.floor(p.y/CHUNK)===cz)prop(groups,p,node);
   for(const [key,geo]of groups){const mesh=geo.finish(pc,app.graphicsDevice);if(!mesh)continue;node._worldMeshes.push(mesh);const e=new pc.Entity(key);e.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,mat(...key.split(':').map((v,i)=>i?Number(v):v)))],castShadows:true,receiveShadows:true});node.addChild(e);}
   root.addChild(node);chunks.set(`${cx}:${cz}`,node);created++;
  }
  function drop(e){e.destroy();for(const mesh of e._worldMeshes||[])mesh.destroy();}
- function update(dt){waterClock+=dt;const water=materials.get('water:0');if(water&&waterClock>=.08){water.diffuseMapOffset.x=(water.diffuseMapOffset.x+waterClock*.007)%1;water.diffuseMapOffset.y=(water.diffuseMapOffset.y+waterClock*.003)%1;water.update();waterClock=0;}const map=bridge.getMap?.(),p=bridge.getPlayer?.();if(!map||!p)return;const nextFloor=bridge.getFloor?.()??p.floor??0,nextExpedition=bridge.getExpedition?.()||null,props=nextFloor===0?(bridge.getProps?.()||[]):[],services=nextFloor>=1000&&nextFloor<=1003?(interiorRoom(nextFloor)?.services||[]):[],sig=[...props,...services].map(p=>`${p.key||p.kind}:${p.x}:${p.y}`).join('|');
+ function update(dt){waterClock+=dt;const water=materials.get('water:0');if(water&&waterClock>=.08){water.diffuseMapOffset.x=(water.diffuseMapOffset.x+waterClock*.007)%1;water.diffuseMapOffset.y=(water.diffuseMapOffset.y+waterClock*.003)%1;water.update();waterClock=0;}const map=bridge.getMap?.(),p=bridge.getPlayer?.();if(!map||!p)return;const nextFloor=bridge.getFloor?.()??p.floor??0,nextExpedition=bridge.getExpedition?.()||null,entry=(bridge.getExpeditionEntrances?.()||[]).find(item=>item?.id==='forja_esquecida')?.npc,ex=Number(entry?.x),ey=Number(entry?.y),nextEntrance=Number.isInteger(ex)&&Number.isInteger(ey)?{x:ex,y:ey}:null,props=nextFloor===0?(bridge.getProps?.()||[]):[],services=nextFloor>=1000&&nextFloor<=1003?(interiorRoom(nextFloor)?.services||[]):[],sig=[...props,...services].map(p=>`${p.key||p.kind}:${p.x}:${p.y}`).concat(nextEntrance?`forge:${ex}:${ey}`:'forge:none').join('|');
+  entrancePosition=nextEntrance;
   if(map!==mapRef||nextFloor!==floor||nextExpedition!==expeditionTheme||sig!==propSignature||scenery.version!==sceneryVersion){for(const e of chunks.values())drop(e);chunks.clear();mapRef=map;floor=nextFloor;expeditionTheme=nextExpedition;propSignature=sig;sceneryVersion=scenery.version;}
   const cam=bridge.getCamera?.(),px=cam?cam.x+(bridge.VP_W||14)/2:p.x,pz=cam?cam.y+(bridge.VP_H||10)/2:p.y,bounds=bridge.getViewBounds?.()||{minX:px-REACH,maxX:px+REACH,minY:pz-REACH,maxY:pz+REACH};
   const fromX=Math.max(0,Math.floor(bounds.minX/CHUNK)),toX=Math.min(Math.ceil(bridge.M_W/CHUNK)-1,Math.floor(bounds.maxX/CHUNK)),fromZ=Math.max(0,Math.floor(bounds.minY/CHUNK)),toZ=Math.min(Math.ceil(bridge.M_H/CHUNK)-1,Math.floor(bounds.maxY/CHUNK));

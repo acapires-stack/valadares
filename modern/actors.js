@@ -16,6 +16,8 @@ export async function createActors(pc,app,bridge){
  const shieldProp='Cleric_Shield';
  const modernBodies=new Map(ADVENTURERS2.map(d=>['V2_'+d.sourceModel,d]));
  const assetPaths=new Map(),texturePaths=new Map();
+ assetPaths.set('Skeleton_Warrior','./assets/characters/Skeleton_Warrior-game.glb');
+ for(const name of ['Skeleton_Rogue','Skeleton_Axe','Big_Demon','Big_BlueDemon','Dragon','Dragon_Evolved'])assetPaths.set(name,`./assets/bestiary/${name}.glb`);
  for(const [key,d] of modernBodies){assetPaths.set(key,d.asset);for(const path of d.animationAssets)assetPaths.set('V2_'+path.split('/').pop().replace('.glb',''),path);}
  const load=(name,series=false)=>new Promise((resolve,reject)=>app.assets.loadFromUrl(new URL(texturePaths.get(name)||assetPaths.get(name)||(name==='Wolf'?'./assets/animals/Wolf-game.glb':series?`./assets/characters-series6/${name}.glb`:`./assets/characters/${name}-game.glb`),import.meta.url).href,texturePaths.has(name)?'texture':'container',(err,a)=>{if(err){if(a){a.unload();app.assets.remove(a);}reject(err);}else{if(texturePaths.has(name)){a.resource.flipY=false;a.resource.upload();}resolve(a);}}));
  const loaded=await Promise.all(legacyNames.map(n=>load(n)));
@@ -25,6 +27,13 @@ export async function createActors(pc,app,bridge){
  const seriesRig=model=>modernBodies.get(model)?.rig||(['OrcBrute','Monstrosity','4GTN','4GTN_Forgotten'].includes(model)?'Rig_Large':seriesNames.includes(model)?'Rig_Medium':null);
  const animationKeys=model=>modernBodies.has(model)?modernBodies.get(model).animationAssets.map(p=>'V2_'+p.split('/').pop().replace('.glb','')):[seriesRig(model)+'_General',seriesRig(model)+'_MovementBasic'];
  const ready=(name,fallback)=>{if(!name)return fallback;const rig=seriesRig(name);if(!rig)return fallback;const keys=[name,...animationKeys(name)];keys.forEach(ensure);return keys.every(k=>assets[k])?name:fallback;};
+ function skeletonModel(e){
+  // Keep the readable bare skull as the common enemy; use the authored armored body sparingly.
+  const key=String(e.id??''),hash=[...key].reduce((value,char)=>(value*31+char.charCodeAt(0))>>>0,0);
+  if(hash%4!==0)return 'Skeleton_Minion';
+  ensure('Skeleton_Warrior');
+  return assets.Skeleton_Warrior?'Skeleton_Warrior':'Skeleton_Minion';
+ }
  const gearReady=name=>{if(!name)return false;ensure(name);return !!assets[name];};
  const mediumCombatTracks=[];
  function sameRigCombat(){
@@ -182,19 +191,50 @@ export async function createActors(pc,app,bridge){
   SENHOR_VALADARES:{model:'Knight',weapon:'sword',height:1.35,armor:'#bf9839',cape:'#e9be55',royal:true},
   ARAUTO:{model:'Mage',preferred:'Cleric',weapon:'staff',height:1.2,armor:'#c4bce2',cape:'#e3d09d'}
  };
+ // The public monster IDs stay stable; each body keeps the original species and animation set of its source asset.
+ const BESPOKE_MOBS={
+  SOMBRA:{model:'Skeleton_Rogue',height:1.48,weapon:'sword',idle:'Idle',move:'Running_A',attack:'1H_Melee_Attack_Chop',death:'Death_A',contactPhase:.56},
+  GOLEM:{model:'Big_Demon',height:1.72,weapon:'unarmed',idle:'Idle',move:'Run',attack:'Weapon',death:'Death',contactPhase:.55},
+  GOLEM_REI:{model:'Big_BlueDemon',height:2.15,weapon:'unarmed',idle:'Idle',move:'Run',attack:'Weapon',death:'Death',contactPhase:.55},
+  DRAKE:{model:'Dragon',height:1.55,fixedScale:.45,labelHeight:1.2,weapon:'unarmed',idle:'Flying_Idle',move:'Fast_Flying',attack:'Headbutt',death:'Death',contactPhase:.5},
+  DRAKE_LIDER:{model:'Dragon_Evolved',height:2.15,fixedScale:.49,labelHeight:1.45,weapon:'unarmed',idle:'Flying_Idle',move:'Fast_Flying',attack:'Headbutt',death:'Death',contactPhase:.5}
+ };
+ function bespokeCreature(e,kind,id,spec){
+  const entity=assets[spec.model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);
+  let low=Infinity,high=-Infinity;
+  for(const render of entity.findComponents('render'))for(const mesh of render.meshInstances){const box=mesh.aabb;low=Math.min(low,box.center.y-box.halfExtents.y);high=Math.max(high,box.center.y+box.halfExtents.y);}
+  // Wing span, not standing height, controls the flying family's floor footprint.
+  const scale=spec.fixedScale||(Number.isFinite(high-low)&&high-low>.1?spec.height/(high-low):1);
+  entity.setLocalScale(scale,scale,scale);
+  const groundOffset=-low*scale,clips={};entity.addComponent('anim',{activate:true});
+  for(const {resource:track}of assets[spec.model].resource.animations){clips[track.name]=track.duration;entity.anim.assignAnimation(track.name,track,undefined,1,track.name===spec.idle||track.name===spec.move);}
+  const owned=[];
+  if(spec.weapon==='sword'){
+   const hand=entity.findByName('handslot.r');
+   if(hand){const holder=new pc.Entity('Arma do esqueleto');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,'sword',false,{},owned);}
+  }
+  return {entity,kind,id,type:e.type,model:spec.model,bespoke:true,w:spec.weapon,owned,visualHeight:spec.labelHeight||spec.height,
+   groundOffset,idleClip:spec.idle,moveClip:spec.move,attackClip:spec.attack,deathClip:spec.death,contactPhase:spec.contactPhase,clips,
+   previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
+ }
  function enemyHumanoid(e,kind,id){
-  const type=e.type,base=RIGGED_MOBS[type],cfg={...base,model:ready(base.preferred,base.model)},def=bridge.getMonsterTypes?.()[type]||{};
+  const type=e.type,base=RIGGED_MOBS[type],cfg={...base,model:type==='SKELETON'?skeletonModel(e):ready(base.preferred,base.model)},def=bridge.getMonsterTypes?.()[type]||{};
+  if(cfg.model==='Skeleton_Warrior'){cfg.weapon='axe';cfg.gear='Skeleton_Axe';cfg.hat=true;}
   const entity=assets[cfg.model].resource.instantiateRenderEntity({castShadows:true});entity.name=id;root.addChild(entity);const owned=[];
   for(const r of entity.findComponents('render')){
    const n=r.entity.name,cape=/Cape|Cloak/.test(n),hat=/Hat|Helmet/.test(n);
-   r.enabled=/^(Barbarian|Skeleton_Minion|Knight|Mage|Rogue|OrcBrute|Monstrosity|Cleric|PlantWarrior|4GTN)_/.test(n)&&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&!/Shield|HolyWater|Staff|Tome/.test(n);
+   r.enabled=/^(Barbarian|Skeleton_Minion|Skeleton_Warrior|Knight|Mage|Rogue|OrcBrute|Monstrosity|Cleric|PlantWarrior|4GTN)_/.test(n)&&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&!/Shield|HolyWater|Staff|Tome/.test(n);
    // Keep the purchased creature's skin, eyes, teeth and armor details intact.
    const color=cape?cfg.cape:/Body|Shoulderpad|LegArmor/.test(n)?cfg.armor:(cfg.regalia||cfg.mask)&&/Head|Arm|Leg/.test(n)?cfg.skin:null;
    for(const mi of r.meshInstances){mi.castShadow=r.enabled;if(color){const m=mi.material.clone();m.diffuse=new pc.Color().fromString(color);m.update();owned.push(m);mi.material=m;}}
   }
   // Measure the complete authored body before hiding a head replaced by a creature part.
   let visualHeight=sizeBody(entity,cfg.fixedHeight||cfg.height*Math.min(def.size||1,1.9));const clips=animate(entity,cfg.model);
-  if(cfg.mask||cfg.regalia||cfg.royal){const size=Math.min(def.size||1,1.65);entity.setLocalScale(.42*size,.6*size,.42*size);}
+  if(cfg.mask||cfg.regalia||cfg.royal){
+   // Keep the approved executioner silhouette while making this recurring elite visibly taller than a player.
+   const size=Math.min(def.size||1,1.65)*(cfg.mask?1.22:1);
+   entity.setLocalScale(.42*size,.6*size,.42*size);
+  }
   // This legacy approximation remains until an authored minotaur is available.
   // Unlike the former root-space add-ons, these parts follow the head bone.
   if(cfg.horns){for(const r of entity.findComponents('render'))if(/Barbarian_Head/.test(r.entity.name))r.enabled=false;const head=new pc.Entity('Cabeca minotauro');entity.addChild(head);
@@ -255,6 +295,7 @@ export async function createActors(pc,app,bridge){
   if(cfg.visualLimit)visualHeight=limitVisualTop(entity,cfg.visualLimit);
   const hand=entity.findByName(cfg.weapon==='bow'?'handslot.l':'handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,cfg.mask?0:-90);if(cfg.mask)weapon(holder,'axe',false,{color:'#b9c5c8'});else if(cfg.gear){
    if(gearReady(cfg.gear)){const item=assets[cfg.gear].resource.instantiateRenderEntity({castShadows:true});holder.addChild(item);const plant=cfg.gear==='PlantWarrior_Spear',scale=plant?.58:.72;item.setLocalScale(scale,scale,scale);item.setLocalEulerAngles(90,plant?90:0,0);item.setLocalPosition(0,plant?.05:.15,.15);}
+   else weapon(holder,cfg.weapon,false);
   }else equipVisual(holder,cfg.weapon,false,cfg.regalia?{color:'#b778e2'}:cfg.royal?{color:'#f8d46f'}:{},owned);}
   if(cfg.shield&&gearReady(cfg.shield)){const left=entity.findByName('handslot.l');if(left){const holder=new pc.Entity('Escudo inimigo');left.addChild(holder);holder.setLocalEulerAngles(0,0,-90);const shield=assets[cfg.shield].resource.instantiateRenderEntity({castShadows:true});holder.addChild(shield);shield.setLocalScale(.85,.85,.85);shield.setLocalPosition(0,.08,.25);}}
   if(cfg.mask||cfg.regalia||cfg.royal)visualHeight=Math.max(.1,...entity.findComponents('render').filter(r=>r.enabled).flatMap(r=>r.meshInstances.map(mi=>mi.aabb.center.y+mi.aabb.halfExtents.y)));
@@ -271,6 +312,7 @@ export async function createActors(pc,app,bridge){
  function creature(e,kind,id){
   if(e.type==='WOLF'){ensure('Wolf');if(assets.Wolf)return animal(e,kind,id);}
   if(kind==='mob'&&RIGGED_MOBS[e.type])return enemyHumanoid(e,kind,id);
+  if(kind==='mob'&&BESPOKE_MOBS[e.type]){const spec=BESPOKE_MOBS[e.type];ensure(spec.model);if(assets[spec.model])return bespokeCreature(e,kind,id,spec);}
   const group=new pc.Entity(id);root.addChild(group);
   const type=e.type||'RAT',def=bridge.getMonsterTypes?.()[type]||{},c=def.color||'#687f66';
   const rec={entity:group,kind,id,type,parts:[],owned:[],lastX:NaN,lastZ:NaN,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1};
@@ -418,7 +460,7 @@ export async function createActors(pc,app,bridge){
   if(prior){if(prior.eventId!==detail.eventId)return false;if(!prior.started)prior.contactAt=Math.max(time,Math.min(prior.receivedAt+500,Number.isFinite(detail.contactAt)?detail.contactAt:time));return true;}
   if(detail.eventId&&deathEvents.has(detail.eventId))return false;
   let rec=entries.get(id);const snapshot=detail.mob||rec?.data;if(!snapshot?.type)return false;
-  if(!rec){rec=creature({...snapshot,hp:1},'mob',id);rec.data={...snapshot};rec.entity.setPosition((snapshot.renderX??snapshot.x)+.5,0,(snapshot.renderY??snapshot.y)+.5);rec.entity.setEulerAngles(0,(FORWARD[snapshot.dir]??0)+(rec.angleOffset||0),0);}
+  if(!rec){rec=creature({...snapshot,hp:1},'mob',id);rec.data={...snapshot};rec.entity.setPosition((snapshot.renderX??snapshot.x)+.5,rec.groundOffset||0,(snapshot.renderY??snapshot.y)+.5);rec.entity.setEulerAngles(0,(FORWARD[snapshot.dir]??0)+(rec.angleOffset||0),0);}
   else entries.delete(id);
   if(rec.entity.anim)rec.entity.anim.speed=0;
   if(detail.eventId){deathEvents.add(detail.eventId);if(deathEvents.size>128)deathEvents.delete(deathEvents.values().next().value);}
@@ -431,16 +473,16 @@ export async function createActors(pc,app,bridge){
   if(time<death.contactAt)continue;
   const rec=death.rec,elapsed=(time-death.contactAt)/1000;
   if(elapsed>=.65){dispose(rec);deathVisuals.delete(id);continue;}
-  if(!death.started){death.started=true;rec.state=rec.animal?'Death':'Death_A';if(rec.entity.anim){rec.entity.anim.baseLayer.transition(rec.state,.035,0);rec.entity.anim.speed=(rec.clips?.[rec.state]||.8)/.55;}}
+  if(!death.started){death.started=true;rec.state=rec.deathClip||(rec.animal?'Death':'Death_A');if(rec.entity.anim){rec.entity.anim.baseLayer.transition(rec.state,.035,0);rec.entity.anim.speed=(rec.clips?.[rec.state]||.8)/.55;}}
   if(!rec.entity.anim){const angle=Math.min(1,elapsed/.4)*75;rec.entity.setEulerAngles(angle,rec.angle||0,0);}
   const shrink=elapsed<.5?1:Math.max(0,1-(elapsed-.5)/.15);rec.entity.setLocalScale(death.scale.x*shrink,death.scale.y*shrink,death.scale.z*shrink);
  }}
  function signature(e,kind){
   if(kind==='pet')return e.type||kind;
-  const w=kind==='mob'?RIGGED_MOBS[e.type]?.weapon:kind==='npc'?(npcTools[e.id]||'unarmed'):weaponKind(e);
+  const w=kind==='mob'?(e.type==='SKELETON'&&skeletonModel(e)==='Skeleton_Warrior'?null:RIGGED_MOBS[e.type]?.weapon||BESPOKE_MOBS[e.type]?.weapon):kind==='npc'?(npcTools[e.id]||'unarmed'):weaponKind(e);
   const prop=propForWeapon[w],visual=prop?(gearReady(prop)?'asset':'shape'):'none';
   const shield=e.equipped?.offhand?(gearReady(shieldProp)?'asset':'shape'):'none';
-  if(kind==='mob'){if(e.type==='WOLF'){ensure('Wolf');return 'WOLF|'+(assets.Wolf?'authored':'pending');}const cfg=RIGGED_MOBS[e.type];return [e.type||kind,visual,cfg?.gear?gearReady(cfg.gear):'',cfg?.shield?gearReady(cfg.shield):''].join('|');}
+  if(kind==='mob'){if(e.type==='WOLF'){ensure('Wolf');return 'WOLF|'+(assets.Wolf?'authored':'pending');}const bespoke=BESPOKE_MOBS[e.type];if(bespoke){ensure(bespoke.model);return [e.type,assets[bespoke.model]?'authored':'pending',visual].join('|');}const cfg=RIGGED_MOBS[e.type];return [e.type||kind,visual,e.type==='SKELETON'&&skeletonModel(e)==='Skeleton_Warrior'?gearReady('Skeleton_Axe'):cfg?.gear?gearReady(cfg.gear):'',cfg?.shield?gearReady(cfg.shield):''].join('|');}
   if(kind==='npc')return e.id+'|'+e.body+'|'+e.hat+'|'+visual;
   const q=e.equipped||{},d=e.dyes||q.dyes||{};
   const weaponAsset=itemVisual(q.weapon,'weapon'),shieldAsset=itemVisual(q.offhand,'offhand');
@@ -453,9 +495,9 @@ export async function createActors(pc,app,bridge){
   now+=dt;const seen=new Set(),p=bridge.getPlayer(),cam=bridge.getCamera();
   const bounds=bridge.getViewBounds?.()||{minX:cam.x-.5,maxX:cam.x+bridge.VP_W+.5,minY:cam.y-.5,maxY:cam.y+bridge.VP_H+.5};
   const visible=e=>{const x=e.renderX??e.x??e.pos?.x,z=e.renderY??e.y??e.pos?.y;return Number.isFinite(x)&&x>=bounds.minX&&x<bounds.maxX&&z>=bounds.minY&&z<bounds.maxY;};
-  const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id);const expected=kind==='mob'&&RIGGED_MOBS[e.type]?ready(RIGGED_MOBS[e.type].preferred,RIGGED_MOBS[e.type].model):kind==='npc'?humanoidModel(e,kind,id,npcTools[e.id]||'unarmed'):kind==='player'||kind==='remote'?humanoidModel(e,kind,id,weaponKind(e)):null;if(rec&&(rec.sig!==sig||expected&&rec.model!==expected)){dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);// First sight and visual rebuilds consume the current cooldown snapshot; they are not new attacks.
+  const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id);const expected=kind==='mob'&&RIGGED_MOBS[e.type]?(e.type==='SKELETON'?skeletonModel(e):ready(RIGGED_MOBS[e.type].preferred,RIGGED_MOBS[e.type].model)):kind==='mob'&&BESPOKE_MOBS[e.type]&&assets[BESPOKE_MOBS[e.type].model]?BESPOKE_MOBS[e.type].model:kind==='npc'?humanoidModel(e,kind,id,npcTools[e.id]||'unarmed'):kind==='player'||kind==='remote'?humanoidModel(e,kind,id,weaponKind(e)):null;if(rec&&(rec.sig!==sig||expected&&rec.model!==expected)){dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);// First sight and visual rebuilds consume the current cooldown snapshot; they are not new attacks.
    rec.previousTimer=e.attackTimer||0;rec.previousAtkAnim=e.atkAnim||0;rec.previousArtAttackAt=e.artAttackAt||0;rec.sig=sig;entries.set(id,rec);}rec.data=e;
-   const x=(e.renderX??e.x??e.pos?.x)+.5,z=(e.renderY??e.y??e.pos?.y)+.5;const distance=Number.isFinite(rec.lastX)?Math.hypot(x-rec.lastX,z-rec.lastZ):0;const moving=distance>.0008;rec.entity.setPosition(x,0,z);
+   const x=(e.renderX??e.x??e.pos?.x)+.5,z=(e.renderY??e.y??e.pos?.y)+.5;const distance=Number.isFinite(rec.lastX)?Math.hypot(x-rec.lastX,z-rec.lastZ):0;const moving=distance>.0008;rec.entity.setPosition(x,rec.groundOffset||0,z);
    let angle=FORWARD[e.dir]??(moving?Math.atan2(x-rec.lastX,z-rec.lastZ)*180/Math.PI:rec.angle||0);rec.angle=angle;rec.entity.setEulerAngles(0,angle+(rec.angleOffset||0),0);
    const timer=e.attackTimer||0,atk=e.atkAnim||0,hit=e.artAttackAt||0;
    const newStrike=timer>rec.previousTimer+60||(atk>0&&rec.previousAtkAnim<=0)||(hit>0&&hit!==rec.previousArtAttackAt);
@@ -472,14 +514,14 @@ export async function createActors(pc,app,bridge){
     // Finish windup, contact and recovery inside the existing attack interval.
     const cadence=(timer||e.attackDelay||800)/1000;rec.attackSeconds=Math.max(.3,Math.min(duration,cadence*.9));rec.attackSpeed=duration/rec.attackSeconds;
     rec.strikeUntil=now+rec.attackSeconds;rec.lastStrikeAt=now;
-    const phase=drawDuration?drawDuration/duration:rec.animal?.525:rec.w==='staff'?.3214:rec.w==='bow'||rec.w==='crossbow'?.4219:rec.w==='unarmed'?.3409:.5625;
+    const phase=rec.contactPhase||(drawDuration?drawDuration/duration:rec.animal?.525:rec.w==='staff'?.3214:rec.w==='bow'||rec.w==='crossbow'?.4219:rec.w==='unarmed'?.3409:.5625);
     rec.attackStartedAt=performance.now();rec.attackContactTime=now+rec.attackSeconds*phase;rec.attackContactAt=rec.attackStartedAt+rec.attackSeconds*phase*1000;rec.attackSequence=++gestureSerial;rec.contactSent=false;
     document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'prepare',sequence:rec.attackSequence,contactAt:rec.attackContactAt,durationMs:rec.attackSeconds*1000}}));
    }
    if(!rec.contactSent&&Number.isFinite(rec.attackContactTime)&&now>=rec.attackContactTime){
     rec.contactSent=true;document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'contact',sequence:rec.attackSequence,contactAt:rec.attackContactAt}}));
    }
-   if(rec.model){const attacking=now<rec.strikeUntil,series=!!seriesRig(rec.model),speed=distance/Math.max(dt,.001);let state=e.hp<=0?(rec.animal?'Death':'Death_A'):attacking?(rec.attackLeadState&&now<rec.attackContactTime?rec.attackLeadState:rec.attackState):moving?(rec.animal?(speed>2.5?'Gallop':'Walk'):'Running_A'):series?'Idle_A':'Idle';
+   if(rec.model){const attacking=now<rec.strikeUntil,series=!!seriesRig(rec.model),speed=distance/Math.max(dt,.001);let state=e.hp<=0?(rec.deathClip||(rec.animal?'Death':'Death_A')):attacking?(rec.attackLeadState&&now<rec.attackContactTime?rec.attackLeadState:rec.attackState):moving?(rec.moveClip||(rec.animal?(speed>2.5?'Gallop':'Walk'):'Running_A')):(rec.idleClip||(series?'Idle_A':'Idle'));
     if(state!==rec.state||strikeStarted&&attacking){rec.entity.anim.baseLayer.transition(state,strikeStarted?.035:.1,0);rec.state=state;}
     rec.entity.anim.speed=attacking?rec.attackSpeed:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
    }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type==='SOMBRA'?Math.sin(now*3)*.075:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;

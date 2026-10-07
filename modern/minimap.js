@@ -77,6 +77,10 @@ export function createMinimap(canvas, legend, bridge) {
                 mark(service.x, service.y, words[service.kind] || service.kind, '#80d7c9', 'diamond');
             }
         } else if (floor === 0) {
+            for (const expedition of bridge.getExpeditionEntrances?.() || []) {
+                mark(expedition.npc?.x, expedition.npc?.y,
+                    language === 'en' ? expedition.nameEn : expedition.name, '#ffb55d', 'diamond');
+            }
             for (const room of bridge.getInteriors?.() || []) {
                 mark(room.door?.x, room.door?.y,
                     roomNames[language]?.[room.id] || room.label || words.door, '#efce8f', 'diamond');

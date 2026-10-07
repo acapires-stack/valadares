@@ -1,39 +1,40 @@
 // KayKit Fantasy Weapons Bits 1.0 EXTRA plus real crossbows from Adventurers 2.0.
+// Item-colored variants preserve the source geometry and its matching inventory icon.
 // Model identity is independent of combat stats. Neither package has a wooden club.
 const MODEL_BY_ITEM = Object.freeze({
- ADAGA:'dagger_A', ADAGA_DUPLA:'dagger_C',
- ESPADA:'sword_B', ESPADA_OSSO:'sword_A', SABRE:'sword_C', ESPADA_ACO:'sword_D',
- LAMINA_DRACO_1H:'sword_F', ESPADA_GUARDIAO:'sword_E',
- LAMINA_ETERNA_1H:'sword_E', LAMINA_CELESTIAL_1H:'sword_G',
- ESPADA_LONGA:'sword_E', ESPADA_DRACO:'sword_F', ESPADA_HL:'sword_E',
- ESPADA_ETERNA:'sword_E', ESPADA_INFINITA:'sword_G',
- // The wooden staff is an honest visual approximation for the missing club geometry.
- PORRETE:'staff_A', CLAVA:'staff_A', BORDAO:'staff_B',
+ ADAGA:'dagger_A', ADAGA_DUPLA:'dagger_B',
+ ESPADA:'sword_B', ESPADA_OSSO:'sword_B__ESPADA_OSSO', SABRE:'sword_C', ESPADA_ACO:'sword_D',
+ LAMINA_DRACO_1H:'sword_F', ESPADA_GUARDIAO:'sword_E__ESPADA_GUARDIAO',
+ LAMINA_ETERNA_1H:'sword_E__LAMINA_ETERNA_1H', LAMINA_CELESTIAL_1H:'sword_G',
+ ESPADA_LONGA:'sword_E', ESPADA_DRACO:'sword_F', ESPADA_HL:'sword_E__ESPADA_HL',
+ ESPADA_ETERNA:'sword_E__ESPADA_ETERNA', ESPADA_INFINITA:'sword_G',
+ // Display names match these authored silhouettes: rustic hammer, iron mace,
+ // metal-banded quarterstaff, and a single steel dagger. Combat IDs stay stable.
+ PORRETE:'hammer_A', CLAVA:'hammer_B', BORDAO:'staff_A',
  MACA:'hammer_A', MARTELO:'hammer_B', MARRETA:'hammer_C', MACA_GIGANTE:'hammer_D',
- MARTELO_GOLEM:'hammer_C', MARTELO_COLOSSO:'hammer_D',
- MARTELO_ETERNAL:'hammer_D', MARTELO_CELESTIAL:'hammer_D',
- MACHADO:'axe_A', MACHADO_MINO:'axe_B', MACHADO_FORJA:'axe_C',
- MACHADO_RUINAS:'axe_D', MACHADO_CATACLISMO:'axe_D', MACHADO_ABISMO:'axe_D',
- ARCO:'bow_A_withString', ARCO_CACA:'bow_B_withString', ARCO_DRACO:'bow_C_withString',
- ARCO_ECLIPSE:'bow_B_withString', ARCO_ASTRAL:'bow_C_withString',
+ MARTELO_GOLEM:'hammer_C', MARTELO_COLOSSO:'hammer_D__MARTELO_COLOSSO',
+ MARTELO_ETERNAL:'hammer_D__MARTELO_ETERNAL', MARTELO_CELESTIAL:'hammer_D__MARTELO_CELESTIAL',
+ MACHADO:'axe_A', MACHADO_MINO:'axe_B', MACHADO_FORJA:'axe_C__MACHADO_FORJA',
+ MACHADO_RUINAS:'axe_D__MACHADO_RUINAS', MACHADO_CATACLISMO:'axe_D__MACHADO_CATACLISMO', MACHADO_ABISMO:'axe_D__MACHADO_ABISMO',
+ ARCO:'bow_A_withString', ARCO_CACA:'bow_B_withString', ARCO_DRACO:'bow_B_withString__ARCO_DRACO',
+ ARCO_ECLIPSE:'bow_B_withString__ARCO_ECLIPSE', ARCO_ASTRAL:'bow_C_withString__ARCO_ASTRAL',
  BESTA:'crossbow_1handed', BESTA_GUARDIAO:'crossbow_2handed',
- LANCA:'spear_A', LANCA_LONGA:'spear_B', LANCA_DRACO:'spear_B',
- LANCA_GUARDIAO:'spear_A', LANCA_ETERNA:'spear_B', LANCA_CELESTIAL:'spear_A',
- ESCUDO_MAD:'shield_A', ESCUDO_FERRO:'shield_B', ESCUDO_OSSO:'shield_C',
- ESCUDO_PEDRA:'shield_C', ESCUDO_GUARDIAO:'shield_D',
- ESCUDO_ETERNAL:'shield_D', ESCUDO_CELESTIAL:'shield_B',
+ LANCA:'spear_A', LANCA_LONGA:'spear_B', LANCA_DRACO:'spear_B__LANCA_DRACO',
+ LANCA_GUARDIAO:'spear_A', LANCA_ETERNA:'spear_B', LANCA_CELESTIAL:'spear_A__LANCA_CELESTIAL',
+ ESCUDO_MAD:'shield_C', ESCUDO_FERRO:'shield_B', ESCUDO_OSSO:'shield_A__ESCUDO_OSSO',
+ ESCUDO_PEDRA:'shield_A__ESCUDO_PEDRA', ESCUDO_GUARDIAO:'shield_D__ESCUDO_GUARDIAO',
+ ESCUDO_ETERNAL:'shield_D__ESCUDO_ETERNAL', ESCUDO_CELESTIAL:'shield_B__ESCUDO_CELESTIAL',
  VARINHA_APRENDIZ:'wand_A', CAJADO_FOGO:'staff_D', CAJADO_GELO:'staff_B',
- CAJADO_RAIO:'staff_C', CAJADO_RUNICO:'staff_C', CAJADO_ETERNO:'staff_D',
- CAJADO_ASTRAL:'staff_B',
+ CAJADO_RAIO:'staff_C__CAJADO_RAIO', CAJADO_RUNICO:'staff_C__CAJADO_RUNICO', CAJADO_ETERNO:'staff_D',
+ CAJADO_ASTRAL:'staff_B__CAJADO_ASTRAL',
 });
 
 const KINDS = Object.freeze({
  dagger:'dagger', sword:'sword', staff:'staff', hammer:'mace', axe:'axe',
  bow:'bow', spear:'spear', shield:'shield', wand:'wand',crossbow:'crossbow',
 });
-const ITEM_KIND = Object.freeze({PORRETE:'club',CLAVA:'club',BORDAO:'club'});
 const TARGET_HEIGHT = Object.freeze({dagger:.58,sword:.82,staff:1.05,mace:.82,axe:.84,
- bow:.91,spear:1.42,shield:.66,wand:.58,club:.66,crossbow:.85});
+ bow:.91,spear:1.42,shield:.66,wand:.58,crossbow:.85});
 const TWO_HAND_HEIGHT = Object.freeze({sword:1.12,mace:1.04,axe:1.1,staff:1.05});
 // Major dimension (metres) from the source glTF POSITION accessors. Bow uses X,
 // crossbow uses Z, and other mapped items use Y. Deterministic before fetch.
@@ -70,17 +71,17 @@ export function resolverEquipmentVisual(itemId, definition, slot){
  const baseId=itemId.replace(/_PLUS_\d+$/,'');
  const name=MODEL_BY_ITEM[baseId];
  if(!name) return null;
- const kind=ITEM_KIND[baseId]||Object.entries(KINDS).find(([prefix])=>name.startsWith(prefix))?.[1];
+ const kind=Object.entries(KINDS).find(([prefix])=>name.startsWith(prefix))?.[1];
  if(!kind || (slot==='offhand')!==(kind==='shield')) return null;
  if(definition && !['weapon','wand','offhand'].includes(definition.kind)) return null;
  const bounds=modelManifest?.get(name)?.bounds;
  const extent=bounds ? bounds.max.map((v,i)=>v-bounds.min[i]) : null;
  const twoHand=definition?.hand==='2h';
- const desired=twoHand&&TWO_HAND_HEIGHT[kind]||TARGET_HEIGHT[kind];
- const major=extent ? (kind==='bow' ? extent[0] : kind==='crossbow' ? extent[2] : extent[1]) : MODEL_MAJOR[name];
+ const desired=baseId==='BORDAO'?.95:(twoHand&&TWO_HAND_HEIGHT[kind]||TARGET_HEIGHT[kind]);
+ const major=extent ? (kind==='bow' ? extent[0] : kind==='crossbow' ? extent[2] : extent[1]) : MODEL_MAJOR[name.split('__')[0]];
  // The hand slot is below the scaled Knight root (~0.45 of authored size).
  // The measured local scale compensates for that inherited character scale.
- const inheritedScaleCorrection=kind==='shield'?1.75:['axe','mace','club'].includes(kind)?1.6:2.2;
+ const inheritedScaleCorrection=kind==='shield'?1.75:['axe','mace'].includes(kind)?1.6:2.2;
  const scale=kind==='crossbow'?1:major && major>0 ? inheritedScaleCorrection*desired/major : null;
  // Bow source runs along X, crossbow along Z; other held items run along Y.
  const rotation=kind==='shield'?[0,0,90]:kind==='bow'?[0,0,180]:kind==='crossbow'?[0,0,90]:[0,90,180];

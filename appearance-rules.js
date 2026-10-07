@@ -41,5 +41,10 @@
       ? { v: 1, body: value.body, palette: value.palette }
       : { v: 1, body: 'knight', palette: 'original' };
   }
-  return Object.freeze({ APPEARANCE_BODIES, APPEARANCE_PALETTES, isValidAppearance, normalizarAppearance });
+  function normalizarAppearanceOwned(value) {
+    if (!Array.isArray(value)) return [];
+    const paid = new Set(APPEARANCE_BODIES.filter(body => body.priceGold > 0).map(body => body.id));
+    return [...new Set(value.filter(id => typeof id === 'string' && paid.has(id)))];
+  }
+  return Object.freeze({ APPEARANCE_BODIES, APPEARANCE_PALETTES, isValidAppearance, normalizarAppearance, normalizarAppearanceOwned });
 });

@@ -66,6 +66,7 @@
     };
     const robotExpedition = {
         ...expedition,id:'forja_esquecida',name:'Forja Esquecida',nameEn:'Forgotten Forge',
+        npc:{x:75,y:33},
         enemies:['FORGE_SENTRY','FORGE_CONSTRUCT'],boss:'FORGE_WARDEN',
     };
     return Object.freeze({items,recipes,families,ascendantPools,expedition,robotExpedition});

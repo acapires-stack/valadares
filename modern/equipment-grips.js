@@ -45,8 +45,8 @@ export function resolverEmpunhadura(model, kind, transform, bodyScale, itemName)
     // Medium Draw lowers the hand near the ground for part of its windup.
     // A compact bow, gripped slightly below center, clears the floor there.
     const desiredWorldLength = model === LARGE ? 1.25
-      : modern || SERIES6.has(model) ? itemName === 'bow_B_withString' ? .70 : .75
-      : itemName === 'bow_B_withString' ? .86 : .94;
+      : modern || SERIES6.has(model) ? itemName?.startsWith('bow_B_withString') ? .70 : .75
+      : itemName?.startsWith('bow_B_withString') ? .86 : .94;
     const scale = transform.scale * desiredWorldLength / (2.2 * .91 * sy);
     return {
       ...transform,
@@ -59,7 +59,7 @@ export function resolverEmpunhadura(model, kind, transform, bodyScale, itemName)
     // Spear_A points along +Z after rotation, so the XZ width profile controls
     // its world length. Move the model toward its tip to grip farther back on
     // the shaft and keep the butt above the floor during the stab windup.
-    const spearB = itemName === 'spear_B';
+    const spearB = itemName?.startsWith('spear_B');
     const desiredWorldLength = model === LARGE ? 1.90 : 1.42;
     const scale = transform.scale * desiredWorldLength / (2.2 * 1.42 * sx);
     return {...transform, position: spearB && model !== LARGE ? [-.8, -.50, 0] : [-.6, 0, 0], rotationQuaternion: SPEAR, scale};
