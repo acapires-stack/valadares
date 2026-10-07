@@ -3,14 +3,15 @@
 <head>
 <!-- GA4 carregado só após consentimento; Clarity fica fora da página de jogo. Ver consent.js -->
 <script src="/consent.js" defer></script>
-<script src="/equipment-rules.js?v=1"></script>
+<script src="/equipment-rules.js?v=2"></script>
 <script src="/appearance-rules.js?v=2"></script>
+<script src="/weapon-techniques-rules.js?v=1"></script>
 <link rel="stylesheet" href="/appearance-ui.css?v=2">
 <script src="/game-audio.js?v=4"></script>
 <script src="/progression-content.js?v=4"></script>
 <script src="/modern-world.js?v=2"></script>
 <script src="/movement-sync.js?v=1"></script>
-<link rel="stylesheet" href="/enchanting.css?v=1">
+<link rel="stylesheet" href="/enchanting.css?v=2">
 <link rel="stylesheet" href="/transmutation.css?v=5">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -2345,7 +2346,8 @@
     <div class="chest-box" style="min-width:560px;max-width:640px">
         <div class="chest-title" data-i18n="modal.talents">⚜ TALENTOS</div>
         <div id="talentsSummary" style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px"></div>
-        <div id="talentsList" style="max-height:60vh;overflow-y:auto;padding-right:4px"></div>
+        <div id="weaponTechniquesPanel" style="max-height:35vh;overflow-y:auto;padding-right:4px"></div>
+        <div id="talentsList" style="max-height:32vh;overflow-y:auto;padding-right:4px"></div>
         <div class="chest-hint" style="margin-top:10px" data-i18n-html="talents.hint">
             1 ponto a cada 10 níveis totais de skill &nbsp;|&nbsp; talentos são permanentes &nbsp;|&nbsp; <kbd>K</kbd> ou <kbd>ESC</kbd> fechar
         </div>
@@ -2353,6 +2355,7 @@
         <button class="chest-close" onclick="closeTalents()">×</button>
     </div>
 </div>
+<div id="weaponTechniqueCharge" style="display:none;position:fixed;right:14px;bottom:72px;z-index:900;color:#e8cc85;background:#1f1b17df;border:1px solid #75603c;border-radius:5px;padding:5px 9px;font-size:11px;pointer-events:none"></div>
 
 <div id="achievementsModal" style="display:none">
     <div class="chest-box" style="min-width:560px;max-width:640px">
@@ -7924,7 +7927,7 @@ function connectMP(){
 function sendJoinNow(){
     if (!ws || ws.readyState !== 1) return;
     try {
-        ws.send(JSON.stringify({t:'join', movementVersion:1, equipmentVersion:1, name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
+        ws.send(JSON.stringify({t:'join', movementVersion:1, equipmentVersion:ValadaresEquipment.VERSION, name:player.name, lang: LANG, x:player.x, y:player.y, pvp:player.pvp,
                                 hp:player.hp, maxHp:player.maxHp, equipped:player.equipped,
                                 badges: (player.equippedBadges || []).slice(0, 2)}));
     } catch {}
@@ -7934,6 +7937,7 @@ function handleMP(msg){
     if (msg.t === 'posAck') { movementSync.ack(msg); return; }
     if (['state','dungeonEnter','dungeonExit','forceTeleport'].includes(msg.t)) {
         clearConfirmedCombatSounds();
+        if(msg.t==='state')window.ValadaresWeaponTechniquesUI?.clear();
         movementSync.reset(msg.movement);
     }
     if (msg.t === 'authOk'){
@@ -8102,6 +8106,12 @@ function handleMP(msg){
                 groundItems.push({ id: d.id, x: d.x, y: d.y, type: d.type, qty: d.qty, owner: d.owner, ownerName: d.ownerName, ownerUntil: d.ownerUntil });
             }
         }
+    } else if (msg.t === 'techniqueState'){
+        window.ValadaresWeaponTechniquesUI?.onState(msg);
+    } else if (msg.t === 'techniqueProc'){
+        const record=confirmedCombatSounds.get(String(msg.eventId||''));
+        if(record)record.techniqueTargets=(msg.targets||[]).filter(x=>!x.main).map(x=>String(x.id));
+        window.ValadaresWeaponTechniquesUI?.onProc(msg);
     } else if (msg.t === 'appearanceResult'){
         if (AppearanceRules.isValidAppearance(msg.appearance)) player.appearance = AppearanceRules.normalizarAppearance(msg.appearance);
         if ('appearanceOwned' in msg) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(msg.appearanceOwned);
@@ -8229,6 +8239,7 @@ function handleMP(msg){
         // N3: server é dono do inv. Cliente reflete autoridade.
         if (msg.inv && typeof msg.inv === 'object') player.inv = msg.inv;
         if (typeof msg.gold === 'number') player.gold = msg.gold;
+        if (typeof msg.gold === 'number') window.ValadaresWeaponTechniquesUI?.setGold(msg.gold);
         if ('appearanceOwned' in msg) player.appearanceOwned = AppearanceRules.normalizarAppearanceOwned(msg.appearanceOwned);
         // M6 Pet: estado autoritativo do server (posse/nível) + equipado persistido.
         if (msg.pets && typeof msg.pets === 'object') player.pets = msg.pets;
@@ -15305,6 +15316,10 @@ function launchPresentedShot(shot){
             shot.record.death.presentation.contactAt=shot.landingAt;
             window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(shot.record.death.presentation);
         }
+        for(const entry of shot.record.techniqueDeaths||[]){
+            entry.presentation.contactAt=shot.landingAt;
+            window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(entry.presentation);
+        }
         shot.record.schedule();
     }
 }
@@ -15333,6 +15348,10 @@ document.addEventListener?.('valadares:actor-gesture',event=>{
             shot.record.death.presentation.contactAt=shot.contactAt+shot.projectile.duration;
             window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(shot.record.death.presentation);
         }
+        for(const entry of shot.record?.techniqueDeaths||[]){
+            entry.presentation.contactAt=shot.contactAt+shot.projectile.duration;
+            window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(entry.presentation);
+        }
         clearTimeout(shot.launchTimer);
         shot.launchTimer=setTimeout(()=>launchPresentedShot(shot),Math.max(0,shot.contactAt-now));
     }else if(gesture.phase==='contact'){
@@ -15343,6 +15362,12 @@ document.addEventListener?.('valadares:actor-gesture',event=>{
 function queueConfirmedMobFloat(msg){
     const dmg=-Number(msg.text),now=performance.now();
     if(!(dmg>0))return false;
+    const techniqueRecord=[...confirmedCombatSounds.values()].reverse().find(r=>
+        r.techniqueTargets?.includes(String(msg.mobId)) && r.floor===(player.floor||0));
+    if(techniqueRecord){
+        const mob=monsters.find(m=>String(m.id)===String(msg.mobId));
+        if(mob){(techniqueRecord.techniqueFloats??=[]).push({msg,mob:{...mob}});return true;}
+    }
     for(let i=recentRangedFloats.length-1;i>=0;i--)
         if(now-recentRangedFloats[i].receivedAt>1000)recentRangedFloats.splice(i,1);
     const matches=[...confirmedCombatSounds.values(),...recentRangedFloats].filter(r=>
@@ -15358,6 +15383,7 @@ function clearConfirmedCombatSounds(targetId,targetType='monster',resetSeen=fals
         if (targetId!==undefined && (String(record.targetId)!==String(targetId) || record.targetType!==targetType)) continue;
         clearTimeout(record.timer); cancelAnimationFrame(record.frame); confirmedCombatSounds.delete(id);
         if(record.death)actors?.cancelConfirmedDeath?.(id);
+        for(const entry of record.techniqueDeaths||[])actors?.cancelConfirmedDeath?.(entry.presentation.eventId);
     }
     for(const shot of pendingRangedShots.values())
         if(targetId===undefined || (String(shot.targetId)===String(targetId) && shot.targetType===targetType))
@@ -15373,11 +15399,12 @@ function presentConfirmedMobDeath(targetId,killSound,fallbackMob,originFloor){
     const actors=window.ValadaresModern?.state==='ready' ? window.ValadaresModern.renderer?.actors : null;
     if(!actors?.retainConfirmedDeath || document.hidden || (Number.isFinite(originFloor) && originFloor!==(player.floor||0)))return false;
     const record=[...confirmedCombatSounds.values()].reverse().find(r=>r.targetType==='monster' &&
-        String(r.targetId)===String(targetId) && r.floor===(player.floor||0));
-    const mob=record?.mob || monsters.find(m=>String(m.id)===String(targetId)) || (Number.isFinite(originFloor)?fallbackMob:null);
+        (String(r.targetId)===String(targetId)||r.techniqueTargets?.includes(String(targetId))) && r.floor===(player.floor||0));
+    const techniqueSecondary=!!record && String(record.targetId)!==String(targetId);
+    const mob=(techniqueSecondary?null:record?.mob) || monsters.find(m=>String(m.id)===String(targetId)) || (Number.isFinite(originFloor)?fallbackMob:null);
     if(!mob)return false;
     const now=performance.now(),contactAt=record ? record.contactAt??record.receivedAt+500 : now;
-    const presentation={eventId:record?.eventId||`death:${player.floor||0}:${targetId}`,targetId,mob:{...mob},
+    const presentation={eventId:techniqueSecondary?`${record.eventId}:technique:${targetId}`:record?.eventId||`death:${player.floor||0}:${targetId}`,targetId,mob:{...mob},
         floor:player.floor||0,contactAt};
     // For a bow shot, the confirmed death waits for the arrow's landing.
     if(record?.shot && !record.shot.launched){
@@ -15385,11 +15412,13 @@ function presentConfirmedMobDeath(targetId,killSound,fallbackMob,originFloor){
             ? record.shot.contactAt+record.shot.projectile.duration
             : now+700+record.shot.projectile.duration;
         if(!actors.retainConfirmedDeath(presentation))return false;
+        if(techniqueSecondary){(record.techniqueDeaths??=[]).push({killSound:!!killSound,presentation});return true;}
         record.death={killSound:!!(killSound||record.death?.killSound),presentation};
         return true;
     }
     if(!actors.retainConfirmedDeath(presentation))return false;
     if(!record)return false; // Past contact/no pending hit: death is presented immediately.
+    if(techniqueSecondary){(record.techniqueDeaths??=[]).push({killSound:!!killSound,presentation});return true;}
     record.death={killSound:!!(killSound||record.death?.killSound),presentation};
     return true;
 }
@@ -15399,7 +15428,7 @@ function queueConfirmedCombatSound(msg){
     if (!eventId || confirmedCombatSounds.has(eventId) || playedCombatEvents.has(eventId)) return;
     const modern=window.ValadaresModern?.state==='ready';
     const details={eventId,weaponType:msg.weaponType,spell:msg.spell,critical:!!msg.critical};
-    if (!modern){playGameSound('impact',details);return;}
+    if (!modern){playGameSound('impact',details);window.ValadaresWeaponTechniquesUI?.onConfirmedImpact(eventId);return;}
     const candidateShot=pendingRangedShots.get(msg.attackPresentationAt);
     const pendingShot=candidateShot && String(candidateShot.targetId)===String(msg.targetId) &&
         candidateShot.targetType===(msg.targetType||'monster') && candidateShot.floor===(player.floor||0)
@@ -15420,6 +15449,7 @@ function queueConfirmedCombatSound(msg){
         const first=confirmedCombatSounds.keys().next().value,old=confirmedCombatSounds.get(first);
         clearTimeout(old.timer);cancelAnimationFrame(old.frame);confirmedCombatSounds.delete(first);
         if(old.death)window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(first);
+        for(const entry of old.techniqueDeaths||[])window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(entry.presentation.eventId);
     }
     const play=()=>{
         if (confirmedCombatSounds.get(eventId)!==record) return;
@@ -15431,11 +15461,13 @@ function queueConfirmedCombatSound(msg){
             (record.actor && (actor!==record.actor || actor.attackSequence!==record.sequence)) ||
             (!record.death && record.selection!=null && (String(player.target)!==String(record.selection) || player.targetType!==record.selectionType))))) {
             if(record.death)window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(eventId);
+            for(const entry of record.techniqueDeaths||[])window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(entry.presentation.eventId);
             return;
         }
         playedCombatEvents.set(eventId,performance.now());
         if(playedCombatEvents.size>128)playedCombatEvents.delete(playedCombatEvents.keys().next().value);
         playGameSound('impact',details);
+        window.ValadaresWeaponTechniquesUI?.onConfirmedImpact(eventId);
         if(record.shot && record.targetType==='monster' && record.mob){
             addFloat(record.mob.x,record.mob.y,`-${record.amount}`,
                 details.critical?'#ffaa20':'#ff8060',details.critical,details.critical?-10:0);
@@ -15444,7 +15476,13 @@ function queueConfirmedCombatSound(msg){
             recentRangedFloats.push(record);
             if(recentRangedFloats.length>32)recentRangedFloats.shift();
         }
+        for(const entry of record.techniqueFloats||[]){
+            addFloat(entry.mob.x,entry.mob.y,entry.msg.text,entry.msg.color||'#e8bc62',false);
+            window.ValadaresAdventureFeedback?.hit?.({x:entry.mob.renderX??entry.mob.x,
+                y:entry.mob.renderY??entry.mob.y,kind:'dealt',crit:false,confirmed:true});
+        }
         if(record.death?.killSound)sndKill();
+        if(record.techniqueDeaths?.some(entry=>entry.killSound))sndKill();
     };
     if(record.shot){
         record.schedule=()=>{
@@ -15470,6 +15508,10 @@ function queueConfirmedCombatSound(msg){
         if(record.death){
             record.death.presentation.contactAt=record.contactAt;
             window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(record.death.presentation);
+        }
+        for(const entry of record.techniqueDeaths||[]){
+            entry.presentation.contactAt=record.contactAt;
+            window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(entry.presentation);
         }
         if (wait>0) record.timer=setTimeout(play,wait); else play();
     });
@@ -15856,6 +15898,7 @@ function openTalents(){
     closeAllModals();
     document.getElementById('talentsModal').style.display = 'flex';
     renderTalents();
+    window.ValadaresWeaponTechniquesUI?.render();
 }
 function closeTalents(){
     document.getElementById('talentsModal').style.display = 'none';
@@ -18241,10 +18284,24 @@ function loop(ts){
 <script src="/journey-ui.js?v=3"></script>
 <script src="/adventure-feedback.js?v=20261005b"></script>
 <script src="/training-rules.js?v=1"></script>
-<script src="/enchanting-ui.js?v=1"></script>
+<script src="/enchanting-ui.js?v=2"></script>
 <script src="/transmutation-rules.js?v=5"></script>
 <script src="/transmutation-ui.js?v=5"></script>
 <script src="/appearance-ui.js?v=2"></script>
+<script src="/weapon-techniques-ui.js?v=1"></script>
+<script>
+window.ValadaresWeaponTechniquesUI?.init({
+    lang:()=>LANG,
+    floor:()=>player.floor||0,
+    send:message=>{if(ws?.readyState===1)ws.send(JSON.stringify(message));},
+    toast:text=>{if(typeof showServerToast==='function')showServerToast('warn',text);else log(text);},
+    present:message=>{
+        const def=window.WeaponTechniquesRules?.BY_ID[message.techniqueId];
+        const target=message.targets?.find(t=>t.main);
+        if(def && target && typeof addFloat==='function')addFloat(target.x,target.y,LANG==='en'?def.nameEn:def.name,'#e8cb76',false,-22);
+    }
+});
+</script>
 <script type="module">
 if (window.VALADARES_MODERN) {
     await import('/modern/entry.js?v=20261006');

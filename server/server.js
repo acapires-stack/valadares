@@ -13,6 +13,9 @@ const progression = require('../progression-content');
 const modernWorld = require('../modern-world');
 const appearanceRules = require('../appearance-rules');
 const appearanceService = require('./appearance-service');
+const weaponTechniques = require('../weapon-techniques-rules');
+const mobPursuit = require('./mob-pursuit');
+const WEAPON_TECHNIQUES_ENABLED = process.env.WEAPON_TECHNIQUES_ENABLED !== '0';
 const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
@@ -1074,6 +1077,7 @@ function updateEnchantSave(p){
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
         permaBuffs:p.permaBuffs,appearance:appearanceRules.normalizarAppearance(p.appearance),
         appearanceOwned:appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
+        weaponTechniques:weaponTechniques.normalize(p.weaponTechniques),
         appearanceOps:p.appearanceOps || [],
         hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
@@ -1250,6 +1254,24 @@ function grantManaOnKill(p){
         broadcastPstatsAll(p);
     }
 }
+function applyMobHitRecovery(p,dealtDamage,basicAttack){
+    if (!(dealtDamage > 0)) return {hp:0,mp:0};
+    const affixes = basicAttack ? equippedAffixes(p) : null;
+    const talentRate = (p.permaBuffs && p.permaBuffs.lifesteal) || 0;
+    const rate = talentRate + (affixes?.vampirism || 0)/100;
+    let hp=0,mp=0;
+    if (rate > 0 && (p.hp ?? 0) < (p.maxHp ?? 0)){
+        const desired = Math.max(talentRate > 0 ? 1 : 0,Math.round(dealtDamage * rate));
+        hp = Math.max(0,Math.min(p.maxHp - p.hp,desired));
+        p.hp += hp;
+    }
+    if (affixes?.manaOnHit > 0 && (p.mp || 0) < (p.maxMp || 0)){
+        mp = Math.max(0,Math.min(p.maxMp - p.mp,affixes.manaOnHit));
+        p.mp += mp;
+    }
+    if (hp || mp) broadcastPstatsAll(p);
+    return {hp,mp};
+}
 function forgeCostFor(baseKey, targetPlus){
     const sell = sellPriceFor(baseKey);
     const base = Math.max(20, sell * 2);
@@ -1270,6 +1292,7 @@ function sendInvUpdate(p, extra){
     if (!p || p.ws.readyState !== 1) return;
     const msg = { t:'invUpdate', inv: p.inv || {}, gold: p.gold || 0, equipped: p.equipped || null,
         appearanceOwned:appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
+        weaponTechniques:weaponTechniques.normalize(p.weaponTechniques),
         enchantToken:p.enchantToken || null,
         transmutationVersion:transmutationRules.VERSION, transmutationToken:p.transmutationToken || null,
         transmutationPity:p.transmutationPity || 0,
@@ -2009,9 +2032,7 @@ function genDungeonGrid(floor,seedOffset=0){
     }
     if (!up) up = far;   // sala minúscula: degenera
     // Sem fundo: TODO andar tem descida (= ponto mais fundo), exceto o teto técnico.
-    // Andar de banda (5, 10, 15…): o boss nasce no 2º ponto mais fundo a ≥3 tiles da
-    // descida — "guarda" a região da escada sem ocupar o tile dela (isTransitionTile
-    // não inclui boss de propósito, senão spawnMob bloquearia o spawn do próprio boss).
+    // Boss guarda a região funda, mas nunca ocupa chegada ou escadas.
     const lastFloor = floor >= DUNGEON_FLOOR_HARD_CAP;
     let bossSpot = null;
     if (isBossFloor(floor)){
@@ -2019,10 +2040,22 @@ function genDungeonGrid(floor,seedOffset=0){
         for (const t of floorTiles){
             const d = dist[idx(t.x - x0, t.y - y0)];
             if (d < 0) continue;
+            if ((t.x === DUNGEON_SPAWN.x && t.y === DUNGEON_SPAWN.y) ||
+                (t.x === up.x && t.y === up.y) ||
+                (!lastFloor && t.x === far.x && t.y === far.y)) continue;
             if (Math.max(Math.abs(t.x - far.x), Math.abs(t.y - far.y)) < 3) continue;
             if (d > bossD){ bossD = d; bossSpot = { x: t.x, y: t.y }; }
         }
-        if (!bossSpot) bossSpot = { x: far.x, y: far.y };   // caverna minúscula: degenera pro fundo
+        // Fallback ainda precisa ser uma casa distinta, inclusive em caverna compacta.
+        if (!bossSpot){
+            for (const t of floorTiles){
+                const d = dist[idx(t.x - x0, t.y - y0)];
+                if (d < 0 || (t.x === DUNGEON_SPAWN.x && t.y === DUNGEON_SPAWN.y) ||
+                    (t.x === up.x && t.y === up.y) ||
+                    (!lastFloor && t.x === far.x && t.y === far.y)) continue;
+                if (d > bossD){ bossD = d; bossSpot = { x: t.x, y: t.y }; }
+            }
+        }
     }
     // Retorno à cidade nas bandas a partir do 25. Escolhe chão alcançável perto
     // da subida, mas fora do alcance imediato das outras escadas e da chegada.
@@ -2099,9 +2132,9 @@ function mobTileOk(m, x, y){
 // Player pode pisar no tile? (movimento autoritativo do handler `pos`). Floor>=1
 // usa o grid real do andar; floor 0 usa o terreno do overworld. AO CONTRÁRIO de
 // mobTileOk, NÃO exclui PZ/santuário (o player FICA lá). E NÃO checa ocupação por
-// mob/NPC/outro player: isso é nicety de colisão do cliente, não exploit, e validar
-// arriscaria desync (server e cliente nem sempre concordam quem ocupa um tile no
-// mesmo instante → snap-back indevido). Só valida terreno: fecha teleporte/parede/água.
+// mob/NPC/outro player: terreno e colisão dinâmica são decisões separadas.
+// No handler pos, mob na casa de destino é deslocado se houver vaga; só o passo
+// sem vaga recebe correção. Caminhada livre não depende de ocupação dinâmica.
 function playerTileWalkable(p, x, y){
     const f = p.floor || 0;
     if (f >= 1) return dungeonTileWalkable(f, x, y);
@@ -2600,7 +2633,8 @@ function mobAt(x, y, floor){
 }
 function playerAt(x, y, floor){
     for (const p of players.values()){
-        if (p.disconnected) continue;
+        // Ghost de logout continua como corpo vivo até o encerramento da sessão.
+        if ((p.hp??100) <= 0) continue;
         if (floor !== undefined && (p.floor || 0) !== floor) continue;
         if (p.x === x && p.y === y) return p;
     }
@@ -2610,7 +2644,7 @@ function playerAt(x, y, floor){
 // entre tickAI do server e movimento client-authoritative).
 function bumpMobAwayFrom(x, y, floor){
     const m = mobAt(x, y, floor);
-    if (!m) return;
+    if (!m) return true;
     const f = m.floor || 0;
     const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
     for (const [dx, dy] of dirs){
@@ -2620,13 +2654,16 @@ function bumpMobAwayFrom(x, y, floor){
         if (mobAt(nx, ny, f)) continue;
         if (playerAt(nx, ny, f)) continue;
         m.x = nx; m.y = ny;
-        return;
+        return true;
     }
+    return false;
 }
 function spawnMob(type, x, y, floor, logicalDepth){
     const def = MTYPE[type];
     if (!def) return null;
     if (isTransitionTile(floor || 0, x, y)) return null;   // nunca spawna em cima de escada/chegada
+    if (mobAt(x,y,floor||0)) return null;
+    if (playerAt(x,y,floor||0)) return null;
     // Caverna do overworld pode se sobrepor a um santuário de NPC. O veto é
     // apenas à proteção: eventos especiais têm posições históricas próprias.
     if ((floor || 0) === 0 && (inSafe(x,y) || inSanctuary(x,y))) return null;
@@ -2774,6 +2811,7 @@ function spawnDungeonMobs(){
 // só rotula a direção no cliente (log/toast).
 function enterDungeonFloor(p, id, floor, dir){
     p.floor = floor;
+    resetTechniqueCharge(p);sendTechniqueState(p);
     const g = getDungeonFloor(floor);          // M4 3b: server é dono do layout do andar
     p.x = g.stairs.spawn.x; p.y = g.stairs.spawn.y;
     // Ranking de profundidade: andar mais fundo ALCANÇADO (persiste no state.json
@@ -2815,6 +2853,7 @@ function returnPlayerToTown(p, id, returnToExpeditionEntrance=false, returnToAut
     p.automaton=null;
     p.pvp = !!p._pvpBeforeDungeon;
     p.floor = 0;
+    resetTechniqueCharge(p);sendTechniqueState(p);
     p.x = returnPoint.x; p.y = returnPoint.y;
     if (p.ws && p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
@@ -2870,6 +2909,7 @@ function exitInterior(p,id,room){
 // toma poção nem reloga pra sair do 0). Agora o servidor RESSUSCITA de fato.
 function respawnPlayerServer(p, id){
     if (!p) return;
+    resetTechniqueCharge(p);sendTechniqueState(p);
     p.dots = [];                                   // clean slate: sem DoT herdado da morte (não sangra pós-respawn)
     p.hp = p.maxHp;
     p.mp = p.maxMp;
@@ -2986,49 +3026,8 @@ const ATTACK_CD_MS = 1100;
 // vários mobs cercam um player: (1) máx de mobs que ACERTAM por janela de cooldown;
 // (2) teto de dano por SEGUNDO como % do HP máx (rede de segurança contra burst).
 // Atacante único / boss raramente bate nos caps (1 < K e 1 hit < 30%/s). Hits absorvidos = 0.
-const SWARM_MAX_ATTACKERS   = parseInt(process.env.SWARM_MAX_ATTACKERS, 10)   || 4;
+const SWARM_MAX_ATTACKERS   = parseInt(process.env.SWARM_MAX_ATTACKERS, 10)   || 8;
 const SWARM_DMG_PCT_PER_SEC = parseFloat(process.env.SWARM_DMG_PCT_PER_SEC)   || 0.30;
-// Pega vaga adjacente ao player que melhor espalhe os mobs (intel >=2 cerca,
-// intel 3 prefere flanco atrás do player). Retorna {x,y} ou null se nada livre.
-function pickSurroundSlot(m, target){
-    const intel = m.intel || 1;
-    const slots = [];
-    for (let dy = -1; dy <= 1; dy++){
-        for (let dx = -1; dx <= 1; dx++){
-            if (!dx && !dy) continue;
-            const x = target.x + dx, y = target.y + dy;
-            if (x < 1 || y < 1 || x >= M_W-1 || y >= M_H-1) continue;
-            if (!mobTileOk(m, x, y)) continue;   // floor-aware: masmorra valida a sala; overworld = walkable + fora da PZ
-            const occ = mobAt(x, y, m.floor);
-            if (occ && occ !== m) continue;
-            if (playerAt(x, y, m.floor)) continue;
-            const d = Math.max(Math.abs(m.x - x), Math.abs(m.y - y));
-            let score = d;
-            // intel >=2: penaliza vagas perto de outros mobs (espalha)
-            if (intel >= 2){
-                let cluster = 0;
-                for (const om of monsters.values()){
-                    if (om === m || om.hp <= 0 || (om.floor||0) !== (m.floor||0)) continue;
-                    const od = Math.max(Math.abs(om.x - x), Math.abs(om.y - y));
-                    if (od <= 1) cluster++;
-                }
-                score += cluster * 0.8;
-            }
-            // intel 3: flanco — atrás do player (oposto à direção)
-            if (intel >= 3){
-                const back = {'up':[0,1],'down':[0,-1],'left':[1,0],'right':[-1,0]}[target.dir] || [0,0];
-                if (Math.sign(dx) === back[0] && Math.sign(dy) === back[1]) score -= 2.0;
-                else if (Math.sign(dx) === back[0] || Math.sign(dy) === back[1]) score -= 0.8;
-            }
-            // tiebreak determinístico por id (mob não fica oscilando)
-            const tiebreak = ((m.id * 31 + dx * 7 + dy * 11) % 100) / 1000;
-            slots.push({ x, y, score: score + tiebreak });
-        }
-    }
-    if (!slots.length) return null;
-    slots.sort((a,b) => a.score - b.score);
-    return slots[0];
-}
 // Esquiva do player SERVER-SIDE (espelha playerDodgeChance do cliente: base 1.5% +
 // 0.6%/ponto de Escudo acima de 10, + talento, teto TOTAL 25%). ANTES só existia no
 // cliente (damagePlayer), que NÃO roda online → a esquiva era MORTA em PvE.
@@ -3046,6 +3045,24 @@ const SHOCK_MS = 700;          // raio: atordoa (pula o turno) por 0.7s
 const FREEZE_SLOW_MULT = 1.8;  // mob frozen anda ~1.8× mais devagar
 function tickAI(){
     const now = Date.now();
+    // Índice de ocupação do tick: BFS não percorre todos os mobs a cada nó.
+    // Contagem preserva sobreposições antigas; ghost de logout também ocupa tile.
+    const occupied = new Map();
+    const tileKey = (floor,x,y) => `${floor}:${x},${y}`;
+    const occupy = (floor,x,y) => {
+        const key = tileKey(floor,x,y);
+        occupied.set(key,(occupied.get(key)||0)+1);
+    };
+    const vacate = (floor,x,y) => {
+        const key = tileKey(floor,x,y), count = occupied.get(key)||0;
+        if (count <= 1) occupied.delete(key);
+        else occupied.set(key,count-1);
+    };
+    for (const other of monsters.values()) if (other.hp > 0)
+        occupy(other.floor||0,other.x,other.y);
+    for (const p of players.values()) if ((p.hp??100) > 0)
+        occupy(p.floor||0,p.x,p.y);
+    const reservedGoals = new Set();
     for (const m of monsters.values()){
         if (m.hp <= 0) continue;
         // ⚡ Choque (raio): atordoado pula o turno (sem mover/atacar). DoT segue no tickMobDots.
@@ -3065,17 +3082,16 @@ function tickAI(){
             // se target inválido (logoff/morte), fallback pro aggro normal abaixo
         }
         if (!target){
-            // procura player mais próximo em aggro range (ignora PZ e mini-PZ de NPC)
-            const mFloor = m.floor || 0;   // M4: mob só mira player do mesmo andar
-            for (const p of players.values()){
-                if ((p.hp ?? 100) <= 0) continue;
-                if ((p.floor || 0) !== mFloor) continue;
-                if (playerInSafe(p)) continue;   // PZ só protege na cidade; masmorra é perigosa
-                if (playerNearNpc(p)) continue;   // mini-PZ ao redor de NPCs
-                const d = chebyshev(m.x, m.y, p.x, p.y);
-                if (d <= m.aggro && d < td){ target = p; td = d; }
-            }
+            const chosen = mobPursuit.selectTarget({
+                mob:m, players:players.values(), now,
+                isSafe:p => playerInSafe(p) || playerNearNpc(p),
+            });
+            target = chosen.target;
+            td = chosen.distance;
+            m._pursuitTargetId = target ? target.id : null;
+            m._pursuitSeenAt = chosen.seenAt;
         }
+        if (!target) m._pursuitRoute = [];
         // Sem target: wandering leve (não vale pra bosses/unique — eles ficam no spot)
         if (!target){
             if (m.unique) continue;
@@ -3111,9 +3127,10 @@ function tickAI(){
             const nx = m.x + dx, ny = m.y + dy;
             if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
             if (!mobTileOk(m, nx, ny)) continue;
-            if (mobAt(nx, ny, m.floor)) continue;
-            if (playerAt(nx, ny, m.floor)) continue;
+            if (occupied.has(tileKey(m.floor||0,nx,ny))) continue;
+            vacate(m.floor||0,m.x,m.y);
             m.x = nx; m.y = ny;
+            occupy(m.floor||0,m.x,m.y);
             m.dir = dy > 0 ? 'down' : dy < 0 ? 'up' : dx > 0 ? 'right' : 'left';
             m.lastMoveAt = now;
             continue;
@@ -3212,30 +3229,24 @@ function tickAI(){
         const effectiveSpeed = Math.floor(((td > 1) ? m.speed * 0.6 : m.speed) * ((m.frozenUntil && now < m.frozenUntil) ? FREEZE_SLOW_MULT : 1));
         if (now - m.lastMoveAt < effectiveSpeed) continue;
         m.lastMoveAt = now;
-        // Intel >=2 escolhe vaga adjacente ao player (cerca + flanco); intel 1 vai direto
-        let tx, ty;
-        if ((m.intel || 1) >= 2){
-            const slot = pickSurroundSlot(m, target);
-            tx = slot ? slot.x : target.x;
-            ty = slot ? slot.y : target.y;
-        } else {
-            tx = target.x; ty = target.y;
-        }
-        const dx = Math.sign(tx - m.x);
-        const dy = Math.sign(ty - m.y);
-        const candidates = [
-            [m.x+dx, m.y+dy],
-            [m.x+dx, m.y],
-            [m.x,    m.y+dy],
-        ];
-        for (const [nx, ny] of candidates){
-            if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
-            if (!mobTileOk(m, nx, ny)) continue;
-            if (mobAt(nx, ny, m.floor)) continue;
-            if (playerAt(nx, ny, m.floor)) continue;   // não entra no tile de player
-            m.x = nx; m.y = ny;
+        const floor = m.floor || 0;
+        const result = mobPursuit.nextPursuitStep({
+            mob:m, target,
+            isWalkable:(x,y) => x>=1 && y>=1 && x<M_W-1 && y<M_H-1 && mobTileOk(m,x,y),
+            isOccupied:(x,y) => (occupied.get(tileKey(floor,x,y))||0) >
+                ((x===m.x && y===m.y) ? 1 : 0),
+            reserved:{has:key => reservedGoals.has(`${floor}:${key}`)},
+            route:m._pursuitRoute||[], routeTarget:m._pursuitRouteTarget,
+        });
+        if (result.goal) reservedGoals.add(`${floor}:${mobPursuit.key(result.goal.x,result.goal.y)}`);
+        m._pursuitRoute = result.route;
+        m._pursuitRouteTarget = mobPursuit.key(target.x,target.y);
+        if (result.step){
+            vacate(floor,m.x,m.y);
+            const dx = result.step.x-m.x, dy = result.step.y-m.y;
+            m.x = result.step.x; m.y = result.step.y;
+            occupy(floor,m.x,m.y);
             m.dir = dy > 0 ? 'down' : dy < 0 ? 'up' : dx > 0 ? 'right' : 'left';
-            break;
         }
     }
 }
@@ -4397,6 +4408,54 @@ async function sendEmail(to, subject, html){
         return { ok: false, error: e.message };
     }
 }
+function techniqueWeaponKey(p){ return p.equipped?.weapon || null; }
+function techniqueIdForPlayer(p){
+    return weaponTechniques.techniqueForBase(equipmentRules.parse(techniqueWeaponKey(p)).base);
+}
+function techniqueWeaponEligible(p){
+    const base=equipmentRules.parse(techniqueWeaponKey(p)).base;
+    return weaponTechniques.eligible(base,ITEM_META[base]);
+}
+function resetTechniqueCharge(p){
+    p._weaponTechniqueCharge={weaponKey:techniqueWeaponKey(p),count:0};
+}
+function techniqueSnapshot(p, extra={}){
+    const state=weaponTechniques.normalize(p.weaponTechniques);
+    const weaponKey=techniqueWeaponKey(p);
+    if (!p._weaponTechniqueCharge || p._weaponTechniqueCharge.weaponKey!==weaponKey) resetTechniqueCharge(p);
+    const id=techniqueIdForPlayer(p);
+    const active=!!(id && techniqueWeaponEligible(p) && state.owned.includes(id) && !state.disabled.includes(id) && WEAPON_TECHNIQUES_ENABLED);
+    return {t:'techniqueState',state,activeId:active?id:null,
+        charge:active?p._weaponTechniqueCharge.count:0,weaponKey,gold:p.gold||0,enabled:WEAPON_TECHNIQUES_ENABLED,
+        inactiveReason:!WEAPON_TECHNIQUES_ENABLED?'unavailable':!weaponKey?'no_weapon':!techniqueWeaponEligible(p)?'not_legendary':!state.owned.includes(id)?'not_owned':state.disabled.includes(id)?'disabled':null,...extra};
+}
+function sendTechniqueState(p,extra){ if(p.joined) sendTo(p.id,techniqueSnapshot(p,extra)); }
+function changeWeaponTechnique(p,id,enabled){
+    if (!WEAPON_TECHNIQUES_ENABLED) return {ok:false,error:'unavailable'};
+    if (typeof id!=='string' || !weaponTechniques.BY_ID[id]) return {ok:false,error:'invalid_id'};
+    const account=p.authedName && getAccount(p.authedName);
+    if (!account?.save) return {ok:false,error:'session_not_ready'};
+    const state=weaponTechniques.normalize(account.weaponTechniques);
+    if (enabled===undefined){
+        if (state.owned.includes(id)) return {ok:true,replayed:true,costGold:0};
+        if (!Number.isFinite(p.gold) || p.gold<weaponTechniques.PRICE) return {ok:false,error:'no_gold'};
+    } else if (typeof enabled!=='boolean') return {ok:false,error:'invalid_toggle'};
+    else if (!state.owned.includes(id)) return {ok:false,error:'not_owned'};
+    const before={state:account.weaponTechniques,save:account.save,gold:p.gold,playerState:p.weaponTechniques,savedAt:account.savedAt};
+    let costGold=0;
+    if (enabled===undefined){state.owned.push(id);costGold=weaponTechniques.PRICE;p.gold-=costGold;}
+    else state.disabled=enabled?state.disabled.filter(x=>x!==id):[...new Set([...state.disabled,id])];
+    account.weaponTechniques=weaponTechniques.normalize(state);
+    p.weaponTechniques=account.weaponTechniques;
+    account.save={...account.save,weaponTechniques:account.weaponTechniques,gold:p.gold};
+    account.savedAt=Date.now();
+    if (!flushAccounts()){
+        account.weaponTechniques=before.state;account.save=before.save;account.savedAt=before.savedAt;
+        p.gold=before.gold;p.weaponTechniques=before.playerState;
+        return {ok:false,error:'save_failed'};
+    }
+    return {ok:true,costGold};
+}
 function setPlayerSave(name, data){
     const a = getAccount(name);
     if (!a) return false;
@@ -4405,6 +4464,7 @@ function setPlayerSave(name, data){
     // Recibos são autoritativos como a aparência; uploads não os podem apagar.
     data.appearanceOps = appearanceService.normalizeReceipts(a.save?.appearanceOps,appearanceRules);
     data.appearanceOwned = appearanceService.ownedForAccount(a,appearanceRules);
+    data.weaponTechniques = weaponTechniques.normalize(a.weaponTechniques);
     a.save = data;
     a.savedAt = Date.now();
     queueSaveAccounts();
@@ -5249,6 +5309,7 @@ function broadcastPvpState(p){
 // (antes os selos/Highlander vinham de msg.selos/msg.highlander do cliente = forjável).
 function processPkDeathServerSide(killer, victim){
     if (!killer || !victim) return;
+    resetTechniqueCharge(victim);sendTechniqueState(victim);
     // Morte PvP: o cliente respawna no spawn local (bloco "Respawn no spawn") e pode
     // nem mandar pos até o 1º movimento. Libera 1 pos não-adjacente pra reconciliar a
     // posição autoritativa sem snap-back. Concedido só na morte → não vira fuga de PvP.
@@ -5458,15 +5519,123 @@ function broadcastPstatsAll(p){
         if (other.ws.readyState === 1) other.ws.send(payload);
     }
 }
+function finalizeWeaponMobDeath(m,p,id){
+                if (m.expedition){ handleExpeditionMobDeath(m,p); return; }
+                grantManaOnKill(p);
+                // morte
+                if (m.unique){
+                    if (m.type === MEGA_BOSS_TYPE){
+                        // ★★ Mega boss morreu — recompensa épica + reset bossLevel
+                        handleMegaBossDeath(p, m);
+                    } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 do mundo escalam/respawnam por timer
+                        bossDeath.set(m.type, Date.now());
+                        // próxima encarnação fica +1 nível (cap)
+                        const cur = bossLevel.get(m.type) || 1;
+                        const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
+                        bossLevel.set(m.type, next);
+                        console.log(`[boss] ${m.type} morto (Lv${cur}) por ${p.name} → próximo Lv${next}`);
+                        // Salva imediatamente
+                        saveStateToDisk();
+                        // Verifica se desbloqueou o mega boss
+                        checkMegaBossSpawn();
+                    } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da banda: cooldown + checkpoint + ranking (caminho único)
+                        onDungeonBossDeath(m, p);
+                    } else if (m.automaton && m.type === progression.automatonDungeon.boss){
+                        onAutomatonBossDeath(m);
+                    }
+                }
+                monsters.delete(m.id);
+                const { loot, drops:spawnedDrops, isBoss } = grantMobLoot(m, p);
+                // T1: XP authoritative na skill da arma equipada
+                const skillUsed = weaponSkillOf(p);
+                gainSkillXpServer(p, skillUsed, m.xp || 1);
+                const petGain = gainPetXp(p, m.xp || 1);
+                // Build de escudo (1-mão + escudo): o Escudo ganha o MESMO XP de kill que a arma (pedido do dono).
+                // 2H e escudo são mutuamente exclusivos → escudo equipado ⇒ arma 1-mão.
+                const shieldXp = hasShieldEquipped(p) ? (m.xp || 1) : 0;
+                if (shieldXp > 0) gainSkillXpServer(p, 'Escudo', shieldXp);
+                // killer recebe mobKill (boss → loot:[] pro cliente não criar drops)
+                sendTo(id, { t:'mobKill', mobId:m.id, floor:m.floor||0, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp, petGain });
+                // Envia skills atualizadas (autoritativo)
+                sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
+                // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
+                broadcast(id, { t:'mobDead', mobId:m.id, floor:m.floor||0, byName:p.name, level:m.level }, m.floor);
+                if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops }, m.floor);
+                // Ranking: incrementa mobKills (e bossKills se for unique) — all-time + season
+                bumpMobKill(p.name, !!m.unique);
+                sharePartyKill(p, m);
+                creditQuestKill(p, m.type);   // Lote 1b: conta kill de quest (melee/magia)
+}
+
+function techniqueLineClear(p,x1,y1,x2,y2){
+    let x=x1,y=y1,dx=Math.abs(x2-x1),dy=Math.abs(y2-y1);
+    const sx=x1<x2?1:-1,sy=y1<y2?1:-1;
+    let err=dx-dy;
+    for(let i=0;i<16;i++){
+        if(x===x2 && y===y2)return true;
+        const e2=2*err;
+        if(e2>-dy){err-=dy;x+=sx;}
+        if(e2<dx){err+=dx;y+=sy;}
+        if(!playerTileWalkable(p,x,y))return false;
+    }
+    return false;
+}
+function prepareWeaponTechnique(p,main,spellWin,thrown,range){
+    if (!WEAPON_TECHNIQUES_ENABLED || spellWin || thrown || !p.joined) return null;
+    if (!techniqueLineClear(p,p.x,p.y,main.x,main.y)) return null;
+    if ((p.floor||0)===0 && (inPzBuffer(p.x,p.y) || inSanctuary(p.x,p.y) ||
+        inPzBuffer(main.x,main.y) || inSanctuary(main.x,main.y))) return null;
+    const state=weaponTechniques.normalize(p.weaponTechniques),id=techniqueIdForPlayer(p);
+    if (!id || !techniqueWeaponEligible(p) || !state.owned.includes(id) || state.disabled.includes(id)) return null;
+    const weaponKey=techniqueWeaponKey(p);
+    if (!p._weaponTechniqueCharge || p._weaponTechniqueCharge.weaponKey!==weaponKey) resetTechniqueCharge(p);
+    p._weaponTechniqueCharge.count++;
+    if (p._weaponTechniqueCharge.count<3){ sendTechniqueState(p);return null; }
+    p._weaponTechniqueCharge.count=0;
+    const def=weaponTechniques.BY_ID[id],origin={x:p.x,y:p.y};
+    const targets=[],floor=p.floor||0;
+    for(const [cellIndex,cell] of weaponTechniques.cells(id,origin,main,range).entries()){
+        if (targets.length>=def.secondary.length) break;
+        if (!techniqueLineClear(p,origin.x,origin.y,cell.x,cell.y)){
+            if (id==='ranged'||id==='spear') break;
+            continue;
+        }
+        if (floor===0 && (inPzBuffer(cell.x,cell.y)||inSanctuary(cell.x,cell.y))) continue;
+        const other=mobAt(cell.x,cell.y,floor);
+        if (!other || other.id===main.id || other.hp<=0 || (other.floor||0)!==floor) continue;
+        if (playerInFullShelter(p) && !isOwnedHunter(p,other)) continue;
+        targets.push({mob:other,percent:def.secondary[id==='ranged'?cellIndex:targets.length]});
+    }
+    return {id,def,origin,targets};
+}
+function applyWeaponTechniqueSecondary(p,proc,baseDamage){
+    for (const hit of proc.targets){
+        const m=hit.mob;
+        if (!monsters.has(m.id) || m.hp<=0 || (m.floor||0)!==(p.floor||0)) continue;
+        const dmg=weaponTechniques.bonus(baseDamage,hit.percent);
+        if (dmg<=0) continue;
+        const dealt=Math.min(m.hp,dmg);
+        m.hp=Math.max(0,m.hp-dmg);
+        if (dealt>0 && m.hp>0){ m._retaliateId=p.id; m._retaliateAt=Date.now(); }
+        recordMobRewardDamage(m,p.id,dealt);
+        const update={t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp};
+        for(const pp of players.values()) if ((pp.floor||0)===(m.floor||0) && pp.ws.readyState===1) pp.ws.send(JSON.stringify(update));
+        broadcast(null,{t:'mobFloat',mobId:m.id,text:`-${dmg}`,color:'#e8bc62',crit:false},m.floor||0);
+        if (m.hp===0) finalizeWeaponMobDeath(m,p,p.id);
+    }
+}
+
 // Presentation-only acknowledgement: damage remains immediate and authoritative.
 function sendCombatImpact(p, targetId, amount, details = {}){
     if (!(amount > 0)) return;
     const weapon = ITEM_META[equipmentRules.parse(p.equipped?.weapon).base];
     const weaponType = details.spell || weapon?.kind === 'wand' ? 'wand'
         : details.thrown || weapon?.ranged ? 'ranged' : 'melee';
-    sendTo(p.id,{t:'combatImpact',eventId:`${p.id}:hit:${p._combatSequence=(p._combatSequence||0)+1}`,
+    const eventId=`${p.id}:hit:${p._combatSequence=(p._combatSequence||0)+1}`;
+    sendTo(p.id,{t:'combatImpact',eventId,
         attackPresentationAt:typeof details.attackPresentationAt==='number' && Number.isFinite(details.attackPresentationAt) && details.attackPresentationAt>=0 ? details.attackPresentationAt : undefined,
         floor:p.floor||0,targetId,targetType:details.targetType||'monster',amount,weaponType,spell:details.spell||null,critical:!!details.critical});
+    return eventId;
 }
 const REGEN_HP_BASE_MS = 4000;
 const REGEN_MP_BASE_MS = 2000;
@@ -5980,7 +6149,6 @@ function genAutomatonGrid(floor){
     const depth=automatonDepth(floor);
     const g=genDungeonGrid(depth,1000);
     g.floor=floor;
-    g.stairs.town=null; // own return protocol; never expose an inactive Profundezas town stair
     return g;
 }
 function spawnAutomatonMobs(){
@@ -6002,7 +6170,7 @@ function spawnAutomatonMobs(){
         let count=0;
         for(const m of monsters.values())if(m.floor===floor&&m.hp>0&&!m.unique)count++;
         const blocked=new Set();
-        for(const s of [g.stairs.spawn,g.stairs.up,g.stairs.down,g.stairs.boss]){
+        for(const s of [g.stairs.spawn,g.stairs.up,g.stairs.down,g.stairs.town,g.stairs.boss]){
             if(s)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)blocked.add((s.x+dx)+','+(s.y+dy));
         }
         let tries=0;
@@ -6159,6 +6327,7 @@ function claimExpeditionReward(p){
 // O grid já está registrado em dungeonFloors (startArenaMatch). spawn = canto do player.
 function enterArenaFloor(p, id, floor, spawn, opponentName){
     p.floor = floor;
+    resetTechniqueCharge(p);sendTechniqueState(p);
     const g = dungeonFloors.get(floor);
     p.x = spawn.x; p.y = spawn.y;
     if (p.ws && p.ws.readyState === 1){
@@ -6181,6 +6350,7 @@ function returnFromArena(p, id){
     p.pvp = !!p._pvpBeforeArena;
     const ret = p._arenaReturn || DUNGEON_RETURN;
     p.floor = 0;
+    resetTechniqueCharge(p);sendTechniqueState(p);
     p.x = ret.x; p.y = ret.y;
     if (p.ws && p.ws.readyState === 1){
         p.ws.send(JSON.stringify({
@@ -6947,6 +7117,7 @@ wss.on('connection', (ws, request) => {
             data.appearance = appearanceRules.normalizarAppearance(p.appearance);
             data.appearanceOps = p.appearanceOps || [];
             data.appearanceOwned = appearanceRules.normalizarAppearanceOwned(p.appearanceOwned);
+            data.weaponTechniques = weaponTechniques.normalize(p.weaponTechniques);
             // ★ LOCKDOWN N3 — ENFORCEMENT (antes era só comentário!). setPlayerSave faz
             // `a.save = data` as-is, e o join re-hidrata p.gold/inv/skills/equipped/chests
             // desse save. Sem sobrescrever aqui pelos valores VIVOS do server, um cliente
@@ -7030,6 +7201,7 @@ wss.on('connection', (ws, request) => {
             data.appearance = appearanceRules.normalizarAppearance(p.appearance);
             data.appearanceOps = p.appearanceOps || [];
             data.appearanceOwned = appearanceRules.normalizarAppearanceOwned(p.appearanceOwned);
+            data.weaponTechniques = weaponTechniques.normalize(p.weaponTechniques);
             acc.save = data;
             acc.savedAt = Date.now();
             acc._restoreUntil = 0;
@@ -7071,6 +7243,8 @@ wss.on('connection', (ws, request) => {
             p.appearance = appearanceRules.normalizarAppearance(acc?.save?.appearance);
             p.appearanceOps = appearanceService.normalizeReceipts(acc?.save?.appearanceOps,appearanceRules);
             p.appearanceOwned = appearanceService.ownedForAccount(acc,appearanceRules);
+            p.weaponTechniques = weaponTechniques.normalize(acc?.weaponTechniques);
+            resetTechniqueCharge(p);
             p.enchantToken = typeof acc?.save?.enchantToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.enchantToken)
                 ? acc.save.enchantToken : crypto.randomUUID();
             p.transmutationToken = typeof acc?.save?.transmutationToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.transmutationToken)
@@ -7223,6 +7397,7 @@ wss.on('connection', (ws, request) => {
                 expeditionClears: p.expeditionClears,
                 expeditionPending: p.expeditionPending,
                 appearanceOwned: appearanceRules.normalizarAppearanceOwned(p.appearanceOwned),
+                weaponTechniques: weaponTechniques.normalize(p.weaponTechniques),
                 players: snapshotPlayers(p.floor),
                 mobs: snapshotMobs(p.floor),
                 motd: SERVER_MOTD_RUNTIME,
@@ -7235,6 +7410,7 @@ wss.on('connection', (ws, request) => {
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
             sendInvUpdate(p, { chests: p.chests, pets: p.pets || {}, pet: p.pet || null, reason:'join' });
+            sendTechniqueState(p);
             // Recuperação: se admin liberou (_restoreUntil), pede o backup local do cliente.
             if (acc && acc._restoreUntil && acc._restoreUntil > Date.now()){
                 sendTo(id, { t:'restoreMode' });
@@ -7302,15 +7478,20 @@ wss.on('connection', (ws, request) => {
             const respawnStep = p.movementVersion === 1
                 ? msg.respawn === true && nx === SAFE_CX && ny === SAFE_CY
                 : chebyshev(p.x, p.y, nx, ny) > 1;
-            if (p._posGraceUntil && _now < p._posGraceUntil && respawnStep){
-                p._posGraceUntil = 0;   // one-shot
-                p.x = nx; p.y = ny;
-            } else if (chebyshev(p.x, p.y, nx, ny) <= 1 && playerTileWalkable(p, nx, ny)){
-                p.x = nx; p.y = ny;
-            } else {
+            const graceStep = p._posGraceUntil && _now < p._posGraceUntil && respawnStep;
+            if (!graceStep && !(chebyshev(p.x, p.y, nx, ny) <= 1 && playerTileWalkable(p, nx, ny))){
                 correctMovement(p, chebyshev(p.x, p.y, nx, ny) > 1 ? 'distance' : 'terrain');
                 return;
             }
+            // O player pode andar para casa ocupada por mob quando há espaço para
+            // empurrá-lo. Se não houver, rejeita só esse passo: jamais deixa os dois
+            // na mesma casa e não altera a caminhada livre.
+            if (!bumpMobAwayFrom(nx, ny, p.floor)){
+                correctMovement(p, 'occupied');
+                return;
+            }
+            if (graceStep) p._posGraceUntil = 0;   // one-shot após movimento aceito
+            p.x = nx; p.y = ny;
             p.dir = (typeof msg.dir === 'string' && msg.dir.length < 8) ? msg.dir : p.dir;
             if (p.movementVersion === 1){
                 p._movementSeq = msg.seq;
@@ -7321,8 +7502,6 @@ wss.on('connection', (ws, request) => {
             // cliente NUNCA são aceitos aqui (F12 `{t:'pos',hp:99999}` virava invencível).
             // Mutações de hp vêm de tickAI/tickPlayerDots/pvpAttack/spellCast/invConsume
             // /playerDeath/recomputeMaxStats — esses já chamam broadcastPstatsAll.
-            // Se um mob acabou no mesmo tile (race com tickAI), empurra
-            bumpMobAwayFrom(p.x, p.y, p.floor);
             broadcast(id, { t:'pos', id, x:p.x, y:p.y, dir:p.dir, hp:p.hp, maxHp:p.maxHp }, p.floor);
             return;
         }
@@ -7341,6 +7520,18 @@ wss.on('connection', (ws, request) => {
                 }
                 broadcastPstatsAll(p);
             }
+            return;
+        }
+
+        if (msg.t === 'techniqueBuy' || msg.t === 'techniqueToggle') {
+            if (!p.joined) return;
+            const result=changeWeaponTechnique(p,msg.id,msg.t==='techniqueToggle'?msg.enabled:undefined);
+            if (result.ok && result.costGold>0){
+                syncGoldRank(p.name,p.gold);
+                sendInvUpdate(p,{goldDelta:{amount:-result.costGold,reason:'weapon_technique'}});
+            }
+            if (result.ok) resetTechniqueCharge(p);
+            sendTechniqueState(p,{result:{...result,id:msg.id,action:msg.t}});
             return;
         }
 
@@ -7579,21 +7770,33 @@ wss.on('connection', (ws, request) => {
 
         if (msg.t === 'invEnchant') {
             const itemKey = itemKeyFromMessage(msg.itemKey), slot = msg.slot;
+            const affixCode = msg.affixCode === undefined ? undefined : msg.affixCode;
+            const request = JSON.stringify([itemKey,slot,affixCode===undefined?null:affixCode]);
             const opId = typeof msg.opId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(msg.opId) ? msg.opId : null;
             const reply = result => sendInvUpdate(p, { enchant:{ opId, itemKey, slot, ...result } });
             if (!opId){ reply({ok:false,error:'bad_op_id'}); return; }
             p.enchantOps = p.enchantOps || [];
             const previous = p.enchantOps.find(x => x.opId === opId);
-            if (previous){ reply(previous.result); return; }
+            if (previous){
+                const savedRequest = previous.request || JSON.stringify([previous.result?.itemKey,previous.result?.slot,null]);
+                reply(savedRequest === request ? previous.result : {ok:false,error:'op_conflict'});
+                return;
+            }
             if (opId !== p.enchantToken){ reply({ok:false,error:'stale_op'}); return; }
             if (!ENCHANTING_ENABLED){ reply({ok:false,error:'disabled'}); return; }
             if (p.equipmentVersion !== equipmentRules.VERSION){ reply({ok:false,error:'update_required'}); return; }
+            if (affixCode !== undefined && (typeof affixCode !== 'string' || !Object.hasOwn(equipmentRules.AFFIXES,affixCode))){
+                reply({ok:false,error:'invalid_choice'}); return;
+            }
             if (p.hp <= 0 || !nearCraftService(p) || p.duel || p.arena || p.tradeId){
                 reply({ok:false,error:'not_at_bench'}); return;
             }
             const meta = itemMetaForKey(itemKey), tier = getUpgradeTier(itemKey);
             if (!meta || !equipmentRules.KINDS.includes(meta.kind) || !Number.isInteger(slot) || slot < 0 || slot > 2){
                 reply({ok:false,error:'bad_item'}); return;
+            }
+            if (affixCode !== undefined && !equipmentRules.AFFIXES[affixCode].kinds.includes(meta.kind)){
+                reply({ok:false,error:'invalid_choice'}); return;
             }
             const equippedSlot = Object.keys(p.equipped || {}).find(s => p.equipped[s] === itemKey);
             if (!equippedSlot && !hasInv(p,itemKey,1)){ reply({ok:false,error:'no_item'}); return; }
@@ -7602,7 +7805,7 @@ wss.on('connection', (ws, request) => {
             if (!hasInv(p,equipmentRules.MATERIAL,cost.essence) || (p.gold || 0) < cost.gold){
                 reply({ok:false,error:'no_resources',cost}); return;
             }
-            const affixes = equipmentRules.roll(meta.kind,tier.affixes,slot);
+            const affixes = equipmentRules.roll(meta.kind,tier.affixes,slot,undefined,affixCode);
             let itemId = tier.id;
             if (!itemId){ do { itemId = crypto.randomBytes(6).toString('hex'); } while (enchantedIdExists(itemId)); }
             const newKey = equipmentRules.make(tier.base,tier.plus,itemId,affixes);
@@ -7620,7 +7823,7 @@ wss.on('connection', (ws, request) => {
             p.gold -= cost.gold;
             if (equippedSlot) recomputeMaxStatsServer(p);
             const result = {ok:true,opId,itemKey,newKey,slot,cost};
-            p.enchantOps = [...p.enchantOps,{opId,result}].slice(-20);
+            p.enchantOps = [...p.enchantOps,{opId,request,result}].slice(-20);
             p.enchantToken = crypto.randomUUID();
             if (!updateEnchantSave(p)){
                 Object.assign(p,old);
@@ -7674,6 +7877,7 @@ wss.on('connection', (ws, request) => {
             if (p.equipped[slot]) incInv(p, p.equipped[slot], 1);
             incInv(p, itemKey, -1);
             p.equipped[slot] = itemKey;
+            if (slot==='weapon' || (slot==='offhand' && returning[1])) { resetTechniqueCharge(p); sendTechniqueState(p); }
             recomputeMaxStatsServer(p);
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey } });
             // Broadcast pstats pros outros verem o visual
@@ -7689,6 +7893,7 @@ wss.on('connection', (ws, request) => {
             if (!canAddKeys(p.inv,[k],SAVE_CAPS.invKeys)){ sendInvUpdate(p,{equipOp:{ok:false,reason:'inventory_full'}}); return; }
             incInv(p, k, 1);
             p.equipped[slot] = null;
+            if (slot==='weapon') { resetTechniqueCharge(p); sendTechniqueState(p); }
             recomputeMaxStatsServer(p);
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey:null } });
             broadcastPstatsAll(p);
@@ -8691,12 +8896,15 @@ wss.on('connection', (ws, request) => {
             }
             const g=dungeonFloors.get(p.floor);
             const down=msg.t==='automatonDescend';
-            const stair=down?g?.stairs.down:g?.stairs.up;
+            const stair=down?g?.stairs.down:msg.t==='automatonExit'?g?.stairs.town:g?.stairs.up;
             if(!stair || chebyshev(p.x,p.y,stair.x,stair.y)>1){
                 sendTo(id,{t:'automatonResult',ok:false,error:'not_at_stair'});return;
             }
             p._lastAutomatonFloorAt=now;
-            if(msg.t==='automatonExit' || (msg.t==='automatonAscend' && depth===1)){
+            if(msg.t==='automatonExit'){
+                returnPlayerToTown(p,id);return;
+            }
+            if(msg.t==='automatonAscend' && depth===1){
                 returnPlayerToTown(p,id,false,true);return;
             }
             enterAutomatonFloor(p,id,depth+(down?1:-1),down?'down':'up');
@@ -9003,6 +9211,7 @@ wss.on('connection', (ws, request) => {
                     incInv(p, wKey, -1);
                     p.equipped.weapon = wKey;
                 }
+                resetTechniqueCharge(p);sendTechniqueState(p);
                 invDirty = true;
                 // Propaga equipped pra outros players
                 broadcast(id, { t:'pstats', id, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, cosmetic:p.cosmetic, pet:p.pet||null, equipped:p.equipped, badges:p.badges || [] });
@@ -9013,18 +9222,18 @@ wss.on('connection', (ws, request) => {
             // dele); só barra o exagero (arma fraca mandando 600 → capada no real dela).
             // MAX_HIT_DMG fica como teto absoluto de segurança (>372 legítimo → nunca clipa).
             const baseDmg = Math.max(1, Math.min(msg.amount | 0, attackDamageCapServer(p, spellWin), MAX_HIT_DMG));
-            const dmg = m.unique && !msg.throwSpear
+            const acceptedDamage = m.unique && !msg.throwSpear
                 ? Math.min(MAX_HIT_DMG, Math.round(baseDmg * (1 + equippedAffixes(p).bossDamage / 100)))
                 : baseDmg;
+            const technique=prepareWeaponTechnique(p,m,spellWin,!!msg.throwSpear,serverRange);
+            const dmg=acceptedDamage+(technique?weaponTechniques.bonus(acceptedDamage,technique.def.primary):0);
             const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
-            sendCombatImpact(p,m.id,dealtDamage,{spell:spellWin?.spellKey,critical:msg.crit,thrown:!!msg.throwSpear,attackPresentationAt:msg.attackPresentationAt});
-            // Vampirismo (t_lifesteal): cura % do dano causado (cap maxHp); sincroniza HP via pstats.
-            const _ls = (p.permaBuffs && p.permaBuffs.lifesteal) || 0;
-            if (_ls > 0 && dmg > 0 && (p.hp ?? 0) < (p.maxHp ?? 0)){
-                p.hp = Math.min(p.maxHp, (p.hp || 0) + Math.max(1, Math.round(dmg * _ls)));
-                broadcastPstatsAll(p);
-            }
+            if (dealtDamage>0 && m.hp>0){ m._retaliateId=id; m._retaliateAt=nowAtk; }
+            const techniqueEventId=sendCombatImpact(p,m.id,dealtDamage,{spell:spellWin?.spellKey,critical:msg.crit,thrown:!!msg.throwSpear,attackPresentationAt:msg.attackPresentationAt});
+            // A arma recupera recursos uma vez pelo alvo principal, após dano real no HP.
+            // Magias e lanças arremessadas mantêm apenas o talento preexistente.
+            applyMobHitRecovery(p,dealtDamage,!spellWin && !msg.throwSpear);
             // Anti-ninja: rastreia dano por player em TODOS os mobs — o dono do loot
             // (boss = direto no inv; mob comum = bag no chão) é quem deu mais dano.
             // damageBy some quando o mob é deletado na morte (sem leak).
@@ -9081,53 +9290,15 @@ wss.on('connection', (ws, request) => {
             }
             // float visual em todos
             broadcast(null, { t:'mobFloat', mobId:m.id, text:`-${dmg}`, color:'#ff8060', crit:!!msg.crit },m.floor||0);
-            if (m.hp === 0){
-                if (m.expedition){ handleExpeditionMobDeath(m,p); return; }
-                grantManaOnKill(p);
-                // morte
-                if (m.unique){
-                    if (m.type === MEGA_BOSS_TYPE){
-                        // ★★ Mega boss morreu — recompensa épica + reset bossLevel
-                        handleMegaBossDeath(p, m);
-                    } else if (BOSSES.some(b => b.type === m.type)) {   // só os 3 do mundo escalam/respawnam por timer
-                        bossDeath.set(m.type, Date.now());
-                        // próxima encarnação fica +1 nível (cap)
-                        const cur = bossLevel.get(m.type) || 1;
-                        const next = Math.min(BOSS_LEVEL_CAP, cur + 1);
-                        bossLevel.set(m.type, next);
-                        console.log(`[boss] ${m.type} morto (Lv${cur}) por ${p.name} → próximo Lv${next}`);
-                        // Salva imediatamente
-                        saveStateToDisk();
-                        // Verifica se desbloqueou o mega boss
-                        checkMegaBossSpawn();
-                    } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da banda: cooldown + checkpoint + ranking (caminho único)
-                        onDungeonBossDeath(m, p);
-                    } else if (m.automaton && m.type === progression.automatonDungeon.boss){
-                        onAutomatonBossDeath(m);
-                    }
-                }
-                monsters.delete(m.id);
-                const { loot, drops:spawnedDrops, isBoss } = grantMobLoot(m, p);
-                // T1: XP authoritative na skill da arma equipada
-                const skillUsed = weaponSkillOf(p);
-                gainSkillXpServer(p, skillUsed, m.xp || 1);
-                const petGain = gainPetXp(p, m.xp || 1);
-                // Build de escudo (1-mão + escudo): o Escudo ganha o MESMO XP de kill que a arma (pedido do dono).
-                // 2H e escudo são mutuamente exclusivos → escudo equipado ⇒ arma 1-mão.
-                const shieldXp = hasShieldEquipped(p) ? (m.xp || 1) : 0;
-                if (shieldXp > 0) gainSkillXpServer(p, 'Escudo', shieldXp);
-                // killer recebe mobKill (boss → loot:[] pro cliente não criar drops)
-                sendTo(id, { t:'mobKill', mobId:m.id, floor:m.floor||0, mobType:m.type, xp:m.xp, x:m.x, y:m.y, level:m.level, loot: isBoss ? [] : loot, drops: spawnedDrops, skill: skillUsed, xpGained: m.xp || 1, shieldXp, petGain });
-                // Envia skills atualizadas (autoritativo)
-                sendInvUpdate(p, { skills: p.skills, reason:'mobKill' });
-                // outros recebem só mobDead + groundSpawn (sem loot, sem xp)
-                broadcast(id, { t:'mobDead', mobId:m.id, floor:m.floor||0, byName:p.name, level:m.level }, m.floor);
-                if (spawnedDrops.length) broadcast(id, { t:'groundSpawn', drops: spawnedDrops }, m.floor);
-                // Ranking: incrementa mobKills (e bossKills se for unique) — all-time + season
-                bumpMobKill(p.name, !!m.unique);
-                sharePartyKill(p, m);
-                creditQuestKill(p, m.type);   // Lote 1b: conta kill de quest (melee/magia)
+            if (technique){
+                sendTo(id,{t:'techniqueProc',techniqueId:technique.id,eventId:techniqueEventId,
+                    attackPresentationAt:typeof msg.attackPresentationAt==='number' && Number.isFinite(msg.attackPresentationAt) ? msg.attackPresentationAt:undefined,
+                    floor:p.floor||0,origin:technique.origin,targets:[{id:m.id,x:m.x,y:m.y,main:true},
+                        ...technique.targets.map(hit=>({id:hit.mob.id,x:hit.mob.x,y:hit.mob.y,main:false}))]});
+                applyWeaponTechniqueSecondary(p,technique,acceptedDamage);
+                sendTechniqueState(p);
             }
+            if (m.hp === 0) finalizeWeaponMobDeath(m,p,id);
             return;
         }
 

@@ -12,7 +12,9 @@
 .ench-wallet{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0;color:#d5b9fa}
 .ench-wallet small{color:#aa9dba;font-size:11px}
 .ench-label{display:block;font-size:11px;color:#afa087;margin-bottom:6px}
-#enchantItem{box-sizing:border-box;width:100%;padding:10px;border:1px solid #514163;border-radius:5px;background:#19141f;color:#e9dbef;font:13px "Segoe UI",sans-serif}
+#enchantItem,[data-enchant-choice]{box-sizing:border-box;width:100%;padding:10px;border:1px solid #514163;border-radius:5px;background:#19141f;color:#e9dbef;font:13px "Segoe UI",sans-serif}
+[data-enchant-choice]{margin-bottom:10px;min-width:0}
+.ench-slot>small{display:block;color:#b8a4c9;font:11px/1.5 "Segoe UI",sans-serif;margin:0 0 12px}
 .ench-piece{display:flex;align-items:center;gap:12px;padding:16px 0}
 .ench-icon{width:40px;height:40px;image-rendering:pixelated;background-size:contain;flex-shrink:0}
 .ench-piece strong{display:block;font-size:14px;color:#e8d9b6}

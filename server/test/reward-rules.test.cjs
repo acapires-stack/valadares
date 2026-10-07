@@ -12,11 +12,9 @@ function functionSource(name){
     assert.ok(end >= 0, `unterminated ${name}`);
     return source.slice(start, end + 2);
 }
-const directStart = source.indexOf('            if (m.hp === 0){\n                if (m.expedition){ handleExpeditionMobDeath(m,p); return; }\n                grantManaOnKill(p);');
-const directEndMarker = '\n            }\n            return;\n        }\n\n        if (msg.t === \'pkDeath\')';
-const directEnd = source.indexOf(directEndMarker, directStart);
-assert.ok(directStart >= 0 && directEnd > directStart, 'direct attack death block changed');
-const directDeathSource = `function directDeath(m, p, id){\n${source.slice(directStart, directEnd + '\n            }'.length)}\n}`;
+assert.ok(source.includes('if (m.hp === 0) finalizeWeaponMobDeath(m,p,id);'), 'direct attack must use the shared death finalizer');
+const directDeathSource = functionSource('finalizeWeaponMobDeath') +
+    '\nfunction directDeath(m,p,id){if(m.hp===0)finalizeWeaponMobDeath(m,p,id);}';
 const functions = [
     'rollLoot', 'recordMobRewardDamage', 'bossLootContributors', 'bossRewardBonus', 'distributeBossLoot',
     'grantMobLoot', 'handleMobDeath', 'tickMobDots', 'sharePartyKill',

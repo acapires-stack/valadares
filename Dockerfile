@@ -17,6 +17,7 @@ COPY transmutation-rules.js ./transmutation-rules.js
 COPY progression-content.js ./progression-content.js
 COPY modern-world.js ./modern-world.js
 COPY appearance-rules.js ./appearance-rules.js
+COPY weapon-techniques-rules.js ./weapon-techniques-rules.js
 
 # Railway define $PORT dinamicamente; server.js já respeita process.env.PORT
 EXPOSE 8080

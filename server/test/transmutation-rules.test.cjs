@@ -8,6 +8,7 @@ const rules = require('../../transmutation-rules');
 const progression = require('../../progression-content');
 const equipmentRules = require('../../equipment-rules');
 const appearanceRules = require('../../appearance-rules');
+const weaponTechniques = require('../../weapon-techniques-rules');
 
 const source = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
 const metaStart=source.indexOf('const ITEM_META = {'),metaEnd=source.indexOf('\n};',metaStart)+3;
@@ -44,7 +45,7 @@ function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,s
     const random=Math; const math=Object.create(random);
     math.random=()=>rolls.length ? rolls.shift() : 0;
     const context=vm.createContext({Math:math,crypto,console:{warn(){},error(){}},
-        fs:fsFake,accounts,ACCOUNTS_FILE:'isolated-accounts.json',interiorsByFloor:new Map(),appearanceRules,
+        fs:fsFake,accounts,ACCOUNTS_FILE:'isolated-accounts.json',interiorsByFloor:new Map(),appearanceRules,weaponTechniques,
         ACCOUNTS_BACKUP_INTERVAL_MS:Infinity,_lastAccountsBackupAt:0,
         _diskAccountsCount:()=>0,backupAccountsFile(){},getAccount:n=>accounts.get(n),
         transmutationRules:rules,equipmentRules,progression,SAVE_CAPS:{invKeys:cap},

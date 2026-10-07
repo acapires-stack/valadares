@@ -61,11 +61,28 @@ process.on('message',msg=>{
         isAutomaton:isAutomatonFloor(floor),isDepth:isDungeonFloor(floor),gold:p?.gold,
         inv:p?.inv,bossLevel:bossLevel.get('FORGE_WARDEN')||0,
         dungeonUnlock:p?.dungeonUnlock||0,expeditionClears:p?.expeditionClears||0,
-        expeditionPending:p?.expeditionPending||null};
+        expeditionPending:p?.expeditionPending||null,
+        position:p?{x:p.x,y:p.y,floor:p.floor}:null,
+        movement:p?{version:p.movementVersion,epoch:p._movementEpoch,seq:p._movementSeq}:null};
     }else if(msg.action==='stair'){
       if(!p||!dungeonFloors.has(p.floor))throw Error('player/grid missing: '+msg.name+' floor='+p?.floor);
       const s=dungeonFloors.get(p.floor).stairs[msg.stair];if(!s)throw Error('stair missing');
       p.hp=100000;p.maxHp=100000;p.x=s.x;p.y=s.y;data={x:p.x,y:p.y,floor:p.floor};
+    }else if(msg.action==='enterDepth'){
+      if(!p||!Number.isInteger(msg.depth)||msg.depth<1||msg.depth>999)throw Error('invalid depth');
+      enterAutomatonFloor(p,p.id,msg.depth,'down');
+      data={floor:p.floor,x:p.x,y:p.y};
+    }else if(msg.action==='collisionRing'){
+      if(!p||p.floor!==2001)throw Error('requires first floor');
+      for(const m of [...monsters.values()])if(m.floor===p.floor)monsters.delete(m.id);
+      p.x=50;p.y=52;p.hp=p.maxHp=100000;
+      const cells=[[51,52],[50,51],[51,51],[52,51],[52,52],[50,53],[51,53],[52,53]];
+      for(const [x,y] of cells)if(!spawnMob('FORGE_SENTRY',x,y,p.floor,1))throw Error('ring spawn blocked '+x+','+y);
+      data={position:{x:p.x,y:p.y,floor:p.floor},count:cells.length,
+        movement:{version:p.movementVersion,epoch:p._movementEpoch,seq:p._movementSeq}};
+    }else if(msg.action==='openRing'){
+      const m=mobAt(52,52,2001);if(!m)throw Error('ring vacancy missing');
+      monsters.delete(m.id);data={removed:m.id};
     }else if(msg.action==='removeCommon'){
       const m=[...monsters.values()].find(m=>m.floor===floor&&m.automaton&&!m.unique);
       if(!m)throw Error('common mob missing');monsters.delete(m.id);data={removed:m.id};
@@ -191,19 +208,46 @@ test('shared Automaton dungeon has separate floors, 8s replenishment, logical sc
         const persisted=JSON.parse(fs.readFileSync(path.join(temp,'state.json'),'utf8'));
         assert(!persisted.monsters.some(m=>m.floor>=2001&&m.floor<=2999),
             'automaton mobs remain ephemeral for compatibility with older server rollback');
+        await qa(running.child,'enterDepth',{name:names[0],depth:25});
+        const twentyFive=await a.c.next(m=>m.t==='dungeonEnter'&&m.depth===25);
+        assert(twentyFive.stairs.town,'andar 25 tem retorno à cidade');
+        assert.notDeepEqual(twentyFive.stairs.boss,twentyFive.stairs.up);
+        assert.equal((await qa(running.child,'inspect',{floor:2025})).mobs.filter(m=>m.type==='FORGE_WARDEN').length,1,
+            'chefe do andar 25 nasce na entrada');
         await delay(650);
         await qa(running.child,'stair',{name:names[0],stair:'up'});
+        assert.equal((await a.c.request({t:'automatonExit'},m=>m.t==='automatonResult')).error,'not_at_stair',
+            'saída direta exige escada town');
+        await qa(running.child,'stair',{name:names[0],stair:'town'});
         const exit=await a.c.request({t:'automatonExit'},m=>m.t==='dungeonExit');
-        assert.deepEqual([exit.x,exit.y],[23,60]);
+        assert.deepEqual([exit.x,exit.y],[50,50]);
         assert.equal((await qa(running.child,'inspect',{floor:2001})).mobs.filter(m=>!m.unique).length,9,
             'other player keeps the shared first floor populated');
+        const ring=await qa(running.child,'collisionRing',{name:names[1]});
+        assert.equal(ring.count,8);
+        function posMessage(move){
+            const frame={t:'pos',x:51,y:52};
+            if(move.version===1)Object.assign(frame,{floor:2001,epoch:move.epoch,seq:move.seq+1});
+            return frame;
+        }
+        const correction=b.c.next(m=>m.t==='posCorrect');
+        b.c.ws.send(JSON.stringify(posMessage(ring.movement)));
+        assert.equal((await correction).reason,'occupied');
+        assert.deepEqual((await qa(running.child,'inspect',{name:names[1],floor:2001})).position,
+            {x:50,y:52,floor:2001},'sem vaga mantém player fora da casa do mob');
+        await qa(running.child,'openRing');
+        const beforeMove=await qa(running.child,'inspect',{name:names[1],floor:2001});
+        b.c.ws.send(JSON.stringify(posMessage(beforeMove.movement)));
+        await delay(100);
+        assert.deepEqual((await qa(running.child,'inspect',{name:names[1],floor:2001})).position,
+            {x:51,y:52,floor:2001},'com vaga desloca mob e aceita passo');
         await qa(running.child,'stair',{name:names[1],stair:'up'});
         await b.c.request({t:'automatonAscend'},m=>m.t==='dungeonExit');
         await qa(running.child,'tick');
         assert.equal((await qa(running.child,'inspect',{floor:2001})).grid,false);
         assert.equal((await qa(running.child,'inspect',{floor:2001})).mobs.length,0);
-        console.log(JSON.stringify({status:'PASS',entrance:[23,60],shared:2001,depth10BossHp:boss10.hp,
-            replenished:true,bossCooldown:true,isolatedFiles:temp}));
+        console.log(JSON.stringify({status:'PASS',entrance:[23,60],town:[50,50],shared:2001,
+            depth10BossHp:boss10.hp,depth25Boss:true,replenished:true,bossCooldown:true,isolatedFiles:temp}));
     }catch(error){error.message+='\nbackend stderr: '+running.stderr().slice(-1800)+'\nfixture: '+temp;throw error;}
     finally{for(const c of clients)await c.close().catch(()=>{});
         running.child.kill();await Promise.race([new Promise(resolve=>running.child.once('exit',resolve)),delay(2000)]);}

@@ -11,6 +11,7 @@
       "progression-content.js",
       "modern-world.js",
       "appearance-rules.js",
+      "weapon-techniques-rules.js",
       "package.json",
       "package-lock.json",
       "Dockerfile",
