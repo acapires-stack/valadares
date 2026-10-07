@@ -35,12 +35,16 @@ export async function createActors(pc,app,bridge){
    entity.anim.assignAnimation(name,a.resource,undefined,1,/^(Idle|Running|Walking)/.test(name));
   }return durations;
  }
- // A single scalar preserves the artist's anatomy. Hats and held items do not change body height.
+ // Size the authored body before adding hats and held items.
  function sizeBody(entity,height){
   let low=Infinity,high=-Infinity;
   for(const r of entity.findComponents('render'))if(r.enabled&&/_(Body|Head|Arm|Leg|Jaw)/.test(r.entity.name))for(const mi of r.meshInstances){const b=mi.aabb;low=Math.min(low,b.center.y-b.halfExtents.y);high=Math.max(high,b.center.y+b.halfExtents.y);}
   const authored=high-low,scale=Number.isFinite(authored)&&authored>.1?height/authored:.6;entity.setLocalScale(scale,scale,scale);return height;
  }
+ // Restore the former Knight's narrow silhouette without changing the current 1.42 height.
+ // This belongs to players, remote players and NPCs only; creature proportions stay authored.
+ const HUMANOID_WIDTH_PROFILE=0.42/0.6135142972230823;
+ function slimHumanoid(entity){const s=entity.getLocalScale();entity.setLocalScale(s.x*HUMANOID_WIDTH_PROFILE,s.y,s.z*HUMANOID_WIDTH_PROFILE);}
  function limitVisualTop(entity,height){
   let top=0;for(const r of entity.findComponents('render'))if(r.enabled)for(const mi of r.meshInstances)top=Math.max(top,mi.aabb.center.y+mi.aabb.halfExtents.y);
   if(top>height){const s=entity.getLocalScale().clone().mulScalar(height/top);entity.setLocalScale(s);return height;}return top;
@@ -120,7 +124,7 @@ export async function createActors(pc,app,bridge){
    r.enabled=modeled&&!builtInTool&&(!hat||(kind==='npc'&&n==='Mage_Hat')||(kind!=='npc'&&!!look.eq.head&&!look.crown))&&(!cape||kind==='npc'||!!look.cape);
    for(const mi of r.meshInstances)mi.castShadow=r.enabled;
   }
-  const visualHeight=sizeBody(entity,1.42),clips=animate(entity,model);
+  const visualHeight=sizeBody(entity,1.42);slimHumanoid(entity);const clips=animate(entity,model);
   const owned=[];
   const right=entity.findByName('handslot.r'),left=entity.findByName('handslot.l');
   const weaponHand=w==='bow'?left:right;
@@ -147,8 +151,8 @@ export async function createActors(pc,app,bridge){
   MINOTAUR:{model:'Barbarian',weapon:'axe',height:1.62,visualLimit:2.05,armor:'#b79773',horns:true},
   SKELETON:{model:'Skeleton_Minion',weapon:'sword',height:1.38},
   CACADOR:{model:'Rogue_Hooded',weapon:'bow',height:1.35,armor:'#c8bb9e',cape:'#baaa80'},
-  CARRASCO:{model:'Barbarian',weapon:'axe',height:1.3,armor:'#87525c',cape:'#863e50'},
-  SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',height:1.4,visualLimit:2.1,armor:'#b691cb',cape:'#86639e',hat:true},
+  CARRASCO:{model:'Barbarian',weapon:'axe',height:1.3,skin:'#9c7464',armor:'#732838',cape:'#491c2a',mask:true},
+  SENHOR_PROFUNDEZAS:{model:'Mage',weapon:'staff',height:1.4,skin:'#97719f',armor:'#592582',cape:'#331443',regalia:true},
   SENHOR_VALADARES:{model:'Knight',weapon:'sword',height:1.35,armor:'#efce8c',cape:'#d9b86f',hat:true},
   ARAUTO:{model:'Mage',preferred:'Cleric',weapon:'staff',height:1.2,armor:'#c4bce2',cape:'#e3d09d'}
  };
@@ -159,11 +163,12 @@ export async function createActors(pc,app,bridge){
    const n=r.entity.name,cape=/Cape|Cloak/.test(n),hat=/Hat|Helmet/.test(n);
    r.enabled=/^(Barbarian|Skeleton_Minion|Knight|Mage|Rogue|OrcBrute|Monstrosity|Cleric)_/.test(n)&&(!cape||!!cfg.cape)&&(!hat||!!cfg.hat)&&!/Shield|HolyWater|Staff|Tome/.test(n);
    // Keep the purchased creature's skin, eyes, teeth and armor details intact.
-   const color=cape?cfg.cape:/Body|Shoulderpad|LegArmor/.test(n)?cfg.armor:null;
+   const color=cape?cfg.cape:/Body|Shoulderpad|LegArmor/.test(n)?cfg.armor:(cfg.regalia||cfg.mask)&&/Head|Arm|Leg/.test(n)?cfg.skin:null;
    for(const mi of r.meshInstances){mi.castShadow=r.enabled;if(color){const m=mi.material.clone();m.diffuse=new pc.Color().fromString(color);m.update();owned.push(m);mi.material=m;}}
   }
   // Measure the complete authored body before hiding a head replaced by a creature part.
   let visualHeight=sizeBody(entity,cfg.height*Math.min(def.size||1,1.9));const clips=animate(entity,cfg.model);
+  if(cfg.mask||cfg.regalia){const size=Math.min(def.size||1,1.65);entity.setLocalScale(.42*size,.6*size,.42*size);}
   // This legacy approximation remains until an authored minotaur is available.
   // Unlike the former root-space add-ons, these parts follow the head bone.
   if(cfg.horns){for(const r of entity.findComponents('render'))if(/Barbarian_Head/.test(r.entity.name))r.enabled=false;const head=new pc.Entity('Cabeca minotauro');entity.addChild(head);
@@ -171,8 +176,44 @@ export async function createActors(pc,app,bridge){
    for(const side of [-1,1]){shape(head,'cone',[.15,.46,.15],[side*.32,2.19,.06],'#dfcfad',[0,0,-side*48]);shape(head,'sphere',[.055,.05,.035],[side*.17,2.01,.35],'#171914');shape(head,'sphere',[.06,.04,.035],[side*.1,1.8,.58],'#4a3429');}
    attachAuthored(entity,'head',head);
   }
+  if(cfg.mask){
+   for(const r of entity.findComponents('render'))if(/Barbarian_Head/.test(r.entity.name))r.enabled=false;
+   const hood=new pc.Entity('Capuz e mascara do carrasco');entity.addChild(hood);
+   shape(hood,'sphere',[.33,.39,.34],[0,1.57,.18],'#30252b');
+   shape(hood,'box',[.47,.10,.06],[0,1.61,.36],'#79515b');
+   shape(hood,'box',[.7,.11,.16],[0,1.54,.36],'#34232b');
+   for(const side of [-1,1])shape(hood,'sphere',[.055,.045,.03],[side*.13,1.63,.44],'#e48472');
+   attachAuthored(entity,'head',hood);
+   for(const side of [-1,1]){
+    const shoulder=new pc.Entity('Ombreira carrasco');entity.addChild(shoulder);shoulder.setLocalPosition(side*.55,1.4,0);
+    shape(shoulder,'capsule',[.18,.28,.18],[-side*.18,-.12,0],'#3d202b',[0,0,-side*40]);
+    shape(shoulder,'sphere',[.28,.18,.27],[0,0,0],'#5b2533');
+    shape(shoulder,'cone',[.11,.28,.11],[side*.11,.20,0],'#842d42',[0,0,-side*31]);
+    attachAuthored(entity,'chest',shoulder);
+   }
+  }
+  if(cfg.regalia){
+   const head=new pc.Entity('Coroa das profundezas');entity.addChild(head);
+   crown(head,'#b47bdf');
+   for(const side of [-1,1]){
+    shape(head,'cone',[.19,.74,.16],[side*.45,2.2,-.08],'#422058',[0,0,-side*32]);
+    shape(head,'sphere',[.055,.045,.035],[side*.16,1.85,.52],'#e8a6ff');
+   }
+   attachAuthored(entity,'head',head);
+   for(const side of [-1,1]){
+    const shoulder=new pc.Entity('Ombreira das profundezas');entity.addChild(shoulder);shoulder.setLocalPosition(side*.55,1.28,.08);
+    shape(shoulder,'sphere',[.27,.24,.23],[-side*.13,-.02,-.04],'#422058');
+    shape(shoulder,'sphere',[.24,.3,.15],[0,0,0],'#8d44b7');
+    shape(shoulder,'sphere',[.09,.1,.08],[side*.07,.02,.18],'#e4a2ff');
+    attachAuthored(entity,'chest',shoulder);
+   }
+   const chest=new pc.Entity('Medalhao das profundezas');entity.addChild(chest);chest.setLocalPosition(0,1.25,.42);
+   shape(chest,'sphere',[.26,.29,.16],[0,0,0],'#bd78ec');
+   attachAuthored(entity,'spine',chest);
+  }
   if(cfg.visualLimit)visualHeight=limitVisualTop(entity,cfg.visualLimit);
-  const hand=entity.findByName(cfg.weapon==='bow'?'handslot.l':'handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,-90);equipVisual(holder,cfg.weapon,false,{},owned);}
+  const hand=entity.findByName(cfg.weapon==='bow'?'handslot.l':'handslot.r');if(hand){const holder=new pc.Entity('Arma inimiga');hand.addChild(holder);holder.setLocalEulerAngles(0,0,cfg.mask?0:-90);if(cfg.mask)weapon(holder,'axe',false,{color:'#b9c5c8'});else equipVisual(holder,cfg.weapon,false,cfg.regalia?{color:'#b778e2'}:{},owned);}
+  if(cfg.mask||cfg.regalia)visualHeight=Math.max(.1,...entity.findComponents('render').filter(r=>r.enabled).flatMap(r=>r.meshInstances.map(mi=>mi.aabb.center.y+mi.aabb.halfExtents.y)));
   return {entity,kind,id,type,model:cfg.model,w:cfg.weapon,owned,visualHeight,clips,previousTimer:0,previousAtkAnim:0,previousArtAttackAt:0,strikeUntil:0,lastStrikeAt:-1,lastX:NaN,lastZ:NaN,state:''};
  }
 

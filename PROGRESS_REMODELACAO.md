@@ -1,6 +1,19 @@
 # Novo Valadares — estado da entrega
 
-Atualizado em 06/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
+Atualizado em 07/10/2026. Autorização: construir a versão paralela até o jogo integrado, sem aprovações por partes, preservando jogabilidade, combate e liberdade. Não há Senna ou Goal inferido.
+
+## Porte dos personagens e identidade de dois chefes — 07/10
+
+Após comparação real, Alcione pediu perfil mais fino para personagens/NPCs, o Carrasco anterior e, em seguida, autorizou explicitamente recuperar o Senhor das Profundezas. Esta decisão visual substitui a preferência por escala uniforme registrada na revisão de 06/10. Fonte anterior pública53a71cb, backendaf8d955.
+
+- Jogador local, remotos e NPCs: fator X/Z0,68458 sobre a escala atual, mantendo altura, sete corpos, cores, animações e identidade independente da arma. O ajuste está restrito ao construtor de humanoides; não comprime as demais criaturas.
+- Carrasco: recuperados porte, máscara e paleta escura; ombreiras ligadas ao torso, visor encostado no capuz e machado ligado à mão. Senhor das Profundezas: recuperados corpo estreito, coroa e adornos roxos; removida a aba larga que ocultava rosto e peito. Coroa, ombreiras e medalhão acompanham a animação. Sombra e outros monstros inalterados.
+- Fonte única de produto alterada: modern/actors.js. Regras, dano, alcance, velocidade, mapa, servidor e dados de contas preservados. Comparação e capturas próprias de repouso/corrida/golpe em work/porte-carrasco-2026-10-07 no workspace da conversa.
+- Inspeção visual dos sete corpos, NPCs, seis armas e dois chefes concluída, incluindo revisão independente do boss na câmera da partida. Build224 arquivos/86 recursos passou foco/clássico/compacto, sete escolhas, limpeza da silhueta ao logout e zero falhas JS/HTTP. Testes integrados de seleção/visibilidade (21 combinações) e combate moderno nativo com três armas, coleta e relogin passaram. Serviços Altar/Bancada/Treino/Baú e Mercador passaram por interação nativa. Cliente tem14 NPCs ativos, todos conferidos; catálogo visual inclui também o Crupiê desativado. Seleção3D, movimento e apresentação de vida/morte dos dois chefes passaram em cena sintética; esse ensaio não comprova dano real dos chefes.
+
+Alcione apontou que usar modelos de jogadores em monstros mantém identidade inadequada. Auditoria focal do acervo confirmou OrcBrute/Monstrosity próprios já usados, lobo/esqueleto dedicados e ausência de pacote pronto correspondente a Carrasco/Profundezas. Os sete ZIPs KayKit incluem cenários e Series6; pacotes modulares adicionais são de avatares. Recuperação autorizada corrige a regressão visual, mas permanece adaptação Barbarian/Mage, não arte definitiva dos chefes. Essa lacuna não está resolvida por este lote nem por mudar somente cores/acessórios.
+
+Recibo da publicação conclusiva será work/publicacao-porte-carrasco-receipt.json no workspace C:/Users/Alcione/Documents/Codex/2026-10-06/valadare. Recuperação de código somente modern/actors.js para53a71cb, sem restaurar contas. Nenhum reinício do backend é necessário. O quadro outputs/Senhor-das-Profundezas-recuperado-07-10.html reúne original, versão com chapéu e recuperação; imagens são inspeções reais do renderizador, não geração de arte.
 
 ## Revisão de elenco e escala — candidato integrado em 06/10
 
