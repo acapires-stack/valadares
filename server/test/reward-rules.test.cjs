@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8').replace(/\r\n/g,'\n');
 function functionSource(name){
     const start = source.indexOf(`function ${name}(`);
     assert.ok(start >= 0, `missing ${name}`);

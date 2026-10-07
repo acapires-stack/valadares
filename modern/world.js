@@ -14,7 +14,9 @@ const PAL = {
  ivory:['#dfd1ad','#f0dcaf'], wood:['#76533b','#60402f'], jade:['#5ba99a','#80c9b0'],
  linen:['#d8c6a0','#eadbb9'], straw:['#cfac69','#e0c483'], teal:['#286e76','#358b91'], blue:['#294f70','#396788'],
  ember:['#f0a34c','#f8c065'], window:['#d8bc7d'], mortar:['#9e9683'],
- clay:['#b46b4c','#bd7654','#ad6246'], dark:['#302f35','#47444a'], roof:['#a65d40','#b46a49']
+ clay:['#b46b4c','#bd7654','#ad6246'], dark:['#302f35','#47444a'], roof:['#a65d40','#b46a49'],
+ forgeFloor:['#434a47','#4a514c','#3b4341'], forgeWall:['#59615a','#4d5651'],
+ forgeSteel:['#646d68','#77827a'], forgeGlow:['#ef8c42','#f6ae54']
 };
 const hash=(x,z,s=0)=>{let n=Math.imul(x+1013,374761393)+Math.imul(z+37,668265263)+Math.imul(s+7,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295;};
 const hexColor=(pc,hex)=>new pc.Color().fromString(hex);
@@ -56,19 +58,53 @@ export function createWorld(pc,app,bridge){
  const root=new pc.Entity('Terreno de Valadares');app.root.addChild(root);
  const scenery=createScenery(pc,app);
  const houses=bridge.getBuildings?.()||[];
- const materials=new Map(),textures=[],chunks=new Map();let mapRef=null,floor=-1,propSignature='',created=0,waterClock=0,sceneryVersion=-1;
- function mat(name,variant=0){const key=name+':'+variant;if(materials.has(key))return materials.get(key);const colors=PAL[name]||PAL.stone,hex=colors[variant%colors.length],m=new pc.StandardMaterial(),textured=['grass','dirt','stone','cave','snow','sand','cliff','roof','water'].includes(name);m.diffuse=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.ambient=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.gloss=(name==='water'||name==='jade')?.45:.1;m.useMetalness=true;m.metalness=name==='copper'?.55:0;
+ const materials=new Map(),textures=[],chunks=new Map();let mapRef=null,floor=-1,propSignature='',expeditionTheme=null,created=0,waterClock=0,sceneryVersion=-1;
+ function mat(name,variant=0){const key=name+':'+variant;if(materials.has(key))return materials.get(key);const colors=PAL[name]||PAL.stone,hex=colors[variant%colors.length],m=new pc.StandardMaterial(),textured=['grass','dirt','stone','cave','snow','sand','cliff','roof','water','forgeFloor'].includes(name);m.diffuse=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.ambient=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.gloss=(name==='water'||name==='jade')?.45:.1;m.useMetalness=true;m.metalness=name==='copper'?.55:name==='forgeSteel'?.35:0;
   if(textured){const tex=noiseTexture(pc,app.graphicsDevice,hex,name);textures.push(tex);m.diffuseMap=tex;}
-   if(name==='ember'||name==='jade'||name==='window'){m.emissive=hexColor(pc,hex);m.emissiveIntensity=name==='ember'?1.6:name==='window'?.32:.45;}
+   if(name==='ember'||name==='jade'||name==='window'||name==='forgeGlow'){m.emissive=hexColor(pc,hex);m.emissiveIntensity=name==='ember'?1.6:name==='forgeGlow'?1.15:name==='window'?.32:.45;}
   m.update();materials.set(key,m);return m;}
  const kind={0:'grass',1:'dirt',2:'grass',3:'water',4:'stone',5:'cave',6:'cave',7:'snow',8:'sand'};
  const get=(map,x,z)=>x<0||z<0||x>=bridge.M_W||z>=bridge.M_H?6:(map[z]?.[x]??6);
+ const forgotten=()=>floor>=8000&&floor<9000&&expeditionTheme==='forja_esquecida';
+ function forgottenTile(groups,map,x,z,node){
+  const t=get(map,x,z),cx=x+.5,cz=z+.5,g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
+  if(t===5){
+   // Plates, rivets and warm seams are visual only; every server walkable tile stays open.
+   const plate=g('forgeSteel',Math.floor(hash(x,z,44)*2));plate.box(cx,-.027,cz,.88,.009,.88);
+   if((x+z)%2===0){const seam=g('copper',0);seam.box(cx,-.016,z+.09,.82,.004,.015);seam.box(x+.09,-.016,cz,.015,.004,.82);}
+   if(z>=49&&z<=51&&((x>=48&&x<=53)||(x>=64&&x<=67))){
+    const lane=g('forgeFloor',1);lane.box(cx,-.013,cz,.72,.004,.72);
+    if(z===49||z===51)g('copper',1).box(cx,-.007,z+(z===49?.12:.88),.88,.004,.024);
+   }
+   if((x===44&&z===50)||(x===58&&z===50)||(x===70&&z===50)){
+    // Flush room marks aid wayfinding without lifting the player or covering mobs.
+    const ring=g('copper',0);for(const sx of [-1,1])ring.box(cx+sx*.27,-.008,cz,.025,.004,.55);
+    for(const sz of [-1,1])ring.box(cx,-.008,cz+sz*.27,.55,.004,.025);
+   }
+   return;
+  }
+  if(t!==6)return;
+  const north=get(map,x,z+1)===5,south=get(map,x,z-1)===5,
+    east=get(map,x+1,z)===5,west=get(map,x-1,z)===5;
+  if(!north&&!south&&!east&&!west)return;
+  // Low southern parapets preserve the isometric line of sight into each room.
+  const height=south ? .27 : north ? .78 : .52;
+  g('forgeWall',Math.floor(hash(x,z,50)*2)).box(cx,-.035,cz,.96,height,.96);
+  g('forgeSteel',0).box(cx,height-.03,cz,.98,.065,.98);
+  if(north&&((x===44&&z===44)||(x===59&&z===43)||(x===70&&z===45))){
+   g('forgeGlow',0).box(cx,height+.039,cz,.24,.045,.24);
+   scenery.place('litTorch',node,cx,height+.08,cz,.31,0,false);
+  }
+  if(south&&((x===45&&z===56)||(x===61&&z===57)||(x===71&&z===55)))
+   scenery.place('rubble',node,cx,height+.03,cz,.29,hash(x,z,51)*360,false);
+ }
  function drawTile(groups,map,x,z,isDungeon,house,node){
-  const t=get(map,x,z),v=Math.floor(hash(x,z,1)*3),name=kind[t]||'grass',g=(k,variant=0)=>{const key=k+':'+variant;let p=groups.get(key);if(!p){p=new Geometry();groups.set(key,p);}return p;};
+  const t=get(map,x,z),v=Math.floor(hash(x,z,1)*3),name=forgotten()?(t===5?'forgeFloor':'forgeWall'):(kind[t]||'grass'),g=(k,variant=0)=>{const key=k+':'+variant;let p=groups.get(key);if(!p){p=new Geometry();groups.set(key,p);}return p;};
   const cx=x+.5,cz=z+.5,edge=.501;
   // World-space UVs keep the same broad, soft texture across tile boundaries.
   const ground=g(name,0),surface=t===3?.004:-.035,u=x/10,q=z/10;
   ground.quad([cx-edge,surface,cz-edge],[cx-edge,surface,cz+edge],[cx+edge,surface,cz+edge],[cx+edge,surface,cz-edge],[u,q,u,q+.1,u+.1,q+.1,u+.1,q]);
+  if(forgotten()){forgottenTile(groups,map,x,z,node);return;}
   // The paving is drawn by one world-aligned irregular stone texture; raised
   // squares at every tile made the plaza read as a repeated board.
   if(t===0){const nearRoad=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dz])=>[1,4].includes(get(map,x+dx,z+dz))),roll=hash(x,z,9);
@@ -291,20 +327,55 @@ export function createWorld(pc,app,bridge){
   const rooms=bridge.getInteriors?.()||globalThis.ValadaresWorld?.interiors||[];
   return Array.isArray(rooms)?rooms.find(r=>r.floor===level)||null:null;
  }
+ function forgottenFeatures(groups,node,cx,cz){
+  const g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
+  const light=(name,x,z,color,intensity,range)=>{const e=new pc.Entity(name);e.addComponent('light',{type:'omni',color:hexColor(pc,color),intensity,range,castShadows:false});e.setPosition(x,1.85,z);node.addChild(e);};
+  if(cx===3&&cz===4){
+   // Arrival room: broken masonry at the outside edge, never on the entrance or patrol tiles.
+   scenery.place('ruinedWall',node,41.55,.44,47.55,.38,90,false);
+   scenery.place('barrel',node,41.55,.44,53.45,.30,0,false);
+   scenery.place('ore',node,46.50,.31,56.50,.19,30,false);
+   light('Brasa da entrada',44.5,48.3,'#efad73',.46,6.2);
+  }
+  if(cx===4&&cz===4){
+   // Furnace stays on the western wall, visible from the workshop without occupying its floor.
+   const x=53.5,z=47.5,wall=g('forgeWall',1),steel=g('forgeSteel',0),fire=g('forgeGlow',0),dark=g('dark',0);
+   wall.box(x,.73,z,.88,.98,.81);steel.box(x,1.68,z,.98,.12,.92);
+   dark.box(x,1.06,z+.422,.68,.55,.045);fire.box(x,1.13,z+.45,.49,.36,.025);
+   steel.box(x-.30,1.68,z,.12,.54,.12);steel.box(x+.30,1.68,z,.12,.54,.12);
+   for(const dx of [-.21,0,.21])fire.box(x+dx,1.57,z+.47,.11,.07,.02);
+   scenery.place('scaffold',node,53.5,.46,45.5,.32,90,false);
+   scenery.place('pickaxeBucket',node,62.5,.31,57.5,.32,25,false);
+   scenery.place('crates',node,55.5,.31,57.5,.28,0,false);
+   scenery.place('ore',node,62.5,.31,43.5,.20,0,false);
+   light('Fornalha esquecida',55.5,48.3,'#ff9a54',.88,7.4);
+  }
+  if(cx===5&&cz===4){
+   // The boss at (70,50) retains the whole floor around it.
+   scenery.place('pillar',node,68.5,.79,45.5,.32,0,false);
+   scenery.place('pillar',node,72.5,.79,45.5,.32,0,false);
+   scenery.place('rubble',node,73.5,.47,48.5,.28,30,false);
+   const steel=g('forgeSteel',1),glow=g('forgeGlow',1);
+   steel.box(70.5,.75,45.5,1.10,.13,.49);
+   glow.box(70.5,.89,45.68,.83,.055,.055);
+   light('Nucleo do guardiao',70.5,48.5,'#eab67d',.54,6.4);
+  }
+ }
  function build(cx,cz,map){const groups=new Map(),node=new pc.Entity(`Setor ${cx},${cz}`),props=floor===0?(bridge.getProps?.()||[]):[];node._worldMeshes=[];
   const valid=floor===0?houses.filter(h=>{for(let z=h.y;z<h.y+h.h;z++)for(let x=h.x;x<h.x+h.w;x++)if(get(map,x,z)!==2)return false;return true;}):[];
   for(let z=cz*CHUNK;z<(cz+1)*CHUNK;z++)for(let x=cx*CHUNK;x<(cx+1)*CHUNK;x++){if(x<0||z<0||x>=bridge.M_W||z>=bridge.M_H)continue;
    if(floor>=1000&&floor<=1003){interiorTile(groups,x,z);continue;}
    const underHouse=valid.some(h=>x>=h.x&&x<h.x+h.w&&z>=h.y&&z<h.y+h.h);drawTile(groups,map,x,z,floor>0,underHouse,node);seam(groups,map,x,z,'x');seam(groups,map,x,z,'z');}
   if(floor>=1000&&floor<=1003&&cx===4&&cz===4)interiorFurnishings(groups,node,interiorRoom());
+  if(forgotten())forgottenFeatures(groups,node,cx,cz);
   for(const h of valid)if(Math.floor((h.x+h.w/2)/CHUNK)===cx&&Math.floor((h.y+h.h/2)/CHUNK)===cz)house(groups,h,node);
   for(const p of props)if(Math.floor(p.x/CHUNK)===cx&&Math.floor(p.y/CHUNK)===cz)prop(groups,p,node);
   for(const [key,geo]of groups){const mesh=geo.finish(pc,app.graphicsDevice);if(!mesh)continue;node._worldMeshes.push(mesh);const e=new pc.Entity(key);e.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,mat(...key.split(':').map((v,i)=>i?Number(v):v)))],castShadows:true,receiveShadows:true});node.addChild(e);}
   root.addChild(node);chunks.set(`${cx}:${cz}`,node);created++;
  }
  function drop(e){e.destroy();for(const mesh of e._worldMeshes||[])mesh.destroy();}
- function update(dt){waterClock+=dt;const water=materials.get('water:0');if(water&&waterClock>=.08){water.diffuseMapOffset.x=(water.diffuseMapOffset.x+waterClock*.007)%1;water.diffuseMapOffset.y=(water.diffuseMapOffset.y+waterClock*.003)%1;water.update();waterClock=0;}const map=bridge.getMap?.(),p=bridge.getPlayer?.();if(!map||!p)return;const nextFloor=bridge.getFloor?.()??p.floor??0,props=nextFloor===0?(bridge.getProps?.()||[]):[],services=nextFloor>=1000&&nextFloor<=1003?(interiorRoom(nextFloor)?.services||[]):[],sig=[...props,...services].map(p=>`${p.key||p.kind}:${p.x}:${p.y}`).join('|');
-  if(map!==mapRef||nextFloor!==floor||sig!==propSignature||scenery.version!==sceneryVersion){for(const e of chunks.values())drop(e);chunks.clear();mapRef=map;floor=nextFloor;propSignature=sig;sceneryVersion=scenery.version;}
+ function update(dt){waterClock+=dt;const water=materials.get('water:0');if(water&&waterClock>=.08){water.diffuseMapOffset.x=(water.diffuseMapOffset.x+waterClock*.007)%1;water.diffuseMapOffset.y=(water.diffuseMapOffset.y+waterClock*.003)%1;water.update();waterClock=0;}const map=bridge.getMap?.(),p=bridge.getPlayer?.();if(!map||!p)return;const nextFloor=bridge.getFloor?.()??p.floor??0,nextExpedition=bridge.getExpedition?.()||null,props=nextFloor===0?(bridge.getProps?.()||[]):[],services=nextFloor>=1000&&nextFloor<=1003?(interiorRoom(nextFloor)?.services||[]):[],sig=[...props,...services].map(p=>`${p.key||p.kind}:${p.x}:${p.y}`).join('|');
+  if(map!==mapRef||nextFloor!==floor||nextExpedition!==expeditionTheme||sig!==propSignature||scenery.version!==sceneryVersion){for(const e of chunks.values())drop(e);chunks.clear();mapRef=map;floor=nextFloor;expeditionTheme=nextExpedition;propSignature=sig;sceneryVersion=scenery.version;}
   const cam=bridge.getCamera?.(),px=cam?cam.x+(bridge.VP_W||14)/2:p.x,pz=cam?cam.y+(bridge.VP_H||10)/2:p.y,bounds=bridge.getViewBounds?.()||{minX:px-REACH,maxX:px+REACH,minY:pz-REACH,maxY:pz+REACH};
   const fromX=Math.max(0,Math.floor(bounds.minX/CHUNK)),toX=Math.min(Math.ceil(bridge.M_W/CHUNK)-1,Math.floor(bounds.maxX/CHUNK)),fromZ=Math.max(0,Math.floor(bounds.minY/CHUNK)),toZ=Math.min(Math.ceil(bridge.M_H/CHUNK)-1,Math.floor(bounds.maxY/CHUNK));
   const wanted=new Set();for(let z=fromZ;z<=toZ;z++)for(let x=fromX;x<=toX;x++){const key=`${x}:${z}`;wanted.add(key);if(!chunks.has(key))build(x,z,map);}for(const [key,node]of chunks)if(!wanted.has(key)){drop(node);chunks.delete(key);}

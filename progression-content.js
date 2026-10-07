@@ -64,5 +64,9 @@
         firstClearKey:'MACHADO_FORJA', enemies:['ORC','GOLEM'],boss:'GOLEM_REI',
         objectives:{guards:4,golems:3,boss:1},
     };
-    return Object.freeze({items,recipes,families,ascendantPools,expedition});
+    const robotExpedition = {
+        ...expedition,id:'forja_esquecida',name:'Forja Esquecida',nameEn:'Forgotten Forge',
+        enemies:['FORGE_SENTRY','FORGE_CONSTRUCT'],boss:'FORGE_WARDEN',
+    };
+    return Object.freeze({items,recipes,families,ascendantPools,expedition,robotExpedition});
 });

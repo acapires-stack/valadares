@@ -18,7 +18,7 @@ function fn(name){
     throw Error(name);
 }
 function fixture({full=false,fail=false}={}){
-    const sent=[],monsters=new Map(),dungeonFloors=new Map();let mobId=1;
+    const sent=[],monsters=new Map(),dungeonFloors=new Map(),interiorsByFloor=new Map();let mobId=1;
     const acc={save:{},savedAt:1};
     const p={id:1,name:'Tester',authedName:'Tester',floor:0,x:78,y:22,hp:500,pvp:true,
         ws:{readyState:1,send:s=>sent.push(JSON.parse(s))},inv:{},gold:50000,
@@ -27,7 +27,7 @@ function fixture({full=false,fail=false}={}){
     if(full)for(let i=0;i<250;i++)p.inv['OTHER_'+i]=1;
     const players=new Map([[1,p]]);
     const context=vm.createContext({crypto,progression,equipmentRules:{VERSION:1},PROGRESSION_ENABLED:true,Date,
-        SAVE_CAPS:{invKeys:250,itemQty:9999},players,monsters,dungeonFloors,
+        SAVE_CAPS:{invKeys:250,itemQty:9999},players,monsters,dungeonFloors,interiorsByFloor,
         getAccount:()=>acc,chebyshev:(ax,ay,bx,by)=>Math.max(Math.abs(ax-bx),Math.abs(ay-by)),
         isAdjacentTo:(p,npc)=>Math.max(Math.abs(p.x-npc.x),Math.abs(p.y-npc.y))<=1,
         QUEST_NPCS:{atendente:{x:50,y:50}},
@@ -58,7 +58,8 @@ function fixture({full=false,fail=false}={}){
         weaponSkillOf:()=> 'Machado',hasShieldEquipped:()=>false,
         gainSkillXpServer:()=>{},gainPetXp:()=>{},grantManaOnKill:()=>{},
         console,Math,expeditionFloorSeq:8000});
-    vm.runInContext(['genForgeGrid','expeditionStatus','sendExpeditionStatus','enterExpedition',
+    vm.runInContext(['nearInteriorService','nearCraftService','movementSnapshot',
+        'genForgeGrid','expeditionStatus','sendExpeditionStatus','enterExpedition',
         'handleExpeditionMobDeath','claimExpeditionReward','executeProgressionCraft']
         .map(fn).join('\n'),context);
     return {p,acc,sent,monsters,dungeonFloors,context,

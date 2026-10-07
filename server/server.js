@@ -12,6 +12,7 @@ const transmutationRules = require('../transmutation-rules');
 const progression = require('../progression-content');
 const modernWorld = require('../modern-world');
 const appearanceRules = require('../appearance-rules');
+const appearanceService = require('./appearance-service');
 const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
 // Suspenso temporariamente por decisão do produto; clientes antigos também são bloqueados.
@@ -686,6 +687,10 @@ const MTYPE = {
     DRAKE_LIDER:{ hp:700, dmg:25, speed:360, xp:800, aggro:7, unique:true, intel:3 },
     GOLEM:      { hp:200, dmg:13, speed:460, xp:180, aggro:6, intel:2 },
     GOLEM_REI:  { hp:900, dmg:20, speed:490, xp:700, aggro:7, unique:true, intel:3 },
+    // Forja Esquecida: equivalentes da expedição anterior, sem spawn no mundo aberto.
+    FORGE_SENTRY:    { hp:140, dmg:11, speed:370, xp:120, aggro:5, intel:2 },
+    FORGE_CONSTRUCT: { hp:200, dmg:13, speed:460, xp:180, aggro:6, intel:2 },
+    FORGE_WARDEN:    { hp:900, dmg:20, speed:490, xp:700, aggro:7, unique:true, intel:3 },
     SCORPION:   { hp:75,  dmg:11, speed:320, xp:55,  aggro:4, intel:2 },
     CACADOR:    { hp:350, dmg:18, speed:320, xp:0,   aggro:999, intel:3 },
     // ─── M4 Masmorra "As Profundezas" — mobs exclusivos, mais fortes ───
@@ -709,7 +714,7 @@ const SPAWN_RINGS = [
 
 const CAVES = [
     { name:'Caverna dos Morcegos', x:18, y:80, r:7, types:['BAT','BAT','BAT','BAT','SKELETON'], target:14 },
-    { name:'Antro do Minotauro',   x:82, y:18, r:8, types:['BAT','MINOTAUR','MINOTAUR','SKELETON'], target:12 },
+    { name:'Santuário da Mata',    x:82, y:18, r:8, types:['BAT','MINOTAUR','MINOTAUR','SKELETON'], target:12 },
     { name:'Cripta dos Mortos',    x:18, y:18, r:6, types:['SKELETON','SKELETON','BAT'], target:10 },
     { name:'Covil do Drake',       x:82, y:80, r:8, types:['DRAKE','DRAKE','DRAKE','BAT'], target:14 },
     { name:'Abismo do Golem',      x:70, y:90, r:7, types:['GOLEM','GOLEM','SKELETON'], target:10 },
@@ -1068,6 +1073,7 @@ function updateEnchantSave(p){
         expeditionClears:p.expeditionClears,expeditionPending:p.expeditionPending,
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
         permaBuffs:p.permaBuffs,appearance:appearanceRules.normalizarAppearance(p.appearance),
+        appearanceOps:p.appearanceOps || [],
         hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp });
     acc.savedAt = Date.now();
     return flushAccounts();
@@ -1747,6 +1753,9 @@ function inSanctuary(x, y){
     return false;
 }
 function playerNearNpc(p){
+    // NPCs e seus abrigos existem apenas na superfície. Andares privados usam
+    // coordenadas parecidas, mas não herdam proteção de NPCs da cidade.
+    if ((p.floor || 0) !== 0) return false;
     // Santuário 5×5 (NPCs de mundo): abrigo TOTAL — o mob larga o alvo mesmo se você
     // atacou de dentro. Sem isto a grace abaixo reativava o alvo e os mobs empilhavam
     // na borda tentando entrar (não pisam no santuário). #9
@@ -1807,13 +1816,13 @@ const POST_BOOT_HEAL_MS = 3 * 60 * 1000;   // 3 min após boot
 // conta). Profundidade máxima alcançada entra no ranking público (entry.depth).
 // O server é DONO do layout: genDungeonGrid gera cada andar como caverna
 // procedural (cellular automata, determinística por andar) e rastreia p.floor.
-// Entrada: Antro do Minotauro (83,17). Player desce → chega em (50,52) no andar.
+// Entrada: Santuário da Mata (83,17). Player desce → chega em (50,52) no andar.
 // As escadas do andar (subida/descida/boss) são PROCEDURAIS — escolhidas por
 // genDungeonGrid em chão alcançável (subida perto da chegada e no lado OPOSTO
 // à descida; descida no ponto mais fundo; boss da banda fundo TAMBÉM, mas a
 // ≥3 tiles da descida — ele "guarda" a região da escada sem bloquear o tile).
 // A saída do andar 1 volta pra PZ da cidade (50,50).
-const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Antro do Minotauro (82,18) — fora da PZ, gated por mobs fortes
+const DUNGEON_ENTRANCE = { x: 83, y: 17 };   // escada no Santuário da Mata (82,18) — fora da PZ, gated por mobs fortes
 const DUNGEON_RETURN   = { x: 50, y: 50 };   // SAÍDA SEGURA: PZ da cidade (antes 83,18 = no meio dos minotauros = morte ao sair)
 const DUNGEON_SPAWN    = { x: 50, y: 52 };   // chegada FIXA ao entrar/trocar de andar (genDungeonGrid garante clareira aqui)
 // Teto TÉCNICO, não de design: protege a faixa 9000+ da arena (arenaFloorSeq) e
@@ -2139,6 +2148,20 @@ function inPzBuffer(x, y){ return chebyshev(x, y, SAFE_CX, SAFE_CY) <= PZ_BUFFER
 // PZ — as coords coincidem com a PZ da cidade, mas lá é perigoso (mobs atacam,
 // regen normal, PvP forçado). Use este helper onde a segurança depende do player.
 function playerInSafe(p){ return (p.floor || 0) === 0 && inSafe(p.x, p.y); }
+function playerInFullShelter(p){ return (p.floor || 0) === 0 && (inSafe(p.x,p.y) || inSanctuary(p.x,p.y)); }
+function isOwnedHunter(p,m){
+    return !!m && m.hp>0 && m.type==='CACADOR' && m.hunter===true &&
+        m.huntTargetId===p.id && (m.floor||0)===(p.floor||0);
+}
+function hasReachableOwnedHunter(p,range){
+    for (const m of monsters.values()){
+        if (!isOwnedHunter(p,m)) continue;
+        if (chebyshev(p.x,p.y,m.x,m.y)>range) continue;
+        if (range>1 && !hasLineOfSight(p.x,p.y,m.x,m.y)) continue;
+        return true;
+    }
+    return false;
+}
 function inCave(x, y){
     for (const c of CAVES) if (chebyshev(x, y, c.x, c.y) <= c.r) return c;
     return null;
@@ -2580,8 +2603,7 @@ function bumpMobAwayFrom(x, y, floor){
     for (const [dx, dy] of dirs){
         const nx = m.x + dx, ny = m.y + dy;
         if (nx < 1 || ny < 1 || nx >= M_W-1 || ny >= M_H-1) continue;
-        if (!isWalkable(nx, ny)) continue;
-        if (inSafe(nx, ny)) continue;
+        if (!mobTileOk(m, nx, ny)) continue;
         if (mobAt(nx, ny, f)) continue;
         if (playerAt(nx, ny, f)) continue;
         m.x = nx; m.y = ny;
@@ -2592,6 +2614,9 @@ function spawnMob(type, x, y, floor){
     const def = MTYPE[type];
     if (!def) return null;
     if (isTransitionTile(floor || 0, x, y)) return null;   // nunca spawna em cima de escada/chegada
+    // Caverna do overworld pode se sobrepor a um santuário de NPC. O veto é
+    // apenas à proteção: eventos especiais têm posições históricas próprias.
+    if ((floor || 0) === 0 && (inSafe(x,y) || inSanctuary(x,y))) return null;
     // Bosses escalam por nível (cap 10): hp x(1+0.15k), dmg x(1+0.10k), xp x(1+0.20k) com k = lvl-1
     const level = def.unique ? Math.max(1, Math.min(BOSS_LEVEL_CAP, bossLevel.get(type) || 1)) : 1;
     const k = level - 1;
@@ -2648,6 +2673,7 @@ function spawnInitial(){
             const x = cave.x + dx, y = cave.y + dy;
             if (x<2||y<2||x>=M_W-2||y>=M_H-2) continue;
             if (tileAt(x, y) !== T.CAVE) continue;  // só piso de caverna
+            if (inSanctuary(x,y) || inSafe(x,y)) continue;
             if (mobAt(x, y)) continue;
             spawnMob(cave.types[Math.floor(Math.random() * cave.types.length)], x, y);
             placed++;
@@ -2901,6 +2927,7 @@ function tickRespawns(){
                 const x = cave.x + dx, y = cave.y + dy;
                 if (x<2||y<2||x>=M_W-2||y>=M_H-2) continue;
                 if (tileAt(x, y) !== T.CAVE) continue;
+                if (inSanctuary(x,y) || inSafe(x,y)) continue;
                 if (mobAt(x, y)) continue;
                 if (tooClose(x, y, 5)) continue;
                 spawnMob(cave.types[Math.floor(Math.random() * cave.types.length)], x, y);
@@ -3002,11 +3029,14 @@ function tickAI(){
         if (m.hp <= 0) continue;
         // ⚡ Choque (raio): atordoado pula o turno (sem mover/atacar). DoT segue no tickMobDots.
         if (m.shockedUntil && now < m.shockedUntil) continue;
-        // Hunter (caçador HL): target hardcoded no player que triggou. Ignora aggro range,
-        // PZ e mini-PZ — persegue pelo mapa inteiro até o target sair do jogo ou morrer.
+        // Hunter (caçador HL): mira no jogador que disparou a caçada. Ignora alcance
+        // de aggro, PZ e mini-PZ na superfície; suspende a perseguição em outro andar.
         let target = null, td = Infinity;
         if (m.hunter && m.huntTargetId != null){
             const tp = players.get(m.huntTargetId);
+            // O dono em outro andar apenas suspende a caçada; não redireciona
+            // o caçador a terceiros que estejam na superfície.
+            if (tp && (tp.hp ?? 100) > 0 && (tp.floor||0)!==(m.floor||0)) continue;
             if (tp && (tp.hp ?? 100) > 0){
                 target = tp;
                 td = chebyshev(m.x, m.y, tp.x, tp.y);
@@ -3203,6 +3233,7 @@ function snapshotMobs(floor){
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir, hp:m.hp, maxHp:m.maxHp, unique:!!m.unique,
             level: m.level || 1,
             hunter: m.hunter ? 1 : undefined,
+            huntTargetId: m.hunter ? m.huntTargetId : undefined,
             dots: ds.length ? ds : undefined,
         };
     });
@@ -4350,6 +4381,8 @@ function setPlayerSave(name, data){
     if (!a) return false;
     // Classic clients do not know this field. Only appearanceSet changes identity.
     data.appearance = appearanceRules.normalizarAppearance(a.save?.appearance);
+    // Recibos são autoritativos como a aparência; uploads não os podem apagar.
+    data.appearanceOps = appearanceService.normalizeReceipts(a.save?.appearanceOps,appearanceRules);
     a.save = data;
     a.savedAt = Date.now();
     queueSaveAccounts();
@@ -5453,7 +5486,7 @@ const ATTACKER_STATUS = {
     SCORPION: { dot:[{ type:'poison', chance:0.30, dmg:3, ticks:5, intervalMs:3000, label:'Escorpião' }] },
     LIZARD:   { dot:[{ type:'bleed',  chance:0.20, dmg:1, ticks:6, intervalMs:2000, label:'Lagarto' }] },
     TROLL:    { stun:[{ chance:0.10, durationMs:1500, label:'Troll' }] },
-    MINOTAUR: { stun:[{ chance:0.25, durationMs:2000, label:'Minotauro' }] },
+    MINOTAUR: { stun:[{ chance:0.25, durationMs:2000, label:'Guardião da Mata' }] },
     SENHOR_VALADARES: {
         stun:[{ chance:0.45, durationMs:2500, label:'Senhor de Valadares' }],
         dot: [{ type:'bleed', chance:0.60, dmg:6, ticks:6, intervalMs:2000, label:'Senhor de Valadares' }],
@@ -5881,9 +5914,9 @@ function genForgeGrid(floor){
     const region={x0:40,y0:42,x1:74,y1:58};
     const walkable=new Set(),floorTiles=[],rows=[];
     const rooms=[
-        [42,47,45,55], // chegada e patrulha orc
-        [54,63,44,56], // forja dos golens
-        [68,72,46,54], // câmara do rei
+        [42,47,45,55], // chegada e primeira patrulha
+        [54,63,44,56], // forja e segunda patrulha
+        [68,72,46,54], // câmara do chefe
     ];
     function opened(x,y){
         if (rooms.some(([x0,x1,y0,y1])=>x>=x0&&x<=x1&&y>=y0&&y<=y1))return true;
@@ -5905,17 +5938,22 @@ function genForgeGrid(floor){
 function expeditionStatus(p){
     const e=p.expedition;
     return {ok:true,stage:e ? (e.cleared?'cleared':'active'):'ready',
+        expedition:e?.id||null,
         guards:e?.guards||0,golems:e?.golems||0,boss:e?.boss||0,
         clears:p.expeditionClears||0,pending:p.expeditionPending||null};
 }
 function sendExpeditionStatus(p, extra){
     sendTo(p.id,{t:'expeditionResult',...expeditionStatus(p),...extra});
 }
-function enterExpedition(p){
+function enterExpedition(p,requestedTheme){
     if (!PROGRESSION_ENABLED) return {ok:false,error:'disabled'};
+    const theme=requestedTheme===undefined ? progression.expedition.id : requestedTheme;
+    const route=theme===progression.expedition.id ? progression.expedition :
+        theme===progression.robotExpedition.id ? progression.robotExpedition : null;
+    if (!route) return {ok:false,error:'bad_expedition'};
     if (p.hp <= 0 || p.floor !== 0 || p.duel || p.arena || p.tradeId)
         return {ok:false,error:'unavailable'};
-    if (chebyshev(p.x,p.y,progression.expedition.npc.x,progression.expedition.npc.y)>2)
+    if (chebyshev(p.x,p.y,route.npc.x,route.npc.y)>2)
         return {ok:false,error:'not_at_blacksmith'};
     if (p.expeditionPending) return {ok:false,error:'claim_pending',pending:p.expeditionPending};
     let floor=0;
@@ -5928,10 +5966,10 @@ function enterExpedition(p){
     if (!floor) return {ok:false,error:'instance_full'};
     const g=genForgeGrid(floor);
     dungeonFloors.set(floor,g);
-    p.expedition={floor,guards:0,golems:0,boss:0,cleared:false};
+    p.expedition={id:route.id,floor,guards:0,golems:0,boss:0,cleared:false};
     const layout=[
-        ['ORC',45,47],['ORC',47,49],['ORC',45,52],['ORC',47,54],
-        ['GOLEM',56,47],['GOLEM',59,49],['GOLEM',58,53],
+        [route.enemies[0],45,47],[route.enemies[0],47,49],[route.enemies[0],45,52],[route.enemies[0],47,54],
+        [route.enemies[1],56,47],[route.enemies[1],59,49],[route.enemies[1],58,53],
     ];
     for (const [type,x,y] of layout){
         const mob=spawnMob(type,x,y,floor);
@@ -5940,15 +5978,15 @@ function enterExpedition(p){
             dungeonFloors.delete(floor); p.expedition=null; return {ok:false,error:'spawn_failed'};
         }
         mob.expedition=true;
-        mob.dmg=type==='ORC'?7:8;
+        mob.dmg=type===route.enemies[0]?7:8;
     }
     broadcast(p.id,{t:'leave',id:p.id},0);
     p._pvpBeforeDungeon=!!p.pvp;
     p.pvp=false;
     p.floor=floor;p.x=g.stairs.spawn.x;p.y=g.stairs.spawn.y;
     sendTo(p.id,{t:'dungeonEnter',movement:movementSnapshot(p,true),floor,dir:'down',x:p.x,y:p.y,
-        grid:{region:g.region,rows:g.rows},stairs:g.stairs,expedition:progression.expedition.id,
-        expeditionLayout:'forge_ruins_v1',
+        grid:{region:g.region,rows:g.rows},stairs:g.stairs,expedition:route.id,
+        expeditionLayout:route.id===progression.robotExpedition.id?'forge_forgotten_v2':'forge_ruins_v1',
         pvp:false,players:[],mobs:snapshotMobs(floor),groundDrops:[]});
     sendExpeditionStatus(p);
     return {ok:true};
@@ -5956,6 +5994,7 @@ function enterExpedition(p){
 function handleExpeditionMobDeath(m,killer){
     const e=killer?.expedition;
     if (!e || e.floor!==m.floor) return;
+    const route=e.id===progression.robotExpedition.id ? progression.robotExpedition : progression.expedition;
     if (m.expeditionBoss){
         if (e.guards<4 || e.golems<3 || e.boss || e.cleared) return;
         const reward={FRAGMENTO_FORJA:3};
@@ -5973,8 +6012,8 @@ function handleExpeditionMobDeath(m,killer){
             return;
         }
         e.boss=1;e.cleared=true;
-    } else if (m.type==='ORC') e.guards=Math.min(4,e.guards+1);
-    else if (m.type==='GOLEM') e.golems=Math.min(3,e.golems+1);
+    } else if (m.type===route.enemies[0]) e.guards=Math.min(4,e.guards+1);
+    else if (m.type===route.enemies[1]) e.golems=Math.min(3,e.golems+1);
     monsters.delete(m.id);
     grantManaOnKill(killer);
     const skill=weaponSkillOf(killer);
@@ -5987,7 +6026,7 @@ function handleExpeditionMobDeath(m,killer){
     sendInvUpdate(killer,{skills:killer.skills,reason:'expeditionKill'});
     sendTo(killer.id,{t:'mobDead',mobId:m.id,floor:m.floor||0,byName:killer.name,level:m.level});
     if (e.guards>=4 && e.golems>=3 && !e.boss && !e.bossSpawned){
-        const boss=spawnMob('GOLEM_REI',70,50,e.floor);
+        const boss=spawnMob(route.boss,70,50,e.floor);
         if (boss){boss.unique=false;boss.expedition=true;boss.expeditionBoss=true;
             boss.hp=boss.maxHp=450;boss.dmg=12;boss.xp=700;boss.level=1;e.bossSpawned=true;
             sendTo(killer.id,{t:'mobs',list:snapshotMobs(e.floor)});
@@ -6803,6 +6842,7 @@ wss.on('connection', (ws, request) => {
             // pelos valores autoritativos atuais (alteráveis só via handler dyeItem).
             data.dyes = p.dyes || {};
             data.appearance = appearanceRules.normalizarAppearance(p.appearance);
+            data.appearanceOps = p.appearanceOps || [];
             // ★ LOCKDOWN N3 — ENFORCEMENT (antes era só comentário!). setPlayerSave faz
             // `a.save = data` as-is, e o join re-hidrata p.gold/inv/skills/equipped/chests
             // desse save. Sem sobrescrever aqui pelos valores VIVOS do server, um cliente
@@ -6883,6 +6923,8 @@ wss.on('connection', (ws, request) => {
             data.progressionOps = p.progressionOps || [];
             data.expeditionClears = p.expeditionClears || 0;
             data.expeditionPending = p.expeditionPending || null;
+            data.appearance = appearanceRules.normalizarAppearance(p.appearance);
+            data.appearanceOps = p.appearanceOps || [];
             acc.save = data;
             acc.savedAt = Date.now();
             acc._restoreUntil = 0;
@@ -6922,6 +6964,7 @@ wss.on('connection', (ws, request) => {
             ensurePlayerInvSlots(p);
             p.equipmentVersion = msg.equipmentVersion === equipmentRules.VERSION ? equipmentRules.VERSION : 0;
             p.appearance = appearanceRules.normalizarAppearance(acc?.save?.appearance);
+            p.appearanceOps = appearanceService.normalizeReceipts(acc?.save?.appearanceOps,appearanceRules);
             p.enchantToken = typeof acc?.save?.enchantToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.enchantToken)
                 ? acc.save.enchantToken : crypto.randomUUID();
             p.transmutationToken = typeof acc?.save?.transmutationToken === 'string' && /^[a-f0-9-]{36}$/i.test(acc.save.transmutationToken)
@@ -7179,26 +7222,19 @@ wss.on('connection', (ws, request) => {
 
         if (msg.t === 'appearanceSet') {
             if (!p.joined) return;
-            const requestId = typeof msg.requestId === 'string' ? msg.requestId.slice(0,64) : null;
-            const reply = (ok,error) => sendTo(id,{t:'appearanceResult',ok,error,requestId,
-                appearance:appearanceRules.normalizarAppearance(p.appearance)});
-            if (!appearanceRules.isValidAppearance(msg.appearance)) { reply(false,'invalid_appearance'); return; }
-            const next = appearanceRules.normalizarAppearance(msg.appearance);
-            if (JSON.stringify(next) === JSON.stringify(p.appearance)) { reply(true); return; }
-            if (p._appearanceAt && Date.now()-p._appearanceAt < 500) { reply(false,'too_fast'); return; }
             const account = getAccount(p.authedName);
-            if (!account?.save) { reply(false,'session_not_ready'); return; }
-            const previous = {appearance:p.appearance,save:account.save,savedAt:account.savedAt};
-            p.appearance = next;
-            account.save = {...account.save,appearance:next};
-            account.savedAt = Date.now();
-            if (!flushAccounts()) {
-                p.appearance=previous.appearance; account.save=previous.save; account.savedAt=previous.savedAt;
-                reply(false,'save_failed'); return;
+            const nearPaid=(p.floor||0)===0 && chebyshev(p.x,p.y,53,53)<=2;
+            const change=appearanceService.applyAppearanceChange({player:p,account,
+                appearance:msg.appearance,requestId:msg.requestId,rules:appearanceRules,
+                nearPaid,flush:flushAccounts});
+            sendTo(id,{t:'appearanceResult',...change.result});
+            if(change.changed){
+                if(change.result.costGold>0){
+                    syncGoldRank(p.name,p.gold);
+                    sendInvUpdate(p,{goldDelta:{amount:-change.result.costGold,reason:'appearance'}});
+                }
+                broadcastPstatsAll(p);
             }
-            p._appearanceAt = Date.now();
-            reply(true);
-            broadcastPstatsAll(p);
             return;
         }
 
@@ -8171,6 +8207,7 @@ wss.on('connection', (ws, request) => {
             const spellKey = String(msg.spellKey || '');
             const sp = SPELLS_META[spellKey];
             if (!sp) return;
+            if (sp.range && playerInFullShelter(p) && !hasReachableOwnedHunter(p,sp.range)) return;
             // Magia de ataque LIBERADA pra qualquer arma (09/06 — gate da wand removido).
             // A wand não é mais obrigatória pra castar; ela só ADICIONA a base dela ao
             // _spellWindow (vide wandBaseServer abaixo) + afinidade elemental no cliente.
@@ -8507,7 +8544,7 @@ wss.on('connection', (ws, request) => {
             sendTo(id,{t:'expeditionResult',...claimExpeditionReward(p)}); return;
         }
         if (msg.t === 'expeditionEnter') {
-            const r=PROGRESSION_ENABLED ? enterExpedition(p) : {ok:false,error:'disabled'};
+            const r=PROGRESSION_ENABLED ? enterExpedition(p,msg.expedition) : {ok:false,error:'disabled'};
             if (!r.ok) sendTo(id,{t:'expeditionResult',...r});
             return;
         }
@@ -8748,6 +8785,7 @@ wss.on('connection', (ws, request) => {
             // dano no boss do andar 5 (coords determinísticas) e roubava o loot via damageBy/
             // distributeBossLoot sem nunca ter descido. Exige o mesmo floor.
             if ((p.floor || 0) !== (m.floor || 0)) { sendTo(id, { t:'mobMissing', mobId: msg.monsterId }); return; }
+            if (playerInFullShelter(p) && !isOwnedHunter(p,m)) return;
             // Rate-limit anti-spam: o ataque legítimo MAIS rápido é 680ms (o cliente
             // trava o input nesse ritmo). 200ms tem 3,4× de folga — não afeta jogo
             // limpo, mas barra a rajada de hits forjados que (mesmo com o teto de 600)

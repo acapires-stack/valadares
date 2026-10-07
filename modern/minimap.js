@@ -87,7 +87,8 @@ export function createMinimap(canvas, legend, bridge) {
             }
         }
         if (!interior) for (const [kind, stair] of Object.entries(bridge.getStairs?.() || {})) {
-            mark(stair?.x, stair?.y, words[kind] || words.door, '#e9ad79', 'diamond');
+            if (!['up','down','town'].includes(kind)) continue;
+            mark(stair?.x, stair?.y, bridge.getExpedition?.() ? words.exit : (words[kind] || words.door), '#e9ad79', 'diamond');
         }
 
         const entity = (x, y, color, radius = 2.7) => {

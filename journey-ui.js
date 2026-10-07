@@ -60,7 +60,8 @@
         return q || list.find(item => !(player.quests?.completed || []).includes(item.id)) || null;
     }
     function objective() {
-        const expedition = progression.expedition;
+        const expedition = (lastExp?.expedition || player._expedition) === progression.robotExpedition?.id
+            ? progression.robotExpedition : progression.expedition;
         if (pendingOpId) return {title:say('Fabricação em confirmação','Craft awaiting confirmation'),
             text:say('Aguarde a resposta antes de criar outra peça. Se demorar, consulte o resultado.','Wait for the result before crafting another piece. If it takes too long, check it.'),
             progress:pendingCraftKey ? itemName(pendingCraftKey) : '',reward:'',label:say('Consultar resultado','Check result'),action:'craftStatus'};
@@ -68,8 +69,11 @@
             reward:Object.entries(lastExp.pending.reward || {}).map(([k,n])=>`${n}× ${itemName(k)}`).join(' · '), label:say('Resgatar','Claim'),action:'claim'};
         if (player._expedition === expedition?.id || lastExp?.stage === 'active') {
             const goals = expedition.objectives || {};
-            return {title:say(expedition.name,expedition.nameEn), text:say('Conclua os guardas, os golems e o chefe. A saída fica na escada da entrada.','Defeat the guards, golems and boss. Exit at the entrance stairs.'),
-                progress:`${say('Guardas','Guards')} ${lastExp?.guards||0}/${goals.guards||4} · ${say('Golems','Golems')} ${lastExp?.golems||0}/${goals.golems||3} · ${say('Chefe','Boss')} ${lastExp?.boss||0}/${goals.boss||1}`,
+            const robots=expedition.id===progression.robotExpedition?.id;
+            return {title:say(expedition.name,expedition.nameEn), text:robots
+                ? say('Desative as sentinelas e os construtos, depois derrote o Guardião da Forja. A saída fica na escada da entrada.','Disable the sentries and constructs, then defeat the Forge Warden. Exit at the entrance stairs.')
+                : say('Conclua os guardas, os golems e o chefe. A saída fica na escada da entrada.','Defeat the guards, golems and boss. Exit at the entrance stairs.'),
+                progress:`${say(robots?'Sentinelas':'Guardas',robots?'Sentries':'Guards')} ${lastExp?.guards||0}/${goals.guards||4} · ${say(robots?'Construtos':'Golems',robots?'Constructs':'Golems')} ${lastExp?.golems||0}/${goals.golems||3} · ${say(robots?'Guardião':'Chefe',robots?'Warden':'Boss')} ${lastExp?.boss||0}/${goals.boss||1}`,
                 reward:say('Ao concluir: ','On clear: ') + itemName(expedition.rewardKey) + (lastExp?.clears ? '' : ' + ' + itemName(expedition.firstClearKey)),
                 label:say('Sair da expedição','Leave expedition'), action:'expeditionExit'};
         }
@@ -108,13 +112,17 @@
         box.hidden = !extra;
         if (!extra) return;
         if (extra === 'expedition') {
-            const e = progression.expedition;
-            if (!e) return;
-            const title = document.createElement('strong'); title.textContent = english()?e.nameEn:e.name; box.appendChild(title);
-            const p = document.createElement('p'); p.textContent = say(`Entrada com o Velho Ferreiro ${loc(e.npc.x,e.npc.y)}. Rota solo: ${e.objectives.guards} guardas, ${e.objectives.golems} golems e o chefe. Faixa sugerida: ${e.recommendedLevel}.`,`Enter near the Old Blacksmith ${loc(e.npc.x,e.npc.y)}. Solo route: ${e.objectives.guards} guards, ${e.objectives.golems} golems and the boss. Suggested level: ${e.recommendedLevel}.`); box.appendChild(p);
-            const reward = document.createElement('p'); reward.textContent = say('Primeira conclusão: ','First clear: ') + itemName(e.firstClearKey) + ` + 3× ${itemName(e.rewardKey)}. ` + say('Repetições: ','Repeat clears: ') + `3× ${itemName(e.rewardKey)}.`; box.appendChild(reward);
-            const b = document.createElement('button'); b.type='button'; b.textContent = near(e.npc.x,e.npc.y) ? say('Entrar na expedição','Enter expedition') : say('Rota até o Ferreiro','Route to Blacksmith') + ' · ' + direction(e.npc.x,e.npc.y);
-            b.disabled = !near(e.npc.x,e.npc.y) || !online(); b.addEventListener('click',()=> { if(send('expeditionEnter')) { pendingAction='enter'; pendingAt=Date.now(); render(); } }); box.appendChild(b);
+            for (const e of [progression.expedition,progression.robotExpedition].filter(Boolean)) {
+                const robots=e.id===progression.robotExpedition?.id;
+                const title = document.createElement('strong'); title.textContent = english()?e.nameEn:e.name; box.appendChild(title);
+                const p = document.createElement('p'); p.textContent = robots
+                    ? say(`Entrada com o Velho Ferreiro ${loc(e.npc.x,e.npc.y)}. Na oficina abandonada, metal antigo desperta sob ruínas e vegetação: ${e.objectives.guards} sentinelas, ${e.objectives.golems} construtos e o Guardião da Forja. Nível sugerido: ${e.recommendedLevel}.`,`Enter near the Old Blacksmith ${loc(e.npc.x,e.npc.y)}. In the abandoned workshop, ancient metal wakes beneath ruins and overgrowth: ${e.objectives.guards} sentries, ${e.objectives.golems} constructs and the Forge Warden. Suggested level: ${e.recommendedLevel}.`)
+                    : say(`Entrada com o Velho Ferreiro ${loc(e.npc.x,e.npc.y)}. Rota solo: ${e.objectives.guards} guardas, ${e.objectives.golems} golems e o chefe. Nível sugerido: ${e.recommendedLevel}.`,`Enter near the Old Blacksmith ${loc(e.npc.x,e.npc.y)}. Solo route: ${e.objectives.guards} guards, ${e.objectives.golems} golems and the boss. Suggested level: ${e.recommendedLevel}.`); box.appendChild(p);
+                const b = document.createElement('button'); b.type='button'; b.textContent = near(e.npc.x,e.npc.y) ? say('Entrar em ','Enter ') + (english()?e.nameEn:e.name) : say('Rota até o Ferreiro','Route to Blacksmith') + ' · ' + direction(e.npc.x,e.npc.y);
+                b.disabled = !near(e.npc.x,e.npc.y) || !online(); b.addEventListener('click',()=> { if(send('expeditionEnter',{expedition:e.id})) { pendingAction='enter'; pendingAt=Date.now(); render(); } }); box.appendChild(b);
+            }
+            const e=progression.expedition;
+            const reward = document.createElement('p'); reward.textContent = say('Prêmio compartilhado entre as duas rotas. Primeira conclusão: ','Shared reward across both routes. First clear: ') + itemName(e.firstClearKey) + ` + 3× ${itemName(e.rewardKey)}. ` + say('Repetições: ','Repeat clears: ') + `3× ${itemName(e.rewardKey)}.`; box.appendChild(reward);
             return;
         }
         const select = document.createElement('select'); select.setAttribute('aria-label',say('Família de arma','Weapon family'));
@@ -168,7 +176,7 @@
         // O guia da primeira caçada é opcional. Quando aberto, a Jornada mostra
         // apenas a navegação para que os dois painéis não repitam o objetivo.
         const guideVisible=!document.getElementById('adventureGuidePanel')?.hidden || !document.getElementById('agMoment')?.hidden;
-        const activeProgress=pendingOpId || lastExp?.pending || player._expedition===progression.expedition?.id || lastExp?.stage==='active';
+        const activeProgress=pendingOpId || lastExp?.pending || !!player._expedition || lastExp?.stage==='active';
         const navigationOnly=guideVisible && !(player.quests?.completed || []).includes('q_ratos') && !activeProgress;
         const o=navigationOnly ? {title:say('Explore no seu ritmo','Explore at your pace'),
             text:say('Escolha uma rota de armas ou conheça a expedição solo.','Choose a weapon path or explore the solo expedition.'),
@@ -228,7 +236,7 @@
     function onQuestResult(){
         if(pendingAction==='turnin'){pendingAction='';lastSignature='';render();}
     }
-    function onDungeonEnter(msg){ if(msg?.expedition){player._expedition=msg.expedition;lastExp={...(lastExp||{}),stage:'active'};extra='';} else player._expedition=null;pendingAction='';lastSignature='';render(); }
+    function onDungeonEnter(msg){ if(msg?.expedition){player._expedition=msg.expedition;lastExp={...(lastExp||{}),stage:'active',expedition:msg.expedition};extra='';} else player._expedition=null;pendingAction='';lastSignature='';render(); }
     function onDungeonExit(){player._expedition=null; if(lastExp?.stage==='active')lastExp.stage='ready';pendingAction='';lastSignature='';render();}
     function onLogout(){currentName='';lastExp=null;pendingAction='';progressionToken=null;pendingOpId='';pendingCraftKey='';lastSignature='';document.body.classList.remove('journey-mobile-open');render();}
     function errorText(code){
@@ -239,6 +247,7 @@
             no_materials:['Faltam materiais.','Missing materials.'],no_gold:['Falta ouro.','Not enough gold.'],inventory_full:['Mochila cheia. Libere espaço.','Bag full. Make room.'],
             save_failed:['Não foi possível salvar. Tente mais tarde.','Could not save. Try later.'],not_found:['O servidor não encontrou esta operação. Você pode tentar de novo.','The server did not find this operation. You may try again.'],
             unavailable:['Expedição indisponível neste momento.','Expedition unavailable right now.'],not_at_blacksmith:['Aproxime-se do Velho Ferreiro em (78, 22).','Move next to the Old Blacksmith at (78, 22).'],
+            bad_expedition:['Rota de expedição desconhecida.','Unknown expedition route.'],
             claim_pending:['Resgate primeiro o prêmio anterior.','Claim your previous reward first.'],instance_full:['Instâncias ocupadas. Tente mais tarde.','Instances are full. Try later.'],
             spawn_failed:['Não foi possível abrir a expedição.','Could not open the expedition.'],not_in_expedition:['Você não está na expedição.','You are not in the expedition.'],
             not_at_exit:['Volte à escada de entrada para sair.','Return to the entrance stairs to leave.'],no_pending:['Não há prêmio aguardando resgate.','No reward is awaiting pickup.']

@@ -1,0 +1,1107 @@
+{
+  "pack": "KayKit Adventurers 2.0",
+  "author": "Kay Lousberg",
+  "sourceUrl": "https://kaylousberg.itch.io/kaykit-adventurers",
+  "license": "CC0 1.0",
+  "archives": {
+    "FREE": {
+      "name": "kaykit-adventurers-Free-2.0.zip",
+      "sha256": "abe48f4763fba0896bab486ee9e6d08ca6b5b3884b9601f235c8847ae94dc479"
+    },
+    "EXTRA": {
+      "name": "kaykit-adventurers-Extra-2.0.zip",
+      "sha256": "40dfe60fa38d06dcbb3e7740849947b36f2781cd901811c17bf30784b22c701c"
+    },
+    "ANIMATIONS_FREE": {
+      "name": "kaykit-character-animations-Free-1.1.zip",
+      "sha256": "65882f31f905ad2e953819648a59287cdeab8f623908d5ef701971d3758be20f"
+    }
+  },
+  "characters": {
+    "Knight": {
+      "tier": "FREE",
+      "rig": "Rig_Medium",
+      "asset": "characters/Knight.glb",
+      "textureAtlas": "knight",
+      "meshCount": 9,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Mage": {
+      "tier": "FREE",
+      "rig": "Rig_Medium",
+      "asset": "characters/Mage.glb",
+      "textureAtlas": "mage",
+      "meshCount": 8,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Rogue": {
+      "tier": "FREE",
+      "rig": "Rig_Medium",
+      "asset": "characters/Rogue.glb",
+      "textureAtlas": "rogue",
+      "meshCount": 7,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Barbarian": {
+      "tier": "FREE",
+      "rig": "Rig_Medium",
+      "asset": "characters/Barbarian.glb",
+      "textureAtlas": "barbarian",
+      "meshCount": 7,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Ranger": {
+      "tier": "FREE",
+      "rig": "Rig_Medium",
+      "asset": "characters/Ranger.glb",
+      "textureAtlas": "ranger",
+      "meshCount": 8,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Engineer": {
+      "tier": "EXTRA",
+      "rig": "Rig_Medium",
+      "asset": "characters/Engineer.glb",
+      "textureAtlas": "engineer",
+      "meshCount": 8,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Druid": {
+      "tier": "EXTRA",
+      "rig": "Rig_Medium",
+      "asset": "characters/Druid.glb",
+      "textureAtlas": "druid",
+      "meshCount": 7,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Barbarian_Large": {
+      "tier": "EXTRA",
+      "rig": "Rig_Large",
+      "asset": "characters/Barbarian_Large.glb",
+      "textureAtlas": "barbarian",
+      "meshCount": 10,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    },
+    "Rogue_Hooded": {
+      "tier": "FREE",
+      "rig": "Rig_Medium",
+      "asset": "characters/Rogue_Hooded.glb",
+      "textureAtlas": "rogue",
+      "meshCount": 8,
+      "handSockets": [
+        "handslot.l",
+        "handslot.r"
+      ],
+      "embeddedAnimationNames": []
+    }
+  },
+  "rigs": {
+    "Rig_Medium_General": {
+      "asset": "animations/Rig_Medium_General.glb",
+      "animationNames": [
+        "Death_A",
+        "Death_A_Pose",
+        "Death_B",
+        "Death_B_Pose",
+        "Hit_A",
+        "Hit_B",
+        "Idle_A",
+        "Idle_B",
+        "Interact",
+        "PickUp",
+        "Spawn_Air",
+        "Spawn_Ground",
+        "T-Pose",
+        "Throw",
+        "Use_Item"
+      ]
+    },
+    "Rig_Medium_MovementBasic": {
+      "asset": "animations/Rig_Medium_MovementBasic.glb",
+      "animationNames": [
+        "Jump_Full_Long",
+        "Jump_Full_Short",
+        "Jump_Idle",
+        "Jump_Land",
+        "Jump_Start",
+        "Running_A",
+        "Running_B",
+        "T-Pose",
+        "Walking_A",
+        "Walking_B",
+        "Walking_C"
+      ]
+    },
+    "Rig_Large_General": {
+      "asset": "animations/Rig_Large_General.glb",
+      "animationNames": [
+        "Death_A",
+        "Death_A_Pose",
+        "Hit_A",
+        "Idle_A",
+        "Idle_B",
+        "T-Pose"
+      ]
+    },
+    "Rig_Large_MovementBasic": {
+      "asset": "animations/Rig_Large_MovementBasic.glb",
+      "animationNames": [
+        "Running_A",
+        "T-Pose",
+        "Walking_A"
+      ]
+    },
+    "Rig_Medium_CombatMelee": {
+      "asset": "animations/Rig_Medium_CombatMelee.glb",
+      "animationNames": [
+        "Melee_1H_Attack_Chop",
+        "Melee_1H_Attack_Jump_Chop",
+        "Melee_1H_Attack_Slice_Diagonal",
+        "Melee_1H_Attack_Slice_Horizontal",
+        "Melee_1H_Attack_Stab",
+        "Melee_2H_Attack_Chop",
+        "Melee_2H_Attack_Slice",
+        "Melee_2H_Attack_Spin",
+        "Melee_2H_Attack_Spinning",
+        "Melee_2H_Attack_Stab",
+        "Melee_2H_Idle",
+        "Melee_Block",
+        "Melee_Block_Attack",
+        "Melee_Block_Hit",
+        "Melee_Blocking",
+        "Melee_Dualwield_Attack_Chop",
+        "Melee_Dualwield_Attack_Slice",
+        "Melee_Dualwield_Attack_Stab",
+        "Melee_Unarmed_Attack_Kick",
+        "Melee_Unarmed_Attack_Punch_A",
+        "Melee_Unarmed_Idle",
+        "T-Pose"
+      ]
+    },
+    "Rig_Medium_CombatRanged": {
+      "asset": "animations/Rig_Medium_CombatRanged.glb",
+      "animationNames": [
+        "Ranged_1H_Aiming",
+        "Ranged_1H_Reload",
+        "Ranged_1H_Shoot",
+        "Ranged_1H_Shooting",
+        "Ranged_2H_Aiming",
+        "Ranged_2H_Reload",
+        "Ranged_2H_Shoot",
+        "Ranged_2H_Shooting",
+        "Ranged_Bow_Aiming_Idle",
+        "Ranged_Bow_Draw",
+        "Ranged_Bow_Draw_Up",
+        "Ranged_Bow_Idle",
+        "Ranged_Bow_Release",
+        "Ranged_Bow_Release_Up",
+        "Ranged_Magic_Raise",
+        "Ranged_Magic_Shoot",
+        "Ranged_Magic_Spellcasting",
+        "Ranged_Magic_Spellcasting_Long",
+        "Ranged_Magic_Summon",
+        "T-Pose"
+      ]
+    },
+    "Rig_Large_CombatMelee": {
+      "asset": "animations/Rig_Large_CombatMelee.glb",
+      "animationNames": [
+        "Melee_1H_Slash",
+        "Melee_1H_Stab",
+        "Melee_2H_Attack",
+        "Melee_2H_Idle",
+        "Melee_2H_Slam",
+        "Melee_Block",
+        "Melee_Block_Attack",
+        "Melee_Block_Hit",
+        "Melee_Blocking",
+        "Melee_Dualwield_Slash",
+        "Melee_Dualwield_SlashCombo",
+        "Melee_Unarmed_Idle",
+        "Melee_Unarmed_Kick",
+        "Melee_Unarmed_Punch",
+        "Melee_Unarmed_Smash",
+        "T-Pose"
+      ]
+    }
+  },
+  "props": {
+    "bow_withString": {
+      "tier": "FREE",
+      "asset": "props/bow_withString.glb"
+    },
+    "arrow_bow": {
+      "tier": "FREE",
+      "asset": "props/arrow_bow.glb"
+    },
+    "quiver": {
+      "tier": "FREE",
+      "asset": "props/quiver.glb"
+    },
+    "sword_1handed": {
+      "tier": "FREE",
+      "asset": "props/sword_1handed.glb"
+    },
+    "sword_2handed": {
+      "tier": "FREE",
+      "asset": "props/sword_2handed.glb"
+    },
+    "axe_1handed": {
+      "tier": "FREE",
+      "asset": "props/axe_1handed.glb"
+    },
+    "staff": {
+      "tier": "FREE",
+      "asset": "props/staff.glb"
+    },
+    "druid_staff": {
+      "tier": "EXTRA",
+      "asset": "props/druid_staff.glb"
+    },
+    "engineer_Wrench": {
+      "tier": "EXTRA",
+      "asset": "props/engineer_Wrench.glb"
+    },
+    "wand": {
+      "tier": "FREE",
+      "asset": "props/wand.glb"
+    }
+  },
+  "compatibility": {
+    "Knight": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Mage": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Rogue": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Barbarian": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Ranger": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Engineer": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Druid": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    },
+    "Barbarian_Large": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Slash": 23,
+      "Melee_2H_Attack": 23
+    },
+    "Rogue_Hooded": {
+      "Idle_A": 23,
+      "Hit_A": 23,
+      "Death_A": 23,
+      "Running_A": 23,
+      "Melee_1H_Attack_Chop": 23,
+      "Melee_2H_Attack_Stab": 23,
+      "Ranged_Bow_Draw": 23,
+      "Ranged_Bow_Release": 23,
+      "Ranged_Magic_Shoot": 23
+    }
+  },
+  "files": {
+    "LICENSE.txt": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/License.txt",
+          "sha256": "d4adc31660d1db22eb60eba648e01db41577548f6fa1a3576cb4a6283dae0a58"
+        }
+      ],
+      "bytes": 1554,
+      "sha256": "d4adc31660d1db22eb60eba648e01db41577548f6fa1a3576cb4a6283dae0a58"
+    },
+    "characters/Knight.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb",
+          "sha256": "e484370733824a0740683e7f6040aae0d20e5efd4107dde1175d6a2ad7e2f199"
+        }
+      ],
+      "bytes": 341688,
+      "sha256": "e484370733824a0740683e7f6040aae0d20e5efd4107dde1175d6a2ad7e2f199"
+    },
+    "characters/Mage.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb",
+          "sha256": "1f7d891bde50b879c70965f155b7b765b166dc3f8518e5abb86c0002f191a26e"
+        }
+      ],
+      "bytes": 352472,
+      "sha256": "1f7d891bde50b879c70965f155b7b765b166dc3f8518e5abb86c0002f191a26e"
+    },
+    "characters/Rogue.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue.glb",
+          "sha256": "cae5d9b2f08d53f7b4ab2617d9f42f021c546eb10920455fdcd82a110867fae4"
+        }
+      ],
+      "bytes": 409188,
+      "sha256": "cae5d9b2f08d53f7b4ab2617d9f42f021c546eb10920455fdcd82a110867fae4"
+    },
+    "characters/Barbarian.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Barbarian.glb",
+          "sha256": "d37824a1d6e8e8af57ef9ae4a87e9271c3986210fbc432fb44670749a577ccac"
+        }
+      ],
+      "bytes": 386648,
+      "sha256": "d37824a1d6e8e8af57ef9ae4a87e9271c3986210fbc432fb44670749a577ccac"
+    },
+    "characters/Ranger.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Ranger.glb",
+          "sha256": "3a0b0166b9d61d58dcaaa739c3cc0538be46e00d2928dd5cb513d9a41770d2e9"
+        }
+      ],
+      "bytes": 484712,
+      "sha256": "3a0b0166b9d61d58dcaaa739c3cc0538be46e00d2928dd5cb513d9a41770d2e9"
+    },
+    "characters/Engineer.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Characters/gltf/Engineer.glb",
+          "sha256": "3398a54498a8a6a3babb43ac5f04aa8ae133d35848ed32139ffab097dcf0942a"
+        }
+      ],
+      "bytes": 455468,
+      "sha256": "3398a54498a8a6a3babb43ac5f04aa8ae133d35848ed32139ffab097dcf0942a"
+    },
+    "characters/Druid.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Characters/gltf/Druid.glb",
+          "sha256": "43c6141be32f60ef8f1e0e1aed90caf6acd1d88c2fa469ec59d92ff23280c106"
+        }
+      ],
+      "bytes": 465800,
+      "sha256": "43c6141be32f60ef8f1e0e1aed90caf6acd1d88c2fa469ec59d92ff23280c106"
+    },
+    "characters/Barbarian_Large.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Characters/gltf/Barbarian_Large.glb",
+          "sha256": "809a7eca2bff3069a864b04150d7983c1d0b320e9176d6a3d158dc5482921adb"
+        }
+      ],
+      "bytes": 686880,
+      "sha256": "809a7eca2bff3069a864b04150d7983c1d0b320e9176d6a3d158dc5482921adb"
+    },
+    "characters/Rogue_Hooded.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue_Hooded.glb",
+          "sha256": "e8f3233c6db190506fbef3ad855683e6cb8bd7350de637d923e14a08aef088dc"
+        }
+      ],
+      "bytes": 381432,
+      "sha256": "e8f3233c6db190506fbef3ad855683e6cb8bd7350de637d923e14a08aef088dc"
+    },
+    "animations/Rig_Medium_General.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+          "sha256": "5f725c0f745f36078c7238968cd5c04843cbc6260689eb6e7f5e2bbd7ffdd7ad"
+        }
+      ],
+      "bytes": 828240,
+      "sha256": "5f725c0f745f36078c7238968cd5c04843cbc6260689eb6e7f5e2bbd7ffdd7ad"
+    },
+    "animations/Rig_Medium_MovementBasic.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+          "sha256": "11422afd50abf7e8c92ea107e2e0bc94abd38023d6d15f55ad580347efbfa29e"
+        }
+      ],
+      "bytes": 689624,
+      "sha256": "11422afd50abf7e8c92ea107e2e0bc94abd38023d6d15f55ad580347efbfa29e"
+    },
+    "animations/Rig_Large_General.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Animations/gltf/Rig_Large/Rig_Large_General.glb",
+          "sha256": "ec263b40704d996692033fc716fc0fcaa11a5089393845fe27877e5f773b2f3e"
+        }
+      ],
+      "bytes": 700336,
+      "sha256": "ec263b40704d996692033fc716fc0fcaa11a5089393845fe27877e5f773b2f3e"
+    },
+    "animations/Rig_Large_MovementBasic.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Animations/gltf/Rig_Large/Rig_Large_MovementBasic.glb",
+          "sha256": "2798a62b6f2a1f0f73b8481468fc0aeb7dd3118ceeb1be7db2fc947b7a1221ad"
+        }
+      ],
+      "bytes": 584676,
+      "sha256": "2798a62b6f2a1f0f73b8481468fc0aeb7dd3118ceeb1be7db2fc947b7a1221ad"
+    },
+    "animations/Rig_Medium_CombatMelee.glb": {
+      "sources": [
+        {
+          "archive": "ANIMATIONS_FREE",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_CombatMelee.glb",
+          "sha256": "c55e6ec1c79e83ae21d46fe1cd921c1b64be8b9a524a24517e51c6ba99231459"
+        }
+      ],
+      "bytes": 999416,
+      "sha256": "c55e6ec1c79e83ae21d46fe1cd921c1b64be8b9a524a24517e51c6ba99231459"
+    },
+    "animations/Rig_Medium_CombatRanged.glb": {
+      "sources": [
+        {
+          "archive": "ANIMATIONS_FREE",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_CombatRanged.glb",
+          "sha256": "7fef1fc0e7b0feafd34b8e12d23f514c8c1f9d068047a691b854b56f1774dff5"
+        }
+      ],
+      "bytes": 1014852,
+      "sha256": "7fef1fc0e7b0feafd34b8e12d23f514c8c1f9d068047a691b854b56f1774dff5"
+    },
+    "animations/Rig_Large_CombatMelee.glb": {
+      "sources": [
+        {
+          "archive": "ANIMATIONS_FREE",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_CombatMelee.glb",
+          "sha256": "485dcde864e015f76901b0832d9dceadecfa3fc1f9fa31df2423a6af9ec66ad8"
+        }
+      ],
+      "bytes": 1025388,
+      "sha256": "485dcde864e015f76901b0832d9dceadecfa3fc1f9fa31df2423a6af9ec66ad8"
+    },
+    "textures/barbarian_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/barbarian_texture.png",
+          "sha256": "f11434d3e5e4df929dacd2c69d15734effb82babf8176a80bb040d2007f5f882"
+        }
+      ],
+      "bytes": 14424,
+      "sha256": "f11434d3e5e4df929dacd2c69d15734effb82babf8176a80bb040d2007f5f882"
+    },
+    "textures/barbarian_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/barbarian_texture_alt_A.png",
+          "sha256": "3433bfc8444856a2d9cc2a8400d893525324f43ff00c5202c223b5369f1d4574"
+        }
+      ],
+      "bytes": 13545,
+      "sha256": "3433bfc8444856a2d9cc2a8400d893525324f43ff00c5202c223b5369f1d4574"
+    },
+    "textures/barbarian_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/barbarian_texture_alt_B.png",
+          "sha256": "23af16cb9251508f038be571bd5dfda34fd69e5e1cbd9e69b0c083f8809c47f9"
+        }
+      ],
+      "bytes": 14964,
+      "sha256": "23af16cb9251508f038be571bd5dfda34fd69e5e1cbd9e69b0c083f8809c47f9"
+    },
+    "textures/barbarian_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/barbarian_texture_alt_C.png",
+          "sha256": "5e1f20e038b4a41dac94b359a9dccaa079bab71d9a29f3221a6b0a04e6bee3c9"
+        }
+      ],
+      "bytes": 14419,
+      "sha256": "5e1f20e038b4a41dac94b359a9dccaa079bab71d9a29f3221a6b0a04e6bee3c9"
+    },
+    "textures/druid_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/druid_texture.png",
+          "sha256": "702f10c2bcaab1954069d500d0c912d8109af702c9a1a9aea400cbb3d17f8d72"
+        }
+      ],
+      "bytes": 15263,
+      "sha256": "702f10c2bcaab1954069d500d0c912d8109af702c9a1a9aea400cbb3d17f8d72"
+    },
+    "textures/druid_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/druid_texture_alt_A.png",
+          "sha256": "84c2524aa03e92aa03044da7eb86cdb23319f3fac433186cba30b4ed69b9f81b"
+        }
+      ],
+      "bytes": 14816,
+      "sha256": "84c2524aa03e92aa03044da7eb86cdb23319f3fac433186cba30b4ed69b9f81b"
+    },
+    "textures/druid_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/druid_texture_alt_B.png",
+          "sha256": "96d105c976c4ceea7d6acae99128b9dbd3061cf741723244c25df7efd38cef84"
+        }
+      ],
+      "bytes": 15360,
+      "sha256": "96d105c976c4ceea7d6acae99128b9dbd3061cf741723244c25df7efd38cef84"
+    },
+    "textures/druid_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/druid_texture_alt_C.png",
+          "sha256": "0c1df6538b4a64e80d204ef70eeaa8a578f8882b45cfe06fd60361b0ee777405"
+        }
+      ],
+      "bytes": 14899,
+      "sha256": "0c1df6538b4a64e80d204ef70eeaa8a578f8882b45cfe06fd60361b0ee777405"
+    },
+    "textures/engineer_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/engineer_texture.png",
+          "sha256": "61b33923e82670d3db85812f6fe29f42a35270285fb275c434ef5183af91423e"
+        }
+      ],
+      "bytes": 16561,
+      "sha256": "61b33923e82670d3db85812f6fe29f42a35270285fb275c434ef5183af91423e"
+    },
+    "textures/engineer_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/engineer_texture_alt_A.png",
+          "sha256": "549f801045afe0bea6dd9e607acb44393f814d8b46b47eeb0504c2c28d2e72ea"
+        }
+      ],
+      "bytes": 15404,
+      "sha256": "549f801045afe0bea6dd9e607acb44393f814d8b46b47eeb0504c2c28d2e72ea"
+    },
+    "textures/engineer_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/engineer_texture_alt_B.png",
+          "sha256": "ba2665e2ba72e2076fdfc8203f78086dd8bc753eb9fdb1c7b40aa80ab542b0fb"
+        }
+      ],
+      "bytes": 15697,
+      "sha256": "ba2665e2ba72e2076fdfc8203f78086dd8bc753eb9fdb1c7b40aa80ab542b0fb"
+    },
+    "textures/engineer_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/engineer_texture_alt_C.png",
+          "sha256": "15c3f20e99086f68e86f3490f29230190abe6e77e49230db5d9f21d8e4ff4f77"
+        }
+      ],
+      "bytes": 16388,
+      "sha256": "15c3f20e99086f68e86f3490f29230190abe6e77e49230db5d9f21d8e4ff4f77"
+    },
+    "textures/knight_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/knight_texture.png",
+          "sha256": "028db4d1cd8b3471e6ba21686515abd4e36ae582f8b314b71ad2ab1fb5453b12"
+        }
+      ],
+      "bytes": 12914,
+      "sha256": "028db4d1cd8b3471e6ba21686515abd4e36ae582f8b314b71ad2ab1fb5453b12"
+    },
+    "textures/knight_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/knight_texture_alt_A.png",
+          "sha256": "f80ecdec4895cddc9e983eea9fcc2c3454942d93598a3741fc6c523e878c5a1f"
+        }
+      ],
+      "bytes": 12341,
+      "sha256": "f80ecdec4895cddc9e983eea9fcc2c3454942d93598a3741fc6c523e878c5a1f"
+    },
+    "textures/knight_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/knight_texture_alt_B.png",
+          "sha256": "1b133dadff6261b9f594086cfbf5aa9b515dc22e5382d55707d30d2897979d22"
+        }
+      ],
+      "bytes": 12614,
+      "sha256": "1b133dadff6261b9f594086cfbf5aa9b515dc22e5382d55707d30d2897979d22"
+    },
+    "textures/knight_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/knight_texture_alt_C.png",
+          "sha256": "215692ab91b7faefb3d1224592782ebd8934947ce81876c636da87cfeba5bfe6"
+        }
+      ],
+      "bytes": 13021,
+      "sha256": "215692ab91b7faefb3d1224592782ebd8934947ce81876c636da87cfeba5bfe6"
+    },
+    "textures/mage_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/mage_texture.png",
+          "sha256": "9ef9672e93b231fc4e0e19238edfae3be22513aaf634df1898f45842ce6e4b5f"
+        }
+      ],
+      "bytes": 14740,
+      "sha256": "9ef9672e93b231fc4e0e19238edfae3be22513aaf634df1898f45842ce6e4b5f"
+    },
+    "textures/mage_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/mage_texture_alt_A.png",
+          "sha256": "39e64cd8441add6e419c06039b59a595e322f839a65a79c76032f3ebf44f5e0d"
+        }
+      ],
+      "bytes": 14136,
+      "sha256": "39e64cd8441add6e419c06039b59a595e322f839a65a79c76032f3ebf44f5e0d"
+    },
+    "textures/mage_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/mage_texture_alt_B.png",
+          "sha256": "32a046c3944712ab3c0a3f8c7a240542807a63bd05281e19db7ed1a38ada5cc9"
+        }
+      ],
+      "bytes": 13673,
+      "sha256": "32a046c3944712ab3c0a3f8c7a240542807a63bd05281e19db7ed1a38ada5cc9"
+    },
+    "textures/mage_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/mage_texture_alt_C.png",
+          "sha256": "1f88d079ad1d926bca7c4b76d8546202761c23940ac697d7e5343eaa1fed947d"
+        }
+      ],
+      "bytes": 15809,
+      "sha256": "1f88d079ad1d926bca7c4b76d8546202761c23940ac697d7e5343eaa1fed947d"
+    },
+    "textures/ranger_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/ranger_texture.png",
+          "sha256": "639cd0ba5106fbdf65370b52b9290091d3bd92fe267693abc8dc474471bb800f"
+        }
+      ],
+      "bytes": 13248,
+      "sha256": "639cd0ba5106fbdf65370b52b9290091d3bd92fe267693abc8dc474471bb800f"
+    },
+    "textures/ranger_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/ranger_texture_alt_A.png",
+          "sha256": "6ff473d8db432b9cd03e7956cd26502ee7973cc8df3ddafa8599a40478c92c71"
+        }
+      ],
+      "bytes": 13547,
+      "sha256": "6ff473d8db432b9cd03e7956cd26502ee7973cc8df3ddafa8599a40478c92c71"
+    },
+    "textures/ranger_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/ranger_texture_alt_B.png",
+          "sha256": "acb7e3e2e0079ffb987806c1efbed4f9d8eee8beed9df6b74af55a3bf3c614ac"
+        }
+      ],
+      "bytes": 13259,
+      "sha256": "acb7e3e2e0079ffb987806c1efbed4f9d8eee8beed9df6b74af55a3bf3c614ac"
+    },
+    "textures/ranger_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/ranger_texture_alt_C.png",
+          "sha256": "3998a09aca289019d82afa7068e5144e2f8c70564ff7b67ae472eca4cd510586"
+        }
+      ],
+      "bytes": 13458,
+      "sha256": "3998a09aca289019d82afa7068e5144e2f8c70564ff7b67ae472eca4cd510586"
+    },
+    "textures/rogue_texture.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/rogue_texture.png",
+          "sha256": "2e2fc741e20e7e2c85b176c8143b49b769bca0d2ed1a1cfc1807a758a0e4d3e1"
+        }
+      ],
+      "bytes": 15026,
+      "sha256": "2e2fc741e20e7e2c85b176c8143b49b769bca0d2ed1a1cfc1807a758a0e4d3e1"
+    },
+    "textures/rogue_texture_alt_A.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/rogue_texture_alt_A.png",
+          "sha256": "2f596728529e8192a27fd1f9c102426522dc24b530d2fafad76db950e1821a1f"
+        }
+      ],
+      "bytes": 12370,
+      "sha256": "2f596728529e8192a27fd1f9c102426522dc24b530d2fafad76db950e1821a1f"
+    },
+    "textures/rogue_texture_alt_B.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/rogue_texture_alt_B.png",
+          "sha256": "338368783406fb0a97bf0d82f3147ce6a276e7202374f3391ab393c91a9128fe"
+        }
+      ],
+      "bytes": 11638,
+      "sha256": "338368783406fb0a97bf0d82f3147ce6a276e7202374f3391ab393c91a9128fe"
+    },
+    "textures/rogue_texture_alt_C.png": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Textures/rogue_texture_alt_C.png",
+          "sha256": "313b6e6b64bb27937a5107d4fa9522273e7a611bebc4ad03894940f45be07ba3"
+        }
+      ],
+      "bytes": 12273,
+      "sha256": "313b6e6b64bb27937a5107d4fa9522273e7a611bebc4ad03894940f45be07ba3"
+    },
+    "props/bow_withString.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/bow_withString.gltf",
+          "sha256": "c55e025638cfbdac33e117a83abac8d01b8d7056a0f7514c72daf937512de932"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/bow_withString.bin",
+          "sha256": "2ae583e6089eddf48f78ddffe1decd4b05f9d9ce47360a113d44856946d78d5a"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/ranger_texture.png",
+          "sha256": "639cd0ba5106fbdf65370b52b9290091d3bd92fe267693abc8dc474471bb800f"
+        }
+      ],
+      "bytes": 64160,
+      "sha256": "7a4843515fb2d9513b14b257536f3f84cb10fd1fb480bb5548c3e37e86bcab45"
+    },
+    "props/arrow_bow.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/arrow_bow.gltf",
+          "sha256": "db8d6c4bcf7f6119703565220770241a4d98047f22dcd011e66557cb7df795c1"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/arrow_bow.bin",
+          "sha256": "9ec104be838c841eb79baf314c54ba6f7cc97505b75978607e0228f1769a1d0b"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/ranger_texture.png",
+          "sha256": "639cd0ba5106fbdf65370b52b9290091d3bd92fe267693abc8dc474471bb800f"
+        }
+      ],
+      "bytes": 17280,
+      "sha256": "b6e27812a43a77c7a907788c1cb5c2141ce18301cef6436bfe12e6748701e301"
+    },
+    "props/quiver.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/quiver.gltf",
+          "sha256": "543c2abf89eee3bf8a3e1a4d066fd47e105c65b318c3f48e0dbc20dfb027dcf4"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/quiver.bin",
+          "sha256": "2091b19054c9b97d5ebd71329ed78068ae9825a0aedf18ae8b6302f6cec97969"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/rogue_texture.png",
+          "sha256": "2e2fc741e20e7e2c85b176c8143b49b769bca0d2ed1a1cfc1807a758a0e4d3e1"
+        }
+      ],
+      "bytes": 30300,
+      "sha256": "7d5b1edaa45df165285c483cd44ab7a87ac0c57686c48a488f6d91a4e0b4d6dc"
+    },
+    "props/sword_1handed.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_1handed.gltf",
+          "sha256": "2a6074d46c3e337f84f0295d0ea862b116fec7d816db8d027d75a464311228b6"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_1handed.bin",
+          "sha256": "c8acdc21adf19257e66b78e86d37855474a0a9fda796c39b39d6d08a5ca34bd5"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/knight_texture.png",
+          "sha256": "028db4d1cd8b3471e6ba21686515abd4e36ae582f8b314b71ad2ab1fb5453b12"
+        }
+      ],
+      "bytes": 27572,
+      "sha256": "98974a657986a634b858e7214b8361cfbcae7fd56728c805076594df6c6dbb2e"
+    },
+    "props/sword_2handed.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_2handed.gltf",
+          "sha256": "42ffb9b49e928763fe21fd928675402ebccd3750ccd89bcec8d186e12c6fdccd"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_2handed.bin",
+          "sha256": "4e8100535e482ed9e2cdd5b32b1e3dc301dcff92f472bb9f6047d1021f4433b1"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/knight_texture.png",
+          "sha256": "028db4d1cd8b3471e6ba21686515abd4e36ae582f8b314b71ad2ab1fb5453b12"
+        }
+      ],
+      "bytes": 34228,
+      "sha256": "6174ae7c8254a510255132eef0adde3812801439a44f68e48c697c11f429d38e"
+    },
+    "props/axe_1handed.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/axe_1handed.gltf",
+          "sha256": "43796b063aa9501cc79cf11e801b98ce0c218022dea850e7b6b33387dd4b89da"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/axe_1handed.bin",
+          "sha256": "909561b9e5774d2ab0dcb1cbe66e1c0ea116b6eef5fcb4780ed56fe834b07f58"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/barbarian_texture.png",
+          "sha256": "f11434d3e5e4df929dacd2c69d15734effb82babf8176a80bb040d2007f5f882"
+        }
+      ],
+      "bytes": 28352,
+      "sha256": "6d7e38fcb00a55208f50346ac786ade99196eef6dccc199e8c01e5ffa32ef646"
+    },
+    "props/staff.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/staff.gltf",
+          "sha256": "25646537632555f2a4e5ae90320bce251bbc5af541e8897960ad4514122110b9"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/staff.bin",
+          "sha256": "578911e8317bfceb428f801ea2701c8ab4e06cce70beeeaaf965ee9a7186ca62"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/mage_texture.png",
+          "sha256": "9ef9672e93b231fc4e0e19238edfae3be22513aaf634df1898f45842ce6e4b5f"
+        }
+      ],
+      "bytes": 34696,
+      "sha256": "bdc7228da87783ed96ef5f26d523291276e98821d16f5337dae092aed983f8fa"
+    },
+    "props/druid_staff.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Assets/gltf/druid_staff.gltf",
+          "sha256": "d199bdb560a8375059c3ce2036a7d7901aa33dcdd0f9835eaac9df939473e967"
+        },
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Assets/gltf/druid_staff.bin",
+          "sha256": "08e45f6c78db1a6b0c103499220fc7bfa9c0d007ec348734bfca7ce0d9ba230c"
+        },
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Assets/gltf/druid_texture.png",
+          "sha256": "702f10c2bcaab1954069d500d0c912d8109af702c9a1a9aea400cbb3d17f8d72"
+        }
+      ],
+      "bytes": 58024,
+      "sha256": "3e86a73ba62b145e526ad3a25d212788e73da5f276cd90fa3e4398f7666aed31"
+    },
+    "props/engineer_Wrench.glb": {
+      "sources": [
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Assets/gltf/engineer_Wrench.gltf",
+          "sha256": "b28fa17e2b0f85a37e0749d054b07a02a0c18d7d6751bb7dee4f4548cb4e9f2e"
+        },
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Assets/gltf/engineer_Wrench.bin",
+          "sha256": "6daf15ba38d4e36c3d3c8279f7c2c207d72bb96c06386682088b8548582da605"
+        },
+        {
+          "archive": "EXTRA",
+          "path": "KayKit_Adventurers_2.0_EXTRA/Assets/gltf/engineer_texture.png",
+          "sha256": "61b33923e82670d3db85812f6fe29f42a35270285fb275c434ef5183af91423e"
+        }
+      ],
+      "bytes": 46480,
+      "sha256": "5b7b93c69fd1a2b973a64bd5f290c404ab5d93ecad2662334488a79514c18e31"
+    },
+    "props/wand.glb": {
+      "sources": [
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/wand.gltf",
+          "sha256": "6392f619655a0869a5255dc9702e50027c72c19de6b17b3eecec1492bfd2a800"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/wand.bin",
+          "sha256": "abdecfe3fa864286eb91a9befd5c455770a5443dc01fa22052c634702d0e698a"
+        },
+        {
+          "archive": "FREE",
+          "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/mage_texture.png",
+          "sha256": "9ef9672e93b231fc4e0e19238edfae3be22513aaf634df1898f45842ce6e4b5f"
+        }
+      ],
+      "bytes": 22076,
+      "sha256": "63479df2bcecc2903e611d4a07e2c5fc89d6a7f392fca44d9916fcbf3603c21d"
+    }
+  }
+}

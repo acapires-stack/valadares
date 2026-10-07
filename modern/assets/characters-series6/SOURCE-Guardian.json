@@ -1,0 +1,58 @@
+{
+  "package": "KayKit_Mystery_Monthly_Series_6_(1.1).zip",
+  "author": "Kay Lousberg",
+  "license": "CC0 1.0",
+  "licenseSource": "KayKit_Mystery_Monthly_Series_6_(1.1)/License.txt",
+  "licenseSha256": "fb46e5e4023ccfa2dfd65b3f28a49a60bbe03925fe4bce89f34726579204399c",
+  "character": {
+    "source": "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/characters/PlantWarrior.glb",
+    "sourceSha256": "e4d8de30e6ddb7cb15f3a7b15ce555aa61ed135563910e3150b9a4c766552487",
+    "derivedSha256": "935fe7057daab40d3de576ecceaa50d1bccacafe215400d99ffd96d5b919f0df",
+    "bytes": 404740,
+    "attack": "1H_Melee_Attack_Stab",
+    "sourceChannels": 123,
+    "retainedChannels": 69,
+    "retainedBones": 23,
+    "droppedControlBones": [
+      "IK-foot.l",
+      "IK-foot.r",
+      "IK-toe.l",
+      "IK-toe.r",
+      "control-foot-roll.l",
+      "control-foot-roll.r",
+      "control-heel-roll.l",
+      "control-heel-roll.r",
+      "control-toe-roll.l",
+      "control-toe-roll.r",
+      "elbowIK.l",
+      "elbowIK.r",
+      "handIK.l",
+      "handIK.r",
+      "heelIK.l",
+      "heelIK.r",
+      "kneeIK.l",
+      "kneeIK.r"
+    ],
+    "appendedBytes": 15016
+  },
+  "stabSource": {
+    "file": "C:\\claude\\_worktrees\\valadares-remodelacao-20261006\\modern\\assets\\characters\\Knight.glb",
+    "sha256": "60428e3abc09ba83e595d256e3af8c5c976b46cdae599f0802fc82b4a3445168",
+    "license": "KayKit character pack, see modern/assets/characters/LICENSE.txt",
+    "animation": "1H_Melee_Attack_Stab"
+  },
+  "shield": {
+    "sources": {
+      "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Shield.gltf": "5104c1ad5a618f2b68912e9c70f420c1f16aa8f0440eacd2b45f20c03238fb74",
+      "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/PlantWarrior_Shield.bin": "af6a1cace452ce3589e38cc825b8ff3d6c954cbaa94131e6b20fcb6386b4b334",
+      "KayKit_Mystery_Monthly_Series_6_(1.1)/5 - November 2025 - Plant Warrior/assets/gltf/plantcreatures_texture.png": "12ea6cd207720dbe27ad14a727916b8eb0ff26203542860bbe1546be56ae4882"
+    },
+    "derivedSha256": "75c6cd4a09f6f03e5663a40b4176f2b225d536c668af3ad6a6f3a6b712f9fa6a",
+    "bytes": 118496
+  },
+  "spearExisting": {
+    "file": "modern\\assets\\characters-series6\\PlantWarrior_Spear.glb",
+    "sha256": "5e3470f4b4607d06ef1360eee786883f4690601197523760cc8ae22710f79f6c"
+  },
+  "reproduce": "python tools/modern/prepare-guardian.py"
+}

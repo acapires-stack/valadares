@@ -2295,6 +2295,7 @@
 <div id="dyeModal" style="display:none">
     <div class="chest-box" style="min-width:400px;max-width:480px">
         <div class="chest-title" data-i18n="modal.dye">🎨 TINTURARIA</div>
+        <button type="button" class="dye-appearance" onclick="closeDye();openAppearance()" data-i18n="hud.appearance">Aparência</button>
         <div style="text-align:center;color:#c8a050;margin-bottom:14px;font-size:13px" data-i18n-html="dye.subtitle">
             Tinge um slot equipado · <b style="color:#ffd060">5.000g</b> por cor · <b style="color:#8aa050">1.000g</b> pra remover
         </div>
@@ -4481,7 +4482,7 @@ const RECIPES = [
     { out:'ELMO_CHIFRES',   in:{ ELMO:1, CHIFRE:2 },                name:'Elmo com chifres' },
     { out:'BOTAS_COURO',    in:{ BOTAS:1, OSSO:2, SILK:2 },         name:'Botas de couro' },
     { out:'ARMADURA_OSSO',  in:{ ARMADURA:1, OSSO:8, CHIFRE:1 },    name:'Armadura óssea' },
-    { out:'MACHADO_MINO',   in:{ MACHADO:1, CHIFRE:3, OSSO:4 },     name:'Machado do Minotauro' },
+    { out:'MACHADO_MINO',   in:{ MACHADO:1, CHIFRE:3, OSSO:4 },     name:'Machado Silvestre' },
     { out:'BOTAS_VENTO',    in:{ BOTAS_RAPIDA:1, ASA_MORCEGO:10, CHIFRE:5 }, name:'Botas do vento' },
     // munições — craft em lote (1 craft = vários flechas)
     { out:'FLECHA',         in:{ OSSO:1, ASA_MORCEGO:1 },                    name:'Flecha (×5)', qtyOut:5 },
@@ -4516,7 +4517,7 @@ const RECIPES = [
 // Cavernas — declaradas cedo porque genMap() esculpe o mapa com elas
 const CAVES = [
     { name:'Caverna dos Morcegos', x:18, y:80, r:7, types:['BAT','BAT','BAT','BAT','SKELETON'], target:14 },
-    { name:'Antro do Minotauro',   x:82, y:18, r:8, types:['BAT','MINOTAUR','MINOTAUR','SKELETON'], target:12 },
+    { name:'Santuário da Mata',    x:82, y:18, r:8, types:['BAT','MINOTAUR','MINOTAUR','SKELETON'], target:12 },
     { name:'Cripta dos Mortos',    x:18, y:18, r:6, types:['SKELETON','SKELETON','BAT'], target:10 },
     { name:'Covil do Drake',       x:82, y:80, r:8, types:['DRAKE','DRAKE','DRAKE','BAT'], target:14 },
     { name:'Abismo do Golem',      x:70, y:90, r:7, types:['GOLEM','GOLEM','SKELETON'], target:10 },
@@ -4549,6 +4550,19 @@ function inSanctuary(x, y){
         if (Math.max(Math.abs(x - n.pos.x), Math.abs(y - n.pos.y)) <= SANCTUARY_RADIUS) return true;
     }
     return false;
+}
+function playerInCombatSanctuary(){
+    return playerInSafeZone() || inSanctuary(player.x, player.y);
+}
+function isOwnedHighlanderHunter(m){
+    return !!m && m.hp>0 && m.type==='CACADOR' && m.hunter===true &&
+        m.huntTargetId===myWsId && (m.floor||0)===(player.floor||0);
+}
+function canDefendHunterWithSpell(sp){
+    const range=sp.aoeRange || sp.range || 0;
+    return range>0 && monsters.some(m=>isOwnedHighlanderHunter(m) &&
+        Math.max(Math.abs(m.x-player.x),Math.abs(m.y-player.y))<=range &&
+        hasLineOfSight(player.x,player.y,m.x,m.y));
 }
 
 const canvas = document.getElementById('canvas');
@@ -5535,7 +5549,7 @@ function drawItemShape(it, cx, cy){
     if (ctx === gameplay2dContext && !r3dOn && window.ValadaresItemArt2D){
         ctx.save();
         ctx.translate(Math.round(cx - 10), Math.round(cy - 10));
-        const drawn = window.ValadaresItemArt2D.drawIcon(ctx, def, it.type, 20);
+        const drawn = window.ValadaresKayKitItemArt?.drawIcon(ctx, def, it.type, 20) || window.ValadaresItemArt2D.drawIcon(ctx, def, it.type, 20);
         ctx.restore();
         if (drawn) return;
     }
@@ -5618,7 +5632,7 @@ const MTYPE = {
     ORC:    { name:'Orc',      hp:140, dmg:11, speed:370, xp:120, color:'#4a6a2a', size:1.05, dodge:0.05, crit:0.15, intel:2 },
     ORC_LIDER: { name:'Orc Líder', hp:450, dmg:19, speed:340, xp:600, color:'#7a2a4a', size:1.4, dodge:0.10, crit:0.25, unique:true, intel:3 },
     BAT:       { name:'Morcego',    hp:25,  dmg:5,  speed:250, xp:22,  color:'#3a2a44', size:0.65, dodge:0.20, crit:0.08, intel:1 },
-    MINOTAUR:  { name:'Minotauro',  hp:220, dmg:16, speed:380, xp:240, color:'#6a3a20', size:1.25, dodge:0.05, crit:0.18, intel:3 },
+    MINOTAUR:  { name:'Guardião da Mata', hp:220, dmg:16, speed:380, xp:240, color:'#47733b', size:1.25, dodge:0.05, crit:0.18, intel:3 },
     SKELETON:   { name:'Esqueleto',   hp:90,  dmg:11, speed:370, xp:80,  color:'#cccccc', size:1.0,  dodge:0.07, crit:0.12, intel:2 },
     // superfície — biomas
     TROLL:      { name:'Troll',        hp:160, dmg:14, speed:420, xp:160, color:'#4a6a40', size:1.15, dodge:0.04, crit:0.10, intel:2 },
@@ -5642,9 +5656,15 @@ const MTYPE = {
     ARAUTO: { name:'O Arauto', hp:3000, dmg:30, speed:320, xp:1500, color:'#a880ff', size:1.5, dodge:0.10, crit:0.20, unique:true, intel:3 },
 };
 // i18n Fase 3 — nomes de mob em EN (chave = tipo). mobName() prefere EN; fallback PT.
+Object.assign(MTYPE,{
+    FORGE_SENTRY:{...MTYPE.ORC,name:'Sentinela da Forja',color:'#cedbd7',size:1},
+    FORGE_CONSTRUCT:{...MTYPE.GOLEM,name:'Construto Esquecido',color:'#788c49',size:1.15},
+    FORGE_WARDEN:{...MTYPE.GOLEM_REI,name:'Guardião da Forja',color:'#9ebbb9',size:1.25},
+});
 const MTYPE_EN = {
     RAT:'Rat', SNAKE:'Snake', SPIDER:'Spider', WOLF:'Wolf', ORC:'Orc', ORC_LIDER:'Orc Leader',
-    BAT:'Bat', MINOTAUR:'Minotaur', SKELETON:'Skeleton', TROLL:'Troll', LIZARD:'Lizard', SCORPION:'Scorpion',
+    BAT:'Bat', MINOTAUR:'Woodland Guardian', SKELETON:'Skeleton', TROLL:'Troll', LIZARD:'Lizard', SCORPION:'Scorpion',
+    FORGE_SENTRY:'Forge Sentry', FORGE_CONSTRUCT:'Forgotten Construct', FORGE_WARDEN:'Forge Warden',
     DRAKE:'Drake', DRAKE_LIDER:'Elder Drake', GOLEM:'Golem', GOLEM_REI:'Golem King',
     CACADOR:'Bounty Hunter', SOMBRA:'Wandering Shadow', CARRASCO:'Abyssal Executioner',
     SENHOR_PROFUNDEZAS:'The Lord of the Depths ★', SENHOR_VALADARES:'The Lord of Valadares ★★', ARAUTO:'The Herald',
@@ -5714,7 +5734,7 @@ const ITEMS = new Proxy({
     CHIFRE:        { name:'Chifre',         color:'#bea878', kind:'mat' },
     // armas exclusivas (mais fortes que as comuns)
     ESPADA_OSSO:   { name:'Espada de osso', color:'#e8e4c4', kind:'weapon', hand:'1h', skill:'Espada',  base:5, def:2 },
-    MACHADO_MINO:  { name:'Machado do Minotauro', color:'#5a2a18', kind:'weapon', hand:'2h', skill:'Machado', base:11, def:4 },
+    MACHADO_MINO:  { name:'Machado Silvestre', color:'#5a2a18', kind:'weapon', hand:'2h', skill:'Machado', base:11, def:4 },
     // armadura/escudo exclusivos (mais fortes)
     ARMADURA_OSSO: { name:'Armadura óssea',  color:'#dde0c8', kind:'armor',  def:7 },
     ELMO_CHIFRES:  { name:'Elmo com chifres',color:'#bea878', kind:'head',   def:3 },
@@ -5803,7 +5823,7 @@ const ITEM_EN = {
     ESCUDO_MAD:{name:'Wooden Shield'}, ESCUDO_FERRO:{name:'Iron Shield'},
     COURO:{name:'Leather Tunic'}, ARMADURA:{name:'Armor'}, ELMO:{name:'Helmet'}, BOTAS:{name:'Boots'},
     ASA_MORCEGO:{name:'Bat Wing'}, OSSO:{name:'Bone'}, CHIFRE:{name:'Horn'},
-    ESPADA_OSSO:{name:'Bone Sword'}, MACHADO_MINO:{name:'Minotaur Axe'},
+    ESPADA_OSSO:{name:'Bone Sword'}, MACHADO_MINO:{name:'Woodland Axe'},
     ARMADURA_OSSO:{name:'Bone Armor'}, ELMO_CHIFRES:{name:'Horned Helmet'}, ESCUDO_OSSO:{name:'Bone Shield'},
     BOTAS_COURO:{name:'Leather Boots'}, BOTAS_VENTO:{name:'Wind Boots'}, BOTAS_RAPIDA:{name:'Swift Boots'},
     ESCAMA:{name:'Drake Scale'}, GARRA:{name:'Lizard Claw'}, CARNE_LAGARTO:{name:'Lizard Meat'}, PEDRA_GOLEM:{name:'Golem Stone'},
@@ -6553,7 +6573,9 @@ function enterDungeonClient(msg){
         log(`<span class="log-sys">${escapeHtml(label)} · ${LANG === 'en' ? 'Safe area' : 'Zona segura'}</span>`);
     } else if (msg.expedition){
         dungeonStairs = msg.stairs || null;
-        const label = LANG === 'en' ? 'Ruins of the Forge · solo expedition' : 'Ruínas da Forja · expedição solo';
+        const label = msg.expedition === 'forja_esquecida'
+            ? (LANG === 'en' ? 'Forgotten Forge · solo expedition' : 'Forja Esquecida · expedição solo')
+            : (LANG === 'en' ? 'Ruins of the Forge · solo expedition' : 'Ruínas da Forja · expedição solo');
         if (typeof showServerToast === 'function') showServerToast('event', label, null, 4500);
         log(`<span class="log-sys">${label}</span>`);
     } else if (msg.arena){
@@ -7432,7 +7454,7 @@ function findArrow(){
 // Arremesso de lança — consome a equipada, auto-equipa outra do inv se houver.
 function throwSpear(){
     if (blockedByDisconnect()) return;
-    if (playerInSafeZone()){
+    if (playerInCombatSanctuary() && !isOwnedHighlanderHunter(monsters.find(m=>m.id===player.target))){
         log(tr('log.no_attack_pz')); return;
     }
     const wKey = player.equipped.weapon;
@@ -7508,7 +7530,7 @@ window.throwSpear = throwSpear;
 function doAttack(m){
     if (blockedByDisconnect()) return;
     if (player._spectate && player._spectate.until > Date.now()) return;   // espectando
-    if (playerInSafeZone()){
+    if (playerInCombatSanctuary() && !isOwnedHighlanderHunter(m)){
         if (!doAttack._warned || Date.now() - doAttack._warned > 2000){
             log(tr('log.no_attack_safezone'));
             doAttack._warned = Date.now();
@@ -8513,7 +8535,7 @@ function handleMP(msg){
         window.ValadaresJourneyUI?.result(msg);
         if (msg.error && typeof showServerToast === 'function') showServerToast('warn',
             window.ValadaresJourneyUI.errorText(msg.error), null, 4500);
-        if (msg.reward && typeof showServerToast === 'function') {
+        if (msg.reward && !msg.pending && typeof showServerToast === 'function') {
             const prize=Object.entries(msg.reward).map(([key,qty])=>`${qty}× ${escapeHtml(itmName(key))}`).join(' · ');
             showServerToast('event', (LANG === 'en' ? 'Expedition reward: ' : 'Prêmio da expedição: ') + prize, null, 5500);
         }
@@ -9043,7 +9065,7 @@ function applyMobsSnapshot(list){
         }
         // Hunter HL: server marca CACADOR triggados via hlHuntTrigger — cor laranja
         // no minimap (linha 7409 lê m.hunter) e aggro permanente sobre o triggerer.
-        if (srv.hunter){ m.hunter = true; m.aggro = true; }
+        if (srv.hunter){ m.hunter = true; m.huntTargetId=srv.huntTargetId; m.aggro = true; }
         // DoTs ativos vêm como [{type}] na snapshot — guarda só pra renderizar ícone
         m.dots = Array.isArray(srv.dots) ? srv.dots : null;
     }
@@ -10086,7 +10108,7 @@ const QUEST_CHAINS = {
               kind:'item', type:'OSSO', count:8, reward:{ gold:200, xp:{Magia:80} } },
             { id:'cr3', name:'Silenciar os mortos', desc:'Elimine 10 Esqueletos.',
               kind:'mob', type:'SKELETON', count:10, reward:{ gold:400, xp:{Magia:150}, item:{OSSO:5} } },
-            { id:'cr4', name:'O Senhor da Cripta', desc:'Mate o Minotauro guardião do Antro.',
+            { id:'cr4', name:'O Guardião da Mata', desc:'Derrote o Guardião da Mata que protege o santuário.',
               kind:'mob', type:'MINOTAUR', count:1, reward:{ gold:800, xp:{Magia:200}, item:{POTION_MP:5}, flag:'flag_vendedor_revealed' } },
         ],
     },
@@ -10137,7 +10159,7 @@ const QUEST_CHAINS = {
               kind:'mob', type:'SPIDER', count:5,
               reward:{ gold:600, xp:{Espada:80} } },
             { id:'vh3', name:'Selo Antigo do Antro',
-              desc:'Vohrim quer um selo perdido — vasculhe o lado OESTE do Antro do Minotauro (78, 18) e veja o que sobrou.',
+              desc:'Vohrim quer um selo perdido — vasculhe o lado OESTE do Santuário da Mata (78, 18) e veja o que sobrou.',
               kind:'visit', x:78, y:18, radius:3,
               reward:{ gold:800, xp:{Distância:80} } },
             { id:'vh4', name:'Tributo Final',
@@ -10219,7 +10241,7 @@ const CHAIN_EN = {
             cr1: { name:'Investigate the Crypt', desc:'The Hermit asks you to visit the Crypt of the Dead (18, 18).' },
             cr2: { name:'Desecrated Remains',    desc:'Bring 8 Bones from the crypt.' },
             cr3: { name:'Silence the Dead',      desc:'Eliminate 10 Skeletons.' },
-            cr4: { name:'The Lord of the Crypt', desc:'Kill the Minotaur guarding the Lair.' },
+            cr4: { name:'The Woodland Guardian', desc:'Defeat the Woodland Guardian protecting the sanctuary.' },
         },
     },
     forja: {
@@ -10251,7 +10273,7 @@ const CHAIN_EN = {
         stages: {
             vh1: { name:'Audience at Court',      desc:'Vohrim asks for signs of respect: 5 Silks and 3 Bones to impress the foreign court.' },
             vh2: { name:'Show of Strength',       desc:'The Ambassador wants proof: kill 5 Spiders (show your efficiency).' },
-            vh3: { name:'Ancient Seal of the Lair', desc:'Vohrim wants a lost seal — search the WEST side of the Minotaur Lair (78, 18) and see what remains.' },
+            vh3: { name:'Ancient Seal of the Sanctuary', desc:'Vohrim wants a lost seal — search the WEST side of the Woodland Sanctuary (78, 18) and see what remains.' },
             vh4: { name:'Final Tribute',          desc:"Vohrim wants 1 Highlander's Heart to \"seal the alliance.\" Something smells wrong about this demand." },
             vh5: { name:'The Truth',              desc:'On receiving the Heart, Vohrim laughs darkly. "You were always so useful." The choice is yours.',
                    choices:['Hand it over and accept the dark pact', 'Refuse and expose the betrayal'] },
@@ -10901,11 +10923,16 @@ function tickStatusEffects(){
 function showServerToast(level, text, fromName, durationMs){
     const container = document.getElementById('toastContainer');
     if (!container) return;
+    const key = JSON.stringify([level || 'info',text,fromName || '']);
+    if (Array.from(container.children).some(el => el.dataset.toastKey === key)) return;
     const div = document.createElement('div');
+    div.dataset.toastKey = key;
     div.className = 'toast toast-' + (level || 'info');
     const prefix = fromName ? `<b class="toast-from">[${escapeHtml(fromName)}]</b> ` : '';
     div.innerHTML = `${prefix}${escapeHtml(text)}`;
     container.appendChild(div);
+    // Bursts on login or expedition transitions must leave combat visible.
+    while (container.children.length > 3) container.firstElementChild.remove();
     // anim slide-in via class adicionada após pintar
     requestAnimationFrame(() => div.classList.add('toast-visible'));
     const dur = durationMs || (level === 'admin' ? 6500 : level === 'event' ? 5500 : 4500);
@@ -11118,7 +11145,7 @@ function drawMinimap(){
         if (f >= 1 && !player._arena){
             const txt = document.getElementById('floorBadgeText');
             if (txt) txt.textContent = player._interior ? interiorLabel(currentInterior()) : player._expedition
-                ? (LANG === 'en' ? 'Ruins of the Forge · Solo' : 'Ruínas da Forja · Solo')
+                ? (player._expedition === 'forja_esquecida' ? (LANG === 'en' ? 'Forgotten Forge · Solo' : 'Forja Esquecida · Solo') : (LANG === 'en' ? 'Ruins of the Forge · Solo' : 'Ruínas da Forja · Solo'))
                 : tr('hud.floor', { floor: f });
             if (player._expedition || player._interior){
                 fb.style.borderColor = '#d89452';
@@ -11762,8 +11789,13 @@ function renderBossesWidget(){
 // SPRITES DE ITENS — pixel art via canvas off-screen, cache por (item, size)
 // ═══════════════════════════════════════════════════════════════════════════
 const _itemIconCache = new Map();
+window.addEventListener('valadares:kaykit-icon-ready',()=>{
+    _itemIconCache.clear();invSignature=null;equipSignature=null;
+});
 
 function getItemIconURL(itemKey, size = 22){
+    const authoredIcon=window.ValadaresKayKitItemArt?.getIconURL(itemKey);
+    if(authoredIcon)return authoredIcon;
     const cacheKey = itemKey + '@' + size;
     const cached = _itemIconCache.get(cacheKey);
     if (cached) return cached;
@@ -11791,6 +11823,7 @@ function _shade(hex, amt){
 
 // Sprites — todos desenham num quadrado SxS, normalizam pra qualquer size
 function drawItemSprite(ctx, def, key, S){
+    if(window.ValadaresKayKitItemArt?.drawIcon(ctx,def,key,S))return;
     // Forjados (X_PLUS_N) usam o sprite da BASE: resolve a base p/ as comparações
     // `key === 'X'` abaixo. Senão a +N perde o sprite especial e vira ícone genérico
     // (ex: Coração do Highlander +1 sem o coração/corrente). def já é o clone da base.
@@ -13608,7 +13641,7 @@ function castSpell(spellKey){
     // Bloqueia magias de ataque/cura offline pra evitar farm; cura local é permitida pq autocura mais útil
     if (sp.damage && blockedByDisconnect()) return;
     // Cura é permitida na PZ; ataque não
-    if (sp.damage && playerInSafeZone()){
+    if ((sp.damage || sp.aoeRange) && playerInCombatSanctuary() && !canDefendHunterWithSpell(sp)){
         log(tr('log.no_attack_pz')); return;
     }
     // Magias ofensivas/AoE/taunt quebram mini-PZ do NPC
@@ -13641,6 +13674,7 @@ function castSpell(spellKey){
         const aoeTargets = [];
         for (const m of monsters){
             if (m.hp <= 0) continue;
+            if (playerInCombatSanctuary() && !isOwnedHighlanderHunter(m)) continue;
             const d = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
             if (d > sp.aoeRange || d === 0) continue;
             if (!hasLineOfSight(player.x, player.y, m.x, m.y)) continue;   // explosão não passa parede
@@ -13770,6 +13804,9 @@ function castSpell(spellKey){
     }
     const m = monsters.find(x => x.id === player.target);
     if (!m){ player.target = null; return; }
+    if (playerInCombatSanctuary() && !isOwnedHighlanderHunter(m)){
+        log(tr('log.no_attack_pz')); return;
+    }
     const dist = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
     if (dist > sp.range){
         log(tr('log.target_too_far', {d: dist, max: sp.range})); return;
@@ -17239,6 +17276,7 @@ window.ValadaresModernBridge = {
     getTrails: () => trails,
     getStairs: () => (player.floor || 0) > 0 ? {up:dungeonStairs?.up,down:dungeonStairs?.down,town:dungeonStairs?.town} : { down: DUNGEON_STAIR_IN },
     getFloor: () => player.floor || 0,
+    getExpedition: () => player._expedition || null,
     getTarget: () => ({ id: player.target, type: player.targetType }),
     getPet: () => player.pet && player._petRX != null
         ? { x: player._petRX, y: player._petRY, renderX: player._petRX,
@@ -17987,10 +18025,12 @@ function loop(ts){
 <script src="/item-art-gear.js?v=20261004c"></script>
 <script src="/item-art-progression.js?v=1"></script>
 <script src="/item-art-supplies.js?v=20261004c"></script>
+<script type="module" src="/modern/item-art-kaykit.js?v=20261007a"></script>
 <script src="/character-art.js?v=20261004b"></script>
 <script src="/monster-art.js?v=20261003b"></script>
 <script src="/monster-art-creatures.js?v=20261003a"></script>
 <script src="/monster-art-depths.js?v=20261003a"></script>
+<script src="/monster-art-harmonized.js?v=20261007a"></script>
 <script src="/village-art.js?v=20261004a"></script>
 <script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>

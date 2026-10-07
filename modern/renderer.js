@@ -18,6 +18,8 @@ export async function createRenderer(bridge){
  const lamp=new pc.Entity('Luz do aventureiro');lamp.addComponent('light',{type:'omni',color:new pc.Color(1,.67,.32),intensity:.9,range:5,castShadows:false});app.root.addChild(lamp);
  let width=720,height=528,ready=false,failed=false,elapsed=0,frames=0,fps=0,lastError=null;
  const itemIcons=new Map();
+ const refreshItemIcons=()=>itemIcons.clear();
+ window.addEventListener('valadares:kaykit-icon-ready',refreshItemIcons);
  const ctx=overlay.getContext('2d');
  function resize(){const rect=host.getBoundingClientRect(),pr=parent.getBoundingClientRect();if(rect.width<2||rect.height<2)return;width=rect.width;height=rect.height;
   for(const c of [canvas,overlay]){c.style.setProperty('--modern-width',width+'px');c.style.setProperty('--modern-height',height+'px');c.style.setProperty('left',(rect.left-pr.left-parent.clientLeft+parent.scrollLeft)+'px','important');c.style.setProperty('top',(rect.top-pr.top-parent.clientTop+parent.scrollTop)+'px','important');c.style.setProperty('width',width+'px','important');c.style.setProperty('height',height+'px','important');c.style.setProperty('max-height','none','important');c.style.setProperty('aspect-ratio','auto','important');}
@@ -60,7 +62,13 @@ export async function createRenderer(bridge){
   for(const p of bridge.getProjectiles?.()||[]){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;const pos=project(p.x+.5,.6,p.y+.5);ctx.fillStyle=p.color||'#f5ca6b';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(pos.x,pos.y,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
   for(const p of bridge.getParticles?.()||[]){const pos=project(p.x+.5,.65,p.y+.5);ctx.globalAlpha=Math.max(0,p.life/(p.maxLife||500));ctx.fillStyle=p.color||'#e7bd68';ctx.beginPath();ctx.arc(pos.x,pos.y,2.2,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
   for(const a of bridge.getAuras?.()||[]){const e=a.entity||player,pos=project((e.renderX??e.x)+.5,.07,(e.renderY??e.y)+.5);ctx.globalAlpha=Math.min(.65,a.life/(a.duration||700));ctx.strokeStyle=a.color||'#79d0c1';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,28,14,0,0,Math.PI*2);ctx.stroke();}ctx.globalAlpha=1;
-  for(const [kind,s]of Object.entries(bridge.getStairs?.()||{})){if(!s)continue;const pos=project(s.x+.5,.04,s.y+.5);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;const near=Math.hypot(s.x-player.x,s.y-player.y)<4;ctx.strokeStyle=kind==='town'?'#95dbc9':'#e5c78c';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,17,8,0,0,Math.PI*2);ctx.stroke();if(near){const en=bridge.getLanguage?.()==='en';text(bridge.getInterior?.()?(en?'Exit':'Saída'):kind==='town'?(en?'Village':'Vila'):kind==='up'?(en?'Up':'Subir'):(en?'Down':'Descer'),pos.x,pos.y-14,'#e8d9b6',11);}}
+  for(const [kind,s]of Object.entries(bridge.getStairs?.()||{})){
+   // Spawn/boss are room anchors, not interactive stairs.
+   if(!s||!['town','up','down'].includes(kind))continue;
+   const pos=project(s.x+.5,.04,s.y+.5);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;
+   const near=Math.hypot(s.x-player.x,s.y-player.y)<4;ctx.strokeStyle=kind==='town'?'#95dbc9':'#e5c78c';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,17,8,0,0,Math.PI*2);ctx.stroke();
+   if(near){const en=bridge.getLanguage?.()==='en';text(bridge.getInterior?.()||bridge.getExpedition?.()?(en?'Exit':'Saída'):kind==='town'?(en?'Village':'Vila'):kind==='up'?(en?'Up':'Subir'):(en?'Down':'Descer'),pos.x,pos.y-14,'#e8d9b6',11);}
+  }
   if(!(player.floor||0))for(const room of bridge.getInteriors?.()||[]){const distance=Math.hypot(room.door.x-player.x,room.door.y-player.y);if(distance>7)continue;const pos=project(room.door.x+.5,.25,room.door.y+.5),en=bridge.getLanguage?.()==='en';text(en?({pousada:'Tavern',oficina:'Forge',biblioteca:'Temple',mercado:'Training hall'})[room.id]:room.label,pos.x,pos.y-18,'#efcb86',12);}
   for(const p of bridge.getProps?.()||[]){if(Math.hypot(p.x-player.x,p.y-player.y)>2.4)continue;const pos=project(p.x+.5,1.15,p.y+.5),en=bridge.getLanguage?.()==='en';text((en?{chest:'Chest',altar:'Altar',craft:'Workbench',dummy:'Training'}:{chest:'Baú',altar:'Altar',craft:'Bancada',dummy:'Treino'})[p.kind]||'',pos.x,pos.y,'#d8c08c',11);}
   for(const p of bridge.getTrails?.()||[]){const pos=project(p.x+.5,.02,p.y+.5);ctx.globalAlpha=Math.max(0,Math.min(.35,p.life/(p.maxLife||500)));ctx.fillStyle=p.color||'#85c2b6';ctx.beginPath();ctx.ellipse(pos.x,pos.y,6,3,0,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
@@ -105,5 +113,5 @@ export async function createRenderer(bridge){
  });
  function captureStream(rate=30){const output=document.createElement('canvas');output.width=canvas.width;output.height=canvas.height;const capture=output.getContext('2d'),stream=output.captureStream(rate);const paint=()=>{capture.drawImage(canvas,0,0,output.width,output.height);capture.drawImage(overlay,0,0,output.width,output.height);};app.on('postrender',paint);const timer=setInterval(()=>{if(stream.getVideoTracks().every(t=>t.readyState==='ended')){clearInterval(timer);app.off('postrender',paint);}},500);return stream;}
  app.start();ready=true;document.body.classList.add('modern-renderer-ready');
- return {app,world,actors,camera,canvas,visibility,bridge,project,captureStream,diagnostics:()=>({ready,fps:Math.round(fps),error:lastError,actors:actors.diagnostics(),world:world.diagnostics(),visibility:visibility.diagnostics(),width,height,drawCalls:app.stats.drawCalls.total}),destroy(){observer.disconnect();window.removeEventListener('resize',resize);visibility.destroy();actors.destroy();world.destroy();app.destroy();canvas.remove();overlay.remove();}};
+ return {app,world,actors,camera,canvas,visibility,bridge,project,captureStream,diagnostics:()=>({ready,fps:Math.round(fps),error:lastError,actors:actors.diagnostics(),world:world.diagnostics(),visibility:visibility.diagnostics(),width,height,drawCalls:app.stats.drawCalls.total}),destroy(){observer.disconnect();window.removeEventListener('resize',resize);window.removeEventListener('valadares:kaykit-icon-ready',refreshItemIcons);visibility.destroy();actors.destroy();world.destroy();app.destroy();canvas.remove();overlay.remove();}};
 }

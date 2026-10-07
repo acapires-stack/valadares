@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const rules = require('../../transmutation-rules');
 const progression = require('../../progression-content');
 const equipmentRules = require('../../equipment-rules');
+const appearanceRules = require('../../appearance-rules');
 
 const source = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
 const metaStart=source.indexOf('const ITEM_META = {'),metaEnd=source.indexOf('\n};',metaStart)+3;
@@ -21,7 +22,7 @@ function literalFunction(name){
     }
     throw Error(`incomplete ${name}`);
 }
-const serverFunctions = ['flushAccounts','updateEnchantSave','transmutationOpId',
+const serverFunctions = ['nearInteriorService','nearCraftService','flushAccounts','updateEnchantSave','transmutationOpId',
     'transmutationStatusResult','deriveTransmutationPity','executeTransmutation','hasInv','sendInvUpdate'].map(literalFunction).join('\n');
 const dispatchStart = source.indexOf("if (msg.t === 'transmuteStatus')");
 const dispatchEnd = source.indexOf("if (msg.t === 'invEnchant')",dispatchStart);
@@ -43,7 +44,7 @@ function fixture({keys=['ADAGA','PORRETE','CLAVA'],gold=2000,rolls=[0],cap=250,s
     const random=Math; const math=Object.create(random);
     math.random=()=>rolls.length ? rolls.shift() : 0;
     const context=vm.createContext({Math:math,crypto,console:{warn(){},error(){}},
-        fs:fsFake,accounts,ACCOUNTS_FILE:'isolated-accounts.json',
+        fs:fsFake,accounts,ACCOUNTS_FILE:'isolated-accounts.json',interiorsByFloor:new Map(),appearanceRules,
         ACCOUNTS_BACKUP_INTERVAL_MS:Infinity,_lastAccountsBackupAt:0,
         _diskAccountsCount:()=>0,backupAccountsFile(){},getAccount:n=>accounts.get(n),
         transmutationRules:rules,equipmentRules,progression,SAVE_CAPS:{invKeys:cap},

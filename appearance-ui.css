@@ -1,5 +1,7 @@
 #appearanceOpen{width:100%;margin-top:10px;padding:8px 12px;border:1px solid #aa88554d;border-radius:6px;background:#243039;color:#f4dfb2;cursor:pointer;font:600 12px system-ui}
 #appearanceOpen:hover,#appearanceOpen:focus-visible{background:#364750;outline:2px solid #cbb582;outline-offset:2px}
+.dye-appearance{display:block;width:100%;margin:12px 0;padding:10px;border:1px solid #aa8855;border-radius:6px;background:#243039;color:#f4dfb2;cursor:pointer;font:600 14px system-ui}
+.dye-appearance:focus-visible{outline:2px solid #f4dfb2;outline-offset:2px}
 #appearanceModal{box-sizing:border-box;width:min(410px,calc(100vw - 24px));max-height:calc(100dvh - 24px);margin:auto 24px auto auto;padding:22px;border:1px solid #9a825b;border-radius:12px;background:#142128;color:#eee5d6;box-shadow:0 18px 60px #0009;font:14px/1.5 system-ui,sans-serif;overflow:auto}
 #appearanceModal::backdrop{background:#030b1220}
 #appearanceModal header{display:flex;align-items:center;justify-content:space-between;gap:16px}
@@ -13,8 +15,12 @@
 #appearanceModal button:disabled{opacity:.65;cursor:wait}
 #appearanceModal button[aria-pressed="true"]{border-color:#f0d197;box-shadow:inset 0 0 0 1px #f0d197;background:#465346}
 #appearanceModal .appearance-bodies{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:240px;overflow:auto;padding:3px}
+#appearanceModal [data-body]{text-align:left;display:flex;flex-direction:column;gap:5px}
+#appearanceModal [data-body] small{font-size:10px;font-weight:400;color:#c4c6b4}
+#appearanceModal .appearance-cost{font-size:12px;color:#f0d8ae;font-weight:600}
 #appearanceModal .appearance-palettes{display:flex;flex-wrap:wrap;gap:7px}
 #appearanceModal [data-palette]{display:flex;align-items:center;gap:6px;padding:8px 9px}
+#appearanceModal [data-palette][hidden]{display:none}
 #appearanceModal [data-palette]::before{content:"";width:14px;height:14px;border-radius:50%;background:var(--appearance-swatch);border:1px solid #fff8}
 #appearanceModal .appearance-note{font-size:12px;color:#a9bcbc}
 #appearanceModal .appearance-status{min-height:2.5em;font-size:13px;color:#dece9a;margin-bottom:10px}
@@ -25,15 +31,22 @@
  #appearanceModal{width:380px;padding:14px}
  #appearanceModal h2{font-size:20px}
  #appearanceModal p{margin:8px 0;font-size:12px;line-height:1.35}
+ #appearanceModal [data-intro]{display:none}
  #appearanceModal fieldset{margin-top:10px}
  #appearanceModal legend{padding-bottom:5px;font-size:12px}
  #appearanceModal button{min-height:34px;padding:7px 8px;font-size:11px}
  #appearanceModal .appearance-bodies{grid-template-columns:repeat(4,1fr);gap:5px;max-height:90px}
+ #appearanceModal:has(.appearance-status:not(:empty)) .appearance-bodies{max-height:75px}
+ #appearanceModal:has(.appearance-status:not(:empty)) fieldset{margin-top:8px}
+ #appearanceModal:has(.appearance-status:not(:empty)) .appearance-cost{margin:4px 0}
+ #appearanceModal:has(.appearance-status:not(:empty)) .appearance-status{margin:2px 0}
  #appearanceModal .appearance-palettes{gap:4px}
+ #appearanceModal:has(.appearance-status:not(:empty)) .appearance-palettes{row-gap:2px}
  #appearanceModal [data-palette]{padding:7px 6px;gap:4px}
  #appearanceModal [data-palette]::before{width:11px;height:11px}
  #appearanceModal .appearance-note{display:none}
  #appearanceModal .appearance-status{min-height:0;margin:6px 0}
  #appearanceModal .appearance-status:empty{display:none}
- #appearanceModal footer{margin-top:12px}
+ #appearanceModal footer{position:sticky;bottom:-14px;z-index:1;margin-top:12px;padding:8px 0 0;background:#142128}
+ #appearanceModal:has(.appearance-status:not(:empty)) footer{margin-top:8px}
 }

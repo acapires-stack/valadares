@@ -72,6 +72,10 @@ test('server training accepts fists with a wand, charges once and rejects incomp
     const end=source.indexOf('        // ─── T3: Cast de magia',start);
     assert.ok(start>0 && end>start);
     const handler=source.slice(start,end);
+    const helperStart=source.indexOf('function chebyshev(');
+    const helperEnd=source.indexOf('}',helperStart);
+    assert.ok(helperStart>0 && helperEnd>helperStart);
+    const chebyshev=source.slice(helperStart,helperEnd+1);
     function attempt(weaponSkill,skill,gold=1000){
         const p={x:49,y:52,name:'fixture',gold,skills:{Punho:{val:100,xp:0,xpNext:600},Espada:{val:100,xp:0,xpNext:600}}};
         const messages=[];
@@ -81,7 +85,7 @@ test('server training accepts fists with a wand, charges once and rejects incomp
             I18N_SRV:{pt:{}},trp:()=> 'rejected',sendTo:(_id,m)=>messages.push(m),
             syncGoldRank:()=>{},gainSkillXpServer:(player,name,xp)=>{player.skills[name].xp+=xp;},
             sendInvUpdate:(_p,m)=>messages.push(m)};
-        vm.runInNewContext('(function(){'+handler+'})()',context);
+        vm.runInNewContext(chebyshev+'\n(function(){'+handler+'})()',context);
         return {p,messages,requestId};
     }
     const wand=attempt('Magia','Punho');

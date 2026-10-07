@@ -1,0 +1,89 @@
+{
+  "package": "KayKit_Mystery_Monthly_Series_6_(1.1).zip",
+  "author": "Kay Lousberg",
+  "license": "CC0 1.0",
+  "licenseSource": "KayKit_Mystery_Monthly_Series_6_(1.1)/License.txt",
+  "licenseSha256": "fb46e5e4023ccfa2dfd65b3f28a49a60bbe03925fe4bce89f34726579204399c",
+  "largeRigNativeClips": {
+    "Rig_Large_General.glb": [
+      "Death_A",
+      "Death_A_Pose",
+      "Hit_A",
+      "Idle_A",
+      "Idle_B",
+      "T-Pose"
+    ],
+    "Rig_Large_MovementBasic.glb": [
+      "Running_A",
+      "T-Pose",
+      "Walking_A"
+    ]
+  },
+  "attackSource": {
+    "archive": "kaykit-character-animations-Free-1.1.zip",
+    "member": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_CombatMelee.glb",
+    "sha256": "485dcde864e015f76901b0832d9dceadecfa3fc1f9fa31df2423a6af9ec66ad8",
+    "license": "KayKit Character Animations 1.1 FREE CC0",
+    "licenseSource": "KayKit_Character_Animations_1.1/License.txt",
+    "licenseSha256": "373b159044d1a886ed15f57ca5a7673ba14e2623c460283452705f2056912ed9",
+    "clip": "Melee_1H_Slash",
+    "method": "69 native Large TRS channels on identical 23-joint hierarchy; corrected only head-rest translation (+0.115 m)"
+  },
+  "files": {
+    "4GTN.glb": {
+      "zipMember": "KayKit_Mystery_Monthly_Series_6_(1.1)/7 - January 2026 - 4GTN/characters/4GTN.glb",
+      "sourceSha256": "1622ad10ae21d2ba09884912fcc2cdfa137ba44a815410c2202adda6ba5a058d",
+      "outputSha256": "6ec0d2f3f3bbb91879417d486a0a89f505d5740b8816fc893499babc22b58cc5",
+      "outputBytes": 946816,
+      "attack": "Melee_1H_Slash",
+      "attackDurationSeconds": 1.5667,
+      "nativeLargeChannels": 69,
+      "restDifferences": {
+        "head": {
+          "translationDelta": [
+            0,
+            0.11500000953674316,
+            0
+          ]
+        }
+      },
+      "unchangedOriginalBinaryPrefixBytes": 878764,
+      "addedAnimationBytes": 24472
+    },
+    "4GTN_Forgotten.glb": {
+      "zipMember": "KayKit_Mystery_Monthly_Series_6_(1.1)/7 - January 2026 - 4GTN/characters/4GTN_Forgotten.glb",
+      "sourceSha256": "bd63d03d588f1a98e2fea7150cfe435b7b0d2caca94953807b817e2563dde114",
+      "outputSha256": "c69c06c24b579fcd0880298d00b0d0bbe634080f976810b93ea7a13324b57f1b",
+      "outputBytes": 1255424,
+      "attack": "Melee_1H_Slash",
+      "attackDurationSeconds": 1.5667,
+      "nativeLargeChannels": 69,
+      "restDifferences": {
+        "head": {
+          "translationDelta": [
+            0,
+            0.11500000953674316,
+            0
+          ]
+        }
+      },
+      "unchangedOriginalBinaryPrefixBytes": 1186028,
+      "addedAnimationBytes": 24472
+    },
+    "4GTN_Katana.glb": {
+      "source": "acervo/4GTN_Katana.glb",
+      "zipSources": {
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/7 - January 2026 - 4GTN/assets/gltf/4GTN_Katana.gltf": "990bd48568ff101da857fb1257e3eadf5d91cf3cb75ff2a31a29447277d62fb2",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/7 - January 2026 - 4GTN/assets/gltf/4GTN_Katana.bin": "973562807fcee2c447aa7a91499bcb6bcfff45304f1dcdf55acc58ec0976f66b",
+        "KayKit_Mystery_Monthly_Series_6_(1.1)/7 - January 2026 - 4GTN/assets/gltf/4GTN_texture.png": "498cabd54d158728737a7ace800dc440167f4219017f3bf51ce731cecd5939bf"
+      },
+      "sourceSha256": "899de290228420758779330ec17ac099b747832f1a9697f6125f89eeb99af956",
+      "outputSha256": "899de290228420758779330ec17ac099b747832f1a9697f6125f89eeb99af956",
+      "outputBytes": 78760,
+      "meshCount": 1,
+      "materialCount": 2,
+      "embeddedImages": 1
+    }
+  },
+  "reproduce": "python tools/modern/prepare-forge-robots.py"
+}

@@ -1,0 +1,1162 @@
+{
+  "format": "4 directions x 6 poses, 64x64 RGBA PNG frames",
+  "files": {
+    "PlantWarrior": {
+      "file": "harmonized-PlantWarrior.png",
+      "model": "PlantWarrior",
+      "sourceGLB": "/modern/assets/characters-series6/PlantWarrior.glb",
+      "directions": [
+        "down",
+        "up",
+        "left",
+        "right"
+      ],
+      "poses": [
+        "idle0",
+        "idle1",
+        "run0",
+        "run1",
+        "attack0",
+        "attack1"
+      ],
+      "frameSize": 64,
+      "atlasWidth": 384,
+      "atlasHeight": 256,
+      "footAnchor": 50,
+      "renderScale": 1.1702744826729767,
+      "sourceScale": 0.6303267345358131,
+      "clipDurations": {
+        "1H_Melee_Attack_Stab": 1.600000023841858,
+        "Death_A": 0.800000011920929,
+        "Death_A_Pose": 0,
+        "Death_B": 2.633333444595337,
+        "Death_B_Pose": 0,
+        "Hit_A": 0.6666666865348816,
+        "Hit_B": 0.8666666746139526,
+        "Idle_A": 1.0666667222976685,
+        "Idle_B": 2.133333444595337,
+        "Interact": 1.2999999523162842,
+        "PickUp": 1.2999999523162842,
+        "Spawn_Air": 1.2999999523162842,
+        "Spawn_Ground": 1.2999999523162842,
+        "T-Pose": 0,
+        "Throw": 1.3666666746139526,
+        "Use_Item": 1.600000023841858,
+        "Jump_Full_Long": 2.3333332538604736,
+        "Jump_Full_Short": 1.1666666269302368,
+        "Jump_Idle": 1.0666667222976685,
+        "Jump_Land": 0.6666666865348816,
+        "Jump_Start": 0.6000000238418579,
+        "Running_A": 0.800000011920929,
+        "Running_B": 0.800000011920929,
+        "Walking_A": 1.0666667222976685,
+        "Walking_B": 1.0666667222976685,
+        "Walking_C": 1.600000023841858
+      },
+      "rawExtents": {
+        "left": 22,
+        "right": 21,
+        "top": 38.45251747882028,
+        "below": 5.135023470665317
+      },
+      "frames": [
+        {
+          "dir": "down",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 52,
+            "minY": 45,
+            "maxX": 78,
+            "maxY": 79,
+            "count": 546
+          },
+          "footY": 79.6704192515087
+        },
+        {
+          "dir": "down",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 52,
+            "minY": 45,
+            "maxX": 78,
+            "maxY": 80,
+            "count": 544
+          },
+          "footY": 79.67042525279317
+        },
+        {
+          "dir": "down",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 51,
+            "minY": 50,
+            "maxX": 80,
+            "maxY": 78,
+            "count": 486
+          },
+          "footY": 78.32630956821048
+        },
+        {
+          "dir": "down",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 51,
+            "minY": 50,
+            "maxX": 79,
+            "maxY": 78,
+            "count": 479
+          },
+          "footY": 78.32567119858452
+        },
+        {
+          "dir": "down",
+          "pose": "attack0",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.18,
+          "bbox": {
+            "minX": 51,
+            "minY": 44,
+            "maxX": 81,
+            "maxY": 78,
+            "count": 588
+          },
+          "footY": 78.79443747083997
+        },
+        {
+          "dir": "down",
+          "pose": "attack1",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.55,
+          "bbox": {
+            "minX": 52,
+            "minY": 50,
+            "maxX": 81,
+            "maxY": 83,
+            "count": 508
+          },
+          "footY": 79.80792412823956
+        },
+        {
+          "dir": "up",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 49,
+            "minY": 43,
+            "maxX": 75,
+            "maxY": 81,
+            "count": 571
+          },
+          "footY": 77.8277314441647
+        },
+        {
+          "dir": "up",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 49,
+            "minY": 43,
+            "maxX": 75,
+            "maxY": 81,
+            "count": 571
+          },
+          "footY": 77.8281107673651
+        },
+        {
+          "dir": "up",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 48,
+            "minY": 41,
+            "maxX": 76,
+            "maxY": 79,
+            "count": 613
+          },
+          "footY": 77.86422291785654
+        },
+        {
+          "dir": "up",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 48,
+            "minY": 40,
+            "maxX": 76,
+            "maxY": 81,
+            "count": 618
+          },
+          "footY": 77.86286253588328
+        },
+        {
+          "dir": "up",
+          "pose": "attack0",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.18,
+          "bbox": {
+            "minX": 46,
+            "minY": 44,
+            "maxX": 76,
+            "maxY": 82,
+            "count": 576
+          },
+          "footY": 78.70420395504519
+        },
+        {
+          "dir": "up",
+          "pose": "attack1",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.55,
+          "bbox": {
+            "minX": 46,
+            "minY": 39,
+            "maxX": 75,
+            "maxY": 79,
+            "count": 647
+          },
+          "footY": 77.45251747882028
+        },
+        {
+          "dir": "left",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 53,
+            "minY": 48,
+            "maxX": 76,
+            "maxY": 84,
+            "count": 497
+          },
+          "footY": 78.86497652933468
+        },
+        {
+          "dir": "left",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 53,
+            "minY": 48,
+            "maxX": 76,
+            "maxY": 84,
+            "count": 504
+          },
+          "footY": 78.86517833057775
+        },
+        {
+          "dir": "left",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 48,
+            "minY": 49,
+            "maxX": 69,
+            "maxY": 83,
+            "count": 481
+          },
+          "footY": 78.09526611784172
+        },
+        {
+          "dir": "left",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 49,
+            "minY": 50,
+            "maxX": 72,
+            "maxY": 83,
+            "count": 510
+          },
+          "footY": 78.09426699242569
+        },
+        {
+          "dir": "left",
+          "pose": "attack0",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.18,
+          "bbox": {
+            "minX": 53,
+            "minY": 48,
+            "maxX": 82,
+            "maxY": 83,
+            "count": 517
+          },
+          "footY": 78.62392986861782
+        },
+        {
+          "dir": "left",
+          "pose": "attack1",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.55,
+          "bbox": {
+            "minX": 42,
+            "minY": 48,
+            "maxX": 72,
+            "maxY": 82,
+            "count": 514
+          },
+          "footY": 78.23006916040967
+        },
+        {
+          "dir": "right",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 52,
+            "minY": 47,
+            "maxX": 74,
+            "maxY": 81,
+            "count": 452
+          },
+          "footY": 78.6331741663387
+        },
+        {
+          "dir": "right",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 51,
+            "minY": 47,
+            "maxX": 74,
+            "maxY": 81,
+            "count": 455
+          },
+          "footY": 78.63335768958052
+        },
+        {
+          "dir": "right",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 58,
+            "minY": 48,
+            "maxX": 79,
+            "maxY": 82,
+            "count": 464
+          },
+          "footY": 78.0952663682253
+        },
+        {
+          "dir": "right",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 55,
+            "minY": 48,
+            "maxX": 79,
+            "maxY": 83,
+            "count": 457
+          },
+          "footY": 78.09426674204211
+        },
+        {
+          "dir": "right",
+          "pose": "attack0",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.18,
+          "bbox": {
+            "minX": 45,
+            "minY": 47,
+            "maxX": 74,
+            "maxY": 80,
+            "count": 471
+          },
+          "footY": 78.87471155726733
+        },
+        {
+          "dir": "right",
+          "pose": "attack1",
+          "clip": "1H_Melee_Attack_Stab",
+          "time": 0.55,
+          "bbox": {
+            "minX": 55,
+            "minY": 48,
+            "maxX": 85,
+            "maxY": 82,
+            "count": 497
+          },
+          "footY": 79.03037244665018
+        }
+      ]
+    },
+    "4GTN": {
+      "file": "harmonized-4GTN.png",
+      "model": "4GTN",
+      "sourceGLB": "/modern/assets/characters-series6/4GTN.glb",
+      "directions": [
+        "down",
+        "up",
+        "left",
+        "right"
+      ],
+      "poses": [
+        "idle0",
+        "idle1",
+        "run0",
+        "run1",
+        "attack0",
+        "attack1"
+      ],
+      "frameSize": 64,
+      "atlasWidth": 384,
+      "atlasHeight": 256,
+      "footAnchor": 50,
+      "renderScale": 0.9491525423728814,
+      "sourceScale": 0.3898436449114652,
+      "clipDurations": {
+        "Melee_1H_Slash": 1.5666667222976685,
+        "Death_A": 1.6666666269302368,
+        "Death_A_Pose": 0,
+        "Hit_A": 0.699999988079071,
+        "Idle_A": 1.9666666984558105,
+        "Idle_B": 6,
+        "T-Pose": 0,
+        "Running_A": 1.0666667222976685,
+        "Walking_A": 1.0666667222976685
+      },
+      "rawExtents": {
+        "left": 30,
+        "right": 29,
+        "top": 38.022538476936575,
+        "below": 10.607407581266216
+      },
+      "frames": [
+        {
+          "dir": "down",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 35,
+            "minY": 46,
+            "maxX": 80,
+            "maxY": 81,
+            "count": 697
+          },
+          "footY": 79.66673727445563
+        },
+        {
+          "dir": "down",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 34,
+            "minY": 47,
+            "maxX": 80,
+            "maxY": 81,
+            "count": 683
+          },
+          "footY": 79.66672812968079
+        },
+        {
+          "dir": "down",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 35,
+            "minY": 50,
+            "maxX": 80,
+            "maxY": 84,
+            "count": 598
+          },
+          "footY": 76.35233580081685
+        },
+        {
+          "dir": "down",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 35,
+            "minY": 48,
+            "maxX": 80,
+            "maxY": 83,
+            "count": 599
+          },
+          "footY": 75.49325155023934
+        },
+        {
+          "dir": "down",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 50,
+            "minY": 44,
+            "maxX": 82,
+            "maxY": 82,
+            "count": 622
+          },
+          "footY": 79.4652237581321
+        },
+        {
+          "dir": "down",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 48,
+            "minY": 50,
+            "maxX": 83,
+            "maxY": 86,
+            "count": 625
+          },
+          "footY": 81.44008797055119
+        },
+        {
+          "dir": "up",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 47,
+            "minY": 48,
+            "maxX": 92,
+            "maxY": 80,
+            "count": 658
+          },
+          "footY": 77.68331709496687
+        },
+        {
+          "dir": "up",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 47,
+            "minY": 48,
+            "maxX": 92,
+            "maxY": 80,
+            "count": 661
+          },
+          "footY": 77.68433286371396
+        },
+        {
+          "dir": "up",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 47,
+            "minY": 46,
+            "maxX": 93,
+            "maxY": 82,
+            "count": 640
+          },
+          "footY": 77.35378688849624
+        },
+        {
+          "dir": "up",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 47,
+            "minY": 46,
+            "maxX": 92,
+            "maxY": 84,
+            "count": 640
+          },
+          "footY": 75.2919329620174
+        },
+        {
+          "dir": "up",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 45,
+            "minY": 40,
+            "maxX": 77,
+            "maxY": 81,
+            "count": 566
+          },
+          "footY": 77.89411399872219
+        },
+        {
+          "dir": "up",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 44,
+            "minY": 38,
+            "maxX": 79,
+            "maxY": 80,
+            "count": 624
+          },
+          "footY": 76.02253847693657
+        },
+        {
+          "dir": "left",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 56,
+            "minY": 45,
+            "maxX": 70,
+            "maxY": 83,
+            "count": 401
+          },
+          "footY": 78.7232974329471
+        },
+        {
+          "dir": "left",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 55,
+            "minY": 45,
+            "maxX": 69,
+            "maxY": 83,
+            "count": 386
+          },
+          "footY": 78.72377938390429
+        },
+        {
+          "dir": "left",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 49,
+            "minY": 46,
+            "maxX": 72,
+            "maxY": 82,
+            "count": 457
+          },
+          "footY": 76.85306242137787
+        },
+        {
+          "dir": "left",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 46,
+            "minY": 44,
+            "maxX": 74,
+            "maxY": 80,
+            "count": 553
+          },
+          "footY": 75.39259241873378
+        },
+        {
+          "dir": "left",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 42,
+            "minY": 44,
+            "maxX": 76,
+            "maxY": 83,
+            "count": 562
+          },
+          "footY": 78.57190866860893
+        },
+        {
+          "dir": "left",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 36,
+            "minY": 44,
+            "maxX": 68,
+            "maxY": 84,
+            "count": 516
+          },
+          "footY": 78.70507089642948
+        },
+        {
+          "dir": "right",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 57,
+            "minY": 45,
+            "maxX": 71,
+            "maxY": 87,
+            "count": 402
+          },
+          "footY": 78.62675828840278
+        },
+        {
+          "dir": "right",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 58,
+            "minY": 46,
+            "maxX": 72,
+            "maxY": 87,
+            "count": 400
+          },
+          "footY": 78.62728355571909
+        },
+        {
+          "dir": "right",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 55,
+            "minY": 45,
+            "maxX": 78,
+            "maxY": 83,
+            "count": 521
+          },
+          "footY": 76.85306192061071
+        },
+        {
+          "dir": "right",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 53,
+            "minY": 45,
+            "maxX": 81,
+            "maxY": 86,
+            "count": 514
+          },
+          "footY": 75.39259241873378
+        },
+        {
+          "dir": "right",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 51,
+            "minY": 45,
+            "maxX": 85,
+            "maxY": 84,
+            "count": 530
+          },
+          "footY": 78.78742908824535
+        },
+        {
+          "dir": "right",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 59,
+            "minY": 44,
+            "maxX": 91,
+            "maxY": 84,
+            "count": 526
+          },
+          "footY": 78.75755555105826
+        }
+      ]
+    },
+    "4GTN_Forgotten": {
+      "file": "harmonized-4GTN_Forgotten.png",
+      "model": "4GTN_Forgotten",
+      "sourceGLB": "/modern/assets/characters-series6/4GTN_Forgotten.glb",
+      "directions": [
+        "down",
+        "up",
+        "left",
+        "right"
+      ],
+      "poses": [
+        "idle0",
+        "idle1",
+        "run0",
+        "run1",
+        "attack0",
+        "attack1"
+      ],
+      "frameSize": 64,
+      "atlasWidth": 384,
+      "atlasHeight": 256,
+      "footAnchor": 50,
+      "renderScale": 0.9491525423728814,
+      "sourceScale": 0.3898436449114652,
+      "clipDurations": {
+        "Melee_1H_Slash": 1.5666667222976685,
+        "Death_A": 1.6666666269302368,
+        "Death_A_Pose": 0,
+        "Hit_A": 0.699999988079071,
+        "Idle_A": 1.9666666984558105,
+        "Idle_B": 6,
+        "T-Pose": 0,
+        "Running_A": 1.0666667222976685,
+        "Walking_A": 1.0666667222976685
+      },
+      "rawExtents": {
+        "left": 30,
+        "right": 29,
+        "top": 38.022538476936575,
+        "below": 10.607407581266216
+      },
+      "frames": [
+        {
+          "dir": "down",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 35,
+            "minY": 46,
+            "maxX": 80,
+            "maxY": 81,
+            "count": 731
+          },
+          "footY": 79.66673727445563
+        },
+        {
+          "dir": "down",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 34,
+            "minY": 47,
+            "maxX": 80,
+            "maxY": 81,
+            "count": 712
+          },
+          "footY": 79.66672812968079
+        },
+        {
+          "dir": "down",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 35,
+            "minY": 50,
+            "maxX": 81,
+            "maxY": 84,
+            "count": 622
+          },
+          "footY": 76.35233580081685
+        },
+        {
+          "dir": "down",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 35,
+            "minY": 48,
+            "maxX": 80,
+            "maxY": 83,
+            "count": 622
+          },
+          "footY": 75.49325155023934
+        },
+        {
+          "dir": "down",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 50,
+            "minY": 44,
+            "maxX": 82,
+            "maxY": 82,
+            "count": 664
+          },
+          "footY": 79.4652237581321
+        },
+        {
+          "dir": "down",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 48,
+            "minY": 50,
+            "maxX": 83,
+            "maxY": 86,
+            "count": 676
+          },
+          "footY": 81.44008797055119
+        },
+        {
+          "dir": "up",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 47,
+            "minY": 46,
+            "maxX": 92,
+            "maxY": 80,
+            "count": 729
+          },
+          "footY": 77.68331709496687
+        },
+        {
+          "dir": "up",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 47,
+            "minY": 46,
+            "maxX": 92,
+            "maxY": 80,
+            "count": 732
+          },
+          "footY": 77.68433286371396
+        },
+        {
+          "dir": "up",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 46,
+            "minY": 43,
+            "maxX": 93,
+            "maxY": 82,
+            "count": 732
+          },
+          "footY": 77.35378688849624
+        },
+        {
+          "dir": "up",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 47,
+            "minY": 43,
+            "maxX": 92,
+            "maxY": 84,
+            "count": 730
+          },
+          "footY": 75.2919329620174
+        },
+        {
+          "dir": "up",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 45,
+            "minY": 40,
+            "maxX": 77,
+            "maxY": 81,
+            "count": 642
+          },
+          "footY": 77.89411399872219
+        },
+        {
+          "dir": "up",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 44,
+            "minY": 38,
+            "maxX": 79,
+            "maxY": 80,
+            "count": 689
+          },
+          "footY": 76.02253847693657
+        },
+        {
+          "dir": "left",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 53,
+            "minY": 45,
+            "maxX": 70,
+            "maxY": 83,
+            "count": 453
+          },
+          "footY": 78.7232974329471
+        },
+        {
+          "dir": "left",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 52,
+            "minY": 45,
+            "maxX": 70,
+            "maxY": 83,
+            "count": 442
+          },
+          "footY": 78.72377938390429
+        },
+        {
+          "dir": "left",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 48,
+            "minY": 46,
+            "maxX": 72,
+            "maxY": 82,
+            "count": 490
+          },
+          "footY": 76.85306242137787
+        },
+        {
+          "dir": "left",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 46,
+            "minY": 44,
+            "maxX": 74,
+            "maxY": 80,
+            "count": 608
+          },
+          "footY": 75.39259241873378
+        },
+        {
+          "dir": "left",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 42,
+            "minY": 44,
+            "maxX": 76,
+            "maxY": 83,
+            "count": 601
+          },
+          "footY": 78.57190866860893
+        },
+        {
+          "dir": "left",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 36,
+            "minY": 44,
+            "maxX": 68,
+            "maxY": 84,
+            "count": 565
+          },
+          "footY": 78.70507089642948
+        },
+        {
+          "dir": "right",
+          "pose": "idle0",
+          "clip": "Idle_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 57,
+            "minY": 45,
+            "maxX": 74,
+            "maxY": 87,
+            "count": 457
+          },
+          "footY": 78.62675828840278
+        },
+        {
+          "dir": "right",
+          "pose": "idle1",
+          "clip": "Idle_A",
+          "time": 0.65,
+          "bbox": {
+            "minX": 57,
+            "minY": 46,
+            "maxX": 75,
+            "maxY": 87,
+            "count": 452
+          },
+          "footY": 78.62728355571909
+        },
+        {
+          "dir": "right",
+          "pose": "run0",
+          "clip": "Running_A",
+          "time": 0.15,
+          "bbox": {
+            "minX": 55,
+            "minY": 45,
+            "maxX": 79,
+            "maxY": 83,
+            "count": 575
+          },
+          "footY": 76.85306192061071
+        },
+        {
+          "dir": "right",
+          "pose": "run1",
+          "clip": "Running_A",
+          "time": 0.55,
+          "bbox": {
+            "minX": 53,
+            "minY": 45,
+            "maxX": 81,
+            "maxY": 86,
+            "count": 543
+          },
+          "footY": 75.39259241873378
+        },
+        {
+          "dir": "right",
+          "pose": "attack0",
+          "clip": "Melee_1H_Slash",
+          "time": 0.18,
+          "bbox": {
+            "minX": 51,
+            "minY": 45,
+            "maxX": 85,
+            "maxY": 84,
+            "count": 591
+          },
+          "footY": 78.78742908824535
+        },
+        {
+          "dir": "right",
+          "pose": "attack1",
+          "clip": "Melee_1H_Slash",
+          "time": 0.55,
+          "bbox": {
+            "minX": 59,
+            "minY": 44,
+            "maxX": 91,
+            "maxY": 84,
+            "count": 584
+          },
+          "footY": 78.75755555105826
+        }
+      ]
+    }
+  }
+}
