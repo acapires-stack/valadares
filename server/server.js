@@ -7782,21 +7782,18 @@ wss.on('connection', (ws, request) => {
                 reply(savedRequest === request ? previous.result : {ok:false,error:'op_conflict'});
                 return;
             }
+            // Recibos da versão com escolha continuam consultáveis acima. Novas
+            // tentativas escolhem atributo e valor aleatoriamente, sem gasto aqui.
+            if (affixCode !== undefined){ reply({ok:false,error:'choice_removed'}); return; }
             if (opId !== p.enchantToken){ reply({ok:false,error:'stale_op'}); return; }
             if (!ENCHANTING_ENABLED){ reply({ok:false,error:'disabled'}); return; }
             if (p.equipmentVersion !== equipmentRules.VERSION){ reply({ok:false,error:'update_required'}); return; }
-            if (affixCode !== undefined && (typeof affixCode !== 'string' || !Object.hasOwn(equipmentRules.AFFIXES,affixCode))){
-                reply({ok:false,error:'invalid_choice'}); return;
-            }
             if (p.hp <= 0 || !nearCraftService(p) || p.duel || p.arena || p.tradeId){
                 reply({ok:false,error:'not_at_bench'}); return;
             }
             const meta = itemMetaForKey(itemKey), tier = getUpgradeTier(itemKey);
             if (!meta || !equipmentRules.KINDS.includes(meta.kind) || !Number.isInteger(slot) || slot < 0 || slot > 2){
                 reply({ok:false,error:'bad_item'}); return;
-            }
-            if (affixCode !== undefined && !equipmentRules.AFFIXES[affixCode].kinds.includes(meta.kind)){
-                reply({ok:false,error:'invalid_choice'}); return;
             }
             const equippedSlot = Object.keys(p.equipped || {}).find(s => p.equipped[s] === itemKey);
             if (!equippedSlot && !hasInv(p,itemKey,1)){ reply({ok:false,error:'no_item'}); return; }
@@ -7805,7 +7802,7 @@ wss.on('connection', (ws, request) => {
             if (!hasInv(p,equipmentRules.MATERIAL,cost.essence) || (p.gold || 0) < cost.gold){
                 reply({ok:false,error:'no_resources',cost}); return;
             }
-            const affixes = equipmentRules.roll(meta.kind,tier.affixes,slot,undefined,affixCode);
+            const affixes = equipmentRules.roll(meta.kind,tier.affixes,slot);
             let itemId = tier.id;
             if (!itemId){ do { itemId = crypto.randomBytes(6).toString('hex'); } while (enchantedIdExists(itemId)); }
             const newKey = equipmentRules.make(tier.base,tier.plus,itemId,affixes);

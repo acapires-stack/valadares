@@ -31,7 +31,7 @@ test('adding and rerolling a slot never changes the other slots',()=>{
         }
     }
 });
-test('chosen attributes keep the same price, roll values, and may repeat in all three slots',()=>{
+test('random attributes and values keep the same price and may repeat in all three slots',()=>{
     const expectedAdd=[{essence:6,gold:500},{essence:12,gold:1500},{essence:24,gold:4000}];
     const expectedReroll=[{essence:3,gold:250},{essence:6,gold:750},{essence:12,gold:2000}];
     for(let i=0;i<3;i++){
@@ -39,14 +39,16 @@ test('chosen attributes keep the same price, roll values, and may repeat in all 
         assert.deepEqual(R.cost(i,true),expectedReroll[i]);
     }
     let aff=[];
-    for(let i=0;i<3;i++)aff=R.roll('weapon',aff,i,()=>i/3,'b');
+    for(let i=0;i<3;i++)aff=R.roll('weapon',aff,i,()=>0.5);
     assert.deepEqual(aff.map(a=>a.code),['b','b','b']);
-    assert.deepEqual(aff.map(a=>a.value),[3,4,6]);
+    assert.deepEqual(aff.map(a=>a.value),[5,5,5]);
     const key=R.make('ESPADA',0,'012345abcdef',aff);
     assert.deepEqual(R.parse(key).affixes,aff);
-    assert.equal(R.bonuses({weapon:key},()=> 'weapon').bossDamage,13);
+    assert.equal(R.bonuses({weapon:key},()=> 'weapon').bossDamage,15);
     assert.equal(R.bonuses({weapon:R.make('ESPADA',0,'fedcba543210',Array(3).fill({code:'b',value:7}))},()=> 'weapon').bossDamage,21);
-    assert.deepEqual(R.roll('weapon',aff,1,()=>1,'b').map(a=>a.value),[3,7,6]);
+    const rolls=[0.5,1];
+    assert.deepEqual(R.roll('weapon',aff,1,()=>rolls.shift()).map(a=>a.value),[5,7,5]);
+    assert.deepEqual(R.roll('weapon',aff,0,()=>0).map(a=>a.code),['h','b','b']);
 });
 test('new weapon affixes respect kind restrictions and effective caps',()=>{
     assert.equal(R.VERSION,2);
@@ -59,9 +61,7 @@ test('new weapon affixes respect kind restrictions and effective caps',()=>{
     assert.equal(R.bonuses({weapon:triple('g')},()=> 'weapon').manaOnHit,9);
     assert.equal(R.bonuses({weapon:triple('d')},()=> 'weapon').def,9);
     assert.equal(R.validFor(triple('v'),'armor'),false);
-    for(const choice of ['__proto__','constructor','x',''])
-        assert.throws(()=>R.roll('weapon',[],0,()=>0,choice));
-    assert.throws(()=>R.roll('armor',[],0,()=>0,'v'));
+    assert.equal(R.roll('armor',[],0,()=>0)[0].code,'h');
 });
 test('equipped bonuses are bounded and cosmetics never contribute',()=>{
     const key=R.make('ITEM',5,'012345abcdef',[{code:'c',value:10},{code:'h',value:45},{code:'m',value:30}]);

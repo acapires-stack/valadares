@@ -51,13 +51,11 @@
         return key;
     }
     function upgrade(key,plus){const t=parse(key);if(!t.valid)throw new Error('Invalid equipment key');return make(t.base,plus,t.id,t.affixes);}
-    function roll(kind,existing,slot,rng,choice){
+    function roll(kind,existing,slot,rng){
         rng=rng||Math.random;
         if(!KINDS.includes(kind)||!Array.isArray(existing)||!Number.isInteger(slot)||slot<0||slot>2||slot>existing.length)throw new Error('Invalid enchantment slot');
-        if(choice!==undefined && (typeof choice!=='string'||!Object.hasOwn(AFFIXES,choice)||!AFFIXES[choice].kinds.includes(kind)))
-            throw new Error('Invalid enchantment choice');
         const pool=Object.keys(AFFIXES).filter(code=>AFFIXES[code].kinds.includes(kind));
-        const code=choice===undefined?pool[Math.min(pool.length-1,Math.floor(rng()*pool.length))]:choice,def=AFFIXES[code];
+        const code=pool[Math.min(pool.length-1,Math.floor(rng()*pool.length))],def=AFFIXES[code];
         const affixes=existing.map(a=>({...a}));
         affixes[slot]={code,value:def.min+Math.min(def.max-def.min,Math.floor(rng()*(def.max-def.min+1)))};
         return affixes;

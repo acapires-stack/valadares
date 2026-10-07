@@ -10,7 +10,7 @@ const {spawn}=require('node:child_process');
 const {chromium}=require(process.env.PLAYWRIGHT_PATH||'C:/Users/Alcione/Documents/Codex/2026-10-03/da-u/work/node_modules/playwright');
 const root=path.resolve(__dirname,'../..');
 const out=path.join(root,'work/weapon-techniques-20261007/qa');
-const run=path.join(out,`${process.argv.includes('--enchant')?'enchant-':''}live-${new Date().toISOString().replace(/[:.]/g,'-')}-${crypto.randomBytes(3).toString('hex')}`);
+const run=path.join(out,`${process.argv.includes('--enchant-random')?'enchant-random-':process.argv.includes('--enchant')?'enchant-':''}live-${new Date().toISOString().replace(/[:.]/g,'-')}-${crypto.randomBytes(3).toString('hex')}`);
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const frames=[],pageErrors=[];
 let phase='setup',backend=null,web=null,browser=null,page=null,backendLog='';
@@ -765,7 +765,105 @@ async function enchantMain(){
   fs.writeFileSync(path.join(run,'result.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify({pass:true,evidence:run,key:current,vRate,gValue}));
 }
-(process.argv.includes('--enchant')?enchantMain():process.argv.includes('--area')?areaMain():main()).catch(async e=>{
+async function enchantRandomMain(){
+  fs.mkdirSync(run,{recursive:true});
+  const a=account(rich,50000),firstKey='ESPADA_HL_PLUS_5';
+  const oldItem='ESPADA_GUARDIAO',oldKey='ESPADA_GUARDIAO~abcdef123456~v2',oldOp=crypto.randomUUID();
+  const oldReceipt={ok:true,opId:oldOp,itemKey:oldItem,newKey:oldKey,slot:0,cost:{essence:6,gold:500}};
+  a.save.x=51;a.save.y=52;a.save.equipped.weapon=firstKey;
+  delete a.save.inv[firstKey];a.save.inv.ESSENCIA_ARCANA=100;a.save.inv[oldKey]=1;
+  a.save.enchantOps=[{opId:oldOp,request:JSON.stringify([oldItem,0,'v']),result:oldReceipt}];
+  a.save.enchantToken=crypto.randomUUID();
+  fs.writeFileSync(path.join(run,'accounts.json'),JSON.stringify({v:1,savedAt:Date.now(),accounts:[a]}));
+  const port=await freePort(),webPort=await startWeb();await startBackend(port,true,true);
+  browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+  const context=await browser.newContext({viewport:{width:1440,height:900}});
+  phase='random enchant login';page=await login(context,webPort,port,rich);
+  await areaIpc({t:'qaEnchantBench',name:rich});
+  const R=require(path.join(root,'equipment-rules.js'));
+  function rain(start){return frames.slice(start).filter(f=>f.direction==='received'&&f.m.t==='invUpdate'&&f.m.goldDelta?.reason==='gold_rain')
+    .reduce((n,f)=>n+f.m.goldDelta.amount,0);}
+  function assertNoSpend(before,after,start){
+    assert.equal(after.player.gold,before.player.gold+rain(start));
+    assert.equal(after.player.inv.ESSENCIA_ARCANA,before.player.inv.ESSENCIA_ARCANA);
+    assert.equal(after.player.equipped.weapon,before.player.equipped.weapon);
+    assert.equal(after.player.enchantOps.length,before.player.enchantOps.length);
+  }
+  phase='historical choice receipt';
+  const historicalBefore=await areaIpc({t:'qaEnchantInspect',name:rich});
+  const historicalStart=frames.length;
+  await page.evaluate(m=>ws.send(JSON.stringify(m)),{t:'invEnchant',itemKey:oldItem,slot:0,opId:oldOp,affixCode:'v'});
+  const historical=(await waitFrame(historicalStart,f=>f.direction==='received'&&f.m.t==='invUpdate'&&f.m.enchant?.opId===oldOp,
+    'historical consumed receipt')).m.enchant;
+  assert.deepEqual(historical,oldReceipt);
+  const historicalAfter=await areaIpc({t:'qaEnchantInspect',name:rich});
+  assertNoSpend(historicalBefore,historicalAfter,historicalStart);
+  phase='unconsumed old choice pending';
+  const pending={itemKey:firstKey,slot:0,opId:historicalAfter.player.enchantToken,affixCode:'v',waiting:false};
+  await page.evaluate(({name,pending})=>localStorage.setItem('valadares:enchantPending:'+name.toLowerCase(),JSON.stringify(pending)),{name:rich,pending});
+  await closeTab();page=await login(context,webPort,port,rich);
+  await page.evaluate(()=>{openCraft();switchCraftTab('enchant');});
+  const retry=page.locator('[data-enchant-retry]');await retry.waitFor({state:'visible'});
+  const rejectedBefore=await areaIpc({t:'qaEnchantInspect',name:rich}),rejectedStart=frames.length;
+  await retry.click();
+  const rejectedSent=(await waitFrame(rejectedStart,f=>f.direction==='sent'&&f.m.t==='invEnchant'&&f.m.opId===pending.opId,'old pending sent')).m;
+  const rejected=(await waitFrame(rejectedStart,f=>f.direction==='received'&&f.m.t==='invUpdate'&&f.m.enchant?.opId===pending.opId,
+    'old choice rejected')).m.enchant;
+  assert.equal(rejectedSent.affixCode,'v');assert.equal(rejected.ok,false);
+  const rejectedAfter=await areaIpc({t:'qaEnchantInspect',name:rich});
+  assertNoSpend(rejectedBefore,rejectedAfter,rejectedStart);
+  await page.waitForFunction(name=>localStorage.getItem('valadares:enchantPending:'+name.toLowerCase())===null,rich,{timeout:5000});
+  await page.locator('[data-enchant-slot="0"]').waitFor({state:'visible'});
+  assert.equal(await page.locator('[data-enchant-slot="0"]').isEnabled(),true,'pending unlocks after error');
+  assert.equal(await page.locator('#enchantPanel [data-enchant-choice]').count(),0,'no attribute selectors');
+  const errorText=await page.locator('#enchantPanel [role="status"]').innerText();
+  assert(errorText.length>10,'visible error message');
+  await page.screenshot({path:path.join(run,'old-pending-error.png')});
+  phase='random UI add and reroll';
+  let current=firstKey,identity=null;
+  const operations=[];
+  async function action(slot,reroll){
+    const before=await areaIpc({t:'qaEnchantInspect',name:rich}),start=frames.length;
+    await page.locator('#enchantItem').selectOption(current);
+    await page.locator('[data-enchant-slot="'+slot+'"]').click();
+    const sent=(await waitFrame(start,f=>f.direction==='sent'&&f.m.t==='invEnchant'&&f.m.slot===slot,'random enchant sent')).m;
+    assert(!Object.hasOwn(sent,'affixCode'),'client omitted old choice');
+    const response=(await waitFrame(start,f=>f.direction==='received'&&f.m.t==='invUpdate'&&f.m.enchant?.opId===sent.opId,
+      'random enchant receipt')).m.enchant;
+    assert.equal(response.ok,true);
+    const parsed=R.parse(response.newKey);
+    assert(parsed.valid&&parsed.enchanted&&parsed.base==='ESPADA_HL'&&parsed.plus===5);
+    if(identity)assert.equal(parsed.id,identity);else identity=parsed.id;
+    assert.equal(response.cost.gold,R.cost(slot,reroll).gold);
+    assert.equal(response.cost.essence,R.cost(slot,reroll).essence);
+    const after=await areaIpc({t:'qaEnchantInspect',name:rich});
+    assert.equal(after.player.equipped.weapon,response.newKey);
+    assert.equal(after.player.inv.ESSENCIA_ARCANA,before.player.inv.ESSENCIA_ARCANA-response.cost.essence);
+    assert.equal(after.player.gold,before.player.gold-response.cost.gold+rain(start));
+    assert.equal(after.player.inv[oldKey],1,'other enchanted item preserved');
+    operations.push({sent,response,before:before.player,after:after.player});current=response.newKey;
+    return parsed;
+  }
+  const one=await action(0,false);
+  const two=await action(1,false);
+  assert.deepEqual(two.affixes[0],one.affixes[0]);
+  const three=await action(0,true);
+  assert.deepEqual(three.affixes[1],two.affixes[1],'other slot unchanged during reroll');
+  assert.equal(three.id,one.id);assert.equal(three.plus,5);
+  await page.screenshot({path:path.join(run,'random-enchant-desktop.png')});
+  await page.setViewportSize({width:430,height:900});await page.waitForTimeout(150);
+  await page.screenshot({path:path.join(run,'random-enchant-narrow.png')});
+  const narrow=await page.evaluate(()=>({width:innerWidth,panel:document.getElementById('enchantPanel').getBoundingClientRect().width,
+    overflow:document.body.scrollWidth-innerWidth}));
+  assert(narrow.panel<=narrow.width+2);assert(narrow.overflow<=1);
+  assert.deepEqual(pageErrors,[]);
+  const result={pass:true,version:R.VERSION,firstKey,oldKey,historical,pending,rejected,rejectedSent,errorText,
+    identity,finalKey:current,operations,affixes:{one:one.affixes,two:two.affixes,three:three.affixes},narrow,pageErrors,
+    checkedAt:new Date().toISOString()};
+  fs.writeFileSync(path.join(run,'result.json'),JSON.stringify(result,null,2));
+  console.log(JSON.stringify({pass:true,evidence:run,version:R.VERSION,key:current,rejection:rejected.error}));
+}
+(process.argv.includes('--enchant-random')?enchantRandomMain():process.argv.includes('--enchant')?enchantMain():process.argv.includes('--area')?areaMain():main()).catch(async e=>{
   const failure={pass:false,phase,error:e.stack||String(e),recentFrames:frames.slice(-60),backendLog:backendLog.slice(-2000)};
   try{if(page&&!page.isClosed())await page.screenshot({path:path.join(run,'failure.png')});}catch{}
   try{fs.mkdirSync(run,{recursive:true});fs.writeFileSync(path.join(run,'result.json'),JSON.stringify(failure,null,2));}catch{}
