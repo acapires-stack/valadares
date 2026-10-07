@@ -8,11 +8,15 @@
       "has": [{ "type": "host", "value": "valadares-xi.vercel.app" }],
       "destination": "https://valadares.app.br/$1",
       "permanent": true
+    },
+    {
+      "source": "/jogar3d",
+      "destination": "/jogar",
+      "permanent": true
     }
   ],
   "rewrites": [
     { "source": "/jogar", "destination": "/play.html" },
-    { "source": "/jogar3d", "destination": "/play.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/ranking", "destination": "/ranking.html" },

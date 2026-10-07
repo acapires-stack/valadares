@@ -18,11 +18,12 @@
     <meta name="theme-color" content="#06060c">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Valadares</title>
+    <title>Jogar Valadares — RPG online 3D</title>
+    <meta name="description" content="Jogue Valadares, RPG online 3D gratuito no navegador para PC e celular. Explore a vila, enfrente criaturas e evolua seus equipamentos.">
 
     <!-- Open Graph (preview ao compartilhar /jogar diretamente) -->
-    <meta property="og:title" content="Valadares — RPG online (PC e Celular)">
-    <meta property="og:description" content="RPG tile-based gratuito direto no navegador — PC e celular. PvP, raid bosses, forja +5, party 4-player, guilds.">
+    <meta property="og:title" content="Jogar Valadares — RPG online 3D">
+    <meta property="og:description" content="Explore a vila em 3D, enfrente criaturas e evolua seus equipamentos em um RPG online gratuito no navegador.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://valadares.app.br/jogar">
     <meta property="og:site_name" content="Valadares">
@@ -31,9 +32,12 @@
     <meta property="og:image:type" content="image/jpeg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Valadares — RPG online tile-based estilo Tibia">
+    <meta property="og:image:alt" content="Valadares — RPG online 3D">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Jogar Valadares — RPG online 3D">
+    <meta name="twitter:description" content="Explore a vila em 3D, enfrente criaturas e evolua seus equipamentos direto no navegador.">
     <meta name="twitter:image" content="https://valadares.app.br/og.jpg">
+    <meta name="twitter:image:alt" content="Valadares — RPG online 3D">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1750,9 +1754,29 @@
     <link rel="stylesheet" href="/adventure-guide.css?v=20261004b">
     <link rel="stylesheet" href="/adventure-feedback.css?v=20261005b">
     <link rel="stylesheet" href="/journey.css?v=2">
-    <script src="/modern/boot.js?v=20261006"></script>
+    <style>
+        /* The old canvas remains an internal sprite/input helper, never a game view. */
+        #gameContainer canvas#canvas { visibility: hidden !important; pointer-events: none !important; }
+        #modernRenderError[hidden] { display: none !important; }
+        #modernRenderError { position: fixed; inset: 0; z-index: 999999; display: grid; place-items: center;
+            padding: 24px; background: #07100f; color: #f6e5c3; font: 16px system-ui, sans-serif; }
+        #modernRenderError .modern-recovery-card { max-width: 460px; padding: 28px; border: 1px solid #be9754;
+            border-radius: 10px; background: #1c201b; text-align: center; box-shadow: 0 18px 60px #0008; }
+        #modernRenderError h2 { margin: 0 0 12px; font-size: 23px; }
+        #modernRenderError p { line-height: 1.5; }
+        #modernRenderError button { padding: 12px 20px; border: 1px solid #d6ad62; border-radius: 6px;
+            background: #d6ad62; color: #15160e; font: bold 16px system-ui, sans-serif; cursor: pointer; }
+    </style>
+    <script src="/modern/boot.js?v=20261007-3d"></script>
 </head>
 <body>
+<div id="modernRenderError" role="alertdialog" aria-modal="true" aria-labelledby="modernRenderErrorTitle" hidden>
+    <div class="modern-recovery-card">
+        <h2 id="modernRenderErrorTitle">Não foi possível abrir o mundo 3D</h2>
+        <p>Recarregue a página para tentar novamente. Seu progresso salvo permanece na sua conta.</p>
+        <button id="modernRenderReload" type="button" onclick="window.location.reload()">Recarregar jogo</button>
+    </div>
+</div>
 
 <!-- Top-bar mobile fixa — sempre visível com body.touch -->
 <div id="mobileTopBar">
@@ -1801,7 +1825,7 @@
     </div>
 </div>
 
-<!-- Orientation lock: portrait no celular impede gameplay tile-based 2D —
+<!-- Orientation lock: portrait no celular impede o jogo em paisagem —
      mostra overlay pedindo pra virar a tela. CSS-only, sem JS necessário. -->
 <div id="orientationLock">
     <div class="ol-icon">📱</div>
@@ -1875,7 +1899,7 @@
 <div id="title">⚔ &nbsp;VALADARES&nbsp; ⚔</div>
 <div id="connStatus" class="offline">— OFFLINE —</div>
 <div id="displayControls" aria-label="Layout do jogo">
-    <button id="layoutModeBtn" type="button" aria-pressed="true" data-i18n="ui.layout_classic">Layout clássico</button>
+    <button id="layoutModeBtn" type="button" aria-pressed="true" data-i18n="ui.layout_classic">Layout completo</button>
     <button id="equipmentPanelBtn" type="button" aria-expanded="false" data-i18n="ui.equipment">Equipamento e status</button>
     <button id="inventoryPanelBtn" type="button" aria-expanded="false" data-i18n="ui.inventory">Inventário</button>
     <button id="chatSizeBtn" type="button" aria-expanded="false" data-i18n="ui.chat_expand">Expandir chat</button>
@@ -2598,7 +2622,7 @@ const I18N = {
   pt: {
     'ui.login_intro': 'Seu nome e senha criam um personagem novo ou retomam o seu personagem.',
     'ui.login_ready': '— pronto para entrar —',
-    'ui.layout_classic': 'Layout clássico', 'ui.layout_focus': 'Modo foco',
+    'ui.layout_classic': 'Layout completo', 'ui.layout_focus': 'Modo foco',
     'ui.equipment': 'Equipamento e status', 'ui.inventory': 'Inventário',
     'ui.chat_expand': 'Expandir chat', 'ui.chat_reduce': 'Reduzir chat',
     'ui.first_title': 'Primeiros passos',
@@ -3342,7 +3366,7 @@ const I18N = {
   en: {
     'ui.login_intro': 'Your name and password create a new character or resume your character.',
     'ui.login_ready': '— ready to enter —',
-    'ui.layout_classic': 'Classic layout', 'ui.layout_focus': 'Focus mode',
+    'ui.layout_classic': 'Full layout', 'ui.layout_focus': 'Focus mode',
     'ui.equipment': 'Equipment and stats', 'ui.inventory': 'Inventory',
     'ui.chat_expand': 'Expand chat', 'ui.chat_reduce': 'Reduce chat',
     'ui.first_title': 'First steps',
@@ -16600,6 +16624,10 @@ window.openTutorial = openTutorial;
 window.closeTutorial = closeTutorial;
 
 async function tryLogin(multiplayer){
+    if (window.ValadaresModern?.state !== 'ready'){
+        document.getElementById('loginError').textContent = 'Preparando o mundo 3D. Aguarde um instante e tente novamente.';
+        return;
+    }
     const name = document.getElementById('charInput').value.trim();
     const pwd  = document.getElementById('pwdInput').value;
     const emailField = document.getElementById('emailInput');
@@ -17321,11 +17349,9 @@ function restoreFromBackup(){
 window.restoreFromBackup = restoreFromBackup;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Helpers antigos do modo 3D, mantidos para eventual revisão.
-// O jogo executa apenas o canvas 2D; nenhuma função abaixo carrega render3d.js.
+// Helpers 2D usados para gerar texturas e encaminhar entradas ao renderizador 3D.
 // ═══════════════════════════════════════════════════════════════════════════
-// Modo 3D desativado: o canvas 2D é sempre o único renderizador ativo.
-// Mantemos os helpers de rasterização para uma eventual revisão futura.
+// O canvas 2D continua em memória, mas não aparece como versão jogável.
 const r3dOn = false;
 try { localStorage.removeItem('valadares:3d'); } catch(e){}
 
@@ -17530,9 +17556,19 @@ window.ValadaresModernBridge = {
     isPartyMate: name => isPartyMate(name),
     getChatState: () => ({ open: document.getElementById('chatPanel')?.offsetHeight > 0 })
 };
+window.valadaresStopOn3DError = () => {
+    clearAllKeys();
+    clearConfirmedCombatSounds();
+    player.target = null;
+    player.autoAttack = false;
+};
 
 function loop(ts){
     if (!started) return;   // logout pausa o loop
+    if (window.ValadaresModern?.state === 'error' || !document.getElementById('modernRenderError').hidden){
+        window.valadaresStopOn3DError();
+        return;              // no simulation or automatic attacks behind the recovery screen
+    }
     const dt = Math.min(ts-lastTs, 80); lastTs = ts;
     waterT += dt*0.002;
     itemPulse += dt*0.005;
@@ -18303,9 +18339,29 @@ window.ValadaresWeaponTechniquesUI?.init({
 });
 </script>
 <script type="module">
-if (window.VALADARES_MODERN) {
-    await import('/modern/entry.js?v=20261006');
-    await import('/modern/ui.js?v=20261006');
+const recovery = document.getElementById('modernRenderError');
+function showModernRecovery() {
+    if (!recovery.hidden) return;
+    window.valadaresStopOn3DError?.();
+    recovery.hidden = false;
+    for (const child of document.body.children) if (child !== recovery) child.inert = true;
+    document.getElementById('modernRenderReload').focus();
+}
+document.addEventListener('valadares:modern-error', showModernRecovery);
+for (const type of ['keydown', 'keyup']) window.addEventListener(type, event => {
+    if (recovery.hidden) return;
+    if (event.key === 'F5' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (type === 'keydown' && (event.key === 'Enter' || event.key === ' ')) window.location.reload();
+}, true);
+try {
+    await import('/modern/entry.js?v=20261007-3d');
+    if (window.ValadaresModern?.state !== 'ready') throw new Error('Mundo 3D indisponível');
+    await import('/modern/ui.js?v=20261007-3d');
+} catch (error) {
+    console.error('[Valadares moderno] Falha ao carregar o jogo', error);
+    showModernRecovery();
 }
 </script>
 </body>

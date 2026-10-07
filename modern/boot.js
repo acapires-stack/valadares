@@ -1,11 +1,8 @@
-// A separate public entry uses the existing account/world. Local previews keep 3D.
+// Every game URL uses the same 3D renderer and the existing account/world.
 (() => {
-    const choice = new URLSearchParams(location.search).get('visual');
-    window.VALADARES_MODERN = choice !== 'classic' && (choice === '3d' ||
-        location.pathname === '/jogar3d' || ['localhost', '127.0.0.1'].includes(location.hostname));
-    if (!window.VALADARES_MODERN) return;
+    window.VALADARES_MODERN = true;
     const style = document.createElement('link');
     style.rel = 'stylesheet';
-    style.href = '/modern/ui.css?v=20261006';
+    style.href = '/modern/ui.css?v=20261007-3d';
     document.head.append(style);
 })();
