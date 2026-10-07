@@ -60,6 +60,9 @@
         return q || list.find(item => !(player.quests?.completed || []).includes(item.id)) || null;
     }
     function objective() {
+        if(player._automaton)return {title:say('Complexo dos Autômatos','Automaton Complex'),
+            text:say('Explore os andares. Patrulhas são repostas; há um Guardião a cada cinco andares. Use as escadas para subir ou descer.','Explore the floors. Patrols replenish; a Warden awaits every five floors. Use the stairs to ascend or descend.'),
+            progress:say('Andar ','Floor ')+(player._dungeonDepth||1),reward:'',label:say('Ver masmorras','View dungeons'),action:'dungeons'};
         const expedition = (lastExp?.expedition || player._expedition) === progression.robotExpedition?.id
             ? progression.robotExpedition : progression.expedition;
         if (pendingOpId) return {title:say('Fabricação em confirmação','Craft awaiting confirmation'),
@@ -123,6 +126,13 @@
             }
             const e=progression.expedition;
             const reward = document.createElement('p'); reward.textContent = say('Prêmio compartilhado entre as duas rotas. Primeira conclusão: ','Shared reward across both routes. First clear: ') + itemName(e.firstClearKey) + ` + 3× ${itemName(e.rewardKey)}. ` + say('Repetições: ','Repeat clears: ') + `3× ${itemName(e.rewardKey)}.`; box.appendChild(reward);
+            const dungeon=progression.automatonDungeon;
+            if(dungeon){
+                const title=document.createElement('strong');title.textContent=english()?dungeon.nameEn:dungeon.name;box.appendChild(title);
+                const p=document.createElement('p');p.textContent=say(`Outra masmorra em ${loc(dungeon.npc.x,dungeon.npc.y)}: andares compartilhados, patrulhas com reposição e dificuldade crescente. Guardião a cada cinco andares. Entrada livre pelo portal e tecla G.`,`Another dungeon at ${loc(dungeon.npc.x,dungeon.npc.y)}: shared floors, replenishing patrols and increasing difficulty. Warden every five floors. Enter freely through the portal with G.`);box.appendChild(p);
+                const button=document.createElement('button');button.type='button';button.textContent=near(dungeon.npc.x,dungeon.npc.y)?say('Entrar no Complexo','Enter the Complex'):say('Rota até o Complexo','Route to the Complex')+' · '+direction(dungeon.npc.x,dungeon.npc.y);
+                button.disabled=!near(dungeon.npc.x,dungeon.npc.y)||!online();button.addEventListener('click',()=>send('automatonEnter'));box.appendChild(button);
+            }
             return;
         }
         const select = document.createElement('select'); select.setAttribute('aria-label',say('Família de arma','Weapon family'));
@@ -176,7 +186,7 @@
         // O guia da primeira caçada é opcional. Quando aberto, a Jornada mostra
         // apenas a navegação para que os dois painéis não repitam o objetivo.
         const guideVisible=!document.getElementById('adventureGuidePanel')?.hidden || !document.getElementById('agMoment')?.hidden;
-        const activeProgress=pendingOpId || lastExp?.pending || !!player._expedition || lastExp?.stage==='active';
+        const activeProgress=pendingOpId || lastExp?.pending || !!player._expedition || !!player._automaton || lastExp?.stage==='active';
         const navigationOnly=guideVisible && !(player.quests?.completed || []).includes('q_ratos') && !activeProgress;
         const o=navigationOnly ? {title:say('Explore no seu ritmo','Explore at your pace'),
             text:say('Escolha uma rota de armas ou conheça a expedição solo.','Choose a weapon path or explore the solo expedition.'),
@@ -200,7 +210,7 @@
             && !(exitTile && Math.max(Math.abs(player.x-exitTile.x),Math.abs(player.y-exitTile.y))<=1);
         action.disabled=!!pendingAction||exitTooFar||(!online()&&o.action!=='quests');
         $('journeyRoutes').textContent=say('Rotas de armas','Weapon paths');
-        $('journeyExpedition').textContent=say('Expedição solo','Solo expedition');
+        $('journeyExpedition').textContent=say('Masmorras e expedições','Dungeons and expeditions');
         mobile.textContent=say('Jornada: ','Journey: ')+o.title;
         mobile.setAttribute('aria-expanded',String(document.body.classList.contains('journey-mobile-open')));
         renderMore();
@@ -208,6 +218,7 @@
     $('journeyToggle').addEventListener('click',()=>{open=!open;try{localStorage.setItem(key(),open?'open':'closed');}catch{} lastSignature='';render();});
     $('journeyAction').addEventListener('click',()=>{
         const o=objective();
+        if(o.action==='dungeons'){extra='expedition';lastSignature='';render();return;}
         if(o.action==='quests') { if(typeof openQuests==='function')openQuests(); return; }
         if(o.action==='equip') { if(typeof equip==='function'&&online())equip(o.item); return; }
         if(o.action==='turnin') { if(typeof turnInQuest==='function'&&online()&&turnInQuest(o.quest.id)){pendingAction='turnin';pendingAt=Date.now();} }

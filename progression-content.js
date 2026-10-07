@@ -69,5 +69,9 @@
         npc:{x:75,y:33},
         enemies:['FORGE_SENTRY','FORGE_CONSTRUCT'],boss:'FORGE_WARDEN',
     };
-    return Object.freeze({items,recipes,families,ascendantPools,expedition,robotExpedition});
+    const automatonDungeon = {
+        id:'complexo_automatos',name:'Complexo dos Autômatos',nameEn:'Automaton Complex',
+        npc:{x:23,y:60},enemies:['FORGE_SENTRY','FORGE_CONSTRUCT'],boss:'FORGE_WARDEN',
+    };
+    return Object.freeze({items,recipes,families,ascendantPools,expedition,robotExpedition,automatonDungeon});
 });

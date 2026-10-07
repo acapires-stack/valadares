@@ -7,7 +7,7 @@
 <script src="/appearance-rules.js?v=2"></script>
 <link rel="stylesheet" href="/appearance-ui.css?v=2">
 <script src="/game-audio.js?v=4"></script>
-<script src="/progression-content.js?v=3"></script>
+<script src="/progression-content.js?v=4"></script>
 <script src="/modern-world.js?v=2"></script>
 <script src="/movement-sync.js?v=1"></script>
 <link rel="stylesheet" href="/enchanting.css?v=1">
@@ -6519,6 +6519,8 @@ async function playerDie(){
     if ((player.floor || 0) > 0){
         player.floor = 0;
         player._interior = null;
+        player._automaton = null;
+        player._dungeonDepth = 0;
         map = overworldMap;
         if (_overworldVisited){ player.visited = _overworldVisited; _overworldVisited = null; }
         monsters.length = 0;
@@ -6547,6 +6549,8 @@ function enterDungeonClient(msg){
     const fromFloor = (player.floor || 0);
     player.floor = msg.floor || 1;
     player._interior = msg.interior || null;
+    player._automaton = msg.automaton || null;
+    player._dungeonDepth = msg.automaton ? Math.max(1, Number(msg.depth)||1) : (msg.floor||0);
     player._expedition = msg.expedition || null;
     player._expeditionExit = msg.expedition ? (msg.stairs?.spawn || msg.stairs?.up || null) : null;
     map = msg.grid ? applyDungeonGrid(msg.grid) : genDungeonFloor(player.floor);  // M4 3b: grid do server (fallback local)
@@ -6579,6 +6583,10 @@ function enterDungeonClient(msg){
             : (LANG === 'en' ? 'Ruins of the Forge · solo expedition' : 'Ruínas da Forja · expedição solo');
         if (typeof showServerToast === 'function') showServerToast('event', label, null, 4500);
         log(`<span class="log-sys">${label}</span>`);
+    } else if (msg.automaton){
+        const label = `${LANG === 'en' ? 'Automaton Complex · Floor' : 'Complexo dos Autômatos · Andar'} ${player._dungeonDepth}`;
+        if (typeof showServerToast === 'function') showServerToast('event', label, null, 4500);
+        log(`<span class="log-sys">${label}</span>`);
     } else if (msg.arena){
         // M7 Arena: instância isolada (não é masmorra). Chrome próprio, sem escadas.
         dungeonStairs = null;
@@ -6593,6 +6601,8 @@ function enterDungeonClient(msg){
 }
 function exitDungeonClient(msg){
     player.floor = 0;
+    player._automaton = null;
+    player._dungeonDepth = 0;
     player._interior = null;
     player._expedition = null;
     player._expeditionExit = null;
@@ -7998,6 +8008,8 @@ function handleMP(msg){
         if (player._expedition) window.ValadaresJourneyUI?.onDungeonExit();
         player._expedition = null;
         player._interior = null;
+        player._automaton = null;
+        player._dungeonDepth = 0;
         player._expeditionExit = null;
         window.equipmentServerVersion = msg.equipmentVersion || 0;
         window.enchantToken = msg.enchantToken || null;
@@ -8554,6 +8566,8 @@ function handleMP(msg){
         // M4: voltou pra cidade. Restaura overworld, PvP anterior, players da cidade.
         exitDungeonClient(msg);
         window.ValadaresJourneyUI?.onDungeonExit(msg);
+    } else if (msg.t === 'automatonResult'){
+        if (msg.error) showServerToast('warn', LANG === 'en' ? 'Approach the portal or the matching stairs. Finish any active trade or duel first.' : 'Aproxime-se do portal ou da escada correspondente. Encerre uma troca ou duelo em andamento primeiro.', null, 4000);
     } else if (msg.t === 'interiorResult'){
         if (msg.error) showServerToast('warn', LANG === 'en' ? 'Approach the door to enter or leave. Finish any active trade or duel first.' : 'Aproxime-se da porta para entrar ou sair. Encerre uma troca ou duelo em andamento primeiro.', null, 4000);
     } else if (msg.t === 'dungeonResult'){
@@ -11152,14 +11166,14 @@ function drawMinimap(){
             const txt = document.getElementById('floorBadgeText');
             if (txt) txt.textContent = player._interior ? interiorLabel(currentInterior()) : player._expedition
                 ? (player._expedition === 'forja_esquecida' ? (LANG === 'en' ? 'Forgotten Forge · Solo' : 'Forja Esquecida · Solo') : (LANG === 'en' ? 'Ruins of the Forge · Solo' : 'Ruínas da Forja · Solo'))
-                : tr('hud.floor', { floor: f });
+                : player._automaton ? `${LANG === 'en' ? 'Automaton Complex' : 'Complexo dos Autômatos'} · ${tr('hud.floor', {floor:player._dungeonDepth})}` : tr('hud.floor', { floor: f });
             if (player._expedition || player._interior){
                 fb.style.borderColor = '#d89452';
                 fb.style.boxShadow = '0 2px 12px rgba(185,88,30,.45)';
                 if (fb.style.display === 'none') fb.style.display = '';
                 return;
             }
-            const t = Math.min(1, (f - 1) / Math.max(1, DUNGEON_TINT_FULL_C - 1));
+            const t = Math.min(1, ((player._automaton ? player._dungeonDepth : f) - 1) / Math.max(1, DUNGEON_TINT_FULL_C - 1));
             fb.style.borderColor = `rgb(${Math.round(110 + 90*t)},${Math.round(58 - 28*t)},${Math.round(130 - 20*t)})`;
             fb.style.boxShadow = `0 2px 12px rgba(${Math.round(110 + 90*t)},20,90,0.45)`;
             if (fb.style.display === 'none') fb.style.display = '';
@@ -13905,8 +13919,12 @@ function tickProjectiles(dt){
 function drawDayNightTint(day){
     // M4 3b polish: na masmorra, banho de cor (roxo→vermelho) que cresce com o andar
     // — ignora o ciclo dia/noite (a masmorra não vê o céu).
-    const dFloor = (player && player.floor) || 0;
+    const dFloor = player._automaton ? player._dungeonDepth : (player && player.floor) || 0;
     if (player._interior) return;
+    if (player._automaton){
+        ctx.save();ctx.fillStyle='rgba(16,76,88,0.10)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);ctx.restore();return;
+    }
     if (player._expedition){
         ctx.save(); ctx.fillStyle='rgba(126,58,23,0.10)';
         ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore();
@@ -13942,7 +13960,7 @@ function drawLighting(cam, day){
     if (!player || player.renderX == null) return;  // guard: só pinta com player carregado
     const px0 = Math.floor(player.x), py0 = Math.floor(player.y);
     const playerInCave = inCave(px0, py0);
-    const dFloor = player.floor || 0;
+    const dFloor = player._automaton ? player._dungeonDepth : player.floor || 0;
     const caveLike = playerInCave || dFloor >= 1;
     // masmorra: escurece e esquenta por profundidade; caverna: sempre escura;
     // fora delas, segue o ciclo dia/noite.
@@ -13951,6 +13969,8 @@ function drawLighting(cam, day){
     let lightScale = 1;
     if (player._interior){
         darkness=0.14; baseR=30; baseG=20; baseB=12; lightScale=1.4;
+    } else if (player._automaton){
+        darkness=.58+Math.min(.12,(dFloor-1)*.008);baseR=12;baseG=28;baseB=33;lightScale=1.2;
     } else if (player._expedition){
         darkness=0.52; baseR=42; baseG=20; baseB=12; lightScale=1.2;
     } else if (dFloor >= 1){
@@ -14809,6 +14829,9 @@ function nearbyWorldDoor(){
         return pos && Math.max(Math.abs(pos.x-player.x),Math.abs(pos.y-player.y)) <= 1 ? {room:inside,pos,exit:true} : null;
     }
     if (player.floor) return null;
+    const dungeon = window.ValadaresProgression?.automatonDungeon;
+    if (dungeon && Math.max(Math.abs(dungeon.npc.x-player.x),Math.abs(dungeon.npc.y-player.y)) <= 2)
+        return {dungeon,pos:dungeon.npc,exit:false};
     const expedition = window.ValadaresProgression?.robotExpedition;
     if (expedition && Math.max(Math.abs(expedition.npc.x-player.x),Math.abs(expedition.npc.y-player.y)) <= 2)
         return {expedition,pos:expedition.npc,exit:false};
@@ -14819,6 +14842,12 @@ let _lastDoorAction = -2000, _lastDoorPaint = 0;
 function interactWorldDoor(){
     const door = nearbyWorldDoor(), now = performance.now();
     if (!door || !ws || ws.readyState !== 1 || !_wsAuthed || now-_lastDoorAction < 800) return;
+    if (door.dungeon){
+        _lastDoorAction = now;
+        clearAllKeys();
+        ws.send(JSON.stringify({t:'automatonEnter'}));
+        return;
+    }
     if (door.expedition){
         _lastDoorAction = now;
         clearAllKeys();
@@ -14841,7 +14870,8 @@ function updateWorldDoor(){
     if (!button) return;
     button.hidden = (!door && !service) || document.getElementById('login')?.style.display !== 'none';
     if (!door && !service) return;
-    const label = service ? (LANG === 'en' ? {craft:'Use workbench',altar:'Use altar',dummy:'Train'} : {craft:'Usar bancada',altar:'Usar altar',dummy:'Treinar'})[service.kind] : door.expedition ? `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${LANG === 'en' ? door.expedition.nameEn : door.expedition.name}` : door.exit ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${interiorLabel(door.room)}`;
+    const route=door?.dungeon || door?.expedition;
+    const label = service ? (LANG === 'en' ? {craft:'Use workbench',altar:'Use altar',dummy:'Train'} : {craft:'Usar bancada',altar:'Usar altar',dummy:'Treinar'})[service.kind] : route ? `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${LANG === 'en' ? route.nameEn : route.name}` : door.exit ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : `${LANG === 'en' ? 'Enter' : 'Entrar'} · ${interiorLabel(door.room)}`;
     button.textContent = label + (document.body.classList.contains('touch') ? '' : ' [G]');
     const parent = canvas.parentElement, bounds = canvas.getBoundingClientRect(), container = parent.getBoundingClientRect();
     const actions = document.querySelector('.modern-actions'), actionBounds = actions?.getBoundingClientRect();
@@ -14868,6 +14898,13 @@ function checkDungeonStairs(x, y){
         }
     } else {
         const sUp = dunStairUp(), sDown = dunStairDown(), sTown = dunStairTown();
+        if (player._automaton){
+            const action=(sTown && x===sTown.x && y===sTown.y)?'automatonExit'
+                :(sUp && x===sUp.x && y===sUp.y)?'automatonAscend'
+                :(sDown && x===sDown.x && y===sDown.y)?'automatonDescend':null;
+            if (action){ _lastStairTrigger=now; try { ws.send(JSON.stringify({t:action})); } catch {} }
+            return;
+        }
         if (player._expedition){
             if ((sTown && x === sTown.x && y === sTown.y) || (sUp && x === sUp.x && y === sUp.y)){
                 _lastStairTrigger = now;
@@ -16562,6 +16599,7 @@ function logout(){
         weapon: null,
         appearance: AppearanceRules.normalizarAppearance(null),
         appearanceOwned: [],
+        _automaton: null, _dungeonDepth: 0,
         equipped: { weapon:null, offhand:null, armor:null, head:null, feet:null, neck:null, cosmetic:null },
         pet: null, pets: {},   // M6: pet equipado (flat) + mapa {key:{lvl,xp}} autoritativo do server
         inv: {}, chests: { b1:{}, b2:{}, b3:{}, b4:{} }, gold: 0,
@@ -17290,6 +17328,9 @@ window.ValadaresModernBridge = {
     getBuildings: () => window.ValadaresWorld.buildings,
     getInteriors: () => window.ValadaresWorld.interiors || [],
     getExpeditionEntrances: () => window.ValadaresProgression?.robotExpedition ? [window.ValadaresProgression.robotExpedition] : [],
+    getDungeonEntrances: () => window.ValadaresProgression?.automatonDungeon ? [window.ValadaresProgression.automatonDungeon] : [],
+    getDungeonTheme: () => player._automaton ? 'automaton_depths' : null,
+    getDungeonDepth: () => player._automaton ? player._dungeonDepth : (player.floor||0),
     getInterior: currentInterior,
     getAuras: () => auraEffects,
     getTrails: () => trails,
@@ -17718,13 +17759,15 @@ function loop(ts){
             drawStair(DUNGEON_STAIR_IN, true, tr('stair.enter'));
             const forge = window.ValadaresProgression?.robotExpedition;
             if (forge) drawStair(forge.npc, true, LANG === 'en' ? forge.nameEn : forge.name);
+            const automaton=window.ValadaresProgression?.automatonDungeon;
+            if (automaton) drawStair(automaton.npc, true, LANG==='en'?automaton.nameEn:automaton.name);
         } else {
             // Sem fundo: a escada de descida existe se o server mandou (stairs.down) —
             // o teto saiu do cliente. Rótulos via tr() (eram o último PT hardcoded da masmorra).
             const su = dunStairUp(), sd = dunStairDown();
             if (su) drawStair(su, false, player._interior ? (LANG === 'en' ? 'Return to village' : 'Sair para a vila') : player._expedition
                 ? (LANG === 'en' ? 'Exit expedition' : 'Sair da expedição')
-                : onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
+                : player._automaton && player._dungeonDepth===1 ? (LANG==='en'?'Return to portal':'Voltar ao portal') : onFloor === 1 ? tr('stair.exit_city') : tr('stair.up'));
             if (sd) drawStair(sd, true, tr('stair.down'));
             const town = dunStairTown();
             if (town){

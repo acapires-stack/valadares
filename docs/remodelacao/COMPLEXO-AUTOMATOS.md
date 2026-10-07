@@ -1,0 +1,11 @@
+# Complexo dos Autômatos
+
+Nova masmorra contínua em (23, 60), separada da Forja Esquecida (75, 33), Ruínas da Forja (78, 22) e Profundezas (83, 17). O acesso aparece no cenário, minimapa e painel Masmorras e expedições. Aproxime-se do portal e use G ou o botão Entrar. Não há nível mínimo nem pagamento de entrada.
+
+Os jogadores compartilham cada andar. A população segue o ritmo das Profundezas: nove patrulheiros comuns, reposição a cada oito segundos enquanto houver jogadores e um Guardião a cada cinco andares, com oito minutos entre mortes e reposição do chefe. Cada andar usa uma planta procedural diferente, com salas e corredores ligados; não é a repetição da expedição curta da Forja. A subida do primeiro andar retorna ao portal. Morte e reconexão seguem a recuperação para a zona segura. PvP segue o comportamento das Profundezas compartilhadas.
+
+Sentinelas, Construtos Esquecidos e Guardiões usam os modelos robóticos originais já integrados dos pacotes. A ambientação combina metal, ruínas e elementos Dungeon, com sinalização ciana e passagem livre. A Forja Esquecida permanece com sua missão curta e seus prêmios de conclusão; o Complexo usa combate, XP e loot contínuos, sem conceder novamente o prêmio de estreia da Forja.
+
+Os andares físicos 2001–2999 são separados dos andares das Profundezas, interiores, expedições e arena. Vida, dano, XP e rótulos usam a profundidade lógica 1–999. As mensagens próprias de entrada, descida e subida evitam redirecionar uma escada antiga para a nova DG. Grades e criaturas de andares vazios são descartadas; o chefe mantém o prazo de reposição durante o processo, mesmo com saída e retorno.
+
+Validação de 07/10/2026: 65 testes de servidor aprovados. No navegador, duas contas isoladas compartilharam os mesmos nove inimigos; clique 3D confirmou combate e loot, a população passou de nove para oito e voltou a nove, e o percurso normal confirmou entrada, descida, subida, saída e reentrada. Telas conferidas em 1440×900 e 844×390, sem erros JavaScript ou HTTP. O teste de navegador percorreu os andares 1 e 2; chefes e escalonamento foram verificados pelo teste conectado do servidor. Uma cópia isolada da versão af2f06c abriu os dados do candidato preservando gold, itens, aparência desbloqueada e recibo de compra.

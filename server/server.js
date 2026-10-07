@@ -1630,7 +1630,12 @@ const LOOT = {
         ['PART_FOGO', 0.10, 1, 1], ['PART_TROVAO', 0.10, 1, 1],
     ],
 };
-function rollLoot(mobType, luck, floor){
+// The continuous Automaton dungeon pays ordinary combat loot, not the short
+// Forge expedition's one-time fragment/axe reward.
+LOOT.FORGE_SENTRY = LOOT.ORC;
+LOOT.FORGE_CONSTRUCT = LOOT.GOLEM;
+LOOT.FORGE_WARDEN = LOOT.GOLEM_REI;
+function rollLoot(mobType, luck, floor, logicalDepth){
     const table = LOOT[mobType] || [];
     const lk = Math.max(0, luck || 0);   // Sortudo (t_luck): + chance relativa de ITENS (gold inalterado)
     // Masmorra escalável: o loot PAGA a profundidade (senão descer não compensa o
@@ -1639,8 +1644,10 @@ function rollLoot(mobType, luck, floor){
     // MAIS DEVAGAR que o HP do mob (+60%/andar), exceto o boss das bandas:
     // nele o ouro acompanha a escala de HP após o andar 5.
     // isDungeonFloor (não `>= 1`): arena 9000+ nunca escalaria loot.
-    const f = isDungeonFloor(floor || 0) ? (floor || 0) : 0;
-    const scaledDungeonBoss = mobType === DUNGEON_BOSS_TYPE && isBossFloor(f);
+    const f = isDungeonFloor(floor || 0) ? (floor || 0) :
+        isAutomatonFloor(floor || 0) && Number.isInteger(logicalDepth) ? logicalDepth : 0;
+    const scaledDungeonBoss = (mobType === DUNGEON_BOSS_TYPE && isBossFloor(f)) ||
+        (mobType === progression.automatonDungeon.boss && isAutomatonFloor(floor || 0) && f % DUNGEON_BOSS_EVERY === 0);
     const bossHpMult = scaledDungeonBoss
         ? (1 + DUNGEON_BOSS_SCALE * Math.max(0, f - DUNGEON_BOSS_EVERY)) : 1;
     const gMult = scaledDungeonBoss
@@ -1842,6 +1849,10 @@ const DUNGEON_BOSS_SPAWN = { x: 50, y: 42 };       // fallback de spawn do boss 
 // Toda lógica nova por-andar deve usar ISTO em vez de `f >= 1` — o padrão `f >= 1`
 // captura floors de arena (bug histórico do M7: mobs escalados spawnando na arena).
 function isDungeonFloor(f){ return f >= 1 && f <= DUNGEON_FLOOR_HARD_CAP; }
+const AUTOMATON_FLOOR_BASE = 2000;
+const AUTOMATON_DEPTH_CAP = 999;
+function isAutomatonFloor(f){ return f > AUTOMATON_FLOOR_BASE && f <= AUTOMATON_FLOOR_BASE + AUTOMATON_DEPTH_CAP; }
+function automatonDepth(f){ return isAutomatonFloor(f) ? f - AUTOMATON_FLOOR_BASE : 0; }
 // Andar de boss (banda): 5, 10, 15… O boss escala com DUNGEON_BOSS_SCALE.
 function isBossFloor(f){ return isDungeonFloor(f) && f % DUNGEON_BOSS_EVERY === 0; }
 // Sala jogável do andar (grid do cliente: CAVE de 40-60, parede em volta).
@@ -1896,7 +1907,7 @@ function dungeonRng(seed){
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
 }
-function genDungeonGrid(floor){
+function genDungeonGrid(floor,seedOffset=0){
     const { x0, y0, x1, y1 } = DUNGEON_REGION;
     const W = x1 - x0 + 1, H = y1 - y0 + 1;
     const sx = DUNGEON_SPAWN.x - x0, sy = DUNGEON_SPAWN.y - y0;   // chegada em coords locais
@@ -1906,7 +1917,7 @@ function genDungeonGrid(floor){
     // Gera caverna; cada tentativa muda o seed. wall[i]=1 parede, 0 chão.
     let wall = null;
     for (let attempt = 0; attempt < 6 && !wall; attempt++){
-        const rng = dungeonRng((floor * 0x9E3779B1) ^ (attempt * 0x85EBCA77));
+        const rng = dungeonRng(((floor + seedOffset) * 0x9E3779B1) ^ (attempt * 0x85EBCA77));
         const w = new Uint8Array(W * H);
         for (let ly = 0; ly < H; ly++) for (let lx = 0; lx < W; lx++)
             w[idx(lx, ly)] = (lx === 0 || ly === 0 || lx === W - 1 || ly === H - 1 || rng() < 0.45) ? 1 : 0;
@@ -2612,7 +2623,7 @@ function bumpMobAwayFrom(x, y, floor){
         return;
     }
 }
-function spawnMob(type, x, y, floor){
+function spawnMob(type, x, y, floor, logicalDepth){
     const def = MTYPE[type];
     if (!def) return null;
     if (isTransitionTile(floor || 0, x, y)) return null;   // nunca spawna em cima de escada/chegada
@@ -2625,12 +2636,15 @@ function spawnMob(type, x, y, floor){
     // Fase 3: mobs comuns escalam por profundidade da masmorra (+60%/andar; andar 1 = base).
     // isDungeonFloor (não `>= 1`): floor de arena (9000+) nunca escala — defesa extra
     // além do guard de spawnDungeonMobs.
-    const fMult = (!def.unique && isDungeonFloor(floor || 0)) ? (1 + DUNGEON_FLOOR_SCALE * ((floor || 0) - 1)) : 1;
+    const scaleDepth = isDungeonFloor(floor || 0) ? floor :
+        isAutomatonFloor(floor || 0) && Number.isInteger(logicalDepth) ? logicalDepth : 0;
+    const fMult = (!def.unique && scaleDepth > 0) ? (1 + DUNGEON_FLOOR_SCALE * (scaleDepth - 1)) : 1;
     // Boss das Profundezas: escala pela BANDA (andar 5 = base ×1, igual antes; +30%/andar
     // além — andar 10 = ×2.5, 15 = ×4, 20 = ×5.5). Mais suave que a curva dos mobs
     // (×6.4 no 10) de propósito: a luta longa demais vira tédio, não desafio.
-    const bMult = (def.unique && type === DUNGEON_BOSS_TYPE && isDungeonFloor(floor || 0))
-        ? (1 + DUNGEON_BOSS_SCALE * Math.max(0, (floor || 0) - DUNGEON_BOSS_EVERY)) : 1;
+    const bMult = (def.unique && ((type === DUNGEON_BOSS_TYPE && isDungeonFloor(floor || 0)) ||
+        (type === progression.automatonDungeon.boss && isAutomatonFloor(floor || 0) && scaleDepth % DUNGEON_BOSS_EVERY === 0)))
+        ? (1 + DUNGEON_BOSS_SCALE * Math.max(0, scaleDepth - DUNGEON_BOSS_EVERY)) : 1;
     const hp  = def.unique ? Math.round(def.hp  * (1 + k * 0.15) * bMult) : Math.round(def.hp  * fMult);
     const dmg = def.unique ? Math.round(def.dmg * (1 + k * 0.10) * bMult) : Math.round(def.dmg * fMult);
     const xp  = def.unique ? Math.round(def.xp  * (1 + k * 0.20) * bMult) : Math.round(def.xp  * fMult);
@@ -2644,6 +2658,7 @@ function spawnMob(type, x, y, floor){
         intel: def.intel || 1,
         lastMoveAt: 0, lastAttackAt: 0,
     };
+    if (isAutomatonFloor(floor || 0) && scaleDepth > 0){m.automaton=true;m.automatonDepth=scaleDepth;}
     monsters.set(m.id, m);
     return m;
 }
@@ -2786,9 +2801,10 @@ function enterDungeonFloor(p, id, floor, dir){
 // (players/mobs/loot). Usado ao sair pela escada (andar 1) E ao MORRER na masmorra
 // — sem isto a morte só teleportava x/y pra (50,50) mantendo p.floor no andar, então
 // o player renascia DENTRO da masmorra colado no boss e o AI do andar seguia batendo. (#5)
-function returnPlayerToTown(p, id, returnToExpeditionEntrance=false){
+function returnPlayerToTown(p, id, returnToExpeditionEntrance=false, returnToAutomatonEntrance=false){
     const returnPoint=returnToExpeditionEntrance && p.expedition?.id===progression.robotExpedition.id
-        ? progression.robotExpedition.npc : DUNGEON_RETURN;
+        ? progression.robotExpedition.npc : returnToAutomatonEntrance && p.automaton
+            ? progression.automatonDungeon.npc : DUNGEON_RETURN;
     if ((p.floor || 0) > 0) broadcast(id, { t:'leave', id }, p.floor);   // some do andar
     if (p.expedition){
         const floor=p.expedition.floor;
@@ -2796,6 +2812,7 @@ function returnPlayerToTown(p, id, returnToExpeditionEntrance=false){
         dungeonFloors.delete(floor);
         p.expedition=null;
     }
+    p.automaton=null;
     p.pvp = !!p._pvpBeforeDungeon;
     p.floor = 0;
     p.x = returnPoint.x; p.y = returnPoint.y;
@@ -3725,7 +3742,7 @@ function saveStateToDisk(){
             archive: seasonState.archive,
         },
         guilds: Array.from(guilds.values()),
-        monsters: Array.from(monsters.values()).filter(m => !m.expedition).map(m => ({
+        monsters: Array.from(monsters.values()).filter(m => !m.expedition && !m.automaton && !isAutomatonFloor(m.floor||0)).map(m => ({
             id:m.id, type:m.type, x:m.x, y:m.y, dir:m.dir,
             hp:m.hp, maxHp:m.maxHp, dmg:m.dmg, speed:m.speed, xp:m.xp,
             aggro:m.aggro, unique:m.unique, level:m.level, floor:m.floor||0,
@@ -3796,7 +3813,7 @@ function loadStateFromDisk(){
         let _dropped = 0;
         if (Array.isArray(d.monsters)){
             for (const m of d.monsters){
-                if (m.floor >= 8000 && m.floor < 9000) continue;
+                if ((m.floor >= 8000 && m.floor < 9000) || isAutomatonFloor(m.floor || 0)) continue;
                 // População COMUM do overworld não persiste (fix superpopulação 12/06):
                 // o estado vivo acumulava 5× o design (667 vs ~140 — mobs orbitando fora
                 // das regiões inflavam o respawn, ver count por âncora no tickRespawns)
@@ -4617,6 +4634,7 @@ setInterval(safeTick('tickAI', tickAI), TICK_AI_MS);
 setInterval(safeTick('broadcastMobs', broadcastMobs), SNAPSHOT_MS);
 setInterval(safeTick('tickRespawns', tickRespawns), 1000);
 setInterval(safeTick('spawnDungeonMobs', spawnDungeonMobs), 8000);   // M4: repõe mobs do andar
+setInterval(safeTick('spawnAutomatonMobs', spawnAutomatonMobs), 8000); // DG robótica: 9 comuns/andar
 spawnDungeonMobs();   // popula o andar 1 no boot
 setInterval(safeTick('tickPartyHp', tickPartyHp), 3000);   // HP da party no widget
 
@@ -4968,7 +4986,7 @@ function grantMobLoot(m, killer){
         : ((killer?.permaBuffs?.rareLuck || 0) + (killer ? petBuffVal(killer, 'rareLuck') : 0));
     const goldBonus = isBoss ? bossRewardBonus(contributors, 'lootBonus')
         : ((killer?.permaBuffs?.lootBonus || 0) + (killer ? petBuffVal(killer, 'lootBonus') : 0));
-    const loot = rollLoot(m.type, luck, m.floor);
+    const loot = rollLoot(m.type, luck, m.floor, m.automatonDepth);
     if (goldBonus > 0){
         for (const it of loot){
             if (it.type === 'GOLD' && it.qty > 0) it.qty = Math.max(1, Math.round(it.qty * (1 + goldBonus)));
@@ -5086,6 +5104,8 @@ function handleMobDeath(m, killerId){
             checkMegaBossSpawn();
         } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da banda: cooldown + checkpoint + ranking (caminho único)
             onDungeonBossDeath(m, players.get(killerId));
+        } else if (m.automaton && m.type === progression.automatonDungeon.boss){
+            onAutomatonBossDeath(m);
         }
     }
     // Hunter HL: se foi o último caçador do target, credita bonus
@@ -5952,6 +5972,70 @@ function genForgeGrid(floor){
     }
     const stairs={spawn:{x:43,y:50},up:{x:43,y:50},down:null,town:null,boss:{x:70,y:50}};
     return {floor,region,rows,walkable,floorTiles,stairs};
+}
+// Shared robot dungeon. The physical floor is 2000 + logical depth; never use
+// that physical ID as a combat multiplier or as a Profundezas ranking depth.
+const automatonBossDeath = new Map(); // physical floor -> last Warden kill
+function genAutomatonGrid(floor){
+    const depth=automatonDepth(floor);
+    const g=genDungeonGrid(depth,1000);
+    g.floor=floor;
+    g.stairs.town=null; // own return protocol; never expose an inactive Profundezas town stair
+    return g;
+}
+function spawnAutomatonMobs(){
+    const occupied=new Set();
+    for(const p of players.values())if(isAutomatonFloor(p.floor||0))occupied.add(p.floor);
+    for(const m of [...monsters.values()])if(isAutomatonFloor(m.floor||0)&&!occupied.has(m.floor))monsters.delete(m.id);
+    for(const floor of [...dungeonFloors.keys()])if(isAutomatonFloor(floor)&&!occupied.has(floor))dungeonFloors.delete(floor);
+    for(const floor of occupied){
+        const depth=automatonDepth(floor);
+        let g=dungeonFloors.get(floor);
+        if(!g){g=genAutomatonGrid(floor);dungeonFloors.set(floor,g);}
+        if(depth%DUNGEON_BOSS_EVERY===0){
+            const alive=[...monsters.values()].some(m=>m.floor===floor&&m.type===progression.automatonDungeon.boss&&m.hp>0);
+            if(!alive&&Date.now()-(automatonBossDeath.get(floor)||0)>=DUNGEON_BOSS_RESPAWN_MS){
+                const m=spawnMob(progression.automatonDungeon.boss,g.stairs.boss.x,g.stairs.boss.y,floor,depth);
+                if(m)automatonBossDeath.delete(floor);
+            }
+        }
+        let count=0;
+        for(const m of monsters.values())if(m.floor===floor&&m.hp>0&&!m.unique)count++;
+        const blocked=new Set();
+        for(const s of [g.stairs.spawn,g.stairs.up,g.stairs.down,g.stairs.boss]){
+            if(s)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)blocked.add((s.x+dx)+','+(s.y+dy));
+        }
+        let tries=0;
+        while(count<DUNGEON_MOB_TARGET&&tries++<120){
+            const t=g.floorTiles[Math.floor(Math.random()*g.floorTiles.length)];
+            if(!t||blocked.has(t.x+','+t.y)||mobAt(t.x,t.y,floor))continue;
+            const mix=depth>=10?['FORGE_SENTRY','FORGE_CONSTRUCT','FORGE_CONSTRUCT']:
+                ['FORGE_SENTRY','FORGE_SENTRY','FORGE_CONSTRUCT'];
+            if(spawnMob(mix[Math.floor(Math.random()*mix.length)],t.x,t.y,floor,depth))count++;
+        }
+    }
+}
+function enterAutomatonFloor(p,id,depth,dir){
+    const oldFloor=p.floor||0;
+    if(oldFloor>0)broadcast(id,{t:'leave',id},oldFloor);
+    const floor=AUTOMATON_FLOOR_BASE+depth;
+    p.floor=floor;p.automaton=progression.automatonDungeon.id;
+    let g=dungeonFloors.get(floor);
+    if(!g){g=genAutomatonGrid(floor);dungeonFloors.set(floor,g);}
+    const arrival=dir==='up'&&g.stairs.down?g.stairs.down:g.stairs.spawn;
+    p.x=arrival.x;p.y=arrival.y;
+    spawnAutomatonMobs();
+    sendTo(id,{t:'dungeonEnter',movement:movementSnapshot(p,true),automaton:p.automaton,depth,
+        floor,dir,x:p.x,y:p.y,pvp:true,grid:{region:g.region,rows:g.rows},stairs:g.stairs,
+        players:snapshotPlayers(floor).filter(sp=>sp.id!==id),mobs:snapshotMobs(floor),
+        groundDrops:snapshotGroundDrops(floor)});
+    broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,pvp:true,
+        hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,cosmetic:p.cosmetic||null,pet:p.pet||null,
+        badges:p.badges||[],dyes:p.dyes||null,appearance:appearanceRules.normalizarAppearance(p.appearance),
+        guild:findGuildOfPlayer(p.name)?.name||null}},floor);
+}
+function onAutomatonBossDeath(m){
+    automatonBossDeath.set(m.floor,Date.now());
 }
 function expeditionStatus(p){
     const e=p.expedition;
@@ -8582,6 +8666,42 @@ wss.on('connection', (ws, request) => {
             sendExpeditionStatus(p);
             return;
         }
+        if (msg.t === 'automatonEnter') {
+            const door=progression.automatonDungeon.npc;
+            if(p.floor!==0 || !(p.hp>0) || p.duel || p.arena || p.expedition || p.tradeId){
+                sendTo(id,{t:'automatonResult',ok:false,error:'unavailable'});return;
+            }
+            if(chebyshev(p.x,p.y,door.x,door.y)>2){
+                sendTo(id,{t:'automatonResult',ok:false,error:'not_at_entrance'});return;
+            }
+            broadcast(id,{t:'leave',id},0);
+            p._pvpBeforeDungeon=!!p.pvp;
+            p.pvp=true;
+            enterAutomatonFloor(p,id,1,'down');
+            return;
+        }
+        if (msg.t === 'automatonDescend' || msg.t === 'automatonAscend' || msg.t === 'automatonExit') {
+            const depth=automatonDepth(p.floor||0);
+            if(!depth || p.automaton!==progression.automatonDungeon.id){
+                sendTo(id,{t:'automatonResult',ok:false,error:'not_in_automaton'});return;
+            }
+            const now=Date.now();
+            if(now-(p._lastAutomatonFloorAt||0)<600){
+                sendTo(id,{t:'automatonResult',ok:false,error:'too_fast'});return;
+            }
+            const g=dungeonFloors.get(p.floor);
+            const down=msg.t==='automatonDescend';
+            const stair=down?g?.stairs.down:g?.stairs.up;
+            if(!stair || chebyshev(p.x,p.y,stair.x,stair.y)>1){
+                sendTo(id,{t:'automatonResult',ok:false,error:'not_at_stair'});return;
+            }
+            p._lastAutomatonFloorAt=now;
+            if(msg.t==='automatonExit' || (msg.t==='automatonAscend' && depth===1)){
+                returnPlayerToTown(p,id,false,true);return;
+            }
+            enterAutomatonFloor(p,id,depth+(down?1:-1),down?'down':'up');
+            return;
+        }
         if (msg.t === 'enterInterior') {
             const room=interiorsById.get(msg.id);
             if (!room){ sendTo(id,{t:'interiorResult',ok:false,error:'unknown_interior'}); return; }
@@ -8982,6 +9102,8 @@ wss.on('connection', (ws, request) => {
                         checkMegaBossSpawn();
                     } else if (m.type === DUNGEON_BOSS_TYPE) {   // boss da banda: cooldown + checkpoint + ranking (caminho único)
                         onDungeonBossDeath(m, p);
+                    } else if (m.automaton && m.type === progression.automatonDungeon.boss){
+                        onAutomatonBossDeath(m);
                     }
                 }
                 monsters.delete(m.id);
@@ -9778,7 +9900,7 @@ wss.on('connection', (ws, request) => {
         }
         // Body stays: mantém ghost por GHOST_TIMEOUT_MS, atacável e droppable
         if (p.disconnected){ players.delete(id); return; }
-        if (p.expedition) returnPlayerToTown(p,id);
+        if (p.expedition || p.automaton) returnPlayerToTown(p,id);
         // Se o player nunca chegou a logar (WS caiu antes do join), só remove — não vira ghost órfão sem nome
         if (!p.name || p.name === 'Anônimo'){
             // Mas ainda pode ter autenticado — usa authedName se houver

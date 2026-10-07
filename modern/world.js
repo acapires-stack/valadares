@@ -16,7 +16,8 @@ const PAL = {
  ember:['#f0a34c','#f8c065'], window:['#d8bc7d'], mortar:['#9e9683'],
  clay:['#b46b4c','#bd7654','#ad6246'], dark:['#302f35','#47444a'], roof:['#a65d40','#b46a49'],
  forgeFloor:['#434a47','#4a514c','#3b4341'], forgeWall:['#59615a','#4d5651'],
- forgeSteel:['#646d68','#77827a'], forgeGlow:['#ef8c42','#f6ae54']
+ forgeSteel:['#646d68','#77827a'], forgeGlow:['#ef8c42','#f6ae54'],
+ automatonGlow:['#68cfc4','#91ded1']
 };
 const hash=(x,z,s=0)=>{let n=Math.imul(x+1013,374761393)+Math.imul(z+37,668265263)+Math.imul(s+7,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295;};
 const hexColor=(pc,hex)=>new pc.Color().fromString(hex);
@@ -58,14 +59,15 @@ export function createWorld(pc,app,bridge){
  const root=new pc.Entity('Terreno de Valadares');app.root.addChild(root);
  const scenery=createScenery(pc,app);
  const houses=bridge.getBuildings?.()||[];
- const materials=new Map(),textures=[],chunks=new Map();let mapRef=null,floor=-1,propSignature='',expeditionTheme=null,entrancePosition=null,created=0,waterClock=0,sceneryVersion=-1;
+ const materials=new Map(),textures=[],chunks=new Map();let mapRef=null,floor=-1,propSignature='',expeditionTheme=null,dungeonTheme=null,entrancePosition=null,dungeonEntrances=[],created=0,waterClock=0,sceneryVersion=-1;
  function mat(name,variant=0){const key=name+':'+variant;if(materials.has(key))return materials.get(key);const colors=PAL[name]||PAL.stone,hex=colors[variant%colors.length],m=new pc.StandardMaterial(),textured=['grass','dirt','stone','cave','snow','sand','cliff','roof','water','forgeFloor'].includes(name);m.diffuse=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.ambient=textured?new pc.Color(1,1,1):hexColor(pc,hex);m.gloss=(name==='water'||name==='jade')?.45:.1;m.useMetalness=true;m.metalness=name==='copper'?.55:name==='forgeSteel'?.35:0;
   if(textured){const tex=noiseTexture(pc,app.graphicsDevice,hex,name);textures.push(tex);m.diffuseMap=tex;}
-   if(name==='ember'||name==='jade'||name==='window'||name==='forgeGlow'){m.emissive=hexColor(pc,hex);m.emissiveIntensity=name==='ember'?1.6:name==='forgeGlow'?1.15:name==='window'?.32:.45;}
+   if(name==='ember'||name==='jade'||name==='window'||name==='forgeGlow'||name==='automatonGlow'){m.emissive=hexColor(pc,hex);m.emissiveIntensity=name==='ember'?1.6:name==='forgeGlow'||name==='automatonGlow'?1.15:name==='window'?.32:.45;}
   m.update();materials.set(key,m);return m;}
  const kind={0:'grass',1:'dirt',2:'grass',3:'water',4:'stone',5:'cave',6:'cave',7:'snow',8:'sand'};
  const get=(map,x,z)=>x<0||z<0||x>=bridge.M_W||z>=bridge.M_H?6:(map[z]?.[x]??6);
  const forgotten=()=>floor>=8000&&floor<9000&&expeditionTheme==='forja_esquecida';
+ const automaton=()=>floor>=2001&&floor<3000&&dungeonTheme==='automaton_depths';
  function forgottenTile(groups,map,x,z,node){
   const t=get(map,x,z),cx=x+.5,cz=z+.5,g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
   if(t===5){
@@ -98,13 +100,38 @@ export function createWorld(pc,app,bridge){
   if(south&&((x===45&&z===56)||(x===61&&z===57)||(x===71&&z===55)))
    scenery.place('rubble',node,cx,height+.03,cz,.29,hash(x,z,51)*360,false);
  }
+ function automatonTile(groups,map,x,z,node){
+  const t=get(map,x,z),cx=x+.5,cz=z+.5,g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
+  if(t===5){
+   // Sparse flush maintenance seams give wayfinding without a tiled checkerboard.
+   if(hash(x,z,61)>.965){
+    g('forgeSteel',0).box(cx,-.024,cz,.38,.005,.035);
+    for(const side of [-1,1])g('copper',0).box(cx+side*.16,-.015,cz,.022,.004,.022);
+   }
+   if(hash(x,z,64)>.988)g('automatonGlow',0).box(cx,-.014,cz,.30,.004,.014);
+   return;
+  }
+  if(t!==6)return;
+  const edge=[[0,-1,0],[1,0,90],[0,1,180],[-1,0,270]].find(([dx,dz])=>get(map,x+dx,z+dz)===5);
+  if(!edge)return;
+  // A low front edge keeps the floor visible. Structural pieces stay on blocked tiles.
+  const front=get(map,x,z-1)===5,height=(front ? .25 : .68)+(hash(x,z,65)-.5)*.12;
+  g('forgeWall',Math.floor(hash(x,z,65)*2)).box(cx,-.035,cz,.94,height,.94);
+  g('forgeSteel',0).box(cx,height-.035,cz,.98,.055,.98);
+  if(hash(x,z,66)>.62){
+   const strip=g(hash(x,z,67)>.25?'copper':'automatonGlow',0);
+   strip.box(cx,height+.022,cz,.33,.016,.055);
+  }
+  if(hash(x,z,68)>.84)scenery.place(front?'rubble':hash(x,z,69)>.5?'crackedWall':'pillar',node,cx,height+.02,cz,front ? .18 : .24,edge[2],false);
+ }
  function drawTile(groups,map,x,z,isDungeon,house,node){
-  const t=get(map,x,z),v=Math.floor(hash(x,z,1)*3),name=forgotten()?(t===5?'forgeFloor':'forgeWall'):(kind[t]||'grass'),g=(k,variant=0)=>{const key=k+':'+variant;let p=groups.get(key);if(!p){p=new Geometry();groups.set(key,p);}return p;};
+  const t=get(map,x,z),v=Math.floor(hash(x,z,1)*3),name=forgotten()?(t===5?'forgeFloor':'forgeWall'):automaton()?(t===5?'forgeFloor':t===6?'forgeWall':kind[t]||'grass'):(kind[t]||'grass'),g=(k,variant=0)=>{const key=k+':'+variant;let p=groups.get(key);if(!p){p=new Geometry();groups.set(key,p);}return p;};
   const cx=x+.5,cz=z+.5,edge=.501;
   // World-space UVs keep the same broad, soft texture across tile boundaries.
   const ground=g(name,0),surface=t===3?.004:-.035,u=x/10,q=z/10;
   ground.quad([cx-edge,surface,cz-edge],[cx-edge,surface,cz+edge],[cx+edge,surface,cz+edge],[cx+edge,surface,cz-edge],[u,q,u,q+.1,u+.1,q+.1,u+.1,q]);
   if(forgotten()){forgottenTile(groups,map,x,z,node);return;}
+  if(automaton()){automatonTile(groups,map,x,z,node);return;}
   // The paving is drawn by one world-aligned irregular stone texture; raised
   // squares at every tile made the plaza read as a repeated board.
   if(t===0){const nearRoad=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dz])=>[1,4].includes(get(map,x+dx,z+dz))),roll=hash(x,z,9);
@@ -391,6 +418,54 @@ export function createWorld(pc,app,bridge){
   const light=new pc.Entity('Luz da entrada da Forja');light.addComponent('light',{type:'omni',color:hexColor(pc,'#f0a36b'),intensity:.35,range:2.7,castShadows:false});
   light.setPosition(x,1.25,z+.32);node.addChild(light);
  }
+ function automatonEntrance(groups,node,tileX,tileY){
+  // A separate, cool-steel entrance; the tile and all neighbors keep their server collision.
+  const x=tileX+.5,z=tileY+.13,g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
+  const floorPlate=g('forgeFloor',1),steel=g('forgeSteel',1),dark=g('dark',0),copper=g('copper',0),glow=g('automatonGlow',0);
+  floorPlate.box(x,-.025,tileY+.53,.9,.009,.8);
+  for(const side of [-1,1]){
+   glow.box(x+side*.38,-.012,tileY+.53,.022,.004,.65);
+   steel.box(x+side*.51,-.018,z,.16,.11,.25);
+   steel.box(x+side*.51,.09,z,.12,1.31,.17);
+   copper.box(x+side*.51,.32,z+.09,.13,.035,.018);
+   glow.box(x+side*.51,1.17,z+.095,.08,.11,.028);
+  }
+  steel.box(x,1.35,z,1.16,.16,.19);
+  dark.box(x,1.53,z,1.42,.29,.24);
+  // Square cog crest reads at gameplay zoom without tiny textured lettering.
+  for(const side of [-1,1]){
+   glow.box(x+side*.22,1.62,z+.14,.045,.13,.03);
+   glow.box(x+side*.12,1.72,z+.14,.12,.045,.03);
+  }
+  copper.box(x,1.55,z+.142,.56,.025,.03);
+  const light=new pc.Entity('Luz da entrada do Complexo');light.addComponent('light',{type:'omni',color:hexColor(pc,'#72d4c5'),intensity:.4,range:2.7,castShadows:false});
+  light.setPosition(x,1.25,z+.32);node.addChild(light);
+ }
+ function automatonFeatures(groups,map,node,cx,cz){
+  const g=(k,v=0)=>{const key=k+':'+v;let geo=groups.get(key);if(!geo){geo=new Geometry();groups.set(key,geo);}return geo;};
+  const used=new Set();
+  for(const [direction,stair] of Object.entries(bridge.getStairs?.()||{})){
+   const x=Number(stair?.x),z=Number(stair?.y);
+   if(!Number.isInteger(x)||!Number.isInteger(z)||Math.floor(x/CHUNK)!==cx||Math.floor(z/CHUNK)!==cz||get(map,x,z)!==5)continue;
+   if(['up','down','town'].includes(direction)){
+    const ring=g(direction==='down'?'automatonGlow':'copper',0),px=x+.5,pz=z+.5;
+    for(const side of [-1,1]){
+     ring.box(px+side*.35,-.009,pz,.025,.005,.72);
+     ring.box(px,-.009,pz+side*.35,.72,.005,.025);
+    }
+   }
+   const asset={up:'crates',down:'scaffold',boss:'pillar'}[direction];
+   if(!asset)continue;
+   const candidates=[];
+   for(let wz=Math.max(cz*CHUNK,z-5);wz<Math.min((cz+1)*CHUNK,z+6);wz++)for(let wx=Math.max(cx*CHUNK,x-5);wx<Math.min((cx+1)*CHUNK,x+6);wx++){
+    if(get(map,wx,wz)!==6||![[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dz])=>get(map,wx+dx,wz+dz)===5)||used.has(`${wx}:${wz}`))continue;
+    candidates.push({x:wx,z:wz,score:Math.abs(wx-x)+Math.abs(wz-z)+hash(wx,wz,74)*.3});
+   }
+   candidates.sort((a,b)=>a.score-b.score);
+   const target=candidates[0];
+   if(target){used.add(`${target.x}:${target.z}`);scenery.place(asset,node,target.x+.5,.18,target.z+.5,direction==='boss' ? .28 : .31,hash(target.x,target.z,75)*360,false);}
+  }
+ }
  function build(cx,cz,map){const groups=new Map(),node=new pc.Entity(`Setor ${cx},${cz}`),props=floor===0?(bridge.getProps?.()||[]):[];node._worldMeshes=[];
   const valid=floor===0?houses.filter(h=>{for(let z=h.y;z<h.y+h.h;z++)for(let x=h.x;x<h.x+h.w;x++)if(get(map,x,z)!==2)return false;return true;}):[];
   for(let z=cz*CHUNK;z<(cz+1)*CHUNK;z++)for(let x=cx*CHUNK;x<(cx+1)*CHUNK;x++){if(x<0||z<0||x>=bridge.M_W||z>=bridge.M_H)continue;
@@ -398,16 +473,19 @@ export function createWorld(pc,app,bridge){
    const underHouse=valid.some(h=>x>=h.x&&x<h.x+h.w&&z>=h.y&&z<h.y+h.h);drawTile(groups,map,x,z,floor>0,underHouse,node);seam(groups,map,x,z,'x');seam(groups,map,x,z,'z');}
   if(floor>=1000&&floor<=1003&&cx===4&&cz===4)interiorFurnishings(groups,node,interiorRoom());
   if(forgotten())forgottenFeatures(groups,node,cx,cz);
+  if(automaton())automatonFeatures(groups,map,node,cx,cz);
   if(floor===0&&entrancePosition&&cx===Math.floor(entrancePosition.x/CHUNK)&&cz===Math.floor(entrancePosition.y/CHUNK))forgeEntrance(groups,node,entrancePosition.x,entrancePosition.y);
+  if(floor===0)for(const entry of dungeonEntrances)if(cx===Math.floor(entry.x/CHUNK)&&cz===Math.floor(entry.y/CHUNK))automatonEntrance(groups,node,entry.x,entry.y);
   for(const h of valid)if(Math.floor((h.x+h.w/2)/CHUNK)===cx&&Math.floor((h.y+h.h/2)/CHUNK)===cz)house(groups,h,node);
   for(const p of props)if(Math.floor(p.x/CHUNK)===cx&&Math.floor(p.y/CHUNK)===cz)prop(groups,p,node);
   for(const [key,geo]of groups){const mesh=geo.finish(pc,app.graphicsDevice);if(!mesh)continue;node._worldMeshes.push(mesh);const e=new pc.Entity(key);e.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,mat(...key.split(':').map((v,i)=>i?Number(v):v)))],castShadows:true,receiveShadows:true});node.addChild(e);}
   root.addChild(node);chunks.set(`${cx}:${cz}`,node);created++;
  }
  function drop(e){e.destroy();for(const mesh of e._worldMeshes||[])mesh.destroy();}
- function update(dt){waterClock+=dt;const water=materials.get('water:0');if(water&&waterClock>=.08){water.diffuseMapOffset.x=(water.diffuseMapOffset.x+waterClock*.007)%1;water.diffuseMapOffset.y=(water.diffuseMapOffset.y+waterClock*.003)%1;water.update();waterClock=0;}const map=bridge.getMap?.(),p=bridge.getPlayer?.();if(!map||!p)return;const nextFloor=bridge.getFloor?.()??p.floor??0,nextExpedition=bridge.getExpedition?.()||null,entry=(bridge.getExpeditionEntrances?.()||[]).find(item=>item?.id==='forja_esquecida')?.npc,ex=Number(entry?.x),ey=Number(entry?.y),nextEntrance=Number.isInteger(ex)&&Number.isInteger(ey)?{x:ex,y:ey}:null,props=nextFloor===0?(bridge.getProps?.()||[]):[],services=nextFloor>=1000&&nextFloor<=1003?(interiorRoom(nextFloor)?.services||[]):[],sig=[...props,...services].map(p=>`${p.key||p.kind}:${p.x}:${p.y}`).concat(nextEntrance?`forge:${ex}:${ey}`:'forge:none').join('|');
+ function update(dt){waterClock+=dt;const water=materials.get('water:0');if(water&&waterClock>=.08){water.diffuseMapOffset.x=(water.diffuseMapOffset.x+waterClock*.007)%1;water.diffuseMapOffset.y=(water.diffuseMapOffset.y+waterClock*.003)%1;water.update();waterClock=0;}const map=bridge.getMap?.(),p=bridge.getPlayer?.();if(!map||!p)return;const nextFloor=bridge.getFloor?.()??p.floor??0,nextExpedition=bridge.getExpedition?.()||null,nextDungeonTheme=bridge.getDungeonTheme?.()||null,entry=(bridge.getExpeditionEntrances?.()||[]).find(item=>item?.id==='forja_esquecida')?.npc,ex=Number(entry?.x),ey=Number(entry?.y),nextEntrance=Number.isInteger(ex)&&Number.isInteger(ey)?{x:ex,y:ey}:null,nextDungeonEntrances=(bridge.getDungeonEntrances?.()||[]).filter(item=>item?.id==='complexo_automatos').map(item=>({x:Number(item.npc?.x),y:Number(item.npc?.y)})).filter(item=>Number.isInteger(item.x)&&Number.isInteger(item.y)),props=nextFloor===0?(bridge.getProps?.()||[]):[],services=nextFloor>=1000&&nextFloor<=1003?(interiorRoom(nextFloor)?.services||[]):[],sig=[...props,...services].map(p=>`${p.key||p.kind}:${p.x}:${p.y}`).concat(nextEntrance?`forge:${ex}:${ey}`:'forge:none',...nextDungeonEntrances.map(item=>`automaton:${item.x}:${item.y}`)).join('|');
   entrancePosition=nextEntrance;
-  if(map!==mapRef||nextFloor!==floor||nextExpedition!==expeditionTheme||sig!==propSignature||scenery.version!==sceneryVersion){for(const e of chunks.values())drop(e);chunks.clear();mapRef=map;floor=nextFloor;expeditionTheme=nextExpedition;propSignature=sig;sceneryVersion=scenery.version;}
+  dungeonEntrances=nextDungeonEntrances;
+  if(map!==mapRef||nextFloor!==floor||nextExpedition!==expeditionTheme||nextDungeonTheme!==dungeonTheme||sig!==propSignature||scenery.version!==sceneryVersion){for(const e of chunks.values())drop(e);chunks.clear();mapRef=map;floor=nextFloor;expeditionTheme=nextExpedition;dungeonTheme=nextDungeonTheme;propSignature=sig;sceneryVersion=scenery.version;}
   const cam=bridge.getCamera?.(),px=cam?cam.x+(bridge.VP_W||14)/2:p.x,pz=cam?cam.y+(bridge.VP_H||10)/2:p.y,bounds=bridge.getViewBounds?.()||{minX:px-REACH,maxX:px+REACH,minY:pz-REACH,maxY:pz+REACH};
   const fromX=Math.max(0,Math.floor(bounds.minX/CHUNK)),toX=Math.min(Math.ceil(bridge.M_W/CHUNK)-1,Math.floor(bounds.maxX/CHUNK)),fromZ=Math.max(0,Math.floor(bounds.minY/CHUNK)),toZ=Math.min(Math.ceil(bridge.M_H/CHUNK)-1,Math.floor(bounds.maxY/CHUNK));
   const wanted=new Set();for(let z=fromZ;z<=toZ;z++)for(let x=fromX;x<=toX;x++){const key=`${x}:${z}`;wanted.add(key);if(!chunks.has(key))build(x,z,map);}for(const [key,node]of chunks)if(!wanted.has(key)){drop(node);chunks.delete(key);}

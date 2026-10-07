@@ -25,6 +25,7 @@ export function createMinimap(canvas, legend, bridge) {
         const map = bridge.getMap?.();
         if (!player || !map) return;
         const floor = bridge.getFloor?.() ?? player.floor ?? 0;
+        const dungeonTheme = bridge.getDungeonTheme?.() || null;
         const interior = bridge.getInterior?.();
         const language = bridge.getLanguage?.() === 'en' ? 'en' : 'pt';
         const words = labels[language];
@@ -81,6 +82,10 @@ export function createMinimap(canvas, legend, bridge) {
                 mark(expedition.npc?.x, expedition.npc?.y,
                     language === 'en' ? expedition.nameEn : expedition.name, '#ffb55d', 'diamond');
             }
+            for (const dungeon of bridge.getDungeonEntrances?.() || []) {
+                mark(dungeon.npc?.x, dungeon.npc?.y,
+                    language === 'en' ? dungeon.nameEn : dungeon.name, '#75d7cd', 'diamond');
+            }
             for (const room of bridge.getInteriors?.() || []) {
                 mark(room.door?.x, room.door?.y,
                     roomNames[language]?.[room.id] || room.label || words.door, '#efce8f', 'diamond');
@@ -131,9 +136,11 @@ export function createMinimap(canvas, legend, bridge) {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('N', size - 14, 14);
 
         const near = marks.sort((a, b) => a.distance - b.distance).slice(0, 2).map(m => m.name);
+        const depth = Number(bridge.getDungeonDepth?.());
+        const automatonDescription = `${language === 'en' ? 'Automaton Complex · Floor' : 'Complexo dos Autômatos · Andar'} ${Number.isInteger(depth) && depth > 0 ? depth : floor - 2000}`;
         const description = interior
             ? (roomNames[language]?.[interior.id] || interior.label || (language === 'en' ? 'Interior' : 'Interior'))
-            : floor ? (language === 'en' ? `Floor ${floor}` : `Andar ${floor}`)
+            : floor ? (dungeonTheme === 'automaton_depths' ? automatonDescription : language === 'en' ? `Floor ${floor}` : `Andar ${floor}`)
                 : (language === 'en' ? 'Explored terrain' : 'Terreno descoberto');
         const legendText = near.length ? near.join(' · ') : description;
         if (legend.textContent !== legendText) legend.textContent = legendText;

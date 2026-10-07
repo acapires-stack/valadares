@@ -46,6 +46,8 @@ function fixture(options = {}){
         LOOT:{ TEST_BOSS:[['GOLD',1,100,100], ['RARE',0.05,1,1], ['GUARANTEED',1,1,1]] },
         MTYPE:{ TEST_BOSS:{unique:true} },
         isDungeonFloor:()=>false, DUNGEON_LOOT_SCALE:0, DUNGEON_ITEM_LUCK_SCALE:0,
+        isAutomatonFloor:()=>false,
+        progression:{ automatonDungeon:{ boss:'FORGE_WARDEN' } },
         equipmentRules:{ MATERIAL:'ESSENCE' },
         SAVE_CAPS:{ invKeys:250 }, LOOT_LOCK_MS:30000,
         BOSSES:[], MEGA_BOSS_TYPE:'OTHER_MEGA', DUNGEON_BOSS_TYPE:'OTHER_DUNGEON',

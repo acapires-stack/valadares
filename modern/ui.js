@@ -156,7 +156,7 @@ function refresh() {
     byId('modernHpBar').style.width = `${fraction(player.hp, player.maxHp)}%`;
     byId('modernMpBar').style.width = `${fraction(player.mp, player.maxMp)}%`;
     const room=bridge.getInterior?.();
-    set('modernPos', room ? (bridge.getLanguage?.()==='en' ? ({pousada:'Village tavern',oficina:'Village forge',biblioteca:'Temple',mercado:'Training hall'})[room.id] || room.label : room.label) : `${Math.floor(player.x)}, ${Math.floor(player.y)}${bridge.getFloor?.() ? ` · ${bridge.getFloor()}` : ''}`);
+    set('modernPos', room ? (bridge.getLanguage?.()==='en' ? ({pousada:'Village tavern',oficina:'Village forge',biblioteca:'Temple',mercado:'Training hall'})[room.id] || room.label : room.label) : `${Math.floor(player.x)}, ${Math.floor(player.y)}${bridge.getFloor?.() ? ` · ${bridge.getDungeonDepth?.() || bridge.getFloor()}` : ''}`);
     const target = bridge.getTarget?.();
     const targetNode = byId('modernTarget');
     if (target?.id != null) {
