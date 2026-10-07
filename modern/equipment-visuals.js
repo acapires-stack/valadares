@@ -59,7 +59,7 @@ export function setEquipmentVisualManifest(manifest){
 }
 
 /**
- * Resolves an exact item identity. For *_PLUS_N the base model stays unchanged.
+ * Resolves an exact item identity. Forging and unique enchantment suffixes keep the base model.
  * `transform` is relative to the hand holders in actors.js: right holder Z=-90
  * degrees; left shield holder Y=90 degrees. Adventurers 2.0 crossbows use the
  * authored right hand grip with the right holder rotation cancelled by +90 Z.
@@ -68,7 +68,7 @@ export function setEquipmentVisualManifest(manifest){
  */
 export function resolverEquipmentVisual(itemId, definition, slot){
  if(typeof itemId!=='string') return null;
- const baseId=itemId.replace(/_PLUS_\d+$/,'');
+ const baseId=itemId.split('~')[0].replace(/_PLUS_\d+$/,'');
  const name=MODEL_BY_ITEM[baseId];
  if(!name) return null;
  const kind=Object.entries(KINDS).find(([prefix])=>name.startsWith(prefix))?.[1];

@@ -59,7 +59,21 @@ export async function createRenderer(bridge){
    ctx.globalAlpha=1;if(e.qty>1)text(String(e.qty),pos.x+12,pos.y+12,'#ede3c9',10);
    if(locked)text('🔒',pos.x,pos.y-22,'#becbc7',10);else if(Math.hypot(x-player.x,y-player.y)<3)text(def.name||e.type,pos.x,pos.y-23,color,10);
   }
-  for(const p of bridge.getProjectiles?.()||[]){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;const pos=project(p.x+.5,.6,p.y+.5);ctx.fillStyle=p.color||'#f5ca6b';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(pos.x,pos.y,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
+  for(const p of bridge.getProjectiles?.()||[]){
+   if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+   const travel=Math.max(0,Math.min(1,(p.life||0)/(p.duration||1)));
+   const height=Number.isFinite(p.startHeight)?p.startHeight+((p.endHeight??.6)-p.startHeight)*travel:.6;
+   const pos=project(p.x+.5,height,p.y+.5),color=p.color||'#f5ca6b';
+   if(p.arrow){
+    const start=project(p.startX+.5,.6,p.startY+.5),end=project(p.endX+.5,.6,p.endY+.5);
+    const angle=Math.atan2(end.y-start.y,end.x-start.x);
+    ctx.save();ctx.translate(pos.x,pos.y);ctx.rotate(angle);ctx.strokeStyle=color;ctx.lineWidth=3;
+    ctx.shadowColor=color;ctx.shadowBlur=5;ctx.beginPath();ctx.moveTo(-9,0);ctx.lineTo(8,0);ctx.stroke();
+    ctx.shadowBlur=0;ctx.fillStyle='#e8e4d3';ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(4,-3);ctx.lineTo(4,3);ctx.closePath();ctx.fill();ctx.restore();
+   }else{
+    ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(pos.x,pos.y,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+   }
+  }
   for(const p of bridge.getParticles?.()||[]){const pos=project(p.x+.5,.65,p.y+.5);ctx.globalAlpha=Math.max(0,p.life/(p.maxLife||500));ctx.fillStyle=p.color||'#e7bd68';ctx.beginPath();ctx.arc(pos.x,pos.y,2.2,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
   for(const a of bridge.getAuras?.()||[]){const e=a.entity||player,pos=project((e.renderX??e.x)+.5,.07,(e.renderY??e.y)+.5);ctx.globalAlpha=Math.min(.65,a.life/(a.duration||700));ctx.strokeStyle=a.color||'#79d0c1';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,28,14,0,0,Math.PI*2);ctx.stroke();}ctx.globalAlpha=1;
   for(const [kind,s]of Object.entries(bridge.getStairs?.()||{})){

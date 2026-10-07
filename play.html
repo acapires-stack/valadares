@@ -7461,6 +7461,11 @@ function findArrow(){
     if ((player.inv.FLECHA_PERF || 0) > 0) return 'FLECHA_PERF';
     return null;
 }
+function faceAttackTarget(target){
+    const dx=target.x-player.x,dy=target.y-player.y;
+    if (!dx && !dy) return;
+    player.dir=Math.abs(dx)>Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up');
+}
 
 // Arremesso de lança — consome a equipada, auto-equipa outra do inv se houver.
 function throwSpear(){
@@ -7491,6 +7496,7 @@ function throwSpear(){
         log(tr('log.los_spear'));
         return;
     }
+    faceAttackTarget(m);
     // Esquiva
     if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
         log(tr('log.dodged_spear', {mob: m.name}));
@@ -7591,6 +7597,7 @@ function doAttack(m){
             player.attackTimer = effectiveAttackDelay();
             return;
         }
+        faceAttackTarget(m);
         player.mp -= WAND_MANA_COST;   // otimista; o server desconta + broadcasta o mp real
         if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
             log(tr('log.dodged_shot', {mob: m.name}));
@@ -7653,10 +7660,22 @@ function doAttack(m){
             return;
         }
         const arrow = ITEMS[arrowKey];
+        faceAttackTarget(m);
         // N3 fase 2: server consome a flecha (ammoKey no payload de attackMob abaixo).
         // Mantém decremento local otimista — invUpdate do server reconcilia.
         player.inv[arrowKey]--;
         if (player.inv[arrowKey] <= 0) delete player.inv[arrowKey];
+        const attackPresentationAt=performance.now();
+        // An evaded shot still releases its arrow; only a confirmed hit gets an impact.
+        queuePresentedRangedShot({attackPresentationAt,targetId:m.id,targetType:'monster',weapon:wKey,
+            kind:getUpgradeTier(wKey).base.startsWith('BESTA')?'crossbow':'bow',
+            floor:player.floor||0,sound:'ranged',projectile:{
+            x: player.renderX, y: player.renderY,
+            startX: player.renderX, startY: player.renderY,
+            endX: m.renderX, endY: m.renderY,
+            color: arrow.color, glow: '#fff8c0',arrow:true,
+            life: 0, duration: Math.max(100, dist * 28),
+        }});
         if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
             log(tr('log.dodged_arrow', {mob: m.name}));
             gainSkillXpLocal('Distância', 1);
@@ -7668,23 +7687,15 @@ function doAttack(m){
         const critR = Math.random() < playerCritChance();
         if (critR) dmgR *= critMultPlayer();
         dmgR = Math.floor(dmgR * buffMult().dmg);
-        addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
-        playGameSound('ranged');
+        if (!(serverAuthMobs && ws && ws.readyState===1))
+            addFloat(m.x, m.y, `-${dmgR}`, critR ? '#ffaa20' : '#cce0a0', critR, critR ? -10 : 0);
         log(tr('log.dmg_hit', {star: critR?'★ ':'', weapon: itmName(wKey), dmg: dmgR, mob: m.name, hp: m.hp, maxhp: m.maxHp}));
-        projectiles.push({
-            x: player.renderX, y: player.renderY,
-            startX: player.renderX, startY: player.renderY,
-            endX: m.renderX, endY: m.renderY,
-            color: arrow.color, glow: '#fff8c0',
-            arrow: true,
-            life: 0, duration: Math.max(100, dist * 28),
-        });
         gainSkillXpLocal('Distância', 1);
         player.attackTimer = effectiveAttackDelay();
         // DoT procs (veneno/sangra/fogo do weapon +N)
         const procsR = rollWeaponStatusOnMob(wItem, m, dmgR);
         if (serverAuthMobs && ws && ws.readyState === 1){
-            ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt:performance.now(), monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
+            ws.send(JSON.stringify({ t:'attackMob', attackPresentationAt, monsterId:m.id, amount:dmgR, range: wItem.ranged, crit: critR, dots: procsR, ammoKey: arrowKey }));
             player.target = m.id; m.aggro = true;
         }
         return;
@@ -7702,6 +7713,7 @@ function doAttack(m){
             return;
         }
     }
+    faceAttackTarget(m);
     // Monstro esquivou?
     if (Math.random() < Math.max(0, m.dodge - equippedEnchantBonuses().precision/100)){
         log(tr('log.dodged_melee', {mob: m.name}));
@@ -7853,7 +7865,7 @@ function connectMP(){
     };
     ws.onclose = (ev) => {
         movementSync.disconnect();
-        clearConfirmedCombatSounds();
+        clearConfirmedCombatSounds(undefined,'monster',true);
         window.ValadaresAppearanceUI?.reset();
         if (training) stopTraining(tr('training.reason_disconnect'));
         trainingRequestPending = null;
@@ -8956,7 +8968,7 @@ function handleMP(msg){
         if (m){ m.hp = msg.hp; m.maxHp = msg.maxHp; }
     } else if (msg.t === 'mobFloat'){
         const m = monsters.find(x => x.id === msg.mobId);
-        if (m) {
+        if (m && !queueConfirmedMobFloat(msg)) {
             addFloat(m.x, m.y, msg.text, msg.color || '#ff8060', !!msg.crit);
             if (/^-\d/.test(String(msg.text))) window.ValadaresAdventureFeedback?.hit?.({
                 x: m.renderX ?? m.x, y: m.renderY ?? m.y, kind: 'dealt', crit: !!msg.crit, confirmed: true
@@ -14635,6 +14647,7 @@ function pvpAttackPlayer(targetId){
     const range = wItem ? (wItem.ranged || wItem.meleeRange || 1) : 1;
     const dist = Math.max(Math.abs(tgt.x - player.x), Math.abs(tgt.y - player.y));
     if (dist > range){ log(tr('log.too_far', {d: dist, max: range})); return; }
+    faceAttackTarget(tgt);
     // dano: usa fórmula melee normal + multiplicadores
     const w  = activeWeapon();
     const sk = player.skills[w.skill];
@@ -14645,19 +14658,27 @@ function pvpAttackPlayer(targetId){
     dmg = applyAttackMults(dmg);
     // Projétil visual em PvP pra arma à distância (wand = magia da cor do elemento; arco
     // = flecha). Antes só mob/melee mostrava projétil — vs player não saía nada (gap do 007).
+    const attackPresentationAt=performance.now();
     if (wItem && (wItem.kind === 'wand' || wItem.ranged)){
         const col = wItem.kind === 'wand' ? (ELEMENT_COL[wItem.element] || wItem.color || '#c060ff') : '#d8c890';
-        projectiles.push({
+        const projectile={
             x: player.renderX, y: player.renderY,
             startX: player.renderX, startY: player.renderY,
             endX: (tgt.renderX != null ? tgt.renderX : tgt.x),
             endY: (tgt.renderY != null ? tgt.renderY : tgt.y),
             color: col, glow: col,
             life: 0, duration: Math.max(120, dist * 30),
-        });
+        };
+        if (wItem.kind==='wand') projectiles.push(projectile);
+        else {
+            projectile.arrow=true;
+            queuePresentedRangedShot({attackPresentationAt,targetId,targetType:'player',weapon:wKey,
+                kind:getUpgradeTier(wKey).base.startsWith('BESTA')?'crossbow':'bow',
+                floor:player.floor||0,sound:'ranged',projectile});
+        }
     }
     if (ws && ws.readyState === 1){
-        ws.send(JSON.stringify({t:'pvpAttack', attackPresentationAt:performance.now(), targetId, amount:dmg}));
+        ws.send(JSON.stringify({t:'pvpAttack', attackPresentationAt, targetId, amount:dmg}));
     }
     log(tr('log.pvp_dmg', {star: crit?'★ ':'', dmg, name: escapeHtml(tgt.name)}));
     gainSkillXpLocal(w.skill, 1);
@@ -15252,14 +15273,97 @@ function updateAmbient(){
 function playGameSound(kind, details){ audioEngine?.play(kind,details || {}); }
 // Presentation only: the server's HP, death, targeting and rewards stay immediate.
 const confirmedCombatSounds = new Map();
-function clearConfirmedCombatSounds(targetId,targetType='monster'){
+const playedCombatEvents = new Map();
+const pendingRangedShots = new Map();
+const recentRangedFloats = [];
+function discardPresentedShot(shot){
+    clearTimeout(shot.launchTimer);clearTimeout(shot.expireTimer);
+    if(pendingRangedShots.get(shot.attackPresentationAt)===shot)
+        pendingRangedShots.delete(shot.attackPresentationAt);
+}
+function launchPresentedShot(shot){
+    if (shot.launched || pendingRangedShots.get(shot.attackPresentationAt)!==shot) return;
+    clearTimeout(shot.launchTimer);
+    if(!started || document.hidden || (player.floor||0)!==shot.floor){discardPresentedShot(shot);return;}
+    shot.launched=true;shot.launchedAt=performance.now();
+    shot.landingAt=shot.launchedAt+shot.projectile.duration;
+    const actor=window.ValadaresModern?.renderer?.actors?.entries?.get('self');
+    const hand=actor?.entity?.findByName?.(shot.kind==='crossbow'?'handslot.r':'handslot.l');
+    const origin=hand?.getPosition?.();
+    const startX=Number.isFinite(origin?.x)?origin.x-.5:player.renderX;
+    const startY=Number.isFinite(origin?.z)?origin.z-.5:player.renderY;
+    shot.projectile.x=shot.projectile.startX=startX;
+    shot.projectile.y=shot.projectile.startY=startY;
+    shot.projectile.startHeight=Number.isFinite(origin?.y)?Math.max(.2,origin.y):.9;
+    shot.projectile.endHeight=.6;
+    shot.projectile.attackPresentationAt=shot.attackPresentationAt;
+    projectiles.push(shot.projectile);
+    playGameSound(shot.sound);
+    if(shot.record){
+        shot.record.contactAt=shot.landingAt;
+        if(shot.record.death){
+            shot.record.death.presentation.contactAt=shot.landingAt;
+            window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(shot.record.death.presentation);
+        }
+        shot.record.schedule();
+    }
+}
+function queuePresentedRangedShot(shot){
+    if(document.hidden)return;
+    if(window.ValadaresModern?.state!=='ready'){
+        projectiles.push(shot.projectile);playGameSound(shot.sound);return;
+    }
+    shot.launched=false;shot.record=null;pendingRangedShots.set(shot.attackPresentationAt,shot);
+    // A missed gesture must not strand a confirmed hit or a death visual.
+    shot.launchTimer=setTimeout(()=>launchPresentedShot(shot),700);
+    shot.expireTimer=setTimeout(()=>discardPresentedShot(shot),3000);
+    if(pendingRangedShots.size>32)discardPresentedShot(pendingRangedShots.values().next().value);
+}
+document.addEventListener?.('valadares:actor-gesture',event=>{
+    const gesture=event.detail||{};
+    if(gesture.actorId!=='self')return;
+    if(gesture.phase==='prepare'){
+        const now=performance.now();
+        const shot=[...pendingRangedShots.values()].reverse().find(s=>!s.sequence &&
+            now-s.attackPresentationAt>=0 && now-s.attackPresentationAt<=120 &&
+            (s.weapon===player.equipped?.weapon) && (s.floor===(player.floor||0)));
+        if(!shot)return;
+        shot.sequence=gesture.sequence;shot.contactAt=Number.isFinite(gesture.contactAt)?gesture.contactAt:now;
+        if(shot.record?.death){
+            shot.record.death.presentation.contactAt=shot.contactAt+shot.projectile.duration;
+            window.ValadaresModern?.renderer?.actors?.retainConfirmedDeath?.(shot.record.death.presentation);
+        }
+        clearTimeout(shot.launchTimer);
+        shot.launchTimer=setTimeout(()=>launchPresentedShot(shot),Math.max(0,shot.contactAt-now));
+    }else if(gesture.phase==='contact'){
+        const shot=[...pendingRangedShots.values()].find(s=>!s.launched && s.sequence===gesture.sequence);
+        if(shot)launchPresentedShot(shot);
+    }
+});
+function queueConfirmedMobFloat(msg){
+    const dmg=-Number(msg.text),now=performance.now();
+    if(!(dmg>0))return false;
+    for(let i=recentRangedFloats.length-1;i>=0;i--)
+        if(now-recentRangedFloats[i].receivedAt>1000)recentRangedFloats.splice(i,1);
+    const matches=[...confirmedCombatSounds.values(),...recentRangedFloats].filter(r=>
+        r.shot && r.targetType==='monster' && String(r.targetId)===String(msg.mobId) &&
+        !r.floatObserved && dmg>=r.amount && !!msg.crit===r.details.critical);
+    const record=matches[0];
+    if(!record)return false;
+    record.floatObserved=true;return true;
+}
+function clearConfirmedCombatSounds(targetId,targetType='monster',resetSeen=false){
     const actors=window.ValadaresModern?.renderer?.actors;
     for (const [id,record] of confirmedCombatSounds){
         if (targetId!==undefined && (String(record.targetId)!==String(targetId) || record.targetType!==targetType)) continue;
         clearTimeout(record.timer); cancelAnimationFrame(record.frame); confirmedCombatSounds.delete(id);
         if(record.death)actors?.cancelConfirmedDeath?.(id);
     }
-    if(targetId===undefined)actors?.clearCombatPresentation?.();
+    for(const shot of pendingRangedShots.values())
+        if(targetId===undefined || (String(shot.targetId)===String(targetId) && shot.targetType===targetType))
+            discardPresentedShot(shot);
+    if(targetId===undefined){recentRangedFloats.length=0;actors?.clearCombatPresentation?.();}
+    if(resetSeen)playedCombatEvents.clear();
 }
 function mobDeathIsOnCurrentFloor(msg){
     // Legacy servers lack a floor: only an existing local victim proves origin.
@@ -15275,6 +15379,15 @@ function presentConfirmedMobDeath(targetId,killSound,fallbackMob,originFloor){
     const now=performance.now(),contactAt=record ? record.contactAt??record.receivedAt+500 : now;
     const presentation={eventId:record?.eventId||`death:${player.floor||0}:${targetId}`,targetId,mob:{...mob},
         floor:player.floor||0,contactAt};
+    // For a bow shot, the confirmed death waits for the arrow's landing.
+    if(record?.shot && !record.shot.launched){
+        presentation.contactAt=record.shot.contactAt!=null
+            ? record.shot.contactAt+record.shot.projectile.duration
+            : now+700+record.shot.projectile.duration;
+        if(!actors.retainConfirmedDeath(presentation))return false;
+        record.death={killSound:!!(killSound||record.death?.killSound),presentation};
+        return true;
+    }
     if(!actors.retainConfirmedDeath(presentation))return false;
     if(!record)return false; // Past contact/no pending hit: death is presented immediately.
     record.death={killSound:!!(killSound||record.death?.killSound),presentation};
@@ -15283,19 +15396,25 @@ function presentConfirmedMobDeath(targetId,killSound,fallbackMob,originFloor){
 function queueConfirmedCombatSound(msg){
     if (!(msg.amount>0) || (msg.floor||0)!==(player.floor||0) || document.hidden) return;
     const eventId=String(msg.eventId||'');
-    if (!eventId || confirmedCombatSounds.has(eventId)) return;
+    if (!eventId || confirmedCombatSounds.has(eventId) || playedCombatEvents.has(eventId)) return;
     const modern=window.ValadaresModern?.state==='ready';
     const details={eventId,weaponType:msg.weaponType,spell:msg.spell,critical:!!msg.critical};
     if (!modern){playGameSound('impact',details);return;}
+    const candidateShot=pendingRangedShots.get(msg.attackPresentationAt);
+    const pendingShot=candidateShot && String(candidateShot.targetId)===String(msg.targetId) &&
+        candidateShot.targetType===(msg.targetType||'monster') && candidateShot.floor===(player.floor||0)
+        ? candidateShot : null;
     // A late acknowledgement after cancel/re-target must not attach to a new swing.
     // Area spells may legitimately confirm several monsters without a selected one.
-    if (!msg.spell && (player.target==null || String(player.target)!==String(msg.targetId))) return;
+    if (!pendingShot && !msg.spell && (player.target==null || String(player.target)!==String(msg.targetId))) return;
     const mob=msg.targetType!=='player' ? monsters.find(m=>String(m.id)===String(msg.targetId)) : null;
     const record={eventId,targetId:msg.targetId,targetType:msg.targetType||'monster',floor:player.floor||0,
         mob:mob?{...mob}:null,attackPresentationAt:msg.attackPresentationAt,
         selection:player.target,selectionType:player.targetType,weapon:player.equipped?.weapon,
-        receivedAt:performance.now(),timer:null,frame:null};
+        receivedAt:performance.now(),timer:null,frame:null,amount:msg.amount,details,
+        shot:pendingShot||null};
     confirmedCombatSounds.set(eventId,record);
+    if(record.shot)record.shot.record=record;
     // Bound memory even if a malformed server floods presentation events.
     if (confirmedCombatSounds.size>32){
         const first=confirmedCombatSounds.keys().next().value,old=confirmedCombatSounds.get(first);
@@ -15306,16 +15425,36 @@ function queueConfirmedCombatSound(msg){
         if (confirmedCombatSounds.get(eventId)!==record) return;
         confirmedCombatSounds.delete(eventId);
         const actor=window.ValadaresModern?.renderer?.actors?.entries?.get('self');
-        if (!started || document.hidden || performance.now()-record.receivedAt>500 ||
-            (player.floor||0)!==record.floor || player.equipped?.weapon!==record.weapon ||
+        if (!started || document.hidden || (player.floor||0)!==record.floor ||
+            (!record.shot && (performance.now()-record.receivedAt>500 ||
+            player.equipped?.weapon!==record.weapon ||
             (record.actor && (actor!==record.actor || actor.attackSequence!==record.sequence)) ||
-            (!record.death && record.selection!=null && (String(player.target)!==String(record.selection) || player.targetType!==record.selectionType))) {
+            (!record.death && record.selection!=null && (String(player.target)!==String(record.selection) || player.targetType!==record.selectionType))))) {
             if(record.death)window.ValadaresModern?.renderer?.actors?.cancelConfirmedDeath?.(eventId);
             return;
         }
+        playedCombatEvents.set(eventId,performance.now());
+        if(playedCombatEvents.size>128)playedCombatEvents.delete(playedCombatEvents.keys().next().value);
         playGameSound('impact',details);
+        if(record.shot && record.targetType==='monster' && record.mob){
+            addFloat(record.mob.x,record.mob.y,`-${record.amount}`,
+                details.critical?'#ffaa20':'#ff8060',details.critical,details.critical?-10:0);
+            window.ValadaresAdventureFeedback?.hit?.({x:record.mob.renderX??record.mob.x,
+                y:record.mob.renderY??record.mob.y,kind:'dealt',crit:details.critical,confirmed:true});
+            recentRangedFloats.push(record);
+            if(recentRangedFloats.length>32)recentRangedFloats.shift();
+        }
         if(record.death?.killSound)sndKill();
     };
+    if(record.shot){
+        record.schedule=()=>{
+            clearTimeout(record.timer);
+            record.contactAt=record.shot.landingAt;
+            record.timer=setTimeout(play,Math.max(0,record.contactAt-performance.now()));
+        };
+        if(record.shot.launched)record.schedule();
+        return;
+    }
     // Let the actor observe this frame's attackTimer before reading its contact marker.
     record.frame=requestAnimationFrame(()=>{
         if (confirmedCombatSounds.get(eventId)!==record) return;

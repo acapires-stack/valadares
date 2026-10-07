@@ -457,14 +457,14 @@ export async function createActors(pc,app,bridge){
   if(destroyed||!detail||detail.targetId==null)return false;
   const floor=bridge.getFloor?.()??bridge.getPlayer()?.floor??0;if((detail.floor??0)!==floor)return false;
   const id='mob:'+detail.targetId,time=performance.now(),prior=deathVisuals.get(id);
-  if(prior){if(prior.eventId!==detail.eventId)return false;if(!prior.started)prior.contactAt=Math.max(time,Math.min(prior.receivedAt+500,Number.isFinite(detail.contactAt)?detail.contactAt:time));return true;}
+  if(prior){if(prior.eventId!==detail.eventId)return false;if(!prior.started)prior.contactAt=Math.max(time,Math.min(prior.receivedAt+1000,Number.isFinite(detail.contactAt)?detail.contactAt:time));return true;}
   if(detail.eventId&&deathEvents.has(detail.eventId))return false;
   let rec=entries.get(id);const snapshot=detail.mob||rec?.data;if(!snapshot?.type)return false;
   if(!rec){rec=creature({...snapshot,hp:1},'mob',id);rec.data={...snapshot};rec.entity.setPosition((snapshot.renderX??snapshot.x)+.5,rec.groundOffset||0,(snapshot.renderY??snapshot.y)+.5);rec.entity.setEulerAngles(0,(FORWARD[snapshot.dir]??0)+(rec.angleOffset||0),0);}
   else entries.delete(id);
   if(rec.entity.anim)rec.entity.anim.speed=0;
   if(detail.eventId){deathEvents.add(detail.eventId);if(deathEvents.size>128)deathEvents.delete(deathEvents.values().next().value);}
-  deathVisuals.set(id,{rec,eventId:detail.eventId,floor,receivedAt:time,contactAt:Math.max(time,Math.min(time+500,Number.isFinite(detail.contactAt)?detail.contactAt:time)),started:false,scale:rec.entity.getLocalScale().clone()});return true;
+  deathVisuals.set(id,{rec,eventId:detail.eventId,floor,receivedAt:time,contactAt:Math.max(time,Math.min(time+1000,Number.isFinite(detail.contactAt)?detail.contactAt:time)),started:false,scale:rec.entity.getLocalScale().clone()});return true;
  }
  function cancelConfirmedDeath(eventId){for(const [id,death]of deathVisuals)if(death.eventId===eventId){dispose(death.rec);deathVisuals.delete(id);}}
  function clearCombatPresentation(){for(const death of deathVisuals.values())dispose(death.rec);deathVisuals.clear();}
@@ -495,34 +495,39 @@ export async function createActors(pc,app,bridge){
   now+=dt;const seen=new Set(),p=bridge.getPlayer(),cam=bridge.getCamera();
   const bounds=bridge.getViewBounds?.()||{minX:cam.x-.5,maxX:cam.x+bridge.VP_W+.5,minY:cam.y-.5,maxY:cam.y+bridge.VP_H+.5};
   const visible=e=>{const x=e.renderX??e.x??e.pos?.x,z=e.renderY??e.y??e.pos?.y;return Number.isFinite(x)&&x>=bounds.minX&&x<bounds.maxX&&z>=bounds.minY&&z<bounds.maxY;};
-  const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id);const expected=kind==='mob'&&RIGGED_MOBS[e.type]?(e.type==='SKELETON'?skeletonModel(e):ready(RIGGED_MOBS[e.type].preferred,RIGGED_MOBS[e.type].model)):kind==='mob'&&BESPOKE_MOBS[e.type]&&assets[BESPOKE_MOBS[e.type].model]?BESPOKE_MOBS[e.type].model:kind==='npc'?humanoidModel(e,kind,id,npcTools[e.id]||'unarmed'):kind==='player'||kind==='remote'?humanoidModel(e,kind,id,weaponKind(e)):null;if(rec&&(rec.sig!==sig||expected&&rec.model!==expected)){dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);// First sight and visual rebuilds consume the current cooldown snapshot; they are not new attacks.
-   rec.previousTimer=e.attackTimer||0;rec.previousAtkAnim=e.atkAnim||0;rec.previousArtAttackAt=e.artAttackAt||0;rec.sig=sig;entries.set(id,rec);}rec.data=e;
+  const sync=(id,e,kind)=>{if(!visible(e))return;seen.add(id);const sig=signature(e,kind);let rec=entries.get(id),pendingContacts=null;const expected=kind==='mob'&&RIGGED_MOBS[e.type]?(e.type==='SKELETON'?skeletonModel(e):ready(RIGGED_MOBS[e.type].preferred,RIGGED_MOBS[e.type].model)):kind==='mob'&&BESPOKE_MOBS[e.type]&&assets[BESPOKE_MOBS[e.type].model]?BESPOKE_MOBS[e.type].model:kind==='npc'?humanoidModel(e,kind,id,npcTools[e.id]||'unarmed'):kind==='player'||kind==='remote'?humanoidModel(e,kind,id,weaponKind(e)):null;if(rec&&(rec.sig!==sig||expected&&rec.model!==expected)){pendingContacts=rec.pendingContacts;dispose(rec);entries.delete(id);rec=null;}if(!rec){rec=kind==='mob'||kind==='pet'?creature(e,kind,id):humanoid(e,kind,id);// First sight and visual rebuilds consume the current cooldown snapshot; they are not new attacks.
+   rec.pendingContacts=pendingContacts||[];rec.previousTimer=e.attackTimer||0;rec.previousAtkAnim=e.atkAnim||0;rec.previousArtAttackAt=e.artAttackAt||0;rec.sig=sig;entries.set(id,rec);}rec.data=e;
    const x=(e.renderX??e.x??e.pos?.x)+.5,z=(e.renderY??e.y??e.pos?.y)+.5;const distance=Number.isFinite(rec.lastX)?Math.hypot(x-rec.lastX,z-rec.lastZ):0;const moving=distance>.0008;rec.entity.setPosition(x,rec.groundOffset||0,z);
-   let angle=FORWARD[e.dir]??(moving?Math.atan2(x-rec.lastX,z-rec.lastZ)*180/Math.PI:rec.angle||0);rec.angle=angle;rec.entity.setEulerAngles(0,angle+(rec.angleOffset||0),0);
+   const requestedAngle=FORWARD[e.dir]??(moving?Math.atan2(x-rec.lastX,z-rec.lastZ)*180/Math.PI:rec.angle||0);
+   // A contact remains owed even if another strike starts in this frame.
+   const flushContacts=()=>{const pending=rec.pendingContacts||[];while(pending.length&&now>=pending[0].time){const contact=pending.shift();if(contact.sequence===rec.attackSequence)rec.contactSent=true;document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:contact.weaponKind,phase:'contact',sequence:contact.sequence,contactAt:contact.at,facingAngle:contact.facingAngle}}));}};
+   flushContacts();
    const timer=e.attackTimer||0,atk=e.atkAnim||0,hit=e.artAttackAt||0;
    const newStrike=timer>rec.previousTimer+60||(atk>0&&rec.previousAtkAnim<=0)||(hit>0&&hit!==rec.previousArtAttackAt);
    rec.previousTimer=timer;rec.previousAtkAnim=atk;rec.previousArtAttackAt=hit;
-   const strikeStarted=newStrike&&now-rec.lastStrikeAt>.14;
+   const strikeStarted=newStrike&&now-rec.lastStrikeAt>.07;
    if(strikeStarted){
+    rec.attackFacing=requestedAngle;
     const native=modernBodies.has(rec.model),twoHand=equipmentDefinition(e.equipped?.weapon)?.hand==='2h';
     const large=seriesRig(rec.model)==='Rig_Large';
-    const preferred=rec.attackClip||(rec.animal?'Attack':native?(rec.w==='staff'?'Ranged_Magic_Shoot':rec.w==='crossbow'?'Ranged_2H_Shoot':rec.w==='bow'?'Ranged_Bow_Release':rec.w==='unarmed'?(large?'Melee_Unarmed_Punch':'Melee_Unarmed_Attack_Punch_A'):rec.w==='spear'?(large?'Melee_1H_Stab':twoHand?'Melee_2H_Attack_Stab':'Melee_1H_Attack_Stab'):large?(twoHand?'Melee_2H_Attack':'Melee_1H_Slash'):twoHand?'Melee_2H_Attack_Chop':'Melee_1H_Attack_Chop'):(rec.w==='staff'?'Spellcast_Shoot':rec.w==='bow'||rec.w==='crossbow'?'2H_Ranged_Shoot':rec.w==='unarmed'?'Unarmed_Melee_Attack_Punch_A':rec.w==='spear'?(twoHand?'2H_Melee_Attack_Stab':'1H_Melee_Attack_Stab'):twoHand?'2H_Melee_Attack_Chop':'1H_Melee_Attack_Chop'));
+    const preferred=rec.attackClip||(rec.animal?'Attack':native?(rec.w==='staff'?'Ranged_Magic_Shoot':rec.w==='crossbow'?'Ranged_2H_Shoot':rec.w==='bow'?'Ranged_Bow_Release':rec.w==='unarmed'?(large?'Melee_Unarmed_Punch':'Melee_Unarmed_Attack_Punch_A'):rec.w==='spear'?(large?'Melee_1H_Stab':twoHand?'Melee_2H_Attack_Stab':'Melee_1H_Attack_Stab'):!large&&rec.w==='sword'?(twoHand?'Melee_2H_Attack_Slice':'Melee_1H_Attack_Slice_Horizontal'):large?(twoHand?'Melee_2H_Attack':'Melee_1H_Slash'):twoHand?'Melee_2H_Attack_Chop':'Melee_1H_Attack_Chop'):(rec.w==='staff'?'Spellcast_Shoot':rec.w==='bow'||rec.w==='crossbow'?'2H_Ranged_Shoot':rec.w==='unarmed'?'Unarmed_Melee_Attack_Punch_A':rec.w==='spear'?(twoHand?'2H_Melee_Attack_Stab':'1H_Melee_Attack_Stab'):twoHand?'2H_Melee_Attack_Chop':'1H_Melee_Attack_Chop'));
     rec.attackState=rec.clips?.[preferred]?preferred:rec.clips?.Melee_1H_Slash?'Melee_1H_Slash':large?'1H_Melee_Attack_Chop':'Use_Item';
     const drawDuration=native&&rec.w==='bow'?(rec.clips?.Ranged_Bow_Draw||0):0;
     rec.attackLeadState=drawDuration?'Ranged_Bow_Draw':null;
     const duration=drawDuration+(rec.clips?.[rec.attackState]||.6);
     // Finish windup, contact and recovery inside the existing attack interval.
-    const cadence=(timer||e.attackDelay||800)/1000;rec.attackSeconds=Math.max(.3,Math.min(duration,cadence*.9));rec.attackSpeed=duration/rec.attackSeconds;
+    const cadence=(timer||e.attackDelay||800)/1000;rec.attackSeconds=Math.max(.08,Math.min(duration,cadence*.9));rec.attackSpeed=duration/rec.attackSeconds;
     rec.strikeUntil=now+rec.attackSeconds;rec.lastStrikeAt=now;
     const phase=rec.contactPhase||(drawDuration?drawDuration/duration:rec.animal?.525:rec.w==='staff'?.3214:rec.w==='bow'||rec.w==='crossbow'?.4219:rec.w==='unarmed'?.3409:.5625);
     rec.attackStartedAt=performance.now();rec.attackContactTime=now+rec.attackSeconds*phase;rec.attackContactAt=rec.attackStartedAt+rec.attackSeconds*phase*1000;rec.attackSequence=++gestureSerial;rec.contactSent=false;
-    document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'prepare',sequence:rec.attackSequence,contactAt:rec.attackContactAt,durationMs:rec.attackSeconds*1000}}));
+    (rec.pendingContacts||(rec.pendingContacts=[])).push({time:rec.attackContactTime,at:rec.attackContactAt,sequence:rec.attackSequence,weaponKind:rec.w,facingAngle:rec.attackFacing});
+    document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'prepare',sequence:rec.attackSequence,contactAt:rec.attackContactAt,durationMs:rec.attackSeconds*1000,facingAngle:rec.attackFacing}}));
    }
-   if(!rec.contactSent&&Number.isFinite(rec.attackContactTime)&&now>=rec.attackContactTime){
-    rec.contactSent=true;document.dispatchEvent(new CustomEvent('valadares:actor-gesture',{detail:{actorId:id,kind,weaponKind:rec.w,phase:'contact',sequence:rec.attackSequence,contactAt:rec.attackContactAt}}));
-   }
+   flushContacts();
+   const facing=(rec.w==='bow'||rec.w==='crossbow')&&now<rec.attackContactTime?rec.attackFacing:requestedAngle;
+   rec.angle=facing;rec.entity.setEulerAngles(0,facing+(rec.angleOffset||0),0);
    if(rec.model){const attacking=now<rec.strikeUntil,series=!!seriesRig(rec.model),speed=distance/Math.max(dt,.001);let state=e.hp<=0?(rec.deathClip||(rec.animal?'Death':'Death_A')):attacking?(rec.attackLeadState&&now<rec.attackContactTime?rec.attackLeadState:rec.attackState):moving?(rec.moveClip||(rec.animal?(speed>2.5?'Gallop':'Walk'):'Running_A')):(rec.idleClip||(series?'Idle_A':'Idle'));
-    if(state!==rec.state||strikeStarted&&attacking){rec.entity.anim.baseLayer.transition(state,strikeStarted?.035:.1,0);rec.state=state;}
+    if(state!==rec.state||strikeStarted&&attacking){rec.entity.anim.baseLayer.transition(state,Math.min(strikeStarted?.035:.1,rec.attackSeconds?rec.attackSeconds*.16:.1),0);rec.state=state;}
     rec.entity.anim.speed=attacking?rec.attackSpeed:moving?Math.max(.75,Math.min(2,distance/Math.max(dt,.001)/3)):1;
    }else {const bob=rec.type==='BAT'?Math.sin(now*5)*.08:rec.type==='SOMBRA'?Math.sin(now*3)*.075:rec.type.startsWith('PET_')?Math.sin(now*4)*.025:0;
     rec.entity.setLocalPosition(x,bob+(now<rec.strikeUntil?Math.max(0,Math.sin((rec.strikeUntil-now)*20))*.035:0),z);
