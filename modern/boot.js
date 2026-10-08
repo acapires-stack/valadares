@@ -3,6 +3,6 @@
     window.VALADARES_MODERN = true;
     const style = document.createElement('link');
     style.rel = 'stylesheet';
-    style.href = '/modern/ui.css?v=20261007-3d';
+    style.href = '/modern/ui.css?v=20261007-mobile1';
     document.head.append(style);
 })();

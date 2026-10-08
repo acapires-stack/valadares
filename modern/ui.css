@@ -231,6 +231,7 @@ body.modern-renderer-ready .modern-sidebar-map {
     body.touch.menu-open .sidebar { border-radius: 7px; margin: 6px; }
     #login .box { max-height: calc(100dvh - 16px); padding: 16px 20px; }
 }
+
 @media (max-width: 900px) and (max-height: 440px) {
     #login .box::before { margin-bottom: 3px; font-size: 8px; }
     #login h2 { font-size: 19px; margin-bottom: 3px; }
@@ -478,4 +479,136 @@ body.modern-renderer-ready .modern-sidebar-map {
     body.modern-renderer-ready.touch.menu-open #journeySidebar,
     body.modern-renderer-ready.touch.menu-open #journeyCard { display: none !important; }
     body.modern-renderer-ready.touch.menu-open #toastContainer { visibility: hidden; }
+}
+
+/* A landscape phone can report more than 900 CSS pixels. Touch, rather than
+   viewport width, decides whether the world or the desktop columns own space. */
+body.modern-renderer-ready.touch {
+    padding: 0;
+    min-height: 100dvh;
+    overflow: hidden;
+    align-items: stretch;
+    --ui-world-reserve: 0px;
+}
+body.modern-renderer-ready.touch #title,
+body.modern-renderer-ready.touch #connStatus,
+body.modern-renderer-ready.touch #displayControls,
+body.modern-renderer-ready.touch #controls,
+body.modern-renderer-ready.touch .modern-hud,
+body.modern-renderer-ready.touch .modern-map,
+body.modern-renderer-ready.touch .modern-actions,
+body.modern-renderer-ready.touch #firstSteps { display: none !important; }
+body.modern-renderer-ready.touch #gameWrapper {
+    position: fixed; inset: 0; display: block;
+    width: 100vw; height: 100dvh; max-width: none;
+    margin: 0; padding: 0; border: 0; border-radius: 0;
+    background: #14231f; box-shadow: none; overflow: hidden;
+}
+body.modern-renderer-ready.touch #gameContainer {
+    display: block; position: relative; flex: none;
+    width: 100vw !important; height: 100dvh;
+    min-width: 0; max-width: none; margin: 0; padding: 0;
+    border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
+}
+body.modern-renderer-ready.touch #gameContainer canvas#canvas {
+    display: block; width: 100vw !important; height: 100dvh !important;
+    min-width: 0; max-height: none !important; aspect-ratio: auto !important;
+}
+body.modern-renderer-ready.touch #modernCanvas,
+body.modern-renderer-ready.touch #modernLabels { border-radius: 0; }
+body.modern-renderer-ready.touch #chatPanel { display: none; }
+body.modern-renderer-ready.touch #mobileTopBar {
+    min-height: 45px; padding-top: max(5px, env(safe-area-inset-top));
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: calc(58px + env(safe-area-inset-right));
+}
+body.modern-renderer-ready.touch #mobileMenu {
+    top: calc(6px + env(safe-area-inset-top));
+    right: calc(8px + env(safe-area-inset-right));
+    width: 44px; height: 44px;
+}
+body.modern-renderer-ready.touch #vjoy {
+    left: calc(12px + env(safe-area-inset-left));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: clamp(96px, 21dvh, 118px); height: clamp(96px, 21dvh, 118px);
+}
+body.modern-renderer-ready.touch #tbtnAttack {
+    right: calc(12px + env(safe-area-inset-right));
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    width: clamp(70px, 17dvh, 88px); height: clamp(70px, 17dvh, 88px);
+    font-size: 12px;
+}
+body.modern-renderer-ready.touch #mobileHotbar {
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    max-width: min(58vw, 410px); gap: clamp(3px, .8vw, 7px);
+}
+body.modern-renderer-ready.touch .mhb-slot {
+    width: clamp(44px, 10dvh, 56px); height: clamp(44px, 10dvh, 56px);
+}
+body.modern-renderer-ready.touch .mhb-ico { font-size: clamp(16px, 4dvh, 21px); }
+body.modern-renderer-ready.touch #floorBadge {
+    top: calc(54px + env(safe-area-inset-top));
+    left: calc(10px + env(safe-area-inset-left));
+}
+body.modern-renderer-ready.touch #recBtn {
+    top: calc(55px + env(safe-area-inset-top));
+    right: calc(10px + env(safe-area-inset-right));
+}
+body.modern-renderer-ready.touch #toastContainer {
+    top: calc(55px + env(safe-area-inset-top));
+    max-width: min(420px, 56vw);
+}
+body.modern-renderer-ready.touch #journeyMobile:not([hidden]) {
+    top: calc(54px + env(safe-area-inset-top));
+}
+body.modern-renderer-ready.touch.journey-mobile-open > #journeyCard {
+    top: calc(82px + env(safe-area-inset-top));
+    max-height: calc(100dvh - 100px - env(safe-area-inset-bottom));
+}
+
+/* Menu overlays the world and retains the original panels and chat. Its own
+   scroll area works in both narrow and wide landscape without scaling text. */
+body.modern-renderer-ready.touch.menu-open #gameWrapper {
+    inset: calc(50px + env(safe-area-inset-top)) 0 env(safe-area-inset-bottom);
+    z-index: 151; width: 100%; height: auto;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+    align-content: start; align-items: start; gap: 10px;
+    padding: 12px; box-sizing: border-box;
+    overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+    background: #10211f;
+}
+body.modern-renderer-ready.touch.menu-open #gameContainer { display: contents !important; }
+body.modern-renderer-ready.touch.menu-open #gameContainer > :not(#chatPanel) { display: none !important; }
+body.modern-renderer-ready.touch.menu-open #leftSidebar,
+body.modern-renderer-ready.touch.menu-open #rightSidebar,
+body.modern-renderer-ready.touch.menu-open #invSidebar {
+    position: static; display: flex !important; flex-direction: column;
+    width: 100% !important; min-width: 0;
+    height: auto !important; max-height: none; margin: 0;
+    overflow: visible;
+}
+body.modern-renderer-ready.touch.menu-open #chatPanel {
+    display: block; position: static; width: 100% !important;
+    min-width: 0 !important; max-width: none; margin: 0;
+    border-radius: 8px;
+}
+body.modern-renderer-ready.touch.menu-open #chatMessages,
+body.modern-renderer-ready.touch.menu-open #log {
+    height: min(30dvh, 170px) !important; max-height: min(30dvh, 170px);
+    overflow-y: auto;
+}
+body.modern-renderer-ready.touch.menu-open #touchControls,
+body.modern-renderer-ready.touch.menu-open #mobileHotbar,
+body.modern-renderer-ready.touch.menu-open #journeyMobile,
+body.modern-renderer-ready.touch.menu-open #journeySidebar,
+body.modern-renderer-ready.touch.menu-open #journeyCard { display: none !important; }
+body.modern-renderer-ready.touch.menu-open #toastContainer { visibility: hidden; }
+body.modern-renderer-ready.touch .chest-box,
+body.modern-renderer-ready.touch .modal-box,
+body.modern-renderer-ready.touch #settingsModal > div,
+body.modern-renderer-ready.touch #talentsModal > div {
+    min-width: 0 !important; width: min(640px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    overflow-y: auto; overflow-x: auto;
 }

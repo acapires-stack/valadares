@@ -125,10 +125,141 @@ async function record(page,label) {
   await page.screenshot({path:path.join(output,label+'.png'),animations:'disabled'});
   return state;
 }
+async function mobileLayoutCase(context, webPort, backendPort, label, size, assertLayout) {
+  phase=label;
+  const page=await pageAt(context,webPort,backendPort,'/jogar');
+  await login(page);
+  const measure=async step=>page.evaluate(step=>{
+    const ids=['gameWrapper','gameContainer','modernCanvas','canvas','mobileTopBar','mobileMenu','touchControls','vjoy','tbtnAttack','mobileHotbar','mhbSlotHp','mhbSlotMp','mhbSlotFood','mhbSlotMagic','mhbSlotSpear','chatPanel','chatInput','leftSidebar','rightSidebar','invSidebar'];
+    const nodes=Object.fromEntries(ids.map(id=>{
+      const e=document.getElementById(id),r=e?.getBoundingClientRect(),s=e&&getComputedStyle(e);
+      return [id,e?{box:r?.toJSON(),display:s.display,visibility:s.visibility,pointerEvents:s.pointerEvents}:null];
+    }));
+    return {step,viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height},body:document.body.className,ready:window.ValadaresModern?.state,started,authed:_wsAuthed,scroll:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight},nodes};
+  },step);
+  const tap=async id=>{
+    const box=await page.locator('#'+id).boundingBox();
+    assert.ok(box,label+' '+id+' visible');
+    await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);
+  };
+  let state=await measure('game');
+  const caseResult={label,size,steps:[state],issues:[]};
+  const issue=(condition,message)=>{if(!condition)caseResult.issues.push(message);};
+  const canvas=state.nodes.modernCanvas.box;
+  issue(state.ready==='ready'&&state.started&&state.authed,'3D/login not ready');
+  issue(canvas.width>=size.width*.75,'3D narrower than 75% of viewport');
+  issue(canvas.height>=size.height*.60,'3D shorter than 60% of viewport');
+  if(state.body.includes('touch'))for(const id of ['vjoy','tbtnAttack','mhbSlotHp','mhbSlotMp','mhbSlotFood','mhbSlotMagic','mhbSlotSpear','mobileMenu']) {
+    const n=state.nodes[id];
+    issue(n.display!=='none'&&n.box.width>=44&&n.box.height>=44,id+' touch target under 44px or hidden');
+  }
+  await page.screenshot({path:path.join(output,label+'-game.png'),animations:'disabled'});
+  if(state.body.includes('touch')) {
+    const cdp=await context.newCDPSession(page);
+    const joy=state.nodes.vjoy.box,jx=joy.x+joy.width/2,jy=joy.y+joy.height/2;
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:jx,y:jy,id:1}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:jx+35,y:jy,id:1}]});
+    issue(await page.evaluate(()=>keys.ArrowRight===true),'joystick touch did not set movement');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    issue(await page.evaluate(()=>keys.ArrowRight!==true),'joystick touch did not release movement');
+    const attack=state.nodes.tbtnAttack.box,ax=attack.x+attack.width/2,ay=attack.y+attack.height/2;
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:ax,y:ay,id:2}]});
+    issue(await page.evaluate(()=>attackPressed===true),'attack touch did not press');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    issue(await page.evaluate(()=>attackPressed===false),'attack touch did not release');
+    await cdp.detach();
+    await tap('mobileMenu');
+    state=await measure('menu-open');caseResult.steps.push(state);
+    issue(state.body.includes('menu-open'),'menu failed to open by touch');
+    issue(state.nodes.invSidebar.display!=='none','inventory hidden in menu');
+    await page.screenshot({path:path.join(output,label+'-menu.png'),animations:'disabled'});
+    const chat=state.nodes.chatInput;
+    if(chat?.display!=='none' && chat.box.width>0 && chat.box.height>0 && chat.box.y<size.height) {
+      await tap('chatInput');
+      const active=await page.evaluate(()=>document.activeElement?.id);
+      issue(active==='chatInput','chat tap did not focus input');
+      await page.evaluate(()=>document.activeElement?.blur());
+    } else caseResult.issues.push('chat input not visible in menu viewport');
+    await page.locator('#inventory').scrollIntoViewIfNeeded();
+    const inventoryVisible=await page.locator('#inventory').evaluate(e=>{const r=e.getBoundingClientRect();return r.top<innerHeight&&r.bottom>0&&r.width>0;});
+    issue(inventoryVisible===true,'inventory cannot scroll into view');
+    await page.screenshot({path:path.join(output,label+'-menu-inventory.png'),animations:'disabled'});
+    await page.locator('#appearanceOpen').scrollIntoViewIfNeeded();
+    await tap('appearanceOpen');
+    const modal=await page.locator('#appearanceModal').evaluate(e=>{const r=e.getBoundingClientRect();return {open:e.open,box:r.toJSON(),scrollHeight:e.scrollHeight,clientHeight:e.clientHeight};});
+    issue(modal.open&&modal.box.left>=0&&modal.box.right<=size.width&&modal.box.top>=0&&modal.box.bottom<=size.height,'appearance modal clipped or failed to open');
+    await page.screenshot({path:path.join(output,label+'-appearance.png'),animations:'disabled'});
+    const closeBox=await page.locator('#appearanceModal [data-close]').boundingBox();
+    assert.ok(closeBox,label+' appearance close visible');
+    await page.touchscreen.tap(closeBox.x+closeBox.width/2,closeBox.y+closeBox.height/2);
+    issue(await page.locator('#appearanceModal').evaluate(e=>!e.open),'appearance modal failed to close');
+    if(await page.evaluate(()=>document.body.classList.contains('menu-open')))await tap('mobileMenu');
+    state=await measure('menu-closed');caseResult.steps.push(state);
+    issue(!state.body.includes('menu-open'),'menu failed to close by touch');
+  }
+  await page.setViewportSize({width:size.height,height:size.width});
+  await page.waitForTimeout(400);
+  caseResult.steps.push(await measure('rotated-portrait'));
+  await page.setViewportSize(size);
+  await page.waitForTimeout(400);
+  state=await measure('rotated-back');caseResult.steps.push(state);
+  issue(state.nodes.modernCanvas.box.width>=size.width*.75,'3D failed width after rotate-back');
+  await page.screenshot({path:path.join(output,label+'-rotated-back.png'),animations:'disabled'});
+  await page.evaluate(()=>logout());
+  await page.waitForFunction(()=>!started&&getComputedStyle(document.getElementById('login')).display==='flex');
+  await login(page);
+  state=await measure('reentry');caseResult.steps.push(state);
+  issue(state.nodes.modernCanvas.box.width>=size.width*.75,'3D failed width after reentry');
+  await page.screenshot({path:path.join(output,label+'-reentry.png'),animations:'disabled'});
+  results.push(caseResult);
+  await page.close();currentPage=null;
+}
 async function main() {
   fs.mkdirSync(output,{recursive:true});seedAccount();
   const backendPort=await freePort(),webPort=await startWeb();await startBackend(backendPort);
   browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+  if(process.argv.includes('--menu-minimap')) {
+    phase='menu minimap';
+    const size={width:844,height:390};
+    const ctx=await browser.newContext({viewport:size,screen:size,isMobile:true,hasTouch:true,deviceScaleFactor:1});
+    const page=await pageAt(ctx,webPort,backendPort,'/jogar');await login(page);
+    const button=await page.locator('#mobileMenu').boundingBox();
+    await page.touchscreen.tap(button.x+button.width/2,button.y+button.height/2);
+    await page.waitForFunction(()=>{
+      const canvas=document.getElementById('modernSidebarMiniMap');
+      const label=document.getElementById('modernSidebarMapLegend')?.textContent?.trim();
+      if(!canvas||!label||label==='—')return false;
+      const pixels=canvas.getContext('2d')?.getImageData(0,0,canvas.width,canvas.height).data;
+      if(!pixels)return false;
+      const colors=new Set();
+      for(let i=0;i<pixels.length;i+=256)colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]},${pixels[i+3]}`);
+      return colors.size>10;
+    },null,{timeout:10000});
+    const state=await page.evaluate(()=>{
+      const canvas=document.getElementById('modernSidebarMiniMap'),box=canvas.getBoundingClientRect();
+      const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+      const colors=new Set();let opaque=0;
+      for(let i=0;i<pixels.length;i+=4){if(pixels[i+3])opaque++;if(i%256===0)colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]},${pixels[i+3]}`);}
+      return {label:document.getElementById('modernSidebarMapLegend').textContent.trim(),box:box.toJSON(),opaquePixels:opaque,uniqueSampleColors:colors.size,menuOpen:document.body.classList.contains('menu-open')};
+    });
+    assert.equal(state.menuOpen,true);assert.ok(state.box.width>=100&&state.box.height>=100);
+    await page.screenshot({path:path.join(output,'menu-minimap-ready.png'),animations:'disabled'});
+    fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({ok:true,mode:'menu-minimap',state,errors},null,2));
+    console.log(JSON.stringify({ok:true,output,state,errors},null,2));
+    await page.close();currentPage=null;await ctx.close();return;
+  }
+  if(process.argv.includes('--mobile-layout')) {
+    const assertLayout=process.argv.includes('--assert-layout');
+    for(const [label,size,mobile] of [['landscape-1280x590',{width:1280,height:590},true],['landscape-844x390',{width:844,height:390},true],['desktop-1440x900',{width:1440,height:900},false]]) {
+      const ctx=await browser.newContext({viewport:size,screen:size,isMobile:mobile,hasTouch:mobile,deviceScaleFactor:1});
+      await mobileLayoutCase(ctx,webPort,backendPort,label,size,assertLayout);
+      await ctx.close();
+    }
+    fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({ok:results.every(x=>x.issues.length===0),mode:'mobile-layout',results,errors},null,2));
+    console.log(JSON.stringify({ok:results.every(x=>x.issues.length===0),output,cases:results.map(x=>({label:x.label,issues:x.issues})),errors},null,2));
+    if(assertLayout&&results.some(x=>x.issues.length))process.exitCode=1;
+    return;
+  }
   const context=await browser.newContext({viewport:{width:1440,height:900}});
   if(process.argv.includes('--capture-full')) {
     phase='capture full HUD';
