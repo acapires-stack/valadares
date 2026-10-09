@@ -15,6 +15,6 @@ tree('devlog',name=>/\.(html|css|js|png|jpg|jpeg|svg|webp)$/.test(name));
 for(const file of ['boot.js','entry.js','renderer.js','world.js','scenery.js','actors.js','adventurers-catalog.js','equipment-visuals.js','equipment-grips.js','item-art-kaykit.js','player-visibility.js','ui.js','minimap.js','ui.css'])copy('modern/'+file);
 copy('modern/vendor/playcanvas.mjs');copy('modern/vendor/LICENSE-PlayCanvas.txt');
 tree('modern/assets',name=>/-game\.glb$|\.(png|jpg|jpeg|webp|txt|json)$/.test(name)||/^modern\/assets\/(scenery|adventurers2|weapons-bits|bestiary)\/.+\.glb$/.test(name)||/^modern\/assets\/characters-series6\/[\w-]+\.glb$/.test(name)||/^modern\/assets\/audio\/[\w-]+\.mp3$/.test(name));
-const modules=['equipment-rules.js','training-rules.js','transmutation-rules.js','progression-content.js','modern-world.js','appearance-rules.js','appearance-ui.js','weapon-techniques-rules.js','weapon-techniques-ui.js'];
+const modules=['equipment-rules.js','training-rules.js','transmutation-rules.js','progression-content.js','modern-world.js','appearance-rules.js','appearance-ui.js','weapon-techniques-rules.js','weapon-techniques-ui.js','daily-rules.js','game-analytics.js','companions-client.js'];
 for(const file of modules)if(!fs.existsSync(path.join(out,file)))throw Error('Missing runtime dependency '+file);
 console.log('Public browser build: '+count+' files; no server, local saves, tools or internal documents.');

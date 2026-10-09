@@ -32,12 +32,16 @@ export async function createRenderer(bridge){
  try{actors=await createActors(pc,app,presentation);}catch(error){observer.disconnect();window.removeEventListener('resize',resize);world.destroy();app.destroy();canvas.remove();overlay.remove();throw error;}
  const visibility=createPlayerVisibility(pc,app,camera);
  const project=(x,y,z)=>{const v=camera.camera.worldToScreen(new pc.Vec3(x,y,z));return{x:v.x,y:v.y,z:v.z};};
- const text=(label,x,y,color='#f3ebcf',size=12)=>{ctx.font=`600 ${size}px system-ui, sans-serif`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(10,18,19,.82)';ctx.strokeText(label,x,y);ctx.fillStyle=color;ctx.fillText(label,x,y);};
- function labels(){ctx.clearRect(0,0,width,height);const player=bridge.getPlayer(),target=bridge.getTarget?.()||{id:player.target,type:player.targetType};
+ const labelBoxes=[];
+ const text=(label,x,y,color='#f3ebcf',size=12)=>{ctx.font=`600 ${size}px system-ui, sans-serif`;const w=ctx.measureText(label).width+8;let box=null;for(const dy of [0,-15,-30,-45]){const candidate={x:x-w/2,y:y+dy-size-2,w,h:size+5};if(candidate.y<0||candidate.x<0||candidate.x+w>width)continue;if(!labelBoxes.some(b=>candidate.x<b.x+b.w&&candidate.x+candidate.w>b.x&&candidate.y<b.y+b.h&&candidate.y+candidate.h>b.y)){box=candidate;y+=dy;break;}}if(!box)return;labelBoxes.push(box);ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(10,18,19,.82)';ctx.strokeText(label,x,y);ctx.fillStyle=color;ctx.fillText(label,x,y);};
+ function labels(){ctx.clearRect(0,0,width,height);labelBoxes.length=0;const player=bridge.getPlayer(),target=bridge.getTarget?.()||{id:player.target,type:player.targetType};
   for(const [id,r]of actors.entries){const e=r.data;const x=(e.renderX??e.x)+.5,z=(e.renderY??e.y)+.5;const isTarget=id===`${target.type==='player'?'remote':'mob'}:${target.id}`;
    if(isTarget){const pos=project(x,.035,z);ctx.strokeStyle='#f3c76b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,18*width/720,9*height/528,0,0,Math.PI*2);ctx.stroke();}
    const y=Number.isFinite(r.visualHeight)?r.visualHeight+.18:r.kind==='mob'?Math.max(.7,(bridge.getMonsterTypes?.()[e.type]?.size||1)*1.35):1.6;const pos=project(x,y,z);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;
    if(r.kind==='npc'){const distance=Math.hypot(e.x-player.x,e.y-player.y);if(distance<4)text(bridge.npcName?.(e)||e.name,pos.x,pos.y,'#e7c787',11);}
+   else if(r.kind==='companion'){
+    if(Math.hypot(e.x-player.x,e.y-player.y)<7)text(`${e.name} · ${bridge.getLanguage?.()==='en'?'automatic':'automático'}`,pos.x,pos.y,'#a5dfbd',10);
+   }
    else if(r.kind==='remote'||r.kind==='player'){
     const cosmetic=bridge.getItems?.()[e.equipped?.cosmetic||e.cosmetic]||{};
     text((e.ghost?'◌ ':e.pvp?'⚔ ':'')+(r.kind==='player'?player.name:e.name),pos.x,pos.y,cosmetic.nameColor||(r.kind==='player'?'#ece3c6':'#9accc5'),11);
@@ -89,18 +93,19 @@ export async function createRenderer(bridge){
   for(const p of bridge.getProps?.()||[]){if(Math.hypot(p.x-player.x,p.y-player.y)>2.4)continue;const pos=project(p.x+.5,1.15,p.y+.5),en=bridge.getLanguage?.()==='en';text((en?{chest:'Chest',altar:'Altar',craft:'Workbench',dummy:'Training'}:{chest:'Baú',altar:'Altar',craft:'Bancada',dummy:'Treino'})[p.kind]||'',pos.x,pos.y,'#d8c08c',11);}
   for(const p of bridge.getTrails?.()||[]){const pos=project(p.x+.5,.02,p.y+.5);ctx.globalAlpha=Math.max(0,Math.min(.35,p.life/(p.maxLife||500)));ctx.fillStyle=p.color||'#85c2b6';ctx.beginPath();ctx.ellipse(pos.x,pos.y,6,3,0,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
  }
- function input(event){if(!bridge.getStarted?.())return;event.preventDefault();const rect=canvas.getBoundingClientRect(),sx=event.clientX-rect.left,sy=event.clientY-rect.top;const cam=bridge.getCamera();let tile=null,best=Infinity;
+ function input(event){if(!bridge.getStarted?.())return;event.preventDefault();const rect=canvas.getBoundingClientRect(),sx=event.clientX-rect.left,sy=event.clientY-rect.top;const cam=bridge.getCamera();let tile=null,best=Infinity,picked=null;
   const near=camera.camera.screenToWorld(sx,sy,.1),far=camera.camera.screenToWorld(sx,sy,80),ray=new pc.Ray(near,far.clone().sub(near).normalize()),hit=new pc.Vec3();
-  const eligible=Array.from(actors.entries.values()).filter(r=>r.entity.enabled&&(event.type==='contextmenu'?r.kind==='remote':['mob','remote'].includes(r.kind)))
+  const eligible=Array.from(actors.entries.values()).filter(r=>r.entity.enabled&&(event.type==='contextmenu'?['remote','companion'].includes(r.kind):['mob','remote','companion'].includes(r.kind)))
    .map(r=>({actor:r,meshes:r.entity.findComponents('render').filter(render=>render.enabled&&render.entity.enabled).flatMap(render=>render.meshInstances.filter(mesh=>mesh.visible))})).filter(r=>r.meshes.length);
   // Tall heads and wide wings can sit far from the ground anchor. Pick visible
   // body-part bounds first; nearest depth resolves overlapping actors. No physics
   // collider or gameplay reach changes. Hidden parts must not become click targets.
   for(const {actor,meshes} of eligible){
-   for(const mesh of meshes){if(!mesh.aabb.intersectsRay(ray,hit))continue;const distance=hit.distanceSq(near);if(distance<best){best=distance;const e=actor.data;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}
+   for(const mesh of meshes){if(!mesh.aabb.intersectsRay(ray,hit))continue;const distance=hit.distanceSq(near);if(distance<best){best=distance;picked=actor;const e=actor.data;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}
   }
   // Preserve generous selection around small creatures when no visible part was hit.
-  if(!tile){best=Infinity;for(const {actor} of eligible){const e=actor.data,q=project((e.renderX??e.x)+.5,.6,(e.renderY??e.y)+.5),distance=Math.hypot(q.x-sx,q.y-sy);if(distance<32*width/720&&distance<best){best=distance;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}}
+  if(!tile){best=Infinity;for(const {actor} of eligible){const e=actor.data,q=project((e.renderX??e.x)+.5,.6,(e.renderY??e.y)+.5),distance=Math.hypot(q.x-sx,q.y-sy);if(distance<32*width/720&&distance<best){best=distance;picked=actor;tile={x:Math.round(e.renderX??e.x),y:Math.round(e.renderY??e.y)};}}}
+  if(picked?.kind==='companion'){window.ValadaresCompanions?.open(picked.data.id);return;}
   if(!tile){const t=-near.y/(far.y-near.y);tile={x:Math.floor(near.x+(far.x-near.x)*t),y:Math.floor(near.z+(far.z-near.z)*t)};}
   const hr=host.getBoundingClientRect();host.dispatchEvent(new MouseEvent(event.type,{bubbles:true,cancelable:true,button:event.button,buttons:event.buttons,clientX:hr.left+(tile.x+.5-cam.x)/bridge.VP_W*hr.width,clientY:hr.top+(tile.y+.5-cam.y)/bridge.VP_H*hr.height}));
   if(event.type==='contextmenu'){const menu=document.getElementById('playerCtxMenu');if(menu){menu.style.left=Math.min(event.clientX,window.innerWidth-menu.offsetWidth-8)+'px';menu.style.top=Math.min(event.clientY,window.innerHeight-menu.offsetHeight-8)+'px';}}

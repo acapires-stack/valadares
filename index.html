@@ -3,6 +3,7 @@
 <head>
   <!-- Analytics (GA4 + Microsoft Clarity) carregados após consentimento. -->
   <script src="/consent.js" defer></script>
+  <script src="/game-analytics.js" defer></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
@@ -127,6 +128,10 @@
     .image-frame img { width: 100%; height: auto; aspect-ratio: 8/5; object-fit: cover; }
     .hero-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; color: #b7c0ae; font-size: .69rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
     .hero-caption span:last-child { color: var(--gold); }
+    .weapon-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+    .weapon-choice strong { width: 100%; color: var(--sage); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
+    .weapon-choice > span { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); padding: 5px 11px 5px 5px; color: var(--cream); font-size: .78rem; font-weight: 700; }
+    .weapon-choice img { width: 29px; height: 29px; object-fit: contain; image-rendering: pixelated; }
     .promise { border-block: 1px solid var(--line); }
     .promise-inner { display: grid; grid-template-columns: repeat(3,1fr); }
     .promise-item { padding: 22px 0; display: flex; align-items: center; justify-content: center; gap: 16px; font-size: .79rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
@@ -218,11 +223,18 @@
       .nav-actions { gap: 3px; }
       .nav-cta { display: none; }
       .lang-switch button { min-width: 44px; }
-      .hero { padding: 67px 0 56px; }
-      .hero-grid { gap: 49px; }
-      h1 { margin: 21px 0 24px; font-size: clamp(3.35rem,12.5vw,5rem); }
+      .hero { padding: 22px 0 45px; }
+      .hero-grid { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+      .hero-copy { display: contents; }
+      .hero-copy .eyebrow { order: 1; }
+      .hero-copy h1 { order: 2; }
+      .hero-art { order: 3; }
+      .hero-copy .hero-actions { order: 4; margin-top: 18px; }
+      .hero-copy > p { order: 5; margin: 18px 0 0; }
+      .hero-copy .weapon-choice { order: 6; }
+      h1 { margin: 13px 0 23px; font-size: clamp(2.55rem,10.5vw,4rem); line-height: 1.02; }
       .hero-copy > p { font-size: 1rem; }
-      .hero-art::before { inset: -9px 9px 9px -9px; }
+      .hero-art::before { inset: -8px 8px 8px -8px; }
       .image-frame { border-width: 5px; }
       .hero-caption { font-size: .58rem; }
       .promise-inner { grid-template-columns: 1fr; }
@@ -267,13 +279,14 @@
         <a href="#explorar" data-i18n="navExplore">Explorar</a>
         <a href="#como-jogar" data-i18n="navHow">Como jogar</a>
         <a href="https://valadares.app.br/ranking" data-i18n="navRank">Ranking</a>
+        <a href="/ajuda.html" data-i18n="navHelp">Ajuda</a>
       </nav>
       <div class="nav-actions">
         <div class="lang-switch" role="group" aria-label="Idioma / Language">
           <button type="button" data-language="pt" aria-label="Português" aria-pressed="true">PT</button>
           <button type="button" data-language="en" aria-label="English" aria-pressed="false">EN</button>
         </div>
-        <a class="button button-gold nav-cta" href="/jogar" data-i18n="playFree">Jogar grátis <span aria-hidden="true">↗</span></a>
+        <a class="button button-gold nav-cta" href="/jogar" data-i18n="playFree" data-analytics-cta="nav">Jogar grátis <span aria-hidden="true">↗</span></a>
         <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false"><span class="menu-icon" aria-hidden="true"></span></button>
       </div>
     </div>
@@ -281,7 +294,8 @@
       <a href="#explorar" data-i18n="navExplore">Explorar</a>
       <a href="#como-jogar" data-i18n="navHow">Como jogar</a>
       <a href="https://valadares.app.br/ranking" data-i18n="navRank">Ranking</a>
-      <a href="/jogar" data-i18n="playFree">Jogar grátis</a>
+      <a href="/ajuda.html" data-i18n="navHelp">Ajuda</a>
+      <a href="/jogar" data-i18n="playFree" data-analytics-cta="mobile">Jogar grátis</a>
     </nav>
   </header>
 
@@ -290,16 +304,17 @@
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <div class="eyebrow" data-i18n="heroEyebrow">RPG online 3D · PC e celular</div>
-          <h1 id="hero-title"><span data-i18n="heroOne">Uma vila.</span><span data-i18n="heroTwo">Mil histórias</span><span><em data-i18n="heroThree">para viver.</em></span></h1>
-          <p data-i18n="heroDesc">Explore uma vila em 3D, enfrente criaturas, evolua seu equipamento e encontre outros jogadores. Grátis, direto no navegador e sem cadastro por e-mail.</p>
+          <h1 id="hero-title"><span data-i18n="heroOne">Sua primeira</span><span data-i18n="heroTwo">caçada</span><span><em data-i18n="heroThree">começa aqui.</em></span></h1>
+          <p data-i18n="heroDesc">Entre na vila, aceite uma missão, enfrente criaturas e equipe o que encontrar. Você pode jogar no seu ritmo, mesmo sozinho. Grátis no navegador, sem pedir e-mail.</p>
+          <div class="weapon-choice" aria-label="Estilos de arma" data-i18n-aria="weaponsAria"><strong data-i18n="weaponsLead">Escolha seu estilo</strong><span><img src="/modern/assets/weapons-bits/icons/sword_A.png" alt="" width="29" height="29" loading="lazy"><span data-i18n="weaponSword">Espada</span></span><span><img src="/modern/assets/weapons-bits/icons/bow_A.png" alt="" width="29" height="29" loading="lazy"><span data-i18n="weaponBow">Arco</span></span><span><img src="/modern/assets/weapons-bits/icons/staff_A.png" alt="" width="29" height="29" loading="lazy"><span data-i18n="weaponStaff">Cajado</span></span></div>
           <div class="hero-actions">
-            <a class="button button-gold" href="/jogar"><span data-i18n="playFree">Jogar grátis</span><span aria-hidden="true">↗</span></a>
+            <a class="button button-gold" href="/jogar" data-analytics-cta="hero"><span data-i18n="playFree">Jogar grátis</span><span aria-hidden="true">↗</span></a>
             <a class="text-link" href="#explorar"><span data-i18n="meetWorld">Conhecer o mundo</span><span class="arrow" aria-hidden="true">↘</span></a>
           </div>
         </div>
         <div class="hero-art">
           <div class="image-frame"><img src="./valadares-site-vila-3d.png" alt="Vila de Valadares em 3D" data-i18n-alt="villageAlt" width="1440" height="900" fetchpriority="high"></div>
-          <div class="hero-caption"><span data-i18n="villageCaption">A vila em 3D</span><span data-i18n="realGame">Imagem real do jogo</span></div>
+          <div class="hero-caption"><span data-i18n="villageCaption">Comece pela vila</span><span data-i18n="realGame">Captura real do jogo</span></div>
         </div>
       </div>
     </section>
@@ -322,7 +337,7 @@
         <div class="world-list">
           <div class="world-item"><span class="number">01</span><div><h3 data-i18n="featureExploreTitle">Vá além da vila</h3><p data-i18n="featureExploreDesc">Siga missões, encare criaturas e avance pelas Profundezas. A partir do andar 25, há retornos à cidade nos andares de chefe a cada cinco níveis.</p></div></div>
           <div class="world-item"><span class="number">02</span><div><h3 data-i18n="featureGrowTitle">Faça seu caminho</h3><p data-i18n="featureGrowDesc">Forje equipamentos até +5, inclusive os eternos. Na bancada, encante cada peça com até três bônus próprios.</p></div></div>
-          <div class="world-item"><span class="number">03</span><div><h3 data-i18n="featureTogetherTitle">Encontre sua companhia</h3><p data-i18n="featureTogetherDesc">Forme uma party, entre em uma guilda e compartilhe a aventura com outros jogadores.</p></div></div>
+          <div class="world-item"><span class="number">03</span><div><h3 data-i18n="featureTogetherTitle">Aventure-se sozinho ou em grupo</h3><p data-i18n="featureTogetherDesc">Cace, cumpra missões e melhore seus equipamentos no seu tempo. Quando quiser companhia, forme uma party ou entre em uma guilda.</p></div></div>
         </div>
       </div>
     </section>
@@ -334,7 +349,7 @@
           <div class="section-kicker" data-i18n="relicsKicker">Tesouros & descobertas</div>
           <h2 id="relics-title" data-i18n="relicsTitle">Toda jornada deixa alguma coisa com você.</h2>
           <p data-i18n="relicsDesc">Monstros podem deixar essências arcanas; chefes sempre deixam. Use-as para encantar uma peça ou trocar um bônus específico, preservando os outros e seu nível de forja.</p>
-          <a href="/jogar" class="text-link"><span data-i18n="enterWorld">Entrar no mundo</span><span class="arrow" aria-hidden="true">↗</span></a>
+          <a href="/jogar" class="text-link" data-analytics-cta="feature"><span data-i18n="enterWorld">Entrar no mundo</span><span class="arrow" aria-hidden="true">↗</span></a>
           <p style="margin-top:18px"><a href="/devlog/arte-e-equipamentos" class="text-link" data-i18n="news">Veja todas as novidades →</a></p>
         </div>
       </div>
@@ -357,7 +372,7 @@
     <section class="closing" aria-labelledby="closing-title">
       <div class="wrap closing-inner">
         <div><div class="eyebrow" data-i18n="closingKicker">A próxima história é sua</div><h2 id="closing-title"><span data-i18n="closingOne">A vila está pronta.</span><br><em data-i18n="closingTwo">E você?</em></h2></div>
-        <div class="closing-actions"><a class="button button-gold" href="/jogar"><span data-i18n="playFree">Jogar grátis</span><span aria-hidden="true">↗</span></a><a class="button button-dark-outline" href="https://valadares.app.br/ranking" data-i18n="seeRanking">Ver ranking</a></div>
+        <div class="closing-actions"><a class="button button-gold" href="/jogar" data-analytics-cta="closing"><span data-i18n="playFree">Jogar grátis</span><span aria-hidden="true">↗</span></a><a class="button button-dark-outline" href="https://valadares.app.br/ranking" data-i18n="seeRanking">Ver ranking</a></div>
       </div>
       <div class="download-note"><span data-i18n="downloadNote">Prefere jogar em uma janela própria no Windows? Escolha a versão para instalar ou a portátil.</span><div class="download-links"><a id="dlSetupBtn" href="https://github.com/acapires-stack/valadares/releases/latest" target="_blank" rel="noopener noreferrer"><span data-i18n="downloadSetup">Baixar Setup</span><span aria-hidden="true">↗</span></a><a id="dlPortableBtn" href="https://github.com/acapires-stack/valadares/releases/latest" target="_blank" rel="noopener noreferrer"><span data-i18n="downloadPortable">Baixar Portable</span><span aria-hidden="true">↗</span></a></div></div>
     </section>
@@ -367,7 +382,7 @@
     <div class="wrap">
       <div class="footer-top">
         <div><a class="footer-brand" href="#inicio">VALADARES</a><p class="footer-note" data-i18n="footerNote">Um mundo de fantasia para explorar no seu tempo.</p></div>
-        <nav class="footer-links" aria-label="Links do rodapé" data-i18n-aria="footerAria"><a href="/jogar" data-i18n="footerPlay">Jogar</a><a href="https://valadares.app.br/ranking" data-i18n="navRank">Ranking</a><a href="https://valadares.app.br/devlog">Devlog</a><a href="https://valadares.app.br/privacy" data-i18n="privacy">Privacidade</a><a href="https://valadares.app.br/terms" data-i18n="terms">Termos</a><a href="https://tactics.valadares.app.br" target="_blank" rel="noopener noreferrer">Valadares Tactics ↗</a></nav>
+        <nav class="footer-links" aria-label="Links do rodapé" data-i18n-aria="footerAria"><a href="/jogar" data-i18n="footerPlay">Jogar</a><a href="https://valadares.app.br/ranking" data-i18n="navRank">Ranking</a><a href="https://valadares.app.br/devlog">Devlog</a><a href="/ajuda.html" data-i18n="navHelp">Ajuda</a><a href="https://valadares.app.br/privacy" data-i18n="privacy">Privacidade</a><a href="https://valadares.app.br/terms" data-i18n="terms">Termos</a><a href="https://tactics.valadares.app.br" target="_blank" rel="noopener noreferrer">Valadares Tactics ↗</a></nav>
       </div>
       <div class="footer-bottom"><span>© 2026 Valadares</span><span data-i18n="tacticsNote">Tactics é outro jogo do universo Valadares.</span></div>
     </div>
@@ -394,6 +409,24 @@
     };
     copy.pt.news = 'Veja todas as novidades →';
     copy.en.news = 'See what is new →';
+    Object.assign(copy.pt, {
+      navHelp: 'Ajuda', playFree: 'Começar a jogar',
+      heroOne: 'Sua primeira', heroTwo: 'caçada', heroThree: 'começa aqui.',
+      heroDesc: 'Entre na vila, aceite uma missão, enfrente criaturas e equipe o que encontrar. Você pode jogar no seu ritmo, mesmo sozinho. Grátis no navegador, sem pedir e-mail.',
+      villageCaption: 'Comece pela vila', realGame: 'Captura real do jogo',
+      weaponsAria: 'Estilos de arma', weaponsLead: 'Escolha seu estilo', weaponSword: 'Espada', weaponBow: 'Arco', weaponStaff: 'Cajado',
+      featureTogetherTitle: 'Aventure-se sozinho ou em grupo',
+      featureTogetherDesc: 'Cace, cumpra missões e melhore seus equipamentos no seu tempo. Quando quiser companhia, forme uma party ou entre em uma guilda.'
+    });
+    Object.assign(copy.en, {
+      navHelp: 'Help', playFree: 'Start playing',
+      heroOne: 'Your first', heroTwo: 'hunt', heroThree: 'starts here.',
+      heroDesc: 'Enter the village, take a quest, face creatures and equip what you find. Play at your own pace, even on your own. Free in your browser, with no email required.',
+      villageCaption: 'Start in the village', realGame: 'Actual game screenshot',
+      weaponsAria: 'Weapon styles', weaponsLead: 'Choose your style', weaponSword: 'Sword', weaponBow: 'Bow', weaponStaff: 'Staff',
+      featureTogetherTitle: 'Adventure solo or together',
+      featureTogetherDesc: 'Hunt, complete quests and improve your gear at your own pace. When you want company, form a party or join a guild.'
+    });
     const menuButton = document.querySelector('.menu-toggle');
     const mobileMenu = document.getElementById('mobile-menu');
     function setMenu(open) {

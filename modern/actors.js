@@ -535,7 +535,7 @@ export async function createActors(pc,app,bridge){
    }
    rec.lastX=x;rec.lastZ=z;rec.entity.enabled=true;
   };
-  sync('self',p,'player');for(const [id,e]of Object.entries(bridge.getRemotePlayers?.()||{}))sync('remote:'+id,e,'remote');for(const e of bridge.getMonsters?.()||[])if(e.hp>0)sync('mob:'+e.id,e,'mob');
+  sync('self',p,'player');for(const [id,e]of Object.entries(bridge.getRemotePlayers?.()||{}))sync('remote:'+id,e,'remote');for(const e of window.ValadaresCompanions?.getAll()||[])sync('companion:'+e.id,e,'companion');for(const e of bridge.getMonsters?.()||[])if(e.hp>0)sync('mob:'+e.id,e,'mob');
   if((p.floor||0)===0)for(const e of bridge.getNpcs?.()||[])sync('npc:'+e.id,{...e,x:e.pos?.x??e.x,y:e.pos?.y??e.y},'npc');
   const pet=bridge.getPet?.();if(pet&&pet.x!==undefined&&pet.pet)sync('pet',{...pet,type:pet.pet},'pet');
   updateDeathVisuals(bridge.getFloor?.()??p.floor??0);

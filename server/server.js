@@ -15,6 +15,9 @@ const appearanceRules = require('../appearance-rules');
 const appearanceService = require('./appearance-service');
 const weaponTechniques = require('../weapon-techniques-rules');
 const mobPursuit = require('./mob-pursuit');
+const dailyRules = require('../daily-rules');
+const engagementMetrics = require('./engagement-metrics');
+const { createCompanions } = require('./companions.cjs');
 const WEAPON_TECHNIQUES_ENABLED = process.env.WEAPON_TECHNIQUES_ENABLED !== '0';
 const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
@@ -24,6 +27,7 @@ const CASINO_ENABLED = false;
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 // Token de admin pro painel web (env var). Sem isso, /api/admin/* rejeita 401.
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+const ENGAGEMENT_EXCLUDED_NAMES = new Set((process.env.ANALYTICS_EXCLUDED_ACCOUNTS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
 if (!ADMIN_TOKEN) console.warn('[admin] ADMIN_TOKEN não configurado — painel web desabilitado');
 
 // HTTP server compartilhado com WS upgrade + endpoints REST (webhook MP, criar PIX, health)
@@ -317,6 +321,15 @@ async function handleHttpRequest(req, res){
             });
             return httpJson(res, 200, { ok:true });
         } catch (e){ return httpJson(res, 400, { error:'invalid_body' }); }
+    }
+    // Somente agregados; nenhuma identidade ou dado de conta sai desta rota.
+    if (req.method === 'GET' && req.url.split('?')[0] === '/api/admin/engagement'){
+        const url = new URL(req.url, 'http://localhost');
+        const token = url.searchParams.get('token') || req.headers['x-admin-token'] || '';
+        if (!adminTokenOk(token)) return httpJson(res, 401, { error:'unauthorized' });
+        return httpJson(res, 200, engagementMetrics.aggregate(accounts.values(), Date.now(), {
+            isAdmin: isAdmin, excludedNames: ENGAGEMENT_EXCLUDED_NAMES,
+        }));
     }
     // GET /api/admin/state?token=X — snapshot pro painel admin web
     if (req.method === 'GET' && req.url.startsWith('/api/admin/state')){
@@ -887,8 +900,8 @@ const RECIPES = [
 // Espelhadas do cliente (play.html). Só os campos que o server precisa pra validar
 // turn-in e calcular reward: kind, type/items/count, reward, choices.
 const QUESTS = [
-    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:10 }, reward:{ gold:50,  xp:{Punho:100}, item:{PORRETE:1} } },
-    { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80,  xp:{Espada:100} } },
+    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:10 }, reward:{ gold:50,  xp:{Clava:100}, item:{PORRETE:1} } },
+    { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80 } }, // +100 XP na perícia da arma equipada na entrega.
     { id:'q_seda',   goal:{ kind:'item', type:'SILK',      count:5  }, reward:{ gold:200 } },
     { id:'q_orcs',   goal:{ kind:'mob',  type:'ORC',       count:3  }, reward:{ gold:300, xp:{Espada:50,Machado:50,Clava:50} } },
     { id:'q_lider',  goal:{ kind:'mob',  type:'ORC_LIDER', count:1  }, reward:{ gold:500 } },
@@ -4194,6 +4207,13 @@ function isEmptyDefaultSaveServer(d){
     return skillsTen && noInv && noGold && noEquip && noChests;
 }
 function getAccount(name){ return accounts.get(String(name || '').toLowerCase()); }
+function measureAccount(account){
+    return engagementMetrics.eligible(account, {isAdmin, excludedNames:ENGAGEMENT_EXCLUDED_NAMES});
+}
+function noteEngagement(p, milestone){
+    const account = p?.authedName && getAccount(p.authedName);
+    if (measureAccount(account) && engagementMetrics.noteMilestone(account, milestone)) queueSaveAccounts();
+}
 async function createAccount(name, clientHash, email){
     const pwHash = await hashPwScryptAsync(clientHash);   // async: não bloqueia o event loop
     const a = {
@@ -4697,6 +4717,21 @@ setInterval(safeTick('spawnDungeonMobs', spawnDungeonMobs), 8000);   // M4: rep�
 setInterval(safeTick('spawnAutomatonMobs', spawnAutomatonMobs), 8000); // DG robótica: 9 comuns/andar
 spawnDungeonMobs();   // popula o andar 1 no boot
 setInterval(safeTick('tickPartyHp', tickPartyHp), 3000);   // HP da party no widget
+
+// Automatic companions have their own channel, never accounts/players/rankings.
+const villageCompanions = createCompanions({
+    walkable: (x,y) => isWalkable(x,y) && !NPC_POSITIONS.some(n => n.x===x && n.y===y)
+        && !Object.values(CHEST_POS).some(n => n.x===x && n.y===y)
+        && !modernWorld.interiors.some(room => room.door.x===x && room.door.y===y)
+        && ![{x:50,y:47},{x:50,y:49},{x:49,y:52},{x:51,y:52},{x:47,y:49}].some(n => n.x===x && n.y===y),
+    count: process.env.COMPANIONS_ENABLED === '0' ? 0 : 10,
+    onAssist: m => broadcast(null, {t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp}, 0)
+});
+setInterval(safeTick('villageCompanions', () => {
+    villageCompanions.tick(players.values(), monsters.values());
+    for (const p of players.values()) if(p.authed && !p.disconnected && p.ws?.readyState === 1)
+        sendTo(p.id, {t:'companions',list:villageCompanions.snapshot(p)});
+}), 650);
 
 // ─── Bot 007 — caça ao impostor ────────────────────────────────────────
 // Player virtual no Map de players. Anda random, ataca players adjacentes,
@@ -5233,6 +5268,7 @@ function tickMobDots(){
             const dmg = d.dmg;
             const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
+            if (dealtDamage > 0) noteEngagement(players.get(d.byId), 'firstFightAt');
             // Anti-ninja: dano de DoT conta pro dono do loot (todos os mobs agora)
             recordMobRewardDamage(m, d.byId, dealtDamage);
             floats.push({ mobId: m.id, text: `-${dmg}`, color: DOT_COLORS[d.type] || '#aaa' });
@@ -5616,6 +5652,7 @@ function applyWeaponTechniqueSecondary(p,proc,baseDamage){
         if (dmg<=0) continue;
         const dealt=Math.min(m.hp,dmg);
         m.hp=Math.max(0,m.hp-dmg);
+        if (dealt>0) noteEngagement(p, 'firstFightAt');
         if (dealt>0 && m.hp>0){ m._retaliateId=p.id; m._retaliateAt=Date.now(); }
         recordMobRewardDamage(m,p.id,dealt);
         const update={t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp};
@@ -6973,6 +7010,7 @@ wss.on('connection', (ws, request) => {
                 p._authAttempts = [];
                 p.authed = true;
                 p.authedName = acc.name;
+                if (measureAccount(acc)) { engagementMetrics.noteLogin(acc); queueSaveAccounts(); }
                 // ★ CAUSA-RAIZ DO WIPE: mata QUALQUER outra sessão da mesma conta (viva OU fantasma).
                 // removeGhostsByName só pegava ghosts JÁ `disconnected` e casava por `op.name` (que é
                 // 'Anônimo' até o join) → uma 2ª sessão VIVA escapava, e era ELA, com p.* vazio, que
@@ -6995,7 +7033,7 @@ wss.on('connection', (ws, request) => {
                 }
                 ws.send(JSON.stringify({
                     t:'authOk', isNew, save: acc.save || null, savedAt: acc.savedAt || 0,
-                    hasEmail: !!acc.email,
+                    hasEmail: !!acc.email, isTest: !measureAccount(acc),
                 }));
                 if (!isNew) alertLogin(acc.name);
             };
@@ -7028,6 +7066,17 @@ wss.on('connection', (ws, request) => {
         // Agora nenhum handler com estado roda sem auth, e a autorização de
         // admin usa p.authedName (conta provada), nunca o p.name falsificável.
         if (!p.authed || !p.authedName) return;
+        if (msg.t === 'companionCommand') {
+            if (!p.joined) return;
+            const at = Date.now();
+            if (msg.action !== 'dismiss' && at - (p._lastCompanionCommand || 0) < 500) {
+                sendTo(id, {t:'companionResult',ok:false,reason:'too_fast'}); return;
+            }
+            p._lastCompanionCommand = at;
+            const result = villageCompanions.command(p, {id:msg.id,action:msg.action});
+            sendTo(id, {t:'companionResult',...result});
+            return;
+        }
         // A conta autenticada ainda não é um personagem carregado. Impede que um
         // cliente recusado no join grave os defaults vazios sobre o save real.
         if (msg.t !== 'join' && !p.joined) return;
@@ -7874,6 +7923,9 @@ wss.on('connection', (ws, request) => {
             if (p.equipped[slot]) incInv(p, p.equipped[slot], 1);
             incInv(p, itemKey, -1);
             p.equipped[slot] = itemKey;
+            if (slot === 'weapon' && tier.base === 'PORRETE' &&
+                getAccount(p.authedName)?.engagement?.firstQuestAt && p.quests?.completed?.includes('q_ratos'))
+                noteEngagement(p, 'rewardEquippedAt');
             if (slot==='weapon' || (slot==='offhand' && returning[1])) { resetTechniqueCharge(p); sendTechniqueState(p); }
             recomputeMaxStatsServer(p);
             sendInvUpdate(p, { equipOp:{ ok:true, slot, itemKey } });
@@ -8249,7 +8301,7 @@ wss.on('connection', (ws, request) => {
                 const dailyId = String(msg.dailyId || '');
                 // id legítimo = d_<hoje>_<0..2> (espelha rollDailyQuests no cliente: 3/dia).
                 // Limita a 3 claims/dia mesmo que o cliente forje a lista com N entries.
-                const today = new Date().toISOString().slice(0, 10);
+                const today = dailyRules.todayKey();
                 const idm = /^d_(\d{4}-\d{2}-\d{2})_([0-2])$/.exec(dailyId);
                 if (!idm || idm[1] !== today) return reject('unknown_quest');
                 if (!p.dailyClaim || p.dailyClaim.day !== today) p.dailyClaim = { day: today, ids: [] };
@@ -8309,12 +8361,17 @@ wss.on('connection', (ws, request) => {
                 if (q.goal.kind === 'item') incInv(p, q.goal.type, -q.goal.count);
                 delete p.quests.active[q.id];
                 p.quests.completed.push(q.id);
-                const delta = applyQuestReward(p, q.reward);
+                const reward = q.id === 'q_cobras'
+                    ? { ...q.reward, xp: { [weaponSkillOf(p)]: 100 } } : q.reward;
+                const delta = applyQuestReward(p, reward);
                 if (!updateEnchantSave(p)){
                     for (const key of ['inv','gold','quests','skills','flags','permaBuffs','hp','mp',
                         'maxHp','maxMp','_gearHp','_gearMp']) p[key]=previous[key];
                     questAcc.save=previous.save;questAcc.savedAt=previous.savedAt;
                     return reject('save_failed');
+                }
+                if (q.id === 'q_ratos') {
+                    noteEngagement(p, 'firstQuestAt');
                 }
                 sendInvUpdate(p, {
                     questResult:{ ok:true, kind:'simple', questId:q.id, delta },
@@ -9226,6 +9283,7 @@ wss.on('connection', (ws, request) => {
             const dmg=acceptedDamage+(technique?weaponTechniques.bonus(acceptedDamage,technique.def.primary):0);
             const dealtDamage = Math.min(m.hp, dmg);
             m.hp = Math.max(0, m.hp - dmg);
+            if (dealtDamage > 0) noteEngagement(p, 'firstFightAt');
             if (dealtDamage>0 && m.hp>0){ m._retaliateId=id; m._retaliateAt=nowAtk; }
             const techniqueEventId=sendCombatImpact(p,m.id,dealtDamage,{spell:spellWin?.spellKey,critical:msg.crit,thrown:!!msg.throwSpear,attackPresentationAt:msg.attackPresentationAt});
             // A arma recupera recursos uma vez pelo alvo principal, após dano real no HP.

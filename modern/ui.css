@@ -436,6 +436,11 @@ body.modern-renderer-ready .modern-sidebar-map {
     .modern-actions button[data-primary="true"] { background: #765b35db; border-color: #c4a876; color: #fff2d8; }
     .modern-actions__symbol { display: block; margin-bottom: 1px; font: 18px Georgia, serif; }
     .modern-actions__key { display: block; color: #c8b987; font: 9px ui-monospace, monospace; }
+    body.modern-simple .modern-actions button:not([data-primary]):not([data-essential]):not(.modern-actions__more):not(.modern-actions__mode) { display: none; }
+    body.modern-simple.modern-more .modern-actions button:not([data-primary]):not([data-essential]) { display: block; }
+    body.modern-simple:not(.modern-more) .modern-actions__mode { display: none; }
+    body:not(.modern-simple) .modern-actions__more { display: none; }
+    .modern-actions .modern-actions__more, .modern-actions .modern-actions__mode { min-width: 86px; }
 }
 
 @media (max-width: 900px) {
@@ -542,6 +547,11 @@ body.modern-renderer-ready.touch #mobileHotbar {
     bottom: calc(8px + env(safe-area-inset-bottom));
     max-width: min(58vw, 410px); gap: clamp(3px, .8vw, 7px);
 }
+body.modern-renderer-ready.touch #worldDoor {
+    max-width: min(330px, calc(100vw - 150px));
+    overflow: hidden; text-overflow: ellipsis;
+    z-index: 149 !important;
+}
 body.modern-renderer-ready.touch .mhb-slot {
     width: clamp(44px, 10dvh, 56px); height: clamp(44px, 10dvh, 56px);
 }
@@ -556,10 +566,17 @@ body.modern-renderer-ready.touch #recBtn {
 }
 body.modern-renderer-ready.touch #toastContainer {
     top: calc(55px + env(safe-area-inset-top));
-    max-width: min(420px, 56vw);
+    max-width: min(420px, 48vw);
 }
 body.modern-renderer-ready.touch #journeyMobile:not([hidden]) {
     top: calc(54px + env(safe-area-inset-top));
+}
+body.modern-renderer-ready.touch #journeyMobile:not([hidden]) {
+    max-width: min(185px, 29vw);
+}
+body.modern-renderer-ready.touch .chest-close {
+    display: grid; place-items: center; min-width: 44px; min-height: 44px;
+    top: 2px; right: 2px; color: #f1d69f;
 }
 body.modern-renderer-ready.touch.journey-mobile-open > #journeyCard {
     top: calc(82px + env(safe-area-inset-top));

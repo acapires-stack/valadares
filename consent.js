@@ -7,6 +7,8 @@
   var GA_ID = 'G-D6FVKT85YG';
   var CLARITY_ID = 'xbcvdqlr9c';
   var isGame = /\/(?:jogar|play\.html)\/?$/i.test(location.pathname);
+  var excluded = !location.hostname || /^(?:localhost|127\.0\.0\.1|\[::1\]|.+\.local)$/i.test(location.hostname) ||
+    /\/(?:admin|admin\.html)(?:\/|$)/i.test(location.pathname) || /(?:^|[?&])test=1(?:&|$)/i.test(location.search || '');
 
   function getLang() {
     try {
@@ -28,8 +30,15 @@
   };
 
   var loaded = false;
+  function notify(value) {
+    window.__valadaresConsent = value;
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', { analytics_storage: value === 'granted' ? 'granted' : 'denied' });
+    }
+    try { window.dispatchEvent(new CustomEvent('valadares:consent', { detail: { value: value } })); } catch (e) {}
+  }
   function loadTrackers() {
-    if (loaded) return;
+    if (loaded || excluded) return;
     loaded = true;
     /* GA4 */
     var s = document.createElement('script');
@@ -39,6 +48,7 @@
     window.dataLayer = window.dataLayer || [];
     function gtag() { window.dataLayer.push(arguments); }
     window.gtag = gtag;
+    gtag('consent', 'default', { analytics_storage: 'granted' });
     gtag('js', new Date());
     gtag('config', GA_ID);
     if (!isGame) {
@@ -59,7 +69,9 @@
   function decide(value) {
     try { localStorage.setItem(KEY, value); } catch (e) {}
     removeBanner();
+    notify(value);
     if (value === 'granted') loadTrackers();
+    else if (loaded && !isGame) location.reload();
   }
 
   function showBanner() {
@@ -92,8 +104,10 @@
   var saved = null;
   try { saved = localStorage.getItem(KEY); } catch (e) {}
   if (saved === 'granted') {
+    notify('granted');
     loadTrackers();
   } else if (saved === 'denied') {
+    notify('denied');
     /* respeita a recusa: nada carrega */
   } else if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', showBanner);
@@ -102,5 +116,10 @@
   }
 
   /* permite reabrir o banner via link: <a href="#" onclick="vdCookies()"> */
-  window.vdCookies = function () { try { localStorage.removeItem(KEY); } catch (e) {} showBanner(); };
+  window.vdCookies = function () {
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    notify('denied');
+    if (loaded && !isGame) { location.reload(); return; }
+    showBanner();
+  };
 })();

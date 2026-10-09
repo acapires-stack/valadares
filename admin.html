@@ -165,6 +165,12 @@
         </div>
     </section>
 
+    <section style="grid-column:1 / -1">
+        <h2>Primeira aventura e retorno</h2>
+        <p style="color:#b7aa88;font-size:12px">Contas humanas medidas desde esta atualização, incluindo contas antigas. D1/D7 medem retorno após o primeiro acesso observado, não após o cadastro. Administradores, testes marcados e companheiros automáticos ficam fora. Dias de retorno seguem UTC.</p>
+        <div id="engagementSummary" class="metrics" aria-live="polite"></div>
+        <div id="engagementStatus" class="empty">Aguardando medição.</div>
+    </section>
     <section>
         <h2>Players online <span class="count" id="onlineCount">0</span></h2>
         <div id="onlineList"><div class="empty">carregando…</div></div>
@@ -278,12 +284,30 @@ async function refreshNow(){
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         renderState(data);
+        refreshEngagement();
         document.getElementById('liveBadge').textContent = '— live (' + new Date().toLocaleTimeString('pt-BR') + ')';
         document.getElementById('liveBadge').className = 'badge live';
     } catch (e){
         document.getElementById('liveBadge').textContent = '— erro: ' + e.message;
         document.getElementById('liveBadge').className = 'badge';
     }
+}
+async function refreshEngagement(){
+    const status=document.getElementById('engagementStatus');
+    try{
+        const res=await adminFetch('/api/admin/engagement');
+        if(!res.ok)throw new Error('HTTP '+res.status);
+        const d=await res.json(),root=document.getElementById('engagementSummary');
+        root.replaceChildren();
+        const fraction=r=>r.eligible?`${r.returned}/${r.eligible}`:'Ainda sem coorte elegível';
+        for(const [label,value] of [['Contas acompanhadas',d.measuredAccounts],['Primeiro combate',d.milestones.firstFight],['Primeira missão',d.milestones.firstQuest],['Prêmio equipado',d.milestones.rewardEquipped],['Voltou no dia seguinte',fraction(d.retention.d1)],['Voltou no 7º dia',fraction(d.retention.d7)]]){
+            const card=document.createElement('div');card.className='metric';
+            const title=document.createElement('div');title.className='label';title.textContent=label;
+            const number=document.createElement('div');number.className='value';number.textContent=String(value);number.style.fontSize='15px';
+            card.append(title,number);root.append(card);
+        }
+        status.textContent=`Atualizado: ${d.asOfDay} UTC. Retorno exato em D1/D7, com denominador; últimos ${d.windowDays} dias de coortes observadas.`;
+    }catch(e){status.textContent='Medição da jornada indisponível nesta consulta. As demais funções continuam disponíveis.';}
 }
 function fmtUptime(s){
     if (s < 60) return s + 's';

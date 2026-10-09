@@ -65,6 +65,7 @@ function fixture(options = {}){
         weaponSkillOf:()=> 'Espada', gainSkillXpServer:(p,s,n)=>xp.push({id:p.id,n}),
         gainPetXp:()=>null, hasShieldEquipped:()=>false,
         bumpMobKill:()=>{}, creditQuestKill:()=>{},
+        noteEngagement:()=>{},
         findPartyOfPlayer:()=>options.party || null,
         partyMembersOnline:()=>Array.from(players.values()),
         chebyshev:(x,y,a,b)=>Math.max(Math.abs(x-a),Math.abs(y-b)),

@@ -50,6 +50,10 @@
         const parts = [];
         if (r.gold) parts.push(r.gold + 'g');
         for (const [skill, amount] of Object.entries(r.xp || {})) parts.push(`${amount} XP ${typeof skillDisp === 'function' ? skillDisp(skill) : skill}`);
+        if (q?.id === 'q_cobras') {
+            const skill = ITEMS[player.equipped?.weapon]?.skill || 'Punho';
+            parts.push(`100 XP ${typeof skillDisp === 'function' ? skillDisp(skill) : skill}`);
+        }
         for (const [k, amount] of Object.entries(r.item || r.items || {})) parts.push(`${amount}× ${itemName(k)}`);
         return parts.length ? say('Ao entregar: ','On turn-in: ') + parts.join(' · ') : '';
     }
@@ -119,8 +123,8 @@
                 const robots=e.id===progression.robotExpedition?.id;
                 const title = document.createElement('strong'); title.textContent = english()?e.nameEn:e.name; box.appendChild(title);
                 const p = document.createElement('p'); p.textContent = robots
-                    ? say(`Entrada própria no Portal da Forja ${loc(e.npc.x,e.npc.y)}. Aproxime-se do arco de metal e escolha Entrar · Forja Esquecida. Na oficina abandonada: ${e.objectives.guards} sentinelas, ${e.objectives.golems} construtos e o Guardião da Forja. Nível sugerido: ${e.recommendedLevel}.`,`Separate entrance at the Forge Portal ${loc(e.npc.x,e.npc.y)}. Approach the metal arch and choose Enter · Forgotten Forge. In the abandoned workshop: ${e.objectives.guards} sentries, ${e.objectives.golems} constructs and the Forge Warden. Suggested level: ${e.recommendedLevel}.`)
-                    : say(`Entrada com o Velho Ferreiro ${loc(e.npc.x,e.npc.y)}. Rota solo: ${e.objectives.guards} guardas, ${e.objectives.golems} demônios e o chefe. Nível sugerido: ${e.recommendedLevel}.`,`Enter near the Old Blacksmith ${loc(e.npc.x,e.npc.y)}. Solo route: ${e.objectives.guards} guards, ${e.objectives.golems} demons and the boss. Suggested level: ${e.recommendedLevel}.`); box.appendChild(p);
+                    ? say(`Entrada própria no Portal da Forja ${loc(e.npc.x,e.npc.y)}. Aproxime-se do arco de metal e escolha Entrar · Forja Esquecida. Na oficina abandonada: ${e.objectives.guards} sentinelas, ${e.objectives.golems} construtos e o Guardião da Forja. Prepare uma perícia de combate por volta de ${e.recommendedLevel}, arma e proteção adequadas, comida ou poções. Entrada livre.`,`Separate entrance at the Forge Portal ${loc(e.npc.x,e.npc.y)}. Approach the metal arch and choose Enter · Forgotten Forge. In the abandoned workshop: ${e.objectives.guards} sentries, ${e.objectives.golems} constructs and the Forge Warden. Prepare a combat skill around ${e.recommendedLevel}, suitable weapon and armor, food or potions. Entry is open.`)
+                    : say(`Entrada com o Velho Ferreiro ${loc(e.npc.x,e.npc.y)}. Rota solo: ${e.objectives.guards} guardas, ${e.objectives.golems} demônios e o chefe. Prepare uma perícia de combate por volta de ${e.recommendedLevel}, arma e proteção adequadas, comida ou poções. Entrada livre.`,`Enter near the Old Blacksmith ${loc(e.npc.x,e.npc.y)}. Solo route: ${e.objectives.guards} guards, ${e.objectives.golems} demons and the boss. Prepare a combat skill around ${e.recommendedLevel}, suitable weapon and armor, food or potions. Entry is open.`); box.appendChild(p);
                 const b = document.createElement('button'); b.type='button'; b.textContent = near(e.npc.x,e.npc.y) ? say('Entrar em ','Enter ') + (english()?e.nameEn:e.name) : (robots ? say('Rota até o Portal da Forja','Route to Forge Portal') : say('Rota até o Ferreiro','Route to Blacksmith')) + ' · ' + direction(e.npc.x,e.npc.y);
                 b.disabled = !near(e.npc.x,e.npc.y) || !online(); b.addEventListener('click',()=> { if(send('expeditionEnter',{expedition:e.id})) { pendingAction='enter'; pendingAt=Date.now(); render(); } }); box.appendChild(b);
             }

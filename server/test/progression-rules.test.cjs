@@ -32,7 +32,8 @@ function fixture({full=false,fail=false}={}){
         isAdjacentTo:(p,npc)=>Math.max(Math.abs(p.x-npc.x),Math.abs(p.y-npc.y))<=1,
         QUEST_NPCS:{atendente:{x:50,y:50}},
         QUESTS_BY_ID:{q_ratos:{id:'q_ratos',goal:{kind:'mob',type:'RAT',count:10},
-            reward:{gold:50,xp:{Punho:100},item:{PORRETE:1}}}},
+            reward:{gold:50,xp:{Clava:100},item:{PORRETE:1}}},
+            q_cobras:{id:'q_cobras',goal:{kind:'mob',type:'SNAKE',count:5},reward:{gold:80}}},
         incInv:(p,k,q)=>{p.inv[k]=(p.inv[k]||0)+q;if(p.inv[k]<=0)delete p.inv[k];},
         applyQuestReward:(p,reward)=>{
             p.gold+=reward.gold;
@@ -51,6 +52,7 @@ function fixture({full=false,fail=false}={}){
             acc.savedAt=Date.now();return true;
         },
         sendTo:(id,msg)=>sent.push(msg),sendInvUpdate:(p,msg)=>sent.push({t:'invUpdate',...msg}),
+        noteEngagement:()=>{},
         broadcast:()=>{},snapshotMobs:f=>[...monsters.values()].filter(m=>m.floor===f),
         genArenaGrid:f=>({floor:f,region:{x0:44,y0:46,x1:56,y1:54},rows:[],
             walkable:new Set(),floorTiles:[],stairs:{}}),
@@ -155,7 +157,20 @@ test('first quest preflights capacity and rolls back a failed save',()=>{
     assert.equal(p.gold,50000);
     f.setFail(false);send();assert.equal(p.quests.completed.join(','),'q_ratos');
     assert.equal(p.inv.PORRETE,1);assert.equal(f.acc.save.quests.completed[0],'q_ratos');
+    assert.equal(f.sent.at(-1).questResult.delta.xp.Clava,100);
     send();assert.equal(errors.at(-1),'not_active');assert.equal(p.inv.PORRETE,1);
+});
+test('second quest credits the equipped weapon skill instead of forcing Sword',()=>{
+    const f=fixture();const {p,context}=f;p.x=50;p.y=50;
+    p.equipped={weapon:'MACHADO_MINO'};
+    p.quests={active:{q_cobras:{progress:5}},completed:[]};
+    const begin=source.indexOf("if (kind === 'simple'){");
+    const end=source.indexOf("if (kind === 'chain'){",begin);
+    const turnIn=vm.runInContext(`(function(p,msg,reject){const kind='simple';${source.slice(begin,end)}})`,context);
+    turnIn(p,{questId:'q_cobras'},reason=>assert.fail(reason));
+    assert.equal(f.sent.at(-1).questResult.delta.xp.Machado,100);
+    assert.equal(f.sent.at(-1).questResult.delta.xp.Espada,undefined);
+    assert.deepEqual(p.quests.completed,['q_cobras']);
 });
 test('feature switch blocks new runs and crafts while preserving pending claims and receipts',()=>{
     const f=fixture();const {p,context}=f;

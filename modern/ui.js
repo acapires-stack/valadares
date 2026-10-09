@@ -92,6 +92,7 @@ for (const [key, icon, label, shortcut, primary] of actions) {
     button.title = `${label} (${shortcut})`;
     button.setAttribute('aria-label', button.title);
     if (primary) button.dataset.primary = 'true';
+    if (['b', 'q'].includes(key)) button.dataset.essential = 'true';
     const symbol = document.createElement('span');
     symbol.className = 'modern-actions__symbol';
     symbol.textContent = icon;
@@ -109,7 +110,52 @@ for (const [key, icon, label, shortcut, primary] of actions) {
     });
     actionBar.append(button);
 }
+const more = document.createElement('button');
+more.type = 'button';
+more.className = 'modern-actions__more';
+more.setAttribute('aria-expanded', 'false');
+more.textContent = (bridge?.getLanguage?.()==='en' ? 'More actions' : 'Mais ações');
+more.addEventListener('click', () => {
+    const expanded = body.classList.toggle('modern-more');
+    more.setAttribute('aria-expanded', String(expanded));
+    more.textContent = expanded ? (bridge?.getLanguage?.()==='en' ? 'Fewer actions' : 'Menos ações') : (bridge?.getLanguage?.()==='en' ? 'More actions' : 'Mais ações');
+});
+actionBar.append(more);
+const mode = document.createElement('button');
+mode.type = 'button';
+mode.className = 'modern-actions__mode';
+mode.textContent = (bridge?.getLanguage?.()==='en' ? 'Use full interface' : 'Usar interface completa');
+mode.addEventListener('click', () => {
+    const simple = body.classList.toggle('modern-simple');
+    const playerName = bridge?.getPlayer?.()?.name || '';
+    try { localStorage.setItem(`valadares:actionMode:${encodeURIComponent(playerName)}`, simple ? 'simple' : 'complete'); } catch {}
+    body.classList.remove('modern-more');
+    more.setAttribute('aria-expanded', 'false');
+    more.textContent = (bridge?.getLanguage?.()==='en' ? 'More actions' : 'Mais ações');
+    mode.textContent = simple ? (bridge?.getLanguage?.()==='en' ? 'Use full interface' : 'Usar interface completa') : (bridge?.getLanguage?.()==='en' ? 'Use simple interface' : 'Usar interface simples');
+});
+actionBar.append(mode);
 container.append(actionBar);
+
+// O modo simples é a primeira apresentação de contas novas. Todos os atalhos
+// continuam disponíveis por teclado e no botão Mais ações.
+window.ValadaresModernActions = {
+    onAuth(isNew, playerName) {
+        const key = `valadares:actionMode:${encodeURIComponent(playerName || '')}`;
+        let saved = null;
+        try { saved = localStorage.getItem(key); } catch {}
+        if (saved === null && isNew) {
+            saved = 'simple';
+            try { localStorage.setItem(key, saved); } catch {}
+        }
+        body.classList.toggle('modern-simple', saved === 'simple' || (saved === null && !!isNew));
+        mode.textContent = body.classList.contains('modern-simple') ? (bridge?.getLanguage?.()==='en' ? 'Use full interface' : 'Usar interface completa') : (bridge?.getLanguage?.()==='en' ? 'Use simple interface' : 'Usar interface simples');
+        body.classList.remove('modern-more');
+        more.setAttribute('aria-expanded', 'false');
+        more.textContent = (bridge?.getLanguage?.()==='en' ? 'More actions' : 'Mais ações');
+    }
+};
+if (body.classList.contains('game-active')) window.ValadaresModernActions.onAuth(body.dataset.newAccount === 'true', bridge?.getPlayer?.()?.name);
 
 const character = byId('modernCharacter');
 const left = byId('leftSidebar');

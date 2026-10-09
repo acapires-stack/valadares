@@ -38,7 +38,7 @@
     let momentKind = '', momentSignature = '', momentReward = null;
     const copy = {
         pt: {
-            title:'Primeira aventura', reopen:'📜 Guia', close:'Recolher guia', missions:'Missões', equipReward:'Equipar Porrete', rewardLabel:'Ao entregar: ',
+            title:'Primeira aventura', reopen:'📜 Guia', close:'Recolher guia', missions:'Missões', equipReward:'Equipar {item}', rewardLabel:'Ao entregar: ',
             introStep:'1 de 3 · O pátio precisa de ajuda', intro:'Encontre a Atendente e aceite a Caçada infestante. Ela está em (47, 53).',
             introNear:'Você está ao lado da Atendente. Aceite a missão para começar.', accept:'Aceitar Caçada',
             huntStep:'2 de 3 · Caçada infestante', hunt:'Mate 10 ratos. Saia da zona segura para lutar; use Espaço no computador ou o botão de ataque no celular. Volte à zona segura se precisar se recuperar.',
@@ -54,7 +54,7 @@
             safeRoute:'Centro da zona segura: (50, 50)', safety:'Como recuperar',
             safetyInfo:'Na zona segura, pare de lutar e aguarde a vida se recuperar. Se tiver comida ou poção de vida no inventário, você também pode usá-la.',
             achievementTitle:'Primeira conquista', achievementEyebrow:'CAÇADA INFESTANTE · CONCLUÍDA',
-            achievementText:'A vila reconhece sua primeira vitória.', achievementNext:'Equipe o Porrete recebido; o próximo objetivo aparece no painel Jornada.',
+            achievementText:'A vila reconhece sua primeira vitória.', achievementNext:'Equipe {item} recebido; o próximo objetivo aparece no painel Jornada.',
             resumeTitle:'Sua aventura continua', resumeEyebrow:'ONDE VOCÊ PAROU', resumeNext:'Próxima missão',
             resumeDeliver:'Próxima ação: entregue à Atendente em (47, 53)',
             resumeContinue:'Próxima ação: continue o objetivo e acompanhe Missões',
@@ -62,7 +62,7 @@
             directions:{left:'oeste ←', right:'leste →', up:'norte ↑', down:'sul ↓'}
         },
         en: {
-            title:'First adventure', reopen:'📜 Guide', close:'Collapse guide', missions:'Quests', equipReward:'Equip Cudgel', rewardLabel:'On turn-in: ',
+            title:'First adventure', reopen:'📜 Guide', close:'Collapse guide', missions:'Quests', equipReward:'Equip {item}', rewardLabel:'On turn-in: ',
             introStep:'1 of 3 · The yard needs help', intro:'Find the Attendant and accept Infestation Hunt. She is at (47, 53).',
             introNear:'You are next to the Attendant. Accept the quest to begin.', accept:'Accept Infestation Hunt',
             huntStep:'2 of 3 · Infestation Hunt', hunt:'Kill 10 rats. Leave the safe zone to fight; use Space on desktop or the attack button on mobile. Return to safety if you need to recover.',
@@ -78,7 +78,7 @@
             safeRoute:'Safe zone center: (50, 50)', safety:'How to recover',
             safetyInfo:'In the safe zone, stop fighting and wait for health to recover. If you have food or a health potion in your inventory, you can use it too.',
             achievementTitle:'First achievement', achievementEyebrow:'INFESTATION HUNT · COMPLETE',
-            achievementText:'The village recognizes your first victory.', achievementNext:'Equip the rewarded Cudgel; your next objective appears in the Journey panel.',
+            achievementText:'The village recognizes your first victory.', achievementNext:'Equip the rewarded {item}; your next objective appears in the Journey panel.',
             resumeTitle:'Your adventure continues', resumeEyebrow:'WHERE YOU LEFT OFF', resumeNext:'Next quest',
             resumeDeliver:'Next step: turn in at the Attendant (47, 53)',
             resumeContinue:'Next step: continue the objective and check Quests',
@@ -87,6 +87,8 @@
         }
     };
     const words = () => copy[typeof LANG !== 'undefined' && LANG === 'en' ? 'en' : 'pt'];
+    const rewardName = () => typeof itmName === 'function' ? itmName('PORRETE') : 'PORRETE';
+    const rewardCopy = template => template.replace('{item}', rewardName());
     const prefKey = () => 'valadares:adventureGuide:' + name;
     const pref = () => { try { return localStorage.getItem(prefKey()); } catch { return null; } };
     const setPref = v => { try { localStorage.setItem(prefKey(), v); } catch {} };
@@ -150,7 +152,7 @@
         momentEyebrow.textContent = kind === 'achievement' ? w.achievementEyebrow : w.resumeEyebrow;
         momentText.textContent = data.text;
         momentDetail.textContent = data.detail;
-        momentAction.textContent = kind === 'achievement' && (momentReward?.items?.PORRETE || 0) > 0 ? w.equipReward : w.missions;
+        momentAction.textContent = kind === 'achievement' && (momentReward?.items?.PORRETE || 0) > 0 ? rewardCopy(w.equipReward) : w.missions;
         momentClose.setAttribute('aria-label', w.close);
         render();
     }
@@ -166,7 +168,7 @@
         const achievement = momentKind === 'achievement';
         put(momentTitle, achievement ? w.achievementTitle : w.resumeTitle);
         put(momentEyebrow, achievement ? w.achievementEyebrow : w.resumeEyebrow);
-        put(momentAction, achievement && (momentReward?.items?.PORRETE || 0) > 0 ? w.equipReward : w.missions);
+        put(momentAction, achievement && (momentReward?.items?.PORRETE || 0) > 0 ? rewardCopy(w.equipReward) : w.missions);
         momentClose.setAttribute('aria-label', w.close);
         if (!achievement) {
             const current = resumeData();
@@ -186,7 +188,7 @@
         }
         put(momentText, w.achievementText);
         put(momentDetail, (rewards.length ? rewards.join(' · ') + ' · ' : '')
-            + ((momentReward?.items?.PORRETE || 0) > 0 ? w.achievementNext : w.explore));
+            + ((momentReward?.items?.PORRETE || 0) > 0 ? rewardCopy(w.achievementNext) : w.explore));
     }
     function onQuestResult(result) {
         if (!ready || !name || !result?.ok || result.kind !== 'simple' || result.questId !== 'q_ratos'
@@ -304,12 +306,13 @@
         const lowHealth = !done() && hasQuest() && (player.floor || 0) === 0
             && typeof playerInSafeZone === 'function' && !playerInSafeZone()
             && player.maxHp > 0 && player.hp / player.maxHp < 0.4;
+        const rat = hasQuest() && !done() ? ratSighting() : null;
         const compact = lowHealth ? (LANG === 'en' ? '⚠ Low health' : '⚠ Vida baixa')
             : done() ? (LANG === 'en' ? '📜 Next quest' : '📜 Próxima missão')
-            : !hasQuest() ? (LANG === 'en' ? '📜 Attendant (47, 53)' : '📜 Atendente (47, 53)')
+            : !hasQuest() ? (LANG === 'en' ? '📜 Attendant ' : '📜 Atendente ') + direction(47, 53)
             : syncing ? (LANG === 'en' ? '📜 Saving quest…' : '📜 Registrando…')
             : questProgress('q_ratos') >= 10 ? (LANG === 'en' ? '📜 Return to Attendant' : '📜 Voltar à Atendente')
-            : (LANG === 'en' ? '📜 Rats ' : '📜 Ratos ') + questProgress('q_ratos') + '/10';
+            : (LANG === 'en' ? '📜 Rats ' : '📜 Ratos ') + questProgress('q_ratos') + '/10' + (rat ? ' · ' + direction(rat.x, rat.y) : '');
         openButton.textContent = compact;
         openButton.setAttribute('aria-label', w.reopen + ' · ' + compact);
         root.querySelector('#agClose').setAttribute('aria-label', w.close);
@@ -339,7 +342,6 @@
             step.textContent = w.huntStep;
             body.textContent = w.hunt;
             const progress = typeof questProgress === 'function' ? questProgress('q_ratos') : 0;
-            const rat = ratSighting();
             detail.textContent = `${w.progress}: ${progress}/10 · ` + (rat
                 ? `${w.spotted}: (${rat.x}, ${rat.y}) ${direction(rat.x, rat.y)}`
                 : w.huntEmpty);
