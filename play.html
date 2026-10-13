@@ -7254,7 +7254,8 @@ function renderQuests(){
             cls = 'active'; badge = tr('quest.badge_inprogress');
         } else {
             cls = 'available'; badge = tr('quest.badge_available');
-            btn = near ? `<button class="quest-btn" data-accept="${q.id}">${tr('quest.btn_accept')}</button>` : '';
+            const pending=questAcceptRequests.has(q.id);
+            btn = near ? `<button class="quest-btn" data-accept="${q.id}" ${pending?'disabled':''}>${pending?(LANG==='en'?'Confirming…':'Confirmando…'):tr('quest.btn_accept')}</button>` : '';
         }
         const prog = questProgress(q.id);
         const total = q.goal.count;
@@ -7901,6 +7902,7 @@ function connectMP(){
         }
     };
     ws.onclose = (ev) => {
+        clearQuestAcceptRequests();
         window.ValadaresCompanions?.reset();
         movementSync.disconnect();
         clearConfirmedCombatSounds(undefined,'monster',true);
@@ -8603,6 +8605,8 @@ function handleMP(msg){
         // estar na aba CHAT, fazendo a falha parecer silenciosa ("não dá nada").
         if (typeof showServerToast === 'function') showServerToast('warn', tr('toast.warn_reason', {text, reason: msg.reason}), null, 5000);
         window.ValadaresJourneyUI?.onQuestResult();
+    } else if (msg.t === 'questAcceptResult'){
+        receiveQuestAccept(msg);
     } else if (msg.t === 'questProgress'){
         // Lote 1b: progresso de quest é server-autoritativo (kill/visita). Aplica o
         // valor ABSOLUTO do server por cima do otimista local e atualiza a UI.
@@ -10172,8 +10176,8 @@ function checkAchievements(){
 
 // ─── Quests ──────────────────────────────────────────────────────────────────
 const QUESTS = [
-    { id:'q_ratos',    name:'Caçada infestante', desc:'Ratos invadiram o pátio. Mate 10.',
-      goal:{ kind:'mob', type:'RAT', count:10 }, reward:{ gold:50,  xp:{Clava:100}, item:{PORRETE:1} } },
+    { id:'q_ratos',    name:'Caçada infestante', desc:'Comece sua aventura: derrote 3 ratos e ganhe sua primeira arma.',
+      goal:{ kind:'mob', type:'RAT', count:3 }, reward:{ gold:50,  xp:{Clava:100}, item:{PORRETE:1} } },
     { id:'q_cobras',   name:'Defenda o pátio',   desc:'Mate 5 cobras-do-pântano.',
       goal:{ kind:'mob', type:'SNAKE', count:5 }, reward:{ gold:80,  xp:{} } },
     { id:'q_seda',     name:'Trama da Aranha',   desc:'Colete 5 sedas (de aranhas).',
@@ -10319,7 +10323,7 @@ const QUEST_CHAINS = {
 // ─── i18n Fase 3.1 — quests/chains em EN (chave = id). Dados PT acima intactos;
 //     helpers caem no PT por fallback. Conteúdo de prosa/chrome vai no I18N. ──────
 const QUEST_EN = {
-    q_ratos:  { name:'Infestation Hunt', desc:'Rats invaded the yard. Kill 10.' },
+    q_ratos:  { name:'Infestation Hunt', desc:'Start your adventure: defeat 3 rats and earn your first weapon.' },
     q_cobras: { name:'Defend the Yard',  desc:'Kill 5 swamp snakes.' },
     q_seda:   { name:"Spider's Weave",   desc:'Collect 5 silks (from spiders).' },
     q_orcs:   { name:'Orc Heads',        desc:'Kill 3 Orcs (the Leader does not count).' },
@@ -10606,10 +10610,36 @@ function questProgress(id){
 function questComplete(id){ return questProgress(id) >= questById(id).goal.count; }
 function questIsActive(id){ return !!player.quests.active[id]; }
 function questIsDone(id){ return player.quests.completed.includes(id); }
+const questAcceptRequests=new Map();
+function clearQuestAcceptRequests(){
+    for(const timer of questAcceptRequests.values())clearTimeout(timer);
+    questAcceptRequests.clear();
+    window.valadaresAdventureGuide?.onAcceptResult?.({ok:false});
+}
+function receiveQuestAccept(msg){
+    clearTimeout(questAcceptRequests.get(msg.questId));questAcceptRequests.delete(msg.questId);
+    if(msg.quests){
+        player.quests.active=msg.quests.active||{};
+        player.quests.completed=msg.quests.completed||[];
+    }
+    if(msg.ok){
+        const q=questById(msg.questId);if(q)log(tr('log.quest_accepted',{name:qName(q)}));
+    }else{
+        showServerToast('warn',LANG==='en'?'Quest not accepted. Move next to the Attendant and try again.':'A missão não foi aceita. Aproxime-se da Atendente e tente novamente.',null,4000);
+    }
+    window.valadaresAdventureGuide?.onAcceptResult?.(msg);
+    window.ValadaresJourneyUI?.refresh();renderQuests();
+}
 function acceptQuest(id){
-    if (questIsActive(id) || questIsDone(id)) return false;
-    player.quests.active[id] = { progress: 0 };
-    log(tr('log.quest_accepted', {name: qName(questById(id))}));
+    if(!questById(id)||questIsActive(id)||questIsDone(id)||questAcceptRequests.has(id)||!_wsAuthed||ws?.readyState!==1)return false;
+    const timer=setTimeout(()=>{
+        questAcceptRequests.delete(id);
+        window.valadaresAdventureGuide?.onAcceptResult?.({questId:id,ok:false});
+        showServerToast('warn',LANG==='en'?'Confirmation did not arrive. You can try accepting again.':'A confirmação não chegou. Você pode tentar aceitar novamente.',null,4000);
+    },8000);
+    questAcceptRequests.set(id,timer);
+    window.valadaresAdventureGuide?.onAcceptPending?.(id);
+    ws.send(JSON.stringify({t:'questAccept',questId:id}));
     return true;
 }
 function turnInQuest(id){
@@ -10627,6 +10657,7 @@ function notifyMobKilledForQuests(type){
     notifyMobKillForChains(type);
     // Quests principais (aceitas)
     for (const id in player.quests.active){
+        if(serverAuthMobs)break; // Online progress arrives only in questProgress from the server.
         const q = questById(id);
         if (!q || q.goal.kind !== 'mob' || q.goal.type !== type) continue;
         const st = player.quests.active[id];
@@ -18134,6 +18165,12 @@ function loop(ts){
             ctx.strokeRect((a.renderX-cam.x)*TS+2,(a.renderY-cam.y)*TS+2,TS-4,TS-4);
         }
     }
+    const guideObjective=window.valadaresAdventureGuide?.getObjective?.();
+    if(guideObjective){
+        const gx=(guideObjective.x-cam.x+.5)*TS,gy=(guideObjective.y-cam.y+.5)*TS;
+        ctx.strokeStyle='#ffd777';ctx.lineWidth=3;ctx.strokeRect(gx-TS/2,gy-TS/2,TS,TS);
+        ctx.fillStyle='#ffd777';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText('▼ '+guideObjective.label,gx,gy-TS);
+    }
     // player (renderX/Y interpolado, com todos equipamentos visíveis)
     const ppx = (player.renderX-cam.x)*TS, ppy = (player.renderY-cam.y)*TS;
     drawCharacter(ppx, ppy, player.dir,
@@ -18402,7 +18439,7 @@ function loop(ts){
 <script src="/village-art.js?v=20261004a"></script>
 <script src="/render2d-polish.js?v=20261004b"></script>
 <script src="/ui-polish.js?v=20261003a"></script>
-<script src="/adventure-guide.js?v=20261006a"></script>
+<script src="/adventure-guide.js?v=20261013-retencao"></script>
 <script src="/journey-ui.js?v=3"></script>
 <script src="/adventure-feedback.js?v=20261005b"></script>
 <script src="/training-rules.js?v=1"></script>

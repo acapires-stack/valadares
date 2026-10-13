@@ -120,6 +120,12 @@ export function createMinimap(canvas, legend, bridge) {
             entity(remote.x, remote.y, mate ? '#74e08c' : remote.pvp ? '#ff4545' : '#71aaff', mate ? 3.2 : 2.7);
         }
 
+        const objective=window.valadaresAdventureGuide?.getObjective?.();
+        if(objective&&floor===0){
+            const marker=point(objective.x,objective.y);
+            ctx.strokeStyle='#ffdc72';ctx.lineWidth=2;
+            ctx.beginPath();ctx.arc(Math.max(7,Math.min(size-7,marker.x)),Math.max(7,Math.min(size-7,marker.y)),6,0,Math.PI*2);ctx.stroke();
+        }
         const p = point(player.x, player.y);
         const facing = dir[player.dir] || dir.down;
         const right = [-facing[1], facing[0]];
@@ -142,7 +148,7 @@ export function createMinimap(canvas, legend, bridge) {
             ? (roomNames[language]?.[interior.id] || interior.label || (language === 'en' ? 'Interior' : 'Interior'))
             : floor ? (dungeonTheme === 'automaton_depths' ? automatonDescription : language === 'en' ? `Floor ${floor}` : `Andar ${floor}`)
                 : (language === 'en' ? 'Explored terrain' : 'Terreno descoberto');
-        const legendText = near.length ? near.join(' · ') : description;
+        const legendText = objective?.label || (near.length ? near.join(' · ') : description);
         if (legend.textContent !== legendText) legend.textContent = legendText;
         const aria = `${description}. ${language === 'en' ? 'Position' : 'Posição'} ${Math.floor(player.x)}, ${Math.floor(player.y)}. ${near.join(', ')}`;
         if (canvas.getAttribute('aria-label') !== aria) canvas.setAttribute('aria-label', aria);

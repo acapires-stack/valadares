@@ -1,6 +1,7 @@
 'use strict';
 const daily = require('../daily-rules');
-const MILESTONES = Object.freeze(['firstFightAt', 'firstQuestAt', 'rewardEquippedAt']);
+const MILESTONES = Object.freeze(['firstFightAt', 'firstQuestAcceptedAt', 'firstQuestGoalAt',
+    'firstQuestAt', 'rewardEquippedAt', 'firstDeathAt']);
 const DAY_MS = 86400000;
 const WINDOW_DAYS = 30;
 
@@ -36,7 +37,8 @@ function aggregate(accounts, now = Date.now(), options = {}) {
     const today = daily.todayKey(now), cutoff = daily.todayKey(Number(now) - (WINDOW_DAYS - 1) * DAY_MS);
     const result = {
         asOfDay: today, windowDays: WINDOW_DAYS, measuredAccounts: 0,
-        milestones: { firstFight: 0, firstQuest: 0, rewardEquipped: 0 },
+        milestones: { firstFight: 0, firstQuestAccepted: 0, firstQuestGoal: 0,
+            firstQuest: 0, rewardEquipped: 0, firstDeath: 0 },
         retention: { d1: { returned: 0, eligible: 0 }, d7: { returned: 0, eligible: 0 } },
         cohorts: [],
     };
@@ -46,7 +48,10 @@ function aggregate(accounts, now = Date.now(), options = {}) {
         const e = account.engagement;
         if (!e || !validTime(e.firstLoginAt)) continue; // saves antigos não são logins
         result.measuredAccounts++;
-        for (const [field, label] of [['firstFightAt','firstFight'], ['firstQuestAt','firstQuest'], ['rewardEquippedAt','rewardEquipped']])
+        for (const [field, label] of [['firstFightAt','firstFight'],
+            ['firstQuestAcceptedAt','firstQuestAccepted'], ['firstQuestGoalAt','firstQuestGoal'],
+            ['firstQuestAt','firstQuest'], ['rewardEquippedAt','rewardEquipped'],
+            ['firstDeathAt','firstDeath']])
             if (validTime(e[field])) result.milestones[label]++;
         const first = daily.todayKey(e.firstLoginAt);
         if (first < cutoff || first > today) continue;

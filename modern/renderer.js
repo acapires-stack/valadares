@@ -53,6 +53,16 @@ export async function createRenderer(bridge){
    }
    if(r.kind==='mob'&&(isTarget||e.hp<e.maxHp)){const pct=Math.max(0,Math.min(1,e.hp/(e.maxHp||e.hp))),w=36;ctx.fillStyle='rgba(11,18,17,.85)';ctx.fillRect(pos.x-w/2-1,pos.y+4,w+2,5);ctx.fillStyle=isTarget?'#c57152':'#89ac80';ctx.fillRect(pos.x-w/2,pos.y+5,w*pct,3);if(isTarget)text(e.name||bridge.getMonsterTypes?.()[e.type]?.name||e.type,pos.x,pos.y,'#f1d4aa',11);}
   }
+  const objective=window.valadaresAdventureGuide?.getObjective?.();
+  if(objective){
+   const at=project(objective.x+.5,2.5,objective.y+.5),ground=project(objective.x+.5,.04,objective.y+.5);
+   const x=Math.max(100,Math.min(width-100,at.x)),y=Math.max(85,Math.min(height-110,at.y));
+   ctx.strokeStyle='#ffd777';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(ground.x,ground.y,22,10,0,0,Math.PI*2);ctx.stroke();
+   ctx.fillStyle='#ffd777';ctx.beginPath();ctx.moveTo(x-7,y-10);ctx.lineTo(x+7,y-10);ctx.lineTo(x,y);ctx.closePath();ctx.fill();
+   ctx.font='700 12px system-ui';const w=ctx.measureText(objective.label).width+18;
+   ctx.fillStyle='rgba(24,29,20,.94)';ctx.fillRect(x-w/2,y-35,w,21);
+   ctx.textAlign='center';ctx.fillStyle='#ffe6a1';ctx.fillText(objective.label,x,y-20);
+  }
   for(const f of bridge.getFloats?.()||[]){const x=f.entity?.renderX??f.x,y=f.entity?.renderY??f.y;if(!Number.isFinite(x)||!Number.isFinite(y))continue;const p=project(x+.5,1.6+(900-f.life)/1000,y+.5);ctx.globalAlpha=Math.min(1,f.life/300);text(String(f.text),p.x,p.y,f.color||'#f4deac',Math.min(18,f.size||13));ctx.globalAlpha=1;}
   for(const e of bridge.getGround?.()||[]){
    const x=e.x??e.tx,y=e.y??e.ty;if(!Number.isFinite(x)||!Number.isFinite(y))continue;

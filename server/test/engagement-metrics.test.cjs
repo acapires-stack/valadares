@@ -14,6 +14,9 @@ test('logins and milestones are unique, durable on the account, and do not rewri
     assert.equal(account.engagement.firstLoginAt, first);
     assert.equal(metrics.noteMilestone(account, 'firstFightAt', first + 2000), true);
     assert.equal(metrics.noteMilestone(account, 'firstFightAt', first + 3000), false);
+    assert.equal(metrics.noteMilestone(account, 'firstQuestAcceptedAt', first + 4000), true);
+    assert.equal(metrics.noteMilestone(account, 'firstQuestGoalAt', first + 5000), true);
+    assert.equal(metrics.noteMilestone(account, 'firstDeathAt', first + 6000), true);
     assert.equal(account.engagement.firstFightAt, first + 2000);
     assert.strictEqual(account.save, oldSave);
     assert.deepEqual(account.save, oldSave);
@@ -21,6 +24,9 @@ test('logins and milestones are unique, durable on the account, and do not rewri
     metrics.noteLogin(reloaded, first + DAY);
     assert.equal(reloaded.engagement.firstLoginAt, first);
     assert.equal(reloaded.engagement.firstFightAt, first + 2000);
+    assert.equal(reloaded.engagement.firstQuestAcceptedAt, first + 4000);
+    assert.equal(reloaded.engagement.firstQuestGoalAt, first + 5000);
+    assert.equal(reloaded.engagement.firstDeathAt, first + 6000);
 });
 
 test('D1/D7 count eligible cohorts with denominators; admin and explicit QA flags are excluded', () => {
@@ -29,6 +35,9 @@ test('D1/D7 count eligible cohorts with denominators; admin and explicit QA flag
     metrics.noteLogin(returning, first + DAY);
     metrics.noteLogin(returning, first + 7 * DAY);
     metrics.noteMilestone(returning, 'firstQuestAt', first + DAY);
+    metrics.noteMilestone(returning, 'firstQuestAcceptedAt', first + 1000);
+    metrics.noteMilestone(returning, 'firstQuestGoalAt', first + 2000);
+    metrics.noteMilestone(returning, 'firstDeathAt', first + 3000);
     const absent = { name:'Ausente' };
     metrics.noteLogin(absent, first);
     const admin = { name:'alcione' };
@@ -45,6 +54,9 @@ test('D1/D7 count eligible cohorts with denominators; admin and explicit QA flag
     assert.deepEqual(result.retention.d1, { returned:1, eligible:2 });
     assert.deepEqual(result.retention.d7, { returned:1, eligible:2 });
     assert.equal(result.milestones.firstQuest, 1);
+    assert.equal(result.milestones.firstQuestAccepted, 1);
+    assert.equal(result.milestones.firstQuestGoal, 1);
+    assert.equal(result.milestones.firstDeath, 1);
     assert.equal(result.cohorts.length, 1);
     assert.equal(result.cohorts[0].firstLogins, 2);
     assert.ok(!JSON.stringify(result).includes('Pessoa'));

@@ -909,7 +909,7 @@ const RECIPES = [
 // Espelhadas do cliente (play.html). Só os campos que o server precisa pra validar
 // turn-in e calcular reward: kind, type/items/count, reward, choices.
 const QUESTS = [
-    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:10 }, reward:{ gold:50,  xp:{Clava:100}, item:{PORRETE:1} } },
+    { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:3 }, reward:{ gold:50,  xp:{Clava:100}, item:{PORRETE:1} } },
     { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80 } }, // +100 XP na perícia da arma equipada na entrega.
     { id:'q_seda',   goal:{ kind:'item', type:'SILK',      count:5  }, reward:{ gold:200 } },
     { id:'q_orcs',   goal:{ kind:'mob',  type:'ORC',       count:3  }, reward:{ gold:300, xp:{Espada:50,Machado:50,Clava:50} } },
@@ -3225,6 +3225,7 @@ function tickAI(){
                             // Morreu → o cliente respawna no spawn (playerDie manda pos pro
                             // outro lado do mapa). Libera 1 pos não-adjacente (anti-teleporte).
                             if (target.hp === 0){
+                                noteEngagement(target, 'firstDeathAt');
                                 target._posGraceUntil = Date.now() + 60000;
                                 // Fix LOOP DE MORTE (2026-06-03): ressuscita server-side (HP/MP cheios)
                                 // + (masmorra→cidade, dentro do helper). O pstats(hp=0) já saiu acima
@@ -5153,6 +5154,7 @@ function serverCurrentChainStage(p, chainId){
 }
 function creditQuestKill(p, mobType){
     if (!p || !mobType) return;
+    const progressMessages = [];
     // Quests simples ativas (goal mob do tipo)
     if (p.quests && p.quests.active){
         for (const qid of Object.keys(p.quests.active)){
@@ -5162,7 +5164,8 @@ function creditQuestKill(p, mobType){
             const st = p.quests.active[qid] || (p.quests.active[qid] = { progress: 0 });
             if ((st.progress | 0) < q.goal.count){
                 st.progress = (st.progress | 0) + 1;
-                sendTo(p.id, { t:'questProgress', kind:'simple', questId: qid, progress: st.progress });
+                if (qid === 'q_ratos' && st.progress === q.goal.count) noteEngagement(p, 'firstQuestGoalAt');
+                progressMessages.push({ t:'questProgress', kind:'simple', questId: qid, progress: st.progress });
             }
         }
     }
@@ -5176,8 +5179,13 @@ function creditQuestKill(p, mobType){
         if ((p.questFlags[chainId][key] || 0) < stage.count){
             p.questFlags[chainId][key] = (p.questFlags[chainId][key] || 0) + 1;
             p.questFlags[chainId][stage.id + '_started'] = true;   // UI: marca engajado
-            sendTo(p.id, { t:'questProgress', kind:'chain', chainId, flags: p.questFlags[chainId] });
+            progressMessages.push({ t:'questProgress', kind:'chain', chainId, flags: p.questFlags[chainId] });
         }
+    }
+    if (progressMessages.length){
+        // A kill já ocorreu: se o disco falhar, mantenha o progresso em memória e tente de novo.
+        if (!updateEnchantSave(p)) queueSaveAccounts();
+        for (const message of progressMessages) sendTo(p.id, message);
     }
 }
 function creditQuestVisit(p, x, y){
@@ -5874,6 +5882,7 @@ function tickPlayerDots(){
                     hpChanged = true;
                     break;
                 }
+                if (!dotFromPlayer) noteEngagement(p, 'firstDeathAt');
                 // Morte por DoT → cliente respawna no spawn. Libera 1 pos não-adjacente.
                 p._posGraceUntil = Date.now() + 60000;
                 // Sinaliza hp=0 ao cliente (dispara playerDie/penalidade UMA vez) ANTES de ressuscitar,
@@ -7159,6 +7168,36 @@ wss.on('connection', (ws, request) => {
         if (msg.t !== 'join' && !p.joined) return;
         if (isInteriorFloor(p.floor) && cityServiceMessages.has(msg.t)) return;
 
+        if (msg.t === 'questAccept') {
+            const questId = typeof msg.questId === 'string' ? msg.questId : '';
+            const reply = (ok, reason) => sendTo(id, {t:'questAcceptResult', ok, questId, reason, quests:p.quests});
+            const quest = QUESTS_BY_ID[questId];
+            if (!quest) return reply(false, 'unknown_quest');
+            if ((p.floor || 0) !== 0 || !isAdjacentTo(p, QUEST_NPCS.atendente)) return reply(false, 'not_at_npc');
+            p.quests = p.quests || {active:{}, completed:[], daily:null};
+            p.quests.active = p.quests.active || {};
+            p.quests.completed = p.quests.completed || [];
+            if (p.quests.completed.includes(questId)) return reply(false, 'already_done');
+            const alreadyActive = !!p.quests.active[questId];
+            const acc = getAccount(p.authedName);
+            if (!acc) return reply(false, 'save_failed');
+            const previous = {quests:JSON.parse(JSON.stringify(p.quests)),
+                save:acc.save ? JSON.parse(JSON.stringify(acc.save)) : null,
+                savedAt:acc.savedAt, engagement:acc.engagement ? JSON.parse(JSON.stringify(acc.engagement)) : null};
+            if (!alreadyActive) {
+                p.quests.active[questId] = {progress:0};
+                if (questId === 'q_ratos') noteEngagement(p, 'firstQuestAcceptedAt');
+            }
+            if (!updateEnchantSave(p)) {
+                p.quests = previous.quests;
+                acc.save = previous.save;
+                acc.savedAt = previous.savedAt;
+                acc.engagement = previous.engagement;
+                return reply(false, 'save_failed');
+            }
+            return reply(true, alreadyActive ? 'already_active' : 'accepted');
+        }
+
         // ─── SAVE upload (snapshot do save do player) ─────────────────────
         if (msg.t === 'saveUpload') {
             if (!p.authed || !p.authedName) return;
@@ -7196,19 +7235,17 @@ wss.on('connection', (ws, request) => {
             // Antes o cliente reenviava completed:[] / questFlags zerados a cada save e
             // re-reivindicava quests infinitamente (gold/itens/permaBuffs ilimitados via
             // questTurnIn). Agora o server IGNORA esses dois campos no saveUpload e mantém os
-            // seus (mutados só por questTurnIn). `active` e `daily` seguem do cliente — active
-            // é só "em quais quests estou"; daily tem anti-replay próprio em p.dailyClaim.
+            // seus (mutados só por questTurnIn). `active` também é server-owned:
+            // contas antigas já foram hidratadas no join; novas aceitações usam questAccept.
+            // Daily continua com anti-replay próprio em p.dailyClaim.
             if (data.quests && typeof data.quests === 'object'){
                 p.quests = p.quests || { active:{}, completed:[], daily:null };
-                // active: o cliente diz EM QUAIS quests está; mas o `progress` de mob é
-                // SERVER-AUTORITATIVO (Lote 1b) — preserva o do server, IGNORA o do cliente
-                // (senão F12 forja progress e reivindica sem matar). Quest nova entra em 0;
-                // o server incrementa em creditQuestKill. (Caveat: quest de mob em andamento
-                // no deploy recontа do zero — item-quest não afeta, deriva do inventário.)
-                const _clientActive = (data.quests.active && typeof data.quests.active === 'object') ? data.quests.active : {};
+                // Snapshot do cliente não cria nem apaga quests simples, tampouco altera
+                // progresso. Preserva as já carregadas do save e confirmadas pelo server.
                 const _prevActive = p.quests.active || {};
                 const _mergedActive = {};
-                for (const _qid of Object.keys(_clientActive)){
+                for (const _qid of Object.keys(_prevActive)){
+                    if (Array.isArray(p.quests.completed) && p.quests.completed.includes(_qid)) continue;
                     const _prev = _prevActive[_qid];
                     _mergedActive[_qid] = { progress: (_prev && typeof _prev.progress === 'number') ? _prev.progress : 0 };
                 }
@@ -7485,6 +7522,8 @@ wss.on('connection', (ws, request) => {
             // em x/y"). Só vale na janela pós-boot → NÃO é fuga de PvP em reconexão
             // normal. Fora da janela: mantém a posição do save.
             const postRestart = Date.now() - SERVER_BOOT_TIME < POST_BOOT_HEAL_MS;
+            const showRestartRecovery = postRestart && !!acc?.save &&
+                (p.x !== SAFE_CX || p.y !== SAFE_CY);
             if (postRestart){
                 p.hp = p.maxHp;
                 p.mp = p.maxMp;
@@ -7531,7 +7570,7 @@ wss.on('connection', (ws, request) => {
                 dailyEvent: dailyEventSnapshot(),
                 groundDrops: snapshotGroundDrops(p.floor),
                 dungeonUnlock: p.dungeonUnlock || 0,   // 🕳️ checkpoint das Profundezas (entrada mostra o seletor)
-                maintenance: postRestart || undefined,   // cliente mostra toast "levado pra PZ"
+                maintenance: showRestartRecovery || undefined,   // aviso só se um save foi reposicionado
             }));
             // Manda inv/equipped/gold/chests autoritativos pro cliente após o join,
             // pra cobrir o caso do save server ser mais recente que o save local.
