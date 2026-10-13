@@ -4,6 +4,10 @@
   const english=()=>window.ValadaresModernBridge?.getLanguage?.()==='en';
   const words=(pt,en)=>english()?en:pt;
   function receive(message) {
+    if(message.t==='companionAttackResult') {
+      window.ValadaresModernBridge?.onCompanionAttackResult?.(message);
+      return;
+    }
     if(message.t==='companionResult') {
       if(status)status.textContent=message.ok?words('Combinado. Pode seguir seu caminho!','All set. Lead the way!'):words('Aproxime-se de um companheiro disponível para pedir ajuda.','Move closer to an available companion to ask for help.');
       return;
@@ -31,10 +35,10 @@
     if(window.ValadaresModernBridge?.sendCompanionAction?.(row.id,action)!==true&&status)status.textContent=words('Reconecte ao mundo para continuar.','Reconnect to the world to continue.');
   }
   const number=value=>Number.isFinite(value)?Math.max(0,Math.floor(value)):0;
-  const stateLabel=row=>({travel:words('Explorando e procurando uma caçada','Exploring and looking for a hunt'),combat:words('Em combate','In combat'),rest:words('Descansando','Resting'),recover:words('Recuperando-se de uma derrota','Recovering from a defeat'),following:words('Acompanhando um aventureiro','Following an adventurer'),assist:words('Ajudando em combate','Helping in combat'),patrol:words('Explorando','Exploring')})[row.state]||words('Preparando a próxima aventura','Preparing the next adventure');
+  const stateLabel=row=>({travel:words('Explorando e procurando uma caçada','Exploring and looking for a hunt'),combat:words('Em combate','In combat'),defend:words('Defendendo-se de um ataque','Defending against an attack'),rest:words('Descansando','Resting'),recover:words('Recuperando-se de uma derrota','Recovering from a defeat'),following:words('Acompanhando um aventureiro','Following an adventurer'),assist:words('Ajudando em combate','Helping in combat'),patrol:words('Explorando','Exploring')})[row.state]||words('Preparando a próxima aventura','Preparing the next adventure');
   function ensureDialog() {
     if(!dialog) {
-      const style=document.createElement('link');style.rel='stylesheet';style.href='/companions.css?v=20261013';document.head.append(style);
+      const style=document.createElement('link');style.rel='stylesheet';style.href='/companions.css?v=20261013-pvp';document.head.append(style);
       dialog=document.createElement('dialog');dialog.className='companion-dialog';dialog.setAttribute('aria-labelledby','companionTitle');document.body.append(dialog);
       dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
       dialog.addEventListener('keydown',e=>e.stopPropagation());
@@ -62,8 +66,10 @@
     details.weapon.textContent=words('Arma: ','Weapon: ')+(item?.name||weapon||'—');
     const player=window.ValadaresModernBridge?.getPlayer?.();
     const near=player&&Math.max(Math.abs(player.x-row.x),Math.abs(player.y-row.y))<=5;
-    details.follow.disabled=!!row.busy||!near||row.state==='recover';
+    details.follow.disabled=!!row.busy||!near||row.state==='recover'||row.state==='defend';
     details.dismiss.disabled=!row.followingYou;
+    details.attack.disabled=row.canAttack!==true;
+    details.attack.textContent=row.hostileToYou?words('Continuar combate','Continue fighting'):words('Atacar (PvP)','Attack (PvP)');
     details.where.textContent=row.followingYou?words('Acompanhando você.','Following you.'):row.busy?words('Acompanhando outro aventureiro.','Following another adventurer.'):near?words('Você pode pedir companhia por um tempo.','You can ask to join for a while.'):words('Encontre este aventureiro no mundo para pedir companhia.','Meet this adventurer in the world to ask to join.');
   }
   function openRoster(){
@@ -86,11 +92,16 @@
     const title=document.createElement('h2');title.id='companionTitle';title.textContent=row.name;dialog.append(title);
     details={};
     for(const key of ['level','activity','health','xp','weapon','task','history','where']){details[key]=element('p','',key==='level'?'companion-level':key==='where'?'companion-note':'');dialog.append(details[key]);}
-    const note=document.createElement('p');note.className='companion-note';note.textContent=words('Eu caço, ganho experiência e descanso para me recuperar. Continuo a aventura quando você sai.','I hunt, gain experience and rest to recover. I keep adventuring when you leave.');dialog.append(note);
+    const note=document.createElement('p');note.className='companion-note';note.textContent=words('Eu caço, evoluo e continuo a aventura quando você sai. Se me atacar fora da zona segura, vou me defender.','I hunt, progress and keep adventuring when you leave. If you attack me outside a safe zone, I will defend myself.');dialog.append(note);
     status=document.createElement('p');status.setAttribute('role','status');dialog.append(status);
     const actions=document.createElement('div');actions.className='companion-actions';dialog.append(actions);
     const follow=document.createElement('button');follow.type='button';follow.textContent=words('Pedir companhia','Ask to join');follow.addEventListener('click',()=>send('follow'));actions.append(follow);details.follow=follow;
     const dismiss=document.createElement('button');dismiss.type='button';dismiss.textContent=words('Retomar suas caçadas','Resume your hunts');dismiss.addEventListener('click',()=>send('dismiss'));actions.append(dismiss);details.dismiss=dismiss;
+    details.attack=action(actions,words('Atacar (PvP)','Attack (PvP)'),()=>{
+      if(window.ValadaresModernBridge?.attackCompanion?.(row.id)===true)dialog.close();
+      else status.textContent=words('Aproxime-se fora da zona segura e confira os requisitos de PvP no chat.','Move closer outside the safe zone and check the PvP requirements in chat.');
+    });
+    details.attack.className='companion-attack';
     action(actions,words('Ver todos','View all'),openRoster);
     const close=document.createElement('button');close.type='button';close.textContent=words('Fechar','Close');close.addEventListener('click',()=>dialog.close());actions.append(close);
     if(!dialog.open)dialog.showModal();refreshDialog();

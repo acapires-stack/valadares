@@ -35,8 +35,9 @@ const taskFor=(completed,level)=>{
 };
 const positiveInt=(v,min,max)=>Number.isInteger(v)&&v>=min&&v<=max;
 
-function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()=>{},onAssist=()=>{},initialState=[]}) {
-  const bots=[],assistBudget=new WeakMap();
+function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()=>{},onAssist=()=>{},
+  onRetaliate=()=>0,safe=(x,y)=>distance({x,y},{x:50,y:50})<=4,attackRange=()=>1,initialState=[]}) {
+  const bots=[],assistBudget=new WeakMap(),lastHumanAttack=new WeakMap();
   const good=(x,y)=>Number.isInteger(x)&&Number.isInteger(y)&&x>=2&&y>=2&&x<98&&y<98&&walkable(x,y);
   const occupied=(x,y,self,people)=>people.some(p=>p.x===x&&p.y===y)||bots.some(b=>b!==self&&b.x===x&&b.y===y);
   function nearest(x,y){
@@ -65,7 +66,7 @@ function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()
       hp:positiveInt(saved?.hp,0,maxHp)?saved.hp:maxHp,maxHp,kills,deaths,tasksCompleted,task,gearTier,
       attackSeq:0,following:null,targetId:null,nextMove:now()+i*110,nextAttack:0,
       nextRetaliation:0,nextHeal:now()+3000,restUntil:0,recoverUntil:0,path:[],pathTarget:null,
-      retryAt:0};
+      retryAt:0,aggressors:new Map(),defendOrigin:null};
     bots.push(bot);
   }
   const setActivity=(b,state,activity,time)=>{if(b.state!==state||b.activity!==activity){b.state=state;b.activity=activity;b.lastActivityAt=time;}};
@@ -80,7 +81,7 @@ function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()
     if(m.maxHp>Math.max(65,45+b.level*40))return false;
     return true;
   }
-  function route(b,goal,people,mobs){
+  function route(b,goal,people,mobs,avoidSafe=false){
     // Four-neighbour BFS on the authoritative map. No diagonal cuts through walls.
     const start=b.x+','+b.y,queue=[{x:b.x,y:b.y}],seen=new Set([start]),prev=new Map();
     const blockedMob=new Set(mobs.filter(m=>m.hp>0&&m.id!==b.targetId).map(m=>m.x+','+m.y));
@@ -90,7 +91,7 @@ function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()
       if(distance(p,goal)<=1){end=p.x+','+p.y;break;}
       const ordered=directions.slice().sort((a,c)=>distance({x:p.x+a[0],y:p.y+a[1]},goal)-distance({x:p.x+c[0],y:p.y+c[1]},goal));
       for(const [dx,dy] of ordered){const x=p.x+dx,y=p.y+dy,key=x+','+y;
-        if(seen.has(key)||!good(x,y)||blockedMob.has(key)||occupied(x,y,b,people))continue;
+        if(seen.has(key)||!good(x,y)||(avoidSafe&&safe(x,y))||blockedMob.has(key)||occupied(x,y,b,people))continue;
         seen.add(key);prev.set(key,p.x+','+p.y);queue.push({x,y});
       }
     }
@@ -103,7 +104,8 @@ function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()
     setActivity(b,'rest','Descansando',time);
   }
   function die(b,time){
-    b.hp=0;b.deaths++;b.targetId=null;b.path=[];b.pathTarget=null;
+    b.hp=0;b.deaths++;b.targetId=null;b.path=[];b.pathTarget=null;b.following=null;
+    b.aggressors.clear();b.defendOrigin=null;
     b.recoverUntil=time+8000;b.restUntil=time+18000;
     const home=nearest(50,50);if(home){b.x=home.x;b.y=home.y;}
     setActivity(b,'recover','Recuperando-se na praça',time);
@@ -134,6 +136,35 @@ function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()
         if(b.state==='rest'||b.state==='recover')b.hp=Math.min(b.maxHp,b.hp+Math.max(2,Math.round(b.maxHp*.09)));
         b.nextHeal=time+2000;
       }
+      for(const [id,until] of b.aggressors){
+        const attacker=people.find(p=>p.id===id);
+        if(until<=time||!attacker||safe(attacker.x,attacker.y)||safe(b.x,b.y)||
+          distance(attacker,b)>8||(b.defendOrigin&&distance(attacker,b.defendOrigin)>8)||
+          attacker.duel||attacker.arena)b.aggressors.delete(id);
+      }
+      if(b.aggressors.size){
+        const attacker=people.filter(p=>b.aggressors.has(p.id))
+          .sort((a,c)=>distance(b,a)-distance(b,c))[0];
+        if(attacker){
+          b.targetId=null;b.path=[];
+          setActivity(b,'defend','Revidando '+attacker.name,time);
+          const range=b.equipped.weapon.startsWith('ARCO')||b.equipped.weapon==='BESTA'||
+            b.equipped.weapon.startsWith('CAJADO')?4:1;
+          if(distance(b,attacker)<=range&&time>=b.nextAttack){
+            b.attackSeq++;b.nextAttack=time+1100;
+            const result=onRetaliate(attacker,b,Math.max(2,4+b.level*2+b.gearTier*2));
+            if(result?.dead)b.aggressors.delete(attacker.id);
+          }else if(time>=b.nextMove&&distance(b,attacker)>range){
+            const steps=route(b,attacker,people.filter(p=>p.id!==attacker.id),mobs,true);
+            const step=steps[0];
+            if(step&&distance(step,b)<=1&&!occupied(step.x,step.y,b,people)&&!safe(step.x,step.y)){
+              move(b,step);b.nextMove=time+650;
+            }
+          }
+          continue;
+        }
+      }
+      b.defendOrigin=null;
       if(owner){
         b.targetId=null;b.path=[];
         const assist=mobs.find(m=>(m.floor||0)===0&&!m.unique&&!m.hunter&&!m.expedition&&
@@ -207,21 +238,48 @@ function createCompanions({walkable,now=Date.now,count=10,onHit=()=>{},onKill=()
     if(message.action==='dismiss'){for(const b of bots)if(b.following===player.id){b.following=null;b.targetId=null;b.path=[];b.state='travel';}return {ok:true};}
     const b=bots.find(x=>x.id===message.id);
     if(!b||message.action!=='follow'||distance(player,b)>5)return {ok:false,reason:'too_far'};
+    if([...b.aggressors.values()].some(until=>until>now()))return {ok:false,reason:'busy'};
     if(b.following!=null&&b.following!==player.id)return {ok:false,reason:'busy'};
     for(const other of bots)if(other.following===player.id){other.following=null;other.targetId=null;other.path=[];}
     b.following=player.id;b.targetId=null;b.path=[];b.state='following';return {ok:true};
+  }
+  function attack(player,id,{damage,delay=650}={}){
+    const time=now(),b=bots.find(x=>x.id===id);
+    if(!b)return {ok:false,id,reason:'not_found'};
+    if(!human(player)||!player.joined||player.duel||player.arena)return {ok:false,id,reason:'unavailable'};
+    if(!player.pvp)return {ok:false,id,reason:'pvp_off'};
+    if(b.hp<=0||time<b.recoverUntil)return {ok:false,id,reason:'recovering'};
+    if(safe(player.x,player.y)||safe(b.x,b.y))return {ok:false,id,reason:'safe_zone'};
+    if(distance(player,b)>Math.max(1,Math.min(8,attackRange(player))))return {ok:false,id,reason:'out_of_range'};
+    if(time-(lastHumanAttack.get(player)||0)<Math.max(400,delay))return {ok:false,id,reason:'cooldown'};
+    const actual=Math.min(b.hp,Math.max(1,Math.floor(Number(damage)||1)));
+    lastHumanAttack.set(player,time);
+    b.hp-=actual;
+    if(b.hp===0){die(b,time);return {ok:true,id,actual};}
+    if(!b.aggressors.size)b.defendOrigin={x:b.x,y:b.y};
+    b.aggressors.set(player.id,time+20000);
+    b.following=null;b.targetId=null;b.path=[];
+    setActivity(b,'defend','Revidando '+player.name,time);
+    return {ok:true,id,actual};
+  }
+  function canAttack(player,b){
+    return !!(human(player)&&player.joined&&!player.duel&&!player.arena&&b.hp>0&&
+      now()>=b.recoverUntil&&!safe(player.x,player.y)&&!safe(b.x,b.y)&&
+      distance(player,b)<=Math.max(1,Math.min(8,attackRange(player))));
   }
   const publicBot=(b,player)=>({id:b.id,name:b.name,x:b.x,y:b.y,dir:b.dir,floor:0,automatic:true,
     equipped:b.equipped,appearance:b.appearance,state:b.state,attackSeq:b.attackSeq,
     followingYou:!!player&&b.following===player.id,busy:b.following!=null&&(!player||b.following!==player.id),
     level:b.level,xp:b.xp,xpToNext:b.xpToNext,hp:b.hp,maxHp:b.maxHp,kills:b.kills,deaths:b.deaths,
     tasksCompleted:b.tasksCompleted,task:{label:b.task.label,progress:b.task.progress,goal:b.task.goal},
-    activity:b.activity,lastActivityAt:b.lastActivityAt});
+    activity:b.activity,lastActivityAt:b.lastActivityAt,
+    hostileToYou:!!player&&b.aggressors.has(player.id)&&b.aggressors.get(player.id)>now(),
+    canAttack:!!player&&canAttack(player,b)});
   function snapshot(player){if(!human(player))return [];return bots.map(b=>publicBot(b,player));}
   function adminSnapshot(){return {count:bots.length,totalKills:bots.reduce((n,b)=>n+b.kills,0),totalDeaths:bots.reduce((n,b)=>n+b.deaths,0),
     totalTasksCompleted:bots.reduce((n,b)=>n+b.tasksCompleted,0),actors:bots.map(b=>publicBot(b,null))};}
   function exportState(){return bots.map(b=>({id:b.id,level:b.level,xp:b.xp,hp:b.hp,kills:b.kills,deaths:b.deaths,
     tasksCompleted:b.tasksCompleted,task:{type:b.task.type,progress:b.task.progress}}));}
-  return {tick,command,snapshot,adminSnapshot,exportState,count:bots.length};
+  return {tick,command,attack,snapshot,adminSnapshot,exportState,count:bots.length};
 }
 module.exports={createCompanions,ROSTER,xpForLevel};

@@ -6,7 +6,7 @@
 <script src="/equipment-rules.js?v=2"></script>
 <script src="/daily-rules.js?v=1"></script>
 <script src="/game-analytics.js?v=1" defer></script>
-<script src="/companions-client.js?v=20261013" defer></script>
+<script src="/companions-client.js?v=20261013-pvp" defer></script>
 <script src="/appearance-rules.js?v=2"></script>
 <script src="/weapon-techniques-rules.js?v=1"></script>
 <link rel="stylesheet" href="/appearance-ui.css?v=2">
@@ -7969,7 +7969,7 @@ function sendJoinNow(){
 }
 
 function handleMP(msg){
-    if (msg.t === 'companions' || msg.t === 'companionResult') { window.ValadaresCompanions?.receive(msg); return; }
+    if (msg.t === 'companions' || msg.t === 'companionResult' || msg.t === 'companionAttackResult') { window.ValadaresCompanions?.receive(msg); return; }
     if (msg.t === 'posAck') { movementSync.ack(msg); return; }
     if (['state','dungeonEnter','dungeonExit','forceTeleport'].includes(msg.t)) {
         clearConfirmedCombatSounds();
@@ -11672,7 +11672,7 @@ function updateSidebar(){
     }
     // combat state
     // Limpa alvo se o monstro alvo morreu/sumiu
-    if (player.target && player.targetType !== 'player'){
+    if (player.target && player.targetType === 'monster'){
         if (!monsters.find(m => m.id === player.target)){
             player.target = null; player.autoAttack = false;
         }
@@ -11757,7 +11757,12 @@ function getBattleList(){
             out.push({ id:parseInt(idK,10), type:'player', ref:rp, name:rp.name||'Player', hp:rp.hp??100, maxHp:rp.maxHp??100, dist, color:'#ff8060', isPlayer:true });
         }
     }
-    out.sort((a,b) => a.dist - b.dist || a.id - b.id);
+    for(const a of window.ValadaresCompanions?.getAll()||[]){
+        if(a.hp<=0||!vis(a.renderX??a.x,a.renderY??a.y)||(!a.hostileToYou&&!(player.targetType==='companion'&&player.target===a.id)))continue;
+        const dist=Math.max(Math.abs(a.x-prx),Math.abs(a.y-pry));
+        out.push({id:a.id,type:'companion',ref:a,name:a.name,hp:a.hp,maxHp:a.maxHp,dist,color:'#f6a18c'});
+    }
+    out.sort((a,b) => a.dist - b.dist || String(a.id).localeCompare(String(b.id),undefined,{numeric:true}));
     return out;
 }
 
@@ -13102,6 +13107,7 @@ canvas.addEventListener('click', e => {
 document.getElementById('targetWidget')?.addEventListener('click', e => {
     const row = e.target.closest('.bl-row');
     if (!row) return;
+    if(row.dataset.btype==='companion'){attackCompanion(row.dataset.bid);return;}
     const id = parseInt(row.dataset.bid, 10);
     const type = row.dataset.btype;
     if (Number.isNaN(id) || !type) return;
@@ -14744,6 +14750,39 @@ function pvpAttackPlayer(targetId){
     player.attackTimer = effectiveAttackDelay();
 }
 window.pvpAttackPlayer = pvpAttackPlayer;
+
+// Automatic adventurers are explicit targets only; they never enter passive PvP selection.
+function attackCompanion(id){
+    const target=window.ValadaresCompanions?.getAll().find(a=>a.id===id);
+    if(!started||!_wsAuthed||ws?.readyState!==WebSocket.OPEN||player.hp<=0||!target?.canAttack||!enablePvpWhiteSkull())return false;
+    player.target=id;player.targetType='companion';player.autoAttack=true;
+    return true;
+}
+function tickCompanionAttack(){
+    const target=window.ValadaresCompanions?.getAll().find(a=>a.id===player.target);
+    if(!target?.canAttack||!player.pvp||player.hp<=0){player.target=null;player.autoAttack=false;return;}
+    if(player.attackTimer>0)return;
+    faceAttackTarget(target);
+    player.lastAttackAt=Date.now();
+    const weapon=ITEMS[player.equipped.weapon];
+    if(weapon?.ranged){
+        const color=weapon.kind==='wand'?(ELEMENT_COL[weapon.element]||weapon.color||'#c060ff'):'#d8c890';
+        projectiles.push({x:player.renderX,y:player.renderY,startX:player.renderX,startY:player.renderY,endX:target.renderX,endY:target.renderY,color,glow:color,arrow:weapon.kind!=='wand',life:0,duration:Math.max(120,melee(target,player)*30)});
+    }
+    ws.send(JSON.stringify({t:'companionAttack',id:target.id}));
+    player.attackTimer=effectiveAttackDelay();
+}
+function onCompanionAttackResult(msg){
+    const target=window.ValadaresCompanions?.getAll().find(a=>a.id===msg.id);
+    if(msg.ok){
+        if(target&&msg.actual>0)addFloat(target.x,target.y,'-'+msg.actual,'#f1b080');
+        return;
+    }
+    if(msg.reason==='cooldown')return;
+    if(player.targetType==='companion'&&player.target===msg.id){player.target=null;player.autoAttack=false;}
+    const reasons={no_gold:LANG==='en'?'You need 5,000 gold to attack an adventurer.':'Você precisa de 5.000 de ouro para atacar um aventureiro.',no_mana:LANG==='en'?'Not enough mana to attack with this wand.':'Você está sem mana para atacar com este cajado.'};
+    log(reasons[msg.reason]||(LANG==='en'?'The adventurer cannot be attacked here. Move within range outside the safe zone with PvP enabled.':'Não é possível atacar o aventureiro aqui. Aproxime-se fora da zona segura com PvP ativo.'));
+}
 
 function stopTraining(reason){
     if (training){
@@ -17579,6 +17618,8 @@ window.ValadaresModernBridge = {
             name: PET_DEFS[player.pet]?.name || 'Companheiro' }
         : null,
     getStatus: () => ({ connected: ws?.readyState === WebSocket.OPEN }),
+    attackCompanion,
+    onCompanionAttackResult,
     sendCompanionAction: (id, action) => {
         if (!started || !_wsAuthed || ws?.readyState !== WebSocket.OPEN) return false;
         ws.send(JSON.stringify({t:'companionCommand',id,action}));
@@ -17630,7 +17671,9 @@ function loop(ts){
     }
 
     // auto-attack (inclui diagonais via Chebyshev)
-    if (player.autoAttack){
+    if (player.autoAttack && player.targetType === 'companion'){
+        tickCompanionAttack();
+    } else if (player.autoAttack){
         const wK = player.equipped.weapon;
         const wI = wK ? ITEMS[wK] : null;
         const wRange = wI ? (wI.ranged || wI.meleeRange || 1) : 1;
@@ -18086,6 +18129,10 @@ function loop(ts){
         drawCharacter((a.renderX-cam.x)*TS, (a.renderY-cam.y)*TS, a.dir||'down',
             {...a.equipped,bodyColor:'#315c47'}, `${a.name} · ${a.level||1} · auto`,
             a.maxHp>0?a.hp/a.maxHp:1, 0, null, getWalkBob(a));
+        if(player.targetType==='companion'&&player.target===a.id){
+            ctx.strokeStyle='#ff8068';ctx.lineWidth=2;
+            ctx.strokeRect((a.renderX-cam.x)*TS+2,(a.renderY-cam.y)*TS+2,TS-4,TS-4);
+        }
     }
     // player (renderX/Y interpolado, com todos equipamentos visíveis)
     const ppx = (player.renderX-cam.x)*TS, ppy = (player.renderY-cam.y)*TS;

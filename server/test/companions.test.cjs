@@ -131,3 +131,68 @@ test('status de persistência reporta falha e limpa após sucesso; tarefa orc so
     assert.deepEqual(resumed.adminSnapshot().actors[0].task,{label:'Caçar orcs',progress:2,goal:4});
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('ataque PvP real aciona revide somente ao agressor, sem progresso farmável',()=>{
+  let time=1000;const retaliation=[];
+  const c=createCompanions({walkable:()=>true,now:()=>time,count:1,safe:()=>false,attackRange:()=>3,
+    onRetaliate:(p,b,dmg)=>{retaliation.push({id:p.id,dmg});p.hp-=dmg;return dmg;}});
+  const b=c.adminSnapshot().actors[0],attacker={...player(1,b.x+1,b.y),joined:true,pvp:true},
+    innocent={...player(2,b.x+2,b.y+1),joined:true,pvp:true};
+  assert.equal(c.snapshot(attacker)[0].canAttack,true);
+  assert.equal(c.attack(attacker,b.id,{damage:9,delay:650}).actual,9);
+  assert.equal(c.snapshot(attacker)[0].hostileToYou,true);
+  assert.equal(c.snapshot(innocent)[0].hostileToYou,false);
+  time+=700;c.tick([attacker,innocent],[]);
+  assert.deepEqual(retaliation.map(x=>x.id),[1]);
+  assert.equal(c.adminSnapshot().actors[0].state,'defend');
+  assert.equal(c.adminSnapshot().actors[0].xp,0);
+  assert.equal(c.adminSnapshot().actors[0].kills,0);
+  assert.equal(c.attack(attacker,b.id,{damage:9,delay:650}).ok,true);
+  assert.equal(c.attack(attacker,b.id,{damage:9,delay:650}).reason,'cooldown');
+  attacker.pvp=false;time+=1200;c.tick([attacker,innocent],[]);
+  assert.equal(retaliation.at(-1).id,1); // toggle off cannot erase a confirmed hit
+  attacker.disconnected=true;time+=1200;c.tick([attacker,innocent],[]);
+  assert.equal(c.snapshot(innocent)[0].state!=='defend',true);
+  attacker.disconnected=false;attacker.floor=1;
+  assert.equal(c.attack(attacker,b.id,{damage:3}).reason,'unavailable');
+  assert.equal(c.snapshot(attacker).length,0);
+});
+
+test('revide troca só entre agressores confirmados e cessa na PZ ou morte humana',()=>{
+  let time=1000;const struck=[];
+  const c=createCompanions({walkable:()=>true,now:()=>time,count:1,safe:(x)=>x<=46,
+    onRetaliate:p=>{struck.push(p.id);return {actual:6,dead:p.id===2};}});
+  const b=c.adminSnapshot().actors[0],a={...player(1,b.x+1,b.y),joined:true,pvp:true},
+    second={...player(2,b.x,b.y+1),joined:true,pvp:true},
+    innocent={...player(3,b.x+1,b.y+1),joined:true,pvp:true};
+  assert.equal(c.attack(a,b.id,{damage:2}).ok,true);
+  assert.equal(c.attack(second,b.id,{damage:2}).ok,true);
+  a.x=46;time+=1200;c.tick([a,second,innocent],[]);
+  assert.deepEqual(struck,[2]);
+  assert.equal(c.snapshot(second)[0].hostileToYou,false);
+  time+=1200;c.tick([a,second,innocent],[]);
+  assert.deepEqual(struck,[2]);
+  assert.equal(c.adminSnapshot().actors[0].state!=='defend',true);
+});
+
+test('PvP respeita PvP ligado, PZ, alcance, arena e recuperação após morte',()=>{
+  let time=1000;const safe=(x,y)=>x<50;
+  const c=createCompanions({walkable:()=>true,now:()=>time,count:1,safe,attackRange:()=>1});
+  const b=c.adminSnapshot().actors[0],p={...player(1,b.x+1,b.y),joined:true,pvp:false};
+  assert.equal(c.attack(p,b.id,{damage:5}).reason,'pvp_off');
+  p.pvp=true;assert.equal(c.attack(p,b.id,{damage:5}).reason,'safe_zone');
+  // Move the actor outside the configured protected tiles through normal hunting.
+  const m=mob(4,63,50);
+  for(let i=0;i<40&&c.adminSnapshot().actors[0].x<50;i++){time+=700;c.tick([],[m]);}
+  const active=c.adminSnapshot().actors[0];
+  assert.ok(active.x>=50);p.x=active.x+3;p.y=active.y;
+  assert.equal(c.attack(p,b.id,{damage:5}).reason,'out_of_range');
+  p.x=active.x+1;p.arena={};assert.equal(c.attack(p,b.id,{damage:5}).reason,'unavailable');
+  p.arena=null;assert.equal(c.attack(p,b.id,{damage:9999}).ok,true);
+  assert.equal(c.adminSnapshot().actors[0].deaths,1);
+  assert.equal(c.adminSnapshot().actors[0].hp,0);
+  assert.equal(c.snapshot(p)[0].canAttack,false);
+  time+=9000;c.tick([],[m]);assert.ok(c.adminSnapshot().actors[0].hp>0);
+  time+=18000;c.tick([],[m]);assert.notEqual(c.adminSnapshot().actors[0].state,'recover');
+  assert.equal(c.adminSnapshot().actors[0].kills,0);
+});

@@ -35,12 +35,13 @@ export async function createRenderer(bridge){
  const labelBoxes=[];
  const text=(label,x,y,color='#f3ebcf',size=12)=>{ctx.font=`600 ${size}px system-ui, sans-serif`;const w=ctx.measureText(label).width+8;let box=null;for(const dy of [0,-15,-30,-45]){const candidate={x:x-w/2,y:y+dy-size-2,w,h:size+5};if(candidate.y<0||candidate.x<0||candidate.x+w>width)continue;if(!labelBoxes.some(b=>candidate.x<b.x+b.w&&candidate.x+candidate.w>b.x&&candidate.y<b.y+b.h&&candidate.y+candidate.h>b.y)){box=candidate;y+=dy;break;}}if(!box)return;labelBoxes.push(box);ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(10,18,19,.82)';ctx.strokeText(label,x,y);ctx.fillStyle=color;ctx.fillText(label,x,y);};
  function labels(){ctx.clearRect(0,0,width,height);labelBoxes.length=0;const player=bridge.getPlayer(),target=bridge.getTarget?.()||{id:player.target,type:player.targetType};
-  for(const [id,r]of actors.entries){const e=r.data;const x=(e.renderX??e.x)+.5,z=(e.renderY??e.y)+.5;const isTarget=id===`${target.type==='player'?'remote':'mob'}:${target.id}`;
+  for(const [id,r]of actors.entries){const e=r.data;const x=(e.renderX??e.x)+.5,z=(e.renderY??e.y)+.5;const isTarget=id===`${target.type==='player'?'remote':target.type==='companion'?'companion':'mob'}:${target.id}`;
    if(isTarget){const pos=project(x,.035,z);ctx.strokeStyle='#f3c76b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,18*width/720,9*height/528,0,0,Math.PI*2);ctx.stroke();}
    const y=Number.isFinite(r.visualHeight)?r.visualHeight+.18:r.kind==='mob'?Math.max(.7,(bridge.getMonsterTypes?.()[e.type]?.size||1)*1.35):1.6;const pos=project(x,y,z);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;
    if(r.kind==='npc'){const distance=Math.hypot(e.x-player.x,e.y-player.y);if(distance<4)text(bridge.npcName?.(e)||e.name,pos.x,pos.y,'#e7c787',11);}
    else if(r.kind==='companion'){
-    if(Math.hypot(e.x-player.x,e.y-player.y)<7)text(`${e.name} · ${bridge.getLanguage?.()==='en'?'Lv.':'Nv.'} ${e.level||1} · ${bridge.getLanguage?.()==='en'?'automatic':'automático'}`,pos.x,pos.y,'#a5dfbd',10);
+    if(Math.hypot(e.x-player.x,e.y-player.y)<7)text(`${e.hostileToYou?'⚔ ':''}${e.name} · ${bridge.getLanguage?.()==='en'?'Lv.':'Nv.'} ${e.level||1} · ${bridge.getLanguage?.()==='en'?'automatic':'automático'}`,pos.x,pos.y,e.hostileToYou?'#f6a18c':'#a5dfbd',10);
+    if(isTarget||e.hostileToYou){const pct=Math.max(0,Math.min(1,e.hp/(e.maxHp||1)));ctx.fillStyle='#18221d';ctx.fillRect(pos.x-20,pos.y+4,40,5);ctx.fillStyle='#c57152';ctx.fillRect(pos.x-20,pos.y+4,40*pct,5);}
    }
    else if(r.kind==='remote'||r.kind==='player'){
     const cosmetic=bridge.getItems?.()[e.equipped?.cosmetic||e.cosmetic]||{};

@@ -221,7 +221,9 @@ function refresh() {
     if (target?.id != null) {
         const entity = target.type === 'player'
             ? Object.entries(bridge.getRemotePlayers?.() || {}).find(([id]) => String(id) === String(target.id))?.[1]
-            : (bridge.getMonsters?.() || []).find(mob => String(mob.id) === String(target.id));
+            : target.type === 'companion'
+                ? window.ValadaresCompanions?.getAll().find(actor => actor.id === target.id)
+                : (bridge.getMonsters?.() || []).find(mob => String(mob.id) === String(target.id));
         targetNode.hidden = false;
         set('modernTarget', entity?.name || bridge.getMonsterTypes?.()[entity?.type]?.name || 'Alvo');
     } else targetNode.hidden = true;

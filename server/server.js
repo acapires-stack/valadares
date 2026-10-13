@@ -4736,8 +4736,32 @@ const villageCompanions = createCompanions({
         && ![{x:50,y:47},{x:50,y:49},{x:49,y:52},{x:51,y:52},{x:47,y:49}].some(n => n.x===x && n.y===y),
     count: process.env.COMPANIONS_ENABLED === '0' ? 0 : 10,
     initialState: companionState.load(),
+    safe: (x,y) => inSafe(x,y) || inSanctuary(x,y),
+    attackRange: p => pvpRangeCapServer(p),
     onHit: m => broadcast(null, {t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp}, 0),
     onAssist: m => broadcast(null, {t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp}, 0),
+    onRetaliate: (target,b,amount) => {
+        if(!target.joined || !target.authed || target.disconnected || target.ws?.readyState!==1 ||
+            (target.floor||0)!==0 || target.hp<=0 || target.duel || target.arena ||
+            inSafe(target.x,target.y) || inSanctuary(target.x,target.y) ||
+            inSafe(b.x,b.y) || inSanctuary(b.x,b.y) ||
+            chebyshev(target.x,target.y,b.x,b.y)>4 || (target._invulnUntil||0)>Date.now())return 0;
+        const def=totalDefenseServer(target),reduction=def>0?def/(def+30):0;
+        const actual=Math.min(target.hp,Math.max(1,Math.round(amount*(1-reduction))));
+        target.hp=Math.max(0,target.hp-actual);
+        broadcastPstatsAll(target);
+        sendTo(target.id,{t:'pvpHit',from:b.id,fromName:b.name,amount,actual});
+        broadcast(null,{t:'float',id:target.id,text:`-${actual}`,color:'#ff3030',big:true},0);
+        const dead=target.hp===0;
+        if(dead){
+            // PvE-style death/respawn: the companion is not a player PK killer.
+            target._pkServerHandled=Date.now();
+            target._lastPvpAttackerId=null;target._lastPvpAttackerName=null;target._lastPvpAttackAt=0;
+            target._posGraceUntil=Date.now()+60000;
+            respawnPlayerServer(target,target.id);
+        }
+        return {actual,dead};
+    },
     onKill: (m,b) => {
         if(monsters.get(m.id)!==m || m.hp>0) return;
         monsters.delete(m.id); // tickRespawns replenishes this ordinary mob.
@@ -5469,6 +5493,15 @@ function pvpRangeCapServer(p){
     if (meta && typeof meta.throwable === 'number') return Math.min(8, meta.throwable);
     if (meta && typeof meta.meleeRange === 'number') return Math.min(3, Math.max(1, meta.meleeRange));
     return 1;
+}
+const COMPANION_PVP_MIN_GOLD=5000;
+function companionAttackDamageServer(p){
+    const tier=getUpgradeTier(p.equipped?.weapon);
+    const meta=ITEM_META[tier.base];
+    const skillName=weaponSkillOf(p);
+    const skill=Math.max(0,Math.min(200,Number(p.skills?.[skillName]?.val)||0));
+    const base=Math.max(2,Math.min(60,Number(meta?.base)||2));
+    return Math.max(1,Math.min(120,base+(FORGE_ATTACK_BONUS_SERVER[tier.plus]||0)+Math.floor(skill/3)));
 }
 
 // ─── Combate PvE autoritativo (Deploy 2a) ────────────────────────────────────
@@ -7098,6 +7131,27 @@ wss.on('connection', (ws, request) => {
             p._lastCompanionCommand = at;
             const result = villageCompanions.command(p, {id:msg.id,action:msg.action});
             sendTo(id, {t:'companionResult',...result});
+            return;
+        }
+        if (msg.t === 'companionAttack') {
+            const botId=typeof msg.id==='string'?msg.id:'';
+            if(!p.joined){sendTo(id,{t:'companionAttackResult',ok:false,id:botId,reason:'unavailable'});return;}
+            if(!p.pvp){sendTo(id,{t:'companionAttackResult',ok:false,id:botId,reason:'pvp_off'});return;}
+            if((p.gold||0)<COMPANION_PVP_MIN_GOLD){
+                sendTo(id,{t:'companionAttackResult',ok:false,id:botId,reason:'no_gold'});return;
+            }
+            const weapon=ITEM_META[getUpgradeTier(p.equipped?.weapon).base];
+            if(weapon?.kind==='wand' && (p.mp||0)<WAND_MANA_COST){
+                sendTo(id,{t:'companionAttackResult',ok:false,id:botId,reason:'no_mana'});return;
+            }
+            const result=villageCompanions.attack(p,botId,{
+                damage:companionAttackDamageServer(p),delay:pvpRangeCapServer(p)>1?850:650
+            });
+            if(result.ok){
+                if(weapon?.kind==='wand'){p.mp-=WAND_MANA_COST;broadcastPstatsAll(p);}
+                broadcast(null,{t:'float',id:botId,text:`-${result.actual}`,color:'#ff3030',big:true},0);
+            }
+            sendTo(id,{t:'companionAttackResult',...result});
             return;
         }
         // A conta autenticada ainda não é um personagem carregado. Impede que um
