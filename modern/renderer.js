@@ -40,7 +40,7 @@ export async function createRenderer(bridge){
    const y=Number.isFinite(r.visualHeight)?r.visualHeight+.18:r.kind==='mob'?Math.max(.7,(bridge.getMonsterTypes?.()[e.type]?.size||1)*1.35):1.6;const pos=project(x,y,z);if(pos.x<0||pos.x>width||pos.y<0||pos.y>height)continue;
    if(r.kind==='npc'){const distance=Math.hypot(e.x-player.x,e.y-player.y);if(distance<4)text(bridge.npcName?.(e)||e.name,pos.x,pos.y,'#e7c787',11);}
    else if(r.kind==='companion'){
-    if(Math.hypot(e.x-player.x,e.y-player.y)<7)text(`${e.name} · ${bridge.getLanguage?.()==='en'?'automatic':'automático'}`,pos.x,pos.y,'#a5dfbd',10);
+    if(Math.hypot(e.x-player.x,e.y-player.y)<7)text(`${e.name} · ${bridge.getLanguage?.()==='en'?'Lv.':'Nv.'} ${e.level||1} · ${bridge.getLanguage?.()==='en'?'automatic':'automático'}`,pos.x,pos.y,'#a5dfbd',10);
    }
    else if(r.kind==='remote'||r.kind==='player'){
     const cosmetic=bridge.getItems?.()[e.equipped?.cosmetic||e.cosmetic]||{};

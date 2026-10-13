@@ -6,7 +6,7 @@
 <script src="/equipment-rules.js?v=2"></script>
 <script src="/daily-rules.js?v=1"></script>
 <script src="/game-analytics.js?v=1" defer></script>
-<script src="/companions-client.js?v=20261009" defer></script>
+<script src="/companions-client.js?v=20261013" defer></script>
 <script src="/appearance-rules.js?v=2"></script>
 <script src="/weapon-techniques-rules.js?v=1"></script>
 <link rel="stylesheet" href="/appearance-ui.css?v=2">
@@ -18080,6 +18080,13 @@ function loop(ts){
         }
     }
 
+    // Automatic adventurers remain visible in the 2D recovery renderer too.
+    for (const a of window.ValadaresCompanions?.getAll() || []) {
+        if (a.renderX<cam.x-1 || a.renderX>=cam.x+VP_W+1 || a.renderY<cam.y-1 || a.renderY>=cam.y+VP_H+1) continue;
+        drawCharacter((a.renderX-cam.x)*TS, (a.renderY-cam.y)*TS, a.dir||'down',
+            {...a.equipped,bodyColor:'#315c47'}, `${a.name} · ${a.level||1} · auto`,
+            a.maxHp>0?a.hp/a.maxHp:1, 0, null, getWalkBob(a));
+    }
     // player (renderX/Y interpolado, com todos equipamentos visíveis)
     const ppx = (player.renderX-cam.x)*TS, ppy = (player.renderY-cam.y)*TS;
     drawCharacter(ppx, ppy, player.dir,
@@ -18390,7 +18397,7 @@ for (const type of ['keydown', 'keyup']) window.addEventListener(type, event => 
 try {
     await import('/modern/entry.js?v=20261007-3d');
     if (window.ValadaresModern?.state !== 'ready') throw new Error('Mundo 3D indisponível');
-    await import('/modern/ui.js?v=20261007-3d');
+    await import('/modern/ui.js?v=20261013-autonomos');
 } catch (error) {
     console.error('[Valadares moderno] Falha ao carregar o jogo', error);
     showModernRecovery();

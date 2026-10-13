@@ -110,6 +110,19 @@ for (const [key, icon, label, shortcut, primary] of actions) {
     });
     actionBar.append(button);
 }
+const adventurers = document.createElement('button');
+adventurers.type = 'button';
+adventurers.id = 'modernAdventurers';
+adventurers.textContent = bridge?.getLanguage?.()==='en' ? 'Adventurers' : 'Aventureiros';
+adventurers.addEventListener('click', () => window.ValadaresCompanions?.openRoster());
+actionBar.append(adventurers);
+const sidebarAdventurers = document.createElement('button');
+sidebarAdventurers.type = 'button';
+sidebarAdventurers.id = 'sidebarAdventurers';
+sidebarAdventurers.className = 'chest-btn';
+sidebarAdventurers.textContent = adventurers.textContent;
+sidebarAdventurers.addEventListener('click', () => window.ValadaresCompanions?.openRoster());
+byId('rightSidebar')?.prepend(sidebarAdventurers);
 const more = document.createElement('button');
 more.type = 'button';
 more.className = 'modern-actions__more';

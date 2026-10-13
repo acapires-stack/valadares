@@ -18,6 +18,7 @@ const mobPursuit = require('./mob-pursuit');
 const dailyRules = require('../daily-rules');
 const engagementMetrics = require('./engagement-metrics');
 const { createCompanions } = require('./companions.cjs');
+const { createCompanionState } = require('./companion-state.cjs');
 const WEAPON_TECHNIQUES_ENABLED = process.env.WEAPON_TECHNIQUES_ENABLED !== '0';
 const PROGRESSION_ENABLED = process.env.PROGRESSION_ENABLED !== '0';
 const ENCHANTING_ENABLED = process.env.ENCHANTING_ENABLED !== '0';
@@ -330,6 +331,14 @@ async function handleHttpRequest(req, res){
         return httpJson(res, 200, engagementMetrics.aggregate(accounts.values(), Date.now(), {
             isAdmin: isAdmin, excludedNames: ENGAGEMENT_EXCLUDED_NAMES,
         }));
+    }
+    if (req.method === 'GET' && req.url.split('?')[0] === '/api/admin/companions'){
+        const url = new URL(req.url, 'http://localhost');
+        const token = url.searchParams.get('token') || req.headers['x-admin-token'] || '';
+        if (!adminTokenOk(token)) return httpJson(res, 401, { error:'unauthorized' });
+        return httpJson(res, 200, {
+            ...villageCompanions.adminSnapshot(), persistence: companionState.status(),
+        });
     }
     // GET /api/admin/state?token=X — snapshot pro painel admin web
     if (req.method === 'GET' && req.url.startsWith('/api/admin/state')){
@@ -4708,8 +4717,8 @@ let lastResetDay = new Date().toDateString();
 if (!loadStateFromDisk()) spawnInitial();
 setInterval(safeTick('saveStateToDisk', saveStateToDisk), STATE_SAVE_INTERVAL_MS);
 setInterval(safeTick('tickAuctionExpire', tickAuctionExpire), 60 * 1000);   // M8: devolve listings expiradas
-process.on('SIGINT',  () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGINT)'); process.exit(0); });
-process.on('SIGTERM', () => { saveStateToDisk(); flushAccounts(); console.log('[state] salvo ao sair (SIGTERM)'); process.exit(0); });
+process.on('SIGINT',  () => { saveStateToDisk(); flushAccounts(); saveCompanions(); console.log('[state] salvo ao sair (SIGINT)'); process.exit(0); });
+process.on('SIGTERM', () => { saveStateToDisk(); flushAccounts(); saveCompanions(); console.log('[state] salvo ao sair (SIGTERM)'); process.exit(0); });
 setInterval(safeTick('tickAI', tickAI), TICK_AI_MS);
 setInterval(safeTick('broadcastMobs', broadcastMobs), SNAPSHOT_MS);
 setInterval(safeTick('tickRespawns', tickRespawns), 1000);
@@ -4718,19 +4727,33 @@ setInterval(safeTick('spawnAutomatonMobs', spawnAutomatonMobs), 8000); // DG rob
 spawnDungeonMobs();   // popula o andar 1 no boot
 setInterval(safeTick('tickPartyHp', tickPartyHp), 3000);   // HP da party no widget
 
-// Automatic companions have their own channel, never accounts/players/rankings.
+// Automatic adventurers share real overworld monsters, but not human rewards.
+const companionState = createCompanionState(STATE_FILE);
 const villageCompanions = createCompanions({
     walkable: (x,y) => isWalkable(x,y) && !NPC_POSITIONS.some(n => n.x===x && n.y===y)
         && !Object.values(CHEST_POS).some(n => n.x===x && n.y===y)
         && !modernWorld.interiors.some(room => room.door.x===x && room.door.y===y)
         && ![{x:50,y:47},{x:50,y:49},{x:49,y:52},{x:51,y:52},{x:47,y:49}].some(n => n.x===x && n.y===y),
     count: process.env.COMPANIONS_ENABLED === '0' ? 0 : 10,
-    onAssist: m => broadcast(null, {t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp}, 0)
+    initialState: companionState.load(),
+    onHit: m => broadcast(null, {t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp}, 0),
+    onAssist: m => broadcast(null, {t:'mobUpdate',id:m.id,hp:m.hp,maxHp:m.maxHp}, 0),
+    onKill: (m,b) => {
+        if(monsters.get(m.id)!==m || m.hp>0) return;
+        monsters.delete(m.id); // tickRespawns replenishes this ordinary mob.
+        broadcast(null,{t:'mobDead',mobId:m.id,floor:0,byName:b.name,level:m.level},0);
+    }
 });
+function saveCompanions(){
+    if (villageCompanions.count === 0) return; // COMPANIONS_ENABLED=0 preserves the previous file and backup.
+    companionState.save(villageCompanions.exportState());
+}
+setInterval(safeTick('saveCompanions', saveCompanions), 15000);
 setInterval(safeTick('villageCompanions', () => {
     villageCompanions.tick(players.values(), monsters.values());
+    const persistence={hasSaveError:companionState.status().lastSaveSucceeded===false};
     for (const p of players.values()) if(p.authed && !p.disconnected && p.ws?.readyState === 1)
-        sendTo(p.id, {t:'companions',list:villageCompanions.snapshot(p)});
+        sendTo(p.id, {t:'companions',list:villageCompanions.snapshot(p),persistence});
 }), 650);
 
 // ─── Bot 007 — caça ao impostor ────────────────────────────────────────

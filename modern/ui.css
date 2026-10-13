@@ -437,7 +437,7 @@ body.modern-renderer-ready .modern-sidebar-map {
     .modern-actions__symbol { display: block; margin-bottom: 1px; font: 18px Georgia, serif; }
     .modern-actions__key { display: block; color: #c8b987; font: 9px ui-monospace, monospace; }
     body.modern-simple .modern-actions button:not([data-primary]):not([data-essential]):not(.modern-actions__more):not(.modern-actions__mode) { display: none; }
-    body.modern-simple.modern-more .modern-actions button:not([data-primary]):not([data-essential]) { display: block; }
+    body.modern-simple.modern-more .modern-actions button:not([data-primary]):not([data-essential]):not(.modern-actions__more):not(.modern-actions__mode) { display: block; }
     body.modern-simple:not(.modern-more) .modern-actions__mode { display: none; }
     body:not(.modern-simple) .modern-actions__more { display: none; }
     .modern-actions .modern-actions__more, .modern-actions .modern-actions__mode { min-width: 86px; }
