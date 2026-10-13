@@ -8,6 +8,9 @@ const repo=path.resolve(__dirname,'../..');
 const source=fs.readFileSync(path.join(repo,'server/server.js'),'utf8');
 const progression=require(path.join(repo,'progression-content'));
 const rules=require(path.join(repo,'transmutation-rules'));
+const questStart=source.indexOf('const QUESTS = ['),questEnd=source.indexOf('const QUESTS_BY_ID',questStart);
+assert.ok(questStart>=0&&questEnd>questStart);
+const questsById=vm.runInNewContext(`${source.slice(questStart,questEnd)};Object.fromEntries(QUESTS.map(q=>[q.id,q]))`);
 function fn(name){
     const start=source.indexOf(`function ${name}(`);assert.ok(start>=0,name);
     let i=source.indexOf('{',start),depth=0;
@@ -31,9 +34,7 @@ function fixture({full=false,fail=false}={}){
         getAccount:()=>acc,chebyshev:(ax,ay,bx,by)=>Math.max(Math.abs(ax-bx),Math.abs(ay-by)),
         isAdjacentTo:(p,npc)=>Math.max(Math.abs(p.x-npc.x),Math.abs(p.y-npc.y))<=1,
         QUEST_NPCS:{atendente:{x:50,y:50}},
-        QUESTS_BY_ID:{q_ratos:{id:'q_ratos',goal:{kind:'mob',type:'RAT',count:10},
-            reward:{gold:50,xp:{Clava:100},item:{PORRETE:1}}},
-            q_cobras:{id:'q_cobras',goal:{kind:'mob',type:'SNAKE',count:5},reward:{gold:80}}},
+        QUESTS_BY_ID:questsById,
         incInv:(p,k,q)=>{p.inv[k]=(p.inv[k]||0)+q;if(p.inv[k]<=0)delete p.inv[k];},
         applyQuestReward:(p,reward)=>{
             p.gold+=reward.gold;
@@ -143,7 +144,7 @@ test('full bag keeps pending reward and save failure does not consume boss',()=>
 });
 test('first quest preflights capacity and rolls back a failed save',()=>{
     const f=fixture({full:true});const {p,context}=f;p.x=50;p.y=50;
-    p.quests={active:{q_ratos:{progress:10}},completed:[]};
+    p.quests={active:{q_ratos:{progress:3}},completed:[]};
     const begin=source.indexOf("if (kind === 'simple'){");
     const end=source.indexOf("if (kind === 'chain'){",begin);
     assert.ok(begin>=0&&end>begin);
@@ -160,17 +161,47 @@ test('first quest preflights capacity and rolls back a failed save',()=>{
     assert.equal(f.sent.at(-1).questResult.delta.xp.Clava,100);
     send();assert.equal(errors.at(-1),'not_active');assert.equal(p.inv.PORRETE,1);
 });
-test('second quest credits the equipped weapon skill instead of forcing Sword',()=>{
-    const f=fixture();const {p,context}=f;p.x=50;p.y=50;
+test('second quest gives one shield and weapon XP, with capacity preflight, save rollback and replay guard',()=>{
+    const f=fixture({full:true});const {p,context}=f;p.x=50;p.y=50;
     p.equipped={weapon:'MACHADO_MINO'};
     p.quests={active:{q_cobras:{progress:5}},completed:[]};
     const begin=source.indexOf("if (kind === 'simple'){");
     const end=source.indexOf("if (kind === 'chain'){",begin);
     const turnIn=vm.runInContext(`(function(p,msg,reject){const kind='simple';${source.slice(begin,end)}})`,context);
-    turnIn(p,{questId:'q_cobras'},reason=>assert.fail(reason));
+    const errors=[];const send=()=>turnIn(p,{questId:'q_cobras'},reason=>errors.push(reason));
+    send();assert.equal(errors.at(-1),'inventory_full');
+    assert.equal(p.inv.ESCUDO_MAD,undefined);assert.equal(p.gold,50000);
+    delete p.inv.OTHER_0;
+    f.setFail(true);send();assert.equal(errors.at(-1),'save_failed');
+    assert.equal(p.inv.ESCUDO_MAD,undefined);assert.equal(p.gold,50000);
+    assert.equal(p.quests.completed.length,0);
+    f.setFail(false);send();
+    assert.equal(p.inv.ESCUDO_MAD,1);assert.equal(p.gold,50080);
+    assert.equal(f.acc.save.inv.ESCUDO_MAD,1);
     assert.equal(f.sent.at(-1).questResult.delta.xp.Machado,100);
     assert.equal(f.sent.at(-1).questResult.delta.xp.Espada,undefined);
-    assert.deepEqual(p.quests.completed,['q_cobras']);
+    assert.equal(p.quests.completed.join(','),'q_cobras');
+    send();assert.equal(errors.at(-1),'not_active');
+    assert.equal(p.inv.ESCUDO_MAD,1);assert.equal(p.gold,50080);
+});
+test('three silks are consumed once; failed save preserves materials and a completed save gets no retrocredit',()=>{
+    const f=fixture();const {p,context}=f;p.x=50;p.y=50;
+    p.inv={SILK:3};p.quests={active:{q_seda:{progress:0}},completed:[]};
+    const begin=source.indexOf("if (kind === 'simple'){");
+    const end=source.indexOf("if (kind === 'chain'){",begin);
+    const turnIn=vm.runInContext(`(function(p,msg,reject){const kind='simple';${source.slice(begin,end)}})`,context);
+    const errors=[];const send=()=>turnIn(p,{questId:'q_seda'},reason=>errors.push(reason));
+    f.setFail(true);send();assert.equal(errors.at(-1),'save_failed');
+    assert.equal(p.inv.SILK,3);assert.equal(p.gold,50000);
+    assert.equal(p.quests.completed.length,0);
+    f.setFail(false);send();
+    assert.equal(p.inv.SILK,undefined);assert.equal(p.gold,50200);
+    assert.equal(f.acc.save.inv.SILK,undefined);
+    assert.equal(p.quests.completed.join(','),'q_seda');
+    send();assert.equal(errors.at(-1),'not_active');assert.equal(p.gold,50200);
+    p.quests={active:{},completed:['q_cobras']};
+    turnIn(p,{questId:'q_cobras'},reason=>errors.push(reason));
+    assert.equal(errors.at(-1),'not_active');assert.equal(p.inv.ESCUDO_MAD,undefined);
 });
 test('feature switch blocks new runs and crafts while preserving pending claims and receipts',()=>{
     const f=fixture();const {p,context}=f;

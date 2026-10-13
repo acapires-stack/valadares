@@ -15,6 +15,12 @@
 #journeyText { margin:5px 0; }
 #journeyProgress { color:#b9d6aa; font-weight:600; margin:4px 0; }
 #journeyReward { color:#dfba72; font-size:10px; margin:5px 0; }
+#journeyGrowth { color:#b9d6aa; font-size:10px; margin:6px 0; }
+#journeyPath { margin-top:9px; border-top:1px solid #6b5129; padding-top:7px; }
+#journeyPath summary { cursor:pointer; color:#ffdc92; padding:4px 0; }
+#journeyPathSteps p { margin:8px 0; }
+#journeyPathSteps strong, #journeyPathSteps span { display:block; }
+#journeyPathSteps span, .journey-resume { color:#c8d5b8; font-size:10px; margin-top:3px; }
 #journeyCard .journey-actions { display:flex; gap:4px; flex-wrap:wrap; margin-top:7px; }
 #journeyCard .journey-actions button { padding:5px 6px; }
 #journeyAction { background:#705022 !important; border-color:#b48c48 !important; font-weight:700 !important; }

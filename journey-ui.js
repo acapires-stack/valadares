@@ -9,9 +9,9 @@
     section.hidden = true;
     section.innerHTML = '<div class="journey-heading"><span id="journeyEyebrow"></span><button id="journeyToggle" type="button" aria-expanded="true"></button></div>' +
         '<div id="journeyContent"><strong id="journeyTitle"></strong><p id="journeyText"></p><div id="journeyProgress"></div>' +
-        '<div id="journeyReward"></div><div class="journey-actions"><button id="journeyAction" type="button"></button>' +
+        '<div id="journeyReward"></div><div id="journeyGrowth"></div><div class="journey-actions"><button id="journeyAction" type="button"></button>' +
         '<button id="journeyRoutes" type="button"></button><button id="journeyExpedition" type="button"></button></div>' +
-        '<div id="journeyMore" hidden></div></div>';
+        '<details id="journeyPath"><summary></summary><div id="journeyPathSteps"></div></details><div id="journeyMore" hidden></div></div>';
     host.appendChild(section);
     const $ = id => section.querySelector('#' + id);
     const mobile = document.createElement('button');
@@ -21,7 +21,7 @@
     mobile.setAttribute('aria-controls', 'journeyCard');
     document.body.appendChild(mobile);
     const progression = window.ValadaresProgression || {items:{}, recipes:{}, families:[], expedition:null};
-    let currentName = '', open = true, extra = '', family = 'machado', lastExp = null;
+    let currentName = '', open = true, extra = '', family = 'machado', familyChosen = false, lastExp = null;
     let pendingAction = '', pendingAt = 0, lastSignature = '', progressionToken = null, pendingOpId = '', pendingCraftKey = '';
     const english = () => typeof LANG !== 'undefined' && LANG === 'en';
     const say = (pt, en) => english() ? en : pt;
@@ -63,6 +63,104 @@
         const q = list.find(item => Object.prototype.hasOwnProperty.call(active,item.id));
         return q || list.find(item => !(player.quests?.completed || []).includes(item.id)) || null;
     }
+    function protectionGoal() {
+        if (!(player.quests?.completed || []).includes('q_cobras')) return null;
+        if(!player.equipped?.offhand && ITEMS[player.equipped?.weapon]?.hand!=='2h' && player.inv?.ESCUDO_MAD>0)return {item:'ESCUDO_MAD',action:'equip'};
+        if(player.equipped?.armor)return null;
+        const armor=Object.keys(player.inv || {}).find(k=>player.inv[k]>0 && ITEMS[k]?.kind==='armor');
+        if(armor)return {item:armor,action:'equip'};
+        const offer=typeof SHOP_BUY!=='undefined' && SHOP_BUY.find(o=>o.item==='COURO');
+        return offer && player.gold>=offer.price ? {item:offer.item,price:offer.price,action:'shop'} : null;
+    }
+    function growthText() {
+        const skill=ITEMS[player.equipped?.weapon]?.skill, state=player.skills?.[skill];
+        if(!state)return '';
+        return `${typeof skillDisp==='function'?skillDisp(skill):skill} ${state.val} · ${state.xp}/${state.xpNext} XP · `
+            +say('sobe ao usar esta arma','improves as you use this weapon');
+    }
+    function renderPath() {
+        const path=$('journeyPath');
+        path.hidden=!(player.quests?.completed || []).includes('q_ratos');
+        if(path.hidden)return;
+        path.querySelector('summary').textContent=say('Próximas conquistas','Next achievements');
+        const box=$('journeyPathSteps');box.replaceChildren();
+        const add=(title,detail,complete=false)=>{const row=document.createElement('p');
+            const name=document.createElement('strong');name.textContent=(complete?'✓ ':'')+title;row.appendChild(name);
+            const text=document.createElement('span');text.textContent=detail;row.appendChild(text);box.appendChild(row);};
+        const completed=player.quests?.completed || [];
+        for(const id of ['q_cobras','q_seda','q_orcs','q_lider']){
+            const q=typeof questById==='function'&&questById(id);if(!q)continue;
+            const active=!!player.quests?.active?.[id];
+            add(typeof qName==='function'?qName(q):q.name,completed.includes(id)?say('Concluída','Completed')
+                :(active?`${questProgress(id)}/${q.goal.count} · `:'')+rewardText(q),completed.includes(id));
+            if(id==='q_cobras'){
+                const offer=typeof SHOP_BUY!=='undefined'&&SHOP_BUY.find(o=>o.item==='COURO');
+                if(offer)add(say('Sua primeira proteção','Your first armor'),player.equipped?.armor?itemName(player.equipped.armor)
+                    :`${itemName('COURO')} · ${offer.price}g · `+say('Mercador. A missão das sedas rende 200g.','Merchant. The silk quest pays 200g.'),!!player.equipped?.armor);
+            }
+        }
+        const e=progression.expedition;
+        if(e){const level=Math.max(0,...Object.values(player.skills||{}).map(s=>s.val||0));
+            add(say('Depois: sua primeira expedição solo','Later: your first solo expedition'),
+                `${say(e.name,e.nameEn)} · `+say(`perícia de combate recomendada ${e.recommendedLevel} (sua maior: ${level}), arma, proteção e suprimentos.`,`recommended combat skill ${e.recommendedLevel} (your highest: ${level}), weapon, armor and supplies.`));
+            add(say('Uma conquista para buscar','An achievement to pursue'),say('Primeira vitória: ','First clear: ')+itemName(e.firstClearKey)+` + 3× ${itemName(e.rewardKey)}. `+say('Nas próximas: mais fragmentos para fabricar equipamentos.','Further clears award more fragments for crafting.'));
+        }
+        const note=document.createElement('p');note.className='journey-resume';note.textContent=say('Pode continuar em outra sessão: missões entregues, caçadas e equipamentos ficam salvos.','Continue another session: completed quests, hunts and equipment are saved.');box.appendChild(note);
+    }
+    function huntRoute(target,allowed) {
+        if(typeof map==='undefined'||typeof walkable!=='function')return [];
+        const threats=monsters.filter(m=>m.hp>0&&!allowed.includes(m.type));
+        const blocked=new Set();
+        for(const m of monsters)if(m.hp>0)blocked.add(m.x+','+m.y);
+        const start={x:player.x,y:player.y,path:[]},queue=[start],seen=new Set([start.x+','+start.y]);
+        for(let i=0;i<queue.length&&i<1800;i++){
+            const p=queue[i];if(Math.max(Math.abs(p.x-target.x),Math.abs(p.y-target.y))<=1)return p.path;
+            for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+                const x=p.x+dx,y=p.y+dy,key=x+','+y;
+                if(seen.has(key)||Math.max(Math.abs(x-player.x),Math.abs(y-player.y))>26||!map[y]||map[y][x]===undefined||!walkable(map[y][x])||blocked.has(key))continue;
+                if(typeof npcOnTile==='function'&&npcOnTile(x,y))continue;
+                if(threats.some(m=>Math.max(Math.abs(m.x-x),Math.abs(m.y-y))<=6))continue;
+                seen.add(key);queue.push({x,y,path:[...p.path,{x,y}]});
+            }
+        }
+        return null;
+    }
+    let targetHint=null,targetHintAt=0,targetHintQuest='',targetHintPosition='';
+    function huntTarget(q) {
+        const type=q?.goal?.kind==='mob'?q.goal.type:q?.id==='q_seda'?'SPIDER':null;
+        if(!type||typeof monsters==='undefined'||!Array.isArray(monsters))return null;
+        const position=player.x+','+player.y;
+        if(targetHintQuest===q.id&&targetHintPosition===position&&Date.now()-targetHintAt<1000)return targetHint;
+        targetHintAt=Date.now();targetHintQuest=q.id;targetHintPosition=position;
+        const allowed=q.id==='q_cobras'?['RAT','SNAKE']:q.id==='q_seda'?['RAT','SNAKE','SPIDER']:null;
+        // Keep a living target stable as patrols move; a missing safe route becomes
+        // a caution marker, never a sudden instruction to cross to the other side.
+        const locked=monsters.find(m=>m.id===targetHint?.id&&m.type===type&&m.hp>0
+            &&Math.max(Math.abs(m.x-player.x),Math.abs(m.y-player.y))<=22);
+        if(locked){const trail=allowed?huntRoute(locked,allowed):[];
+            targetHint={...locked,trail:trail||[],caution:trail===null};return targetHint;}
+        const candidates=monsters.filter(m=>m.type===type&&m.hp>0&&Number.isFinite(m.x)&&Number.isFinite(m.y)
+            &&Math.max(Math.abs(m.x-player.x),Math.abs(m.y-player.y))<=22
+            &&(q.id!=='q_cobras'||Math.max(Math.abs(m.x-50),Math.abs(m.y-50))<=16)
+            &&(!allowed||!monsters.some(other=>other.hp>0&&!allowed.includes(other.type)&&Math.max(Math.abs(other.x-m.x),Math.abs(other.y-m.y))<=5)));
+        candidates.sort((a,b)=>Math.max(Math.abs(a.x-player.x),Math.abs(a.y-player.y))-Math.max(Math.abs(b.x-player.x),Math.abs(b.y-player.y)));
+        const previous=candidates.findIndex(m=>m.id===targetHint?.id);if(previous>0)candidates.unshift(candidates.splice(previous,1)[0]);
+        targetHint=null;
+        for(const target of candidates.slice(0,6)){
+            const trail=allowed?huntRoute(target,allowed):[];
+            if(trail!==null){targetHint={...target,trail};break;}
+        }
+        return targetHint;
+    }
+    function getObjective() {
+        if(!gameReady()||!online()||(player.floor||0)!==0||!(player.quests?.completed||[]).includes('q_ratos'))return null;
+        if(player.hp/player.maxHp<.4 && typeof playerInSafeZone==='function'&&!playerInSafeZone())return{x:50,y:50,kind:'safe',label:say('Recupere-se na vila','Recover in the village')};
+        const o=objective();
+        if(o.action==='shop')return{x:47,y:47,kind:'npc',label:say('Mercador · sua proteção','Merchant · your armor')};
+        const q=o.quest;if(!q)return null;
+        if(!player.quests?.active?.[q.id]||questProgress(q.id)>=q.goal.count)return{x:47,y:53,kind:'npc',label:say('Atendente · próxima missão','Attendant · next quest')};
+        const target=huntTarget(q);return target?{x:target.x,y:target.y,id:target.id,trail:target.trail,caution:target.caution,kind:'monster',label:(typeof mobName==='function'?mobName(target.type):target.type)+(target.caution?say(' · cuidado',' · caution'):'')}:null;
+    }
     function objective() {
         if(player._automaton)return {title:say('Complexo dos Autômatos','Automaton Complex'),
             text:say('Explore os andares. Patrulhas são repostas; há um Guardião a cada cinco andares. Use as escadas para subir ou descer.','Explore the floors. Patrols replenish; a Warden awaits every five floors. Use the stairs to ascend or descend.'),
@@ -89,6 +187,13 @@
             title:say('Equipe sua primeira arma','Equip your first weapon'), text:say('Sua arma está no inventário. Equipe para aumentar seu ataque.','Your weapon is in your bag. Equip it to increase your attack.'),
             progress:itemName(weapon),reward:'',label:say('Equipar agora','Equip now'),action:'equip',item:weapon};
         const q = nextQuest();
+        const readyQuest=q&&player.quests?.active?.[q.id]&&questProgress(q.id)>=q.goal.count;
+        const protection=!readyQuest&&protectionGoal();
+        if(protection)return {title:say('Prepare sua proteção','Prepare your armor'),item:protection.item,action:protection.action,
+            text:protection.action==='equip'?say('Você já tem uma proteção na mochila. Equipe antes da próxima caçada.','You already have armor in your bag. Equip it before the next hunt.')
+                :say('O Mercador vende uma túnica que reduz o dano recebido. Siga a marca dourada e escolha a compra na loja.','The Merchant sells a tunic that reduces incoming damage. Follow the golden marker and choose the purchase in the shop.'),
+            progress:itemName(protection.item)+(protection.price?` · ${protection.price}g · ${direction(47,47)}`:''),reward:'',
+            label:protection.action==='equip'?say('Equipar proteção','Equip armor'):say('Abrir loja do Mercador','Open Merchant shop')};
         if (q) {
             const active = !!player.quests?.active?.[q.id];
             const count = q.goal?.count || 1;
@@ -99,12 +204,19 @@
             const goal = (q.goal?.kind === 'item' ? say('Colete','Collect') : say('Derrote','Defeat')) + ` ${count}× ${goalName}`;
             return {title:typeof qName === 'function' ? qName(q) : q.name,
                 text:ready ? say('Objetivo cumprido. Entregue à Atendente.','Objective complete. Turn it in to the Attendant.')
-                    : active ? goal : say('Fale com a Atendente para iniciar esta missão.','Talk to the Attendant to start this quest.'),
+                    : active ? goal+'. '+(q.id==='q_cobras'?say('Procure cobras nos arredores da vila; enfrente uma de cada vez.','Look for snakes around the village; fight one at a time.')
+                        :q.id==='q_seda'?say('Aranhas podem deixar seda; nem toda vitória dá material. Recupere-se na vila quando precisar.','Spiders can drop silk; not every kill gives material. Recover in the village when needed.')
+                        :say('Use a marca dourada para localizar um alvo próximo.','Use the golden marker to locate a nearby target.'))
+                    : goal+'. '+say('Aceite com a Atendente seguindo a marca dourada.','Accept at the Attendant by following the golden marker.'),
                 progress:active ? `${n}/${count}` + (ready ? ' · ' + (npc ? say('Pode entregar agora','Ready to turn in') : direction(47,53)) : '') : loc(47,53) + ' · ' + direction(47,53),
                 reward:rewardText(q), label:ready && npc ? say('Entregar missão','Turn in quest') : !active && npc && q.id !== 'q_ratos' ? say('Aceitar missão','Accept quest') : say('Ver missões','View quests'),
                 action:ready && npc ? 'turnin' : !active && npc && q.id !== 'q_ratos' ? 'accept' : 'quests', quest:q};
         }
-        return {title:say('Escolha uma nova rota','Choose a new path'),text:say('Veja missões, receitas ou uma expedição solo.','Explore quests, recipes or a solo expedition.'),reward:'',label:say('Ver missões','View quests'),action:'quests'};
+        const e=progression.expedition;
+        return {title:say('Prepare sua expedição solo','Prepare your solo expedition'),
+            text:say(`Sua próxima conquista pode ser ${e.name}. A recomendação é perícia de combate ${e.recommendedLevel}, arma, proteção e suprimentos. A entrada é livre.`,`Your next achievement can be ${e.nameEn}. Recommended: combat skill ${e.recommendedLevel}, weapon, armor and supplies. Entry is open.`),
+            progress:growthText(),reward:say('Na primeira vitória: ','On first clear: ')+itemName(e.firstClearKey)+` + 3× ${itemName(e.rewardKey)}`,
+            label:say('Ver preparação e entrada','View preparation and entrance'),action:'dungeons'};
     }
     function routeData() {
         const f = progression.families.find(row => row.id === family) || progression.families[0];
@@ -141,8 +253,11 @@
         }
         const select = document.createElement('select'); select.setAttribute('aria-label',say('Família de arma','Weapon family'));
         for (const f of progression.families) { const o=document.createElement('option'); o.value=f.id; o.textContent=english()?f.nameEn:f.name; select.appendChild(o); }
-        select.value=family; select.addEventListener('change',()=> {family=select.value;renderMore();}); box.appendChild(select);
+        select.value=family; select.addEventListener('change',()=> {family=select.value;familyChosen=true;renderMore();}); box.appendChild(select);
         const info = document.createElement('p'); info.textContent = say('Rotas garantidas mostram materiais e ouro. Peças ascendentes vêm da mesa de transmutação.','Guaranteed paths show materials and gold. Ascendant pieces come from the transmutation table.'); box.appendChild(info);
+        if(family==='clava'){
+            const early=document.createElement('p');early.textContent=say('Antes dos martelos avançados: lobos podem deixar Maça de Ferro ou Maça; orcs podem deixar Martelo 2H. São drops possíveis, não garantidos. Leve proteção e suprimentos.','Before advanced hammers: wolves can drop Iron Mace or Mace; orcs can drop Hammer 2H. These drops are possible, not guaranteed. Bring armor and supplies.');box.appendChild(early);
+        }
         for (const [k,v] of routeData().rows) {
             const row = document.createElement('div'); row.className='journey-route';
             const name = document.createElement('strong'); name.textContent = itemName(k) + ` · T${v.tier}`; row.appendChild(name);
@@ -177,7 +292,7 @@
         if (!floating && section.parentNode!==host) host.appendChild(section);
         host.hidden = !gameReady() || compact;
         if (!gameReady()) { section.hidden=true;mobile.hidden=true;return; }
-        if (currentName!==player.name) { currentName=player.name;lastExp=null;extra='';pendingAction='';progressionToken=null;
+        if (currentName!==player.name) { currentName=player.name;lastExp=null;extra='';pendingAction='';progressionToken=null;targetHint=null;targetHintAt=0;familyChosen=false;
             try{
                 open=localStorage.getItem(key())!=='closed';
                 const saved=JSON.parse(localStorage.getItem(key()+':craftOp')||'null');
@@ -187,6 +302,8 @@
             if(online()){send('expeditionStatus');if(pendingOpId)send('progressionCraftStatus',{opId:pendingOpId});}
         }
         section.hidden=false; mobile.hidden=!compact;
+        if(!familyChosen){const skill=ITEMS[player.equipped?.weapon]?.skill;
+            family=skill==='Clava'?'clava':skill==='Espada'?'espada_escudo':skill==='Distância'?'distancia':'machado';}
         // O guia da primeira caçada é opcional. Quando aberto, a Jornada mostra
         // apenas a navegação para que os dois painéis não repitam o objetivo.
         const guideVisible=!document.getElementById('adventureGuidePanel')?.hidden || !document.getElementById('agMoment')?.hidden;
@@ -195,7 +312,7 @@
         const o=navigationOnly ? {title:say('Explore no seu ritmo','Explore at your pace'),
             text:say('Escolha uma rota de armas ou conheça a expedição solo.','Choose a weapon path or explore the solo expedition.'),
             progress:'',reward:'',label:'',action:''} : objective();
-        const signature=JSON.stringify([player.name,english(),open,extra,family,o,navigationOnly,lastExp,player.inv,player.gold,player.x,player.y,online(),pendingAction,progressionToken,pendingOpId,pendingCraftKey]);
+        const signature=JSON.stringify([player.name,english(),open,extra,family,o,navigationOnly,lastExp,player.inv,player.gold,player.skills,player.equipped,player.quests?.completed,player.x,player.y,online(),pendingAction,progressionToken,pendingOpId,pendingCraftKey]);
         if (signature===lastSignature) return;
         lastSignature=signature;
         $('journeyEyebrow').textContent=say('SUGESTÃO DE AVENTURA','ADVENTURE SUGGESTION');
@@ -208,11 +325,14 @@
         $('journeyProgress').textContent=o.progress||'';
         $('journeyReward').textContent=o.reward||'';
         $('journeyReward').hidden=!o.reward;
+        $('journeyGrowth').textContent=growthText();
+        $('journeyGrowth').hidden=navigationOnly||!growthText();
+        renderPath();
         const action=$('journeyAction');action.textContent=o.label;action.dataset.mode=o.action;action.hidden=navigationOnly;
         const exitTile=player._expeditionExit;
         const exitTooFar=o.action==='expeditionExit'&&lastExp?.stage!=='cleared'
             && !(exitTile && Math.max(Math.abs(player.x-exitTile.x),Math.abs(player.y-exitTile.y))<=1);
-        action.disabled=!!pendingAction||exitTooFar||(!online()&&o.action!=='quests');
+        action.disabled=!!pendingAction||exitTooFar||(o.action==='shop'&&!near(47,47))||(!online()&&o.action!=='quests');
         $('journeyRoutes').textContent=say('Rotas de armas','Weapon paths');
         $('journeyExpedition').textContent=say('Masmorras e expedições','Dungeons and expeditions');
         mobile.textContent=say('Jornada: ','Journey: ')+o.title;
@@ -225,8 +345,9 @@
         if(o.action==='dungeons'){extra='expedition';lastSignature='';render();return;}
         if(o.action==='quests') { if(typeof openQuests==='function')openQuests(); return; }
         if(o.action==='equip') { if(typeof equip==='function'&&online())equip(o.item); return; }
+        if(o.action==='shop') { if(typeof openShop==='function'&&near(47,47))openShop(); return; }
         if(o.action==='turnin') { if(typeof turnInQuest==='function'&&online()&&turnInQuest(o.quest.id)){pendingAction='turnin';pendingAt=Date.now();} }
-        if(o.action==='accept') { if(typeof acceptQuest==='function'&&near(47,53)&&acceptQuest(o.quest.id)){if(typeof saveState==='function')saveState(); if(typeof renderQuests==='function')renderQuests();} }
+        if(o.action==='accept') { if(typeof acceptQuest==='function'&&near(47,53)&&acceptQuest(o.quest.id)){if(typeof renderQuests==='function')renderQuests();} }
         if(o.action==='claim'&&send('progressionClaim')) {pendingAction='claim';pendingAt=Date.now();}
         if(o.action==='craftStatus'&&pendingOpId&&send('progressionCraftStatus',{opId:pendingOpId})) {pendingAction='status';pendingAt=Date.now();}
         if(o.action==='expeditionExit'&&send('expeditionExit')) {pendingAction='exit';pendingAt=Date.now();}
@@ -269,7 +390,7 @@
         };
         const row=messages[code];return row ? row[english()?1:0] : say('Operação não concluída.','Operation not completed.');
     }
-    window.ValadaresJourneyUI={refresh:()=>{lastSignature='';render();},result,onServerState,onCraftResult,onQuestResult,onDungeonEnter,onDungeonExit,onLogout,errorText};
+    window.ValadaresJourneyUI={refresh:()=>{lastSignature='';render();},getObjective,result,onServerState,onCraftResult,onQuestResult,onDungeonEnter,onDungeonExit,onLogout,errorText};
     window.addEventListener('resize',render);
     setInterval(()=>{
         if(pendingAction&&Date.now()-pendingAt>6000){

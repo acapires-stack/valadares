@@ -910,8 +910,8 @@ const RECIPES = [
 // turn-in e calcular reward: kind, type/items/count, reward, choices.
 const QUESTS = [
     { id:'q_ratos',  goal:{ kind:'mob',  type:'RAT',       count:3 }, reward:{ gold:50,  xp:{Clava:100}, item:{PORRETE:1} } },
-    { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80 } }, // +100 XP na perícia da arma equipada na entrega.
-    { id:'q_seda',   goal:{ kind:'item', type:'SILK',      count:5  }, reward:{ gold:200 } },
+    { id:'q_cobras', goal:{ kind:'mob',  type:'SNAKE',     count:5  }, reward:{ gold:80, item:{ESCUDO_MAD:1} } }, // +100 XP na perícia da arma equipada na entrega.
+    { id:'q_seda',   goal:{ kind:'item', type:'SILK',      count:3  }, reward:{ gold:200 } },
     { id:'q_orcs',   goal:{ kind:'mob',  type:'ORC',       count:3  }, reward:{ gold:300, xp:{Espada:50,Machado:50,Clava:50} } },
     { id:'q_lider',  goal:{ kind:'mob',  type:'ORC_LIDER', count:1  }, reward:{ gold:500 } },
 ];

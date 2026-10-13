@@ -59,7 +59,17 @@ test('WS quest acceptance, three real rat kills, immediate persistence, reconnec
     const accountsFile=path.join(tmp,'accounts.json');
     fs.writeFileSync(accountsFile,JSON.stringify({v:1,savedAt:Date.now(),accounts:[account(name,48,53)]}));
     const port=await freePort();
-    const hook=`\nprocess.on('message',m=>{if(m==='stop')return process.emit('SIGTERM');
+    const hook=`\nconst qaName=${JSON.stringify(name)};
+      let qaDeathArmed=false;
+      const originalFlushAccounts=flushAccounts;
+      flushAccounts=()=>{
+        const ok=originalFlushAccounts();
+        if(ok&&qaDeathArmed&&getAccount(qaName)?.engagement?.firstDeathAt){
+          qaDeathArmed=false;process.send({t:'deathPersisted'});
+        }
+        return ok;
+      };
+      process.on('message',m=>{if(m==='stop')return process.emit('SIGTERM');
       if(m?.t==='rat'||m?.t==='death'||m?.t==='home'||m?.t==='resetSaveRate'){
         const p=[...players.values()].find(x=>x.authedName===m.name);
         if(!p)return process.send({t:'ratResult',error:'no_player'});
@@ -72,6 +82,9 @@ test('WS quest acceptance, three real rat kills, immediate persistence, reconnec
           p.x=x;p.y=y;const rat=spawnMob('RAT',x+1,y,0);
           if(rat){
             if(m.t==='death'){
+              if(getAccount(qaName)?.engagement?.firstDeathAt)
+                return process.send({t:'ratResult',error:'unexpected earlier PvE death'});
+              qaDeathArmed=true;
               p.connectedAt=Date.now()-11000;p.hp=1;
               rat.hp=1000;rat.maxHp=1000;rat.dmg=100;rat.aggro=10;
               rat._retaliateId=p.id;rat._retaliateAt=Date.now();
@@ -97,6 +110,11 @@ test('WS quest acceptance, three real rat kills, immediate persistence, reconnec
     const position=t=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('position hook timeout')),3000);
         const receive=m=>{if(m?.t!=='ratResult')return;clearTimeout(timer);child.off('message',receive);
             m.error?reject(Error(m.error)):resolve(m.id);};child.on('message',receive);child.send({t,name});});
+    const deathPersisted=()=>new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{child.off('message',receive);reject(Error('PvE death was not flushed'))},8000);
+        const receive=m=>{if(m?.t!=='deathPersisted')return;clearTimeout(timer);child.off('message',receive);resolve();};
+        child.on('message',receive);
+    });
     try{
         await waitBackend(port,child);
         let joined=await connect(port,name),client=joined.client;clients.push(client);
@@ -156,9 +174,11 @@ test('WS quest acceptance, three real rat kills, immediate persistence, reconnec
         const completedReject=await client.request({t:'questAccept',questId:'q_ratos'},m=>m.t==='questAcceptResult');
         assert.equal(completedReject.reason,'already_done');
         assert.deepEqual(completedReject.quests.completed,['q_ratos']);
-        await position('death');
-        await client.next(m=>m.t==='pstats'&&m.id===joined.state.you&&m.hp===0,15000);
-        for(let i=0;i<25&&!saved().engagement?.firstDeathAt;i++)await pause(100);
+        const persisted=deathPersisted();
+        const deathRatId=await position('death');
+        const zeroHp=client.next(m=>m.t==='pstats'&&m.id===joined.state.you&&m.hp===0,15000);
+        const lethalHit=client.next(m=>m.t==='mobHit'&&m.mobId===deathRatId&&m.actual>0,15000);
+        await Promise.all([zeroHp,lethalHit,persisted]);
         assert.ok(saved().engagement.firstDeathAt,'PvE death milestone persisted');
     }catch(error){error.message+='\nserver stderr='+stderr.slice(-1600);throw error;}
     finally{

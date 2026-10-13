@@ -120,7 +120,7 @@ export function createMinimap(canvas, legend, bridge) {
             entity(remote.x, remote.y, mate ? '#74e08c' : remote.pvp ? '#ff4545' : '#71aaff', mate ? 3.2 : 2.7);
         }
 
-        const objective=window.valadaresAdventureGuide?.getObjective?.();
+        const objective=window.valadaresAdventureGuide?.getObjective?.()||window.ValadaresJourneyUI?.getObjective?.();
         if(objective&&floor===0){
             const marker=point(objective.x,objective.y);
             ctx.strokeStyle='#ffdc72';ctx.lineWidth=2;

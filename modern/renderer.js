@@ -53,8 +53,9 @@ export async function createRenderer(bridge){
    }
    if(r.kind==='mob'&&(isTarget||e.hp<e.maxHp)){const pct=Math.max(0,Math.min(1,e.hp/(e.maxHp||e.hp))),w=36;ctx.fillStyle='rgba(11,18,17,.85)';ctx.fillRect(pos.x-w/2-1,pos.y+4,w+2,5);ctx.fillStyle=isTarget?'#c57152':'#89ac80';ctx.fillRect(pos.x-w/2,pos.y+5,w*pct,3);if(isTarget)text(e.name||bridge.getMonsterTypes?.()[e.type]?.name||e.type,pos.x,pos.y,'#f1d4aa',11);}
   }
-  const objective=window.valadaresAdventureGuide?.getObjective?.();
+  const objective=window.valadaresAdventureGuide?.getObjective?.()||window.ValadaresJourneyUI?.getObjective?.();
   if(objective){
+   ctx.fillStyle='rgba(255,215,119,.8)';for(const step of objective.trail||[]){const p=project(step.x+.5,.06,step.y+.5);ctx.beginPath();ctx.ellipse(p.x,p.y,3.5,2,0,0,Math.PI*2);ctx.fill();}
    const at=project(objective.x+.5,2.5,objective.y+.5),ground=project(objective.x+.5,.04,objective.y+.5);
    const x=Math.max(100,Math.min(width-100,at.x)),y=Math.max(85,Math.min(height-110,at.y));
    ctx.strokeStyle='#ffd777';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(ground.x,ground.y,22,10,0,0,Math.PI*2);ctx.stroke();
