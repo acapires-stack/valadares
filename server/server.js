@@ -7561,13 +7561,18 @@ wss.on('connection', (ws, request) => {
             }
             if (p.hp == null) p.hp = p.maxHp;
             if (p.mp == null) p.mp = p.maxMp;
-            // PIX aprovado antes de a conta ter save (creditGoldToPlayer): entra agora e só
-            // sai da conta depois de gravado no save.
+            // PIX aprovado antes de a conta ter save (creditGoldToPlayer): entra uma vez só.
+            // Ouro no save e fim da pendência mudam juntos na mesma conta em memória e vão
+            // juntos para o accounts.json; se a gravação falhar, a fila regrava os dois.
+            // Devolver a pendência aqui deixava o ouro no save E na pendência (crédito em dobro).
             if (acc && Number.isInteger(acc.pendingPixGold) && acc.pendingPixGold > 0){
                 const pix = acc.pendingPixGold;
                 p.gold = (p.gold || 0) + pix;
                 delete acc.pendingPixGold;
-                if (!updateEnchantSave(p)){ acc.pendingPixGold = pix; p.gold -= pix; }
+                if (!updateEnchantSave(p)){
+                    queueSaveAccounts();
+                    console.warn(`[mp] gold pendente aplicado no login, gravação adiada: ${p.name} +${pix}`);
+                }
                 else console.log(`[mp] gold pendente aplicado no login: ${p.name} +${pix}`);
             }
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1

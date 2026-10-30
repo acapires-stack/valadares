@@ -46,3 +46,32 @@ test('PIX: nome inexistente é recusado na criação e o ouro nunca some depois 
     }catch(error){error.message+='\nserver stderr='+server.stderr.slice(-1200);throw error;}
     finally{await server.stop();}
 });
+
+// Primeiro login com a gravação em disco falhando: o ouro pendente entra uma vez só,
+// inclusive depois que a fila regrava e o jogador volta.
+const failingFlush=`qaHandlers.failFlushOnce=()=>{const real=flushAccounts;let fail=1;
+flushAccounts=()=>fail-->0?false:real();return true;};
+qaHandlers.flush=()=>flushAccounts();
+qaHandlers.gold=({name})=>[...players.values()].find(x=>x.authedName===name&&!x.disconnected).gold;`;
+
+test('PIX: falha de gravação no 1º login não aplica o ouro pendente duas vezes',{timeout:45000},async()=>{
+    const fresh='Novo'+crypto.randomBytes(3).toString('hex');
+    const acc=account(fresh,{save:null});acc.pendingPixGold=10000;
+    const server=await startServer({hook:failingFlush,accounts:[acc]});
+    try{
+        assert.equal(await server.qa('failFlushOnce'),true);
+        const first=await server.connect(fresh);
+        assert.equal(await server.qa('gold',{name:fresh}),10000,'aplicado no login');
+        assert.equal(server.saved(fresh).pendingPixGold,10000,'disco ainda sem a gravação que falhou');
+        await pause(2600);   // queueSaveAccounts regrava em 2 s
+        assert.equal(await server.qa('flush'),true);
+        assert.equal(server.saved(fresh).pendingPixGold,undefined,'pendência some junto com o ouro gravado');
+        assert.equal(server.saved(fresh).save.gold,10000);
+        await first.client.close();
+        await pause(300);
+        await server.connect(fresh);
+        assert.equal(await server.qa('gold',{name:fresh}),10000,'relogar não credita de novo');
+        assert.equal(server.saved(fresh).save.gold,10000);
+    }catch(error){error.message+='\nserver stderr='+server.stderr.slice(-1200);throw error;}
+    finally{await server.stop();}
+});
