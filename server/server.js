@@ -437,12 +437,16 @@ async function handleCreatePix(body, res){
     if (!mpPreference){
         return httpJson(res, 503, { error:'mp_not_configured' });
     }
-    const playerName = String(body.playerName || '').trim().substring(0, 14);
+    const typedName  = String(body.playerName || '').trim().substring(0, 14);
     const packageId  = String(body.packageId || '');
     const email      = String(body.email || '').trim().substring(0, 120);
-    if (!playerName){ return httpJson(res, 400, { error:'missing_player' }); }
+    if (!typedName){ return httpJson(res, 400, { error:'missing_player' }); }
     if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
     if (!isValidEmail(email)){ return httpJson(res, 400, { error:'invalid_email' }); }
+    // Pagamento para nome sem conta era aprovado e o ouro não tinha onde cair.
+    const payAcc = getAccount(typedName);
+    if (!payAcc){ return httpJson(res, 404, { error:'unknown_player' }); }
+    const playerName = payAcc.name;
     const pkg = GOLD_PACKAGES[packageId];
     // NÃO persiste o email na conta aqui: este endpoint HTTP não tem sessão autenticada,
     // então `playerName` é arbitrário — gravar o email permitiria envenenar o save de
@@ -574,9 +578,13 @@ async function handleMpWebhook(body, req, res){
         mpPayments.set(paymentId, pending);
         console.log(`[mp] webhook payment=${paymentId} status=${status} ref=${ref} player=${pending.playerName} gold=${pending.gold}`);
         if (status === 'approved' && pending.playerName && pending.gold > 0 && !pending.credited && !creditedPayments.has(paymentId)){
-            pending.credited = true;
-            creditGoldToPlayer(pending.playerName, pending.gold, paymentId);
-            markPaymentCredited(paymentId);   // idempotência durável (audit 2026-06-03): bloqueia re-crédito após restart
+            // Só marca creditado quando o ouro tem dono; senão fica para conciliação manual.
+            if (creditGoldToPlayer(pending.playerName, pending.gold, paymentId)){
+                pending.credited = true;
+                markPaymentCredited(paymentId);   // idempotência durável (audit 2026-06-03): bloqueia re-crédito após restart
+            } else {
+                console.error(`[mp] PAGAMENTO APROVADO SEM CRÉDITO payment=${paymentId} player=${pending.playerName} gold=${pending.gold} — conciliar manualmente`);
+            }
         }
     } catch (e){
         console.warn('[mp] erro no webhook:', e.message);
@@ -584,6 +592,7 @@ async function handleMpWebhook(body, req, res){
     return httpJson(res, 200, { received:true });
 }
 
+// Retorna true só quando o ouro ficou registrado (no jogador ou na conta).
 function creditGoldToPlayer(playerName, gold, paymentId){
     // Procura player online primeiro; se offline, persiste no accounts.json
     let credited = false;
@@ -595,6 +604,7 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             // goldDelta no invUpdate já dispara toast + log + float + som no cliente.
             // Não duplicar com serverMsg aqui.
             sendInvUpdate(p, { goldDelta:{ amount: gold, reason:'pix', paymentId } });
+            if (!updateEnchantSave(p)) queueSaveAccounts();   // ouro pago não espera o próximo saveUpload
             credited = true;
             console.log(`[mp] gold creditado online: ${playerName} +${gold} (payment ${paymentId})`);
             break;
@@ -607,8 +617,15 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             if (acc && acc.save){
                 acc.save.gold = (acc.save.gold || 0) + gold;
                 acc.save._pendingPixCredit = (acc.save._pendingPixCredit || 0) + gold;
-                flushAccounts();
+                if (!flushAccounts()) queueSaveAccounts();
                 console.log(`[mp] gold creditado offline (save): ${playerName} +${gold} (payment ${paymentId})`);
+                credited = true;
+            } else if (acc){
+                // Conta que nunca salvou: o join aplica este crédito no primeiro login.
+                acc.pendingPixGold = (acc.pendingPixGold || 0) + gold;
+                if (!flushAccounts()) queueSaveAccounts();
+                console.log(`[mp] gold pendente até o 1º login: ${playerName} +${gold} (payment ${paymentId})`);
+                credited = true;
             } else {
                 console.warn(`[mp] player não encontrado pra creditar: ${playerName} +${gold}`);
             }
@@ -616,6 +633,7 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             console.warn('[mp] erro ao persistir credit offline:', e.message);
         }
     }
+    return credited;
 }
 
 // Dá item a um player por nome (admin: chat /give + /api/admin/action kind:'give').
@@ -7543,6 +7561,15 @@ wss.on('connection', (ws, request) => {
             }
             if (p.hp == null) p.hp = p.maxHp;
             if (p.mp == null) p.mp = p.maxMp;
+            // PIX aprovado antes de a conta ter save (creditGoldToPlayer): entra agora e só
+            // sai da conta depois de gravado no save.
+            if (acc && Number.isInteger(acc.pendingPixGold) && acc.pendingPixGold > 0){
+                const pix = acc.pendingPixGold;
+                p.gold = (p.gold || 0) + pix;
+                delete acc.pendingPixGold;
+                if (!updateEnchantSave(p)){ acc.pendingPixGold = pix; p.gold -= pix; }
+                else console.log(`[mp] gold pendente aplicado no login: ${p.name} +${pix}`);
+            }
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
             // (race condition de reconexões rápidas, ou WS órfão antes do join).
             removeGhostsByName(p.name, id);
