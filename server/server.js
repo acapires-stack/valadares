@@ -437,12 +437,16 @@ async function handleCreatePix(body, res){
     if (!mpPreference){
         return httpJson(res, 503, { error:'mp_not_configured' });
     }
-    const playerName = String(body.playerName || '').trim().substring(0, 14);
+    const typedName  = String(body.playerName || '').trim().substring(0, 14);
     const packageId  = String(body.packageId || '');
     const email      = String(body.email || '').trim().substring(0, 120);
-    if (!playerName){ return httpJson(res, 400, { error:'missing_player' }); }
+    if (!typedName){ return httpJson(res, 400, { error:'missing_player' }); }
     if (!GOLD_PACKAGES[packageId]){ return httpJson(res, 400, { error:'invalid_package' }); }
     if (!isValidEmail(email)){ return httpJson(res, 400, { error:'invalid_email' }); }
+    // Pagamento para nome sem conta era aprovado e o ouro não tinha onde cair.
+    const payAcc = getAccount(typedName);
+    if (!payAcc){ return httpJson(res, 404, { error:'unknown_player' }); }
+    const playerName = payAcc.name;
     const pkg = GOLD_PACKAGES[packageId];
     // NÃO persiste o email na conta aqui: este endpoint HTTP não tem sessão autenticada,
     // então `playerName` é arbitrário — gravar o email permitiria envenenar o save de
@@ -574,9 +578,13 @@ async function handleMpWebhook(body, req, res){
         mpPayments.set(paymentId, pending);
         console.log(`[mp] webhook payment=${paymentId} status=${status} ref=${ref} player=${pending.playerName} gold=${pending.gold}`);
         if (status === 'approved' && pending.playerName && pending.gold > 0 && !pending.credited && !creditedPayments.has(paymentId)){
-            pending.credited = true;
-            creditGoldToPlayer(pending.playerName, pending.gold, paymentId);
-            markPaymentCredited(paymentId);   // idempotência durável (audit 2026-06-03): bloqueia re-crédito após restart
+            // Só marca creditado quando o ouro tem dono; senão fica para conciliação manual.
+            if (creditGoldToPlayer(pending.playerName, pending.gold, paymentId)){
+                pending.credited = true;
+                markPaymentCredited(paymentId);   // idempotência durável (audit 2026-06-03): bloqueia re-crédito após restart
+            } else {
+                console.error(`[mp] PAGAMENTO APROVADO SEM CRÉDITO payment=${paymentId} player=${pending.playerName} gold=${pending.gold} — conciliar manualmente`);
+            }
         }
     } catch (e){
         console.warn('[mp] erro no webhook:', e.message);
@@ -584,6 +592,7 @@ async function handleMpWebhook(body, req, res){
     return httpJson(res, 200, { received:true });
 }
 
+// Retorna true só quando o ouro ficou registrado (no jogador ou na conta).
 function creditGoldToPlayer(playerName, gold, paymentId){
     // Procura player online primeiro; se offline, persiste no accounts.json
     let credited = false;
@@ -595,6 +604,7 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             // goldDelta no invUpdate já dispara toast + log + float + som no cliente.
             // Não duplicar com serverMsg aqui.
             sendInvUpdate(p, { goldDelta:{ amount: gold, reason:'pix', paymentId } });
+            if (!updateEnchantSave(p)) queueSaveAccounts();   // ouro pago não espera o próximo saveUpload
             credited = true;
             console.log(`[mp] gold creditado online: ${playerName} +${gold} (payment ${paymentId})`);
             break;
@@ -607,8 +617,15 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             if (acc && acc.save){
                 acc.save.gold = (acc.save.gold || 0) + gold;
                 acc.save._pendingPixCredit = (acc.save._pendingPixCredit || 0) + gold;
-                flushAccounts();
+                if (!flushAccounts()) queueSaveAccounts();
                 console.log(`[mp] gold creditado offline (save): ${playerName} +${gold} (payment ${paymentId})`);
+                credited = true;
+            } else if (acc){
+                // Conta que nunca salvou: o join aplica este crédito no primeiro login.
+                acc.pendingPixGold = (acc.pendingPixGold || 0) + gold;
+                if (!flushAccounts()) queueSaveAccounts();
+                console.log(`[mp] gold pendente até o 1º login: ${playerName} +${gold} (payment ${paymentId})`);
+                credited = true;
             } else {
                 console.warn(`[mp] player não encontrado pra creditar: ${playerName} +${gold}`);
             }
@@ -616,6 +633,7 @@ function creditGoldToPlayer(playerName, gold, paymentId){
             console.warn('[mp] erro ao persistir credit offline:', e.message);
         }
     }
+    return credited;
 }
 
 // Dá item a um player por nome (admin: chat /give + /api/admin/action kind:'give').
@@ -1095,6 +1113,7 @@ function updateEnchantSave(p){
         enchantToken:p.enchantToken, transmutationOps:p.transmutationOps,
         transmutationToken:p.transmutationToken, transmutationPity:p.transmutationPity,
         progressionToken:p.progressionToken,progressionOps:p.progressionOps,
+        dailyKills:p.dailyKills || null,
         expeditionClears:p.expeditionClears,expeditionPending:p.expeditionPending,
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
         permaBuffs:p.permaBuffs,appearance:appearanceRules.normalizarAppearance(p.appearance),
@@ -5154,6 +5173,11 @@ function serverCurrentChainStage(p, chainId){
 }
 function creditQuestKill(p, mobType){
     if (!p || !mobType) return;
+    // Diárias de caça: a lista do dia vem do cliente, então a prova da caçada é esta
+    // contagem server-side por tipo, zerada a cada dia (mesmo dia UTC do dailyId).
+    const dailyDay = dailyRules.todayKey();
+    if (!p.dailyKills || p.dailyKills.day !== dailyDay) p.dailyKills = { day: dailyDay, counts: {} };
+    p.dailyKills.counts[mobType] = (p.dailyKills.counts[mobType] || 0) + 1;
     const progressMessages = [];
     // Quests simples ativas (goal mob do tipo)
     if (p.quests && p.quests.active){
@@ -7317,6 +7341,7 @@ wss.on('connection', (ws, request) => {
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
+            data.dailyKills = p.dailyKills || null;   // contagem de caça das diárias: só creditQuestKill muda
             data.scReadyAt = p.scReadyAt || 0;   // 🕯️ Segunda Chance: cooldown persiste (server-autoritativo, timestamp absoluto)
             data.dungeonUnlock = p.dungeonUnlock || 0;   // 🕳️ checkpoint das Profundezas (server-owned — cliente não muda)
             // ★ TRAVA ANTI-WIPE: nunca deixa um save vazio-default sobrescrever um acc.save
@@ -7397,8 +7422,13 @@ wss.on('connection', (ws, request) => {
             p.x     = SAFE_CX;
             p.y     = SAFE_CY;
             p.pvp   = !!msg.pvp;
-            p.hp    = msg.hp ?? 100;
-            p.maxHp = msg.maxHp ?? 100;
+            // HP/MP vêm do save do server, nunca da mensagem: hp:'x' virava NaN (imortal,
+            // nunca chega a 0) e hp/maxHp forjados curavam ao relogar no meio da luta.
+            { const vital = (v, min, fallback) => Number.isFinite(v) && v >= min ? v : fallback;
+              p.maxHp = vital(acc?.save?.maxHp, 1, 100);
+              p.maxMp = vital(acc?.save?.maxMp, 1, 100);
+              p.hp    = vital(acc?.save?.hp, 1, p.maxHp);
+              p.mp    = vital(acc?.save?.mp, 0, p.maxMp); }
             // N3 fase 2: hidrata inv/equipped/gold/chests do save (server vira dono).
             // Se cliente legado (sem auth) ou conta nova, pega do msg como antes.
             ensurePlayerInvSlots(p);
@@ -7455,6 +7485,10 @@ wss.on('connection', (ws, request) => {
                 }
                 // Anti-replay de daily: hidrata SÓ do save server-side (nunca de data do saveUpload)
                 if (acc.save.dailyClaim && typeof acc.save.dailyClaim === 'object') p.dailyClaim = acc.save.dailyClaim;
+                { const dk = acc.save.dailyKills;
+                  p.dailyKills = dk && typeof dk.day === 'string' && dk.counts && typeof dk.counts === 'object'
+                      && !Array.isArray(dk.counts) ? { day: dk.day, counts: Object.fromEntries(Object.entries(dk.counts)
+                      .filter(([, n]) => Number.isInteger(n) && n > 0)) } : null; }
                 if (typeof acc.save.scReadyAt === 'number') p.scReadyAt = acc.save.scReadyAt;   // 🕯️ Segunda Chance cooldown
                 // 🕳️ Checkpoint das Profundezas: andar de banda mais fundo cujo boss já caiu
                 // (server-owned: só onDungeonBossDeath muda; saveUpload re-stampa o vivo).
@@ -7503,11 +7537,6 @@ wss.on('connection', (ws, request) => {
             }
             // Fase 5: maxHp/maxMp autoritativos no server — recalcula baseado em
             // skills + talent hpBonus. Cliente fica com valor server via pstats.
-            // Inicializa hp/mp do save (cliente envia no join) só na primeira vez.
-            if (p.maxHp == null && typeof msg.maxHp === 'number') p.maxHp = msg.maxHp;
-            if (p.maxMp == null && typeof msg.maxMp === 'number') p.maxMp = msg.maxMp;
-            if (p.hp == null && typeof msg.hp === 'number') p.hp = msg.hp;
-            if (p.mp == null && typeof msg.mp === 'number') p.mp = msg.mp;
             // O maxHp salvo já pode incluir bônus do equipamento.
             p._gearHp = equippedAffixes(p).hp;
             p._gearMp = equippedAffixes(p).mp;
@@ -7532,6 +7561,20 @@ wss.on('connection', (ws, request) => {
             }
             if (p.hp == null) p.hp = p.maxHp;
             if (p.mp == null) p.mp = p.maxMp;
+            // PIX aprovado antes de a conta ter save (creditGoldToPlayer): entra uma vez só.
+            // Ouro no save e fim da pendência mudam juntos na mesma conta em memória e vão
+            // juntos para o accounts.json; se a gravação falhar, a fila regrava os dois.
+            // Devolver a pendência aqui deixava o ouro no save E na pendência (crédito em dobro).
+            if (acc && Number.isInteger(acc.pendingPixGold) && acc.pendingPixGold > 0){
+                const pix = acc.pendingPixGold;
+                p.gold = (p.gold || 0) + pix;
+                delete acc.pendingPixGold;
+                if (!updateEnchantSave(p)){
+                    queueSaveAccounts();
+                    console.warn(`[mp] gold pendente aplicado no login, gravação adiada: ${p.name} +${pix}`);
+                }
+                else console.log(`[mp] gold pendente aplicado no login: ${p.name} +${pix}`);
+            }
             // Limpa TODOS os ghosts com mesmo nome — não dá pra confiar que só existe 1
             // (race condition de reconexões rápidas, ou WS órfão antes do join).
             removeGhostsByName(p.name, id);
@@ -8428,6 +8471,11 @@ wss.on('connection', (ws, request) => {
                 if (!pool) return reject('bad_daily');   // cliente forjou entry fake
                 // valida items se kind='item'
                 if (pool.kind === 'item' && !hasInv(p, pool.type, pool.count)) return reject('no_items');
+                // Caça: exige as mortes contadas pelo server hoje (antes bastava forjar a lista).
+                if (pool.kind === 'mob'){
+                    const kills = p.dailyKills && p.dailyKills.day === today ? (p.dailyKills.counts[pool.type] | 0) : 0;
+                    if (kills < pool.count) return reject('not_done');
+                }
                 if (pool.kind === 'item') incInv(p, pool.type, -pool.count);
                 p.dailyClaim.ids.push(dailyId);   // anti-replay autoritativo (persistido no lockdown)
                 daily.claimed = daily.claimed || [];
