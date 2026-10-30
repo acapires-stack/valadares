@@ -1095,6 +1095,7 @@ function updateEnchantSave(p){
         enchantToken:p.enchantToken, transmutationOps:p.transmutationOps,
         transmutationToken:p.transmutationToken, transmutationPity:p.transmutationPity,
         progressionToken:p.progressionToken,progressionOps:p.progressionOps,
+        dailyKills:p.dailyKills || null,
         expeditionClears:p.expeditionClears,expeditionPending:p.expeditionPending,
         quests:p.quests,questFlags:p.questFlags,flags:p.flags,skills:p.skills,
         permaBuffs:p.permaBuffs,appearance:appearanceRules.normalizarAppearance(p.appearance),
@@ -5154,6 +5155,11 @@ function serverCurrentChainStage(p, chainId){
 }
 function creditQuestKill(p, mobType){
     if (!p || !mobType) return;
+    // Diárias de caça: a lista do dia vem do cliente, então a prova da caçada é esta
+    // contagem server-side por tipo, zerada a cada dia (mesmo dia UTC do dailyId).
+    const dailyDay = dailyRules.todayKey();
+    if (!p.dailyKills || p.dailyKills.day !== dailyDay) p.dailyKills = { day: dailyDay, counts: {} };
+    p.dailyKills.counts[mobType] = (p.dailyKills.counts[mobType] || 0) + 1;
     const progressMessages = [];
     // Quests simples ativas (goal mob do tipo)
     if (p.quests && p.quests.active){
@@ -7317,6 +7323,7 @@ wss.on('connection', (ws, request) => {
             // Lockdown do anti-replay de daily: server é dono (cliente forjava claimed:[]
             // pra re-claim). p.dailyClaim só muda no handler de daily; aqui só persiste.
             data.dailyClaim = p.dailyClaim || null;
+            data.dailyKills = p.dailyKills || null;   // contagem de caça das diárias: só creditQuestKill muda
             data.scReadyAt = p.scReadyAt || 0;   // 🕯️ Segunda Chance: cooldown persiste (server-autoritativo, timestamp absoluto)
             data.dungeonUnlock = p.dungeonUnlock || 0;   // 🕳️ checkpoint das Profundezas (server-owned — cliente não muda)
             // ★ TRAVA ANTI-WIPE: nunca deixa um save vazio-default sobrescrever um acc.save
@@ -7460,6 +7467,10 @@ wss.on('connection', (ws, request) => {
                 }
                 // Anti-replay de daily: hidrata SÓ do save server-side (nunca de data do saveUpload)
                 if (acc.save.dailyClaim && typeof acc.save.dailyClaim === 'object') p.dailyClaim = acc.save.dailyClaim;
+                { const dk = acc.save.dailyKills;
+                  p.dailyKills = dk && typeof dk.day === 'string' && dk.counts && typeof dk.counts === 'object'
+                      && !Array.isArray(dk.counts) ? { day: dk.day, counts: Object.fromEntries(Object.entries(dk.counts)
+                      .filter(([, n]) => Number.isInteger(n) && n > 0)) } : null; }
                 if (typeof acc.save.scReadyAt === 'number') p.scReadyAt = acc.save.scReadyAt;   // 🕯️ Segunda Chance cooldown
                 // 🕳️ Checkpoint das Profundezas: andar de banda mais fundo cujo boss já caiu
                 // (server-owned: só onDungeonBossDeath muda; saveUpload re-stampa o vivo).
@@ -8428,6 +8439,11 @@ wss.on('connection', (ws, request) => {
                 if (!pool) return reject('bad_daily');   // cliente forjou entry fake
                 // valida items se kind='item'
                 if (pool.kind === 'item' && !hasInv(p, pool.type, pool.count)) return reject('no_items');
+                // Caça: exige as mortes contadas pelo server hoje (antes bastava forjar a lista).
+                if (pool.kind === 'mob'){
+                    const kills = p.dailyKills && p.dailyKills.day === today ? (p.dailyKills.counts[pool.type] | 0) : 0;
+                    if (kills < pool.count) return reject('not_done');
+                }
                 if (pool.kind === 'item') incInv(p, pool.type, -pool.count);
                 p.dailyClaim.ids.push(dailyId);   // anti-replay autoritativo (persistido no lockdown)
                 daily.claimed = daily.claimed || [];
