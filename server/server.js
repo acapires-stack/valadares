@@ -7397,8 +7397,13 @@ wss.on('connection', (ws, request) => {
             p.x     = SAFE_CX;
             p.y     = SAFE_CY;
             p.pvp   = !!msg.pvp;
-            p.hp    = msg.hp ?? 100;
-            p.maxHp = msg.maxHp ?? 100;
+            // HP/MP vêm do save do server, nunca da mensagem: hp:'x' virava NaN (imortal,
+            // nunca chega a 0) e hp/maxHp forjados curavam ao relogar no meio da luta.
+            { const vital = (v, min, fallback) => Number.isFinite(v) && v >= min ? v : fallback;
+              p.maxHp = vital(acc?.save?.maxHp, 1, 100);
+              p.maxMp = vital(acc?.save?.maxMp, 1, 100);
+              p.hp    = vital(acc?.save?.hp, 1, p.maxHp);
+              p.mp    = vital(acc?.save?.mp, 0, p.maxMp); }
             // N3 fase 2: hidrata inv/equipped/gold/chests do save (server vira dono).
             // Se cliente legado (sem auth) ou conta nova, pega do msg como antes.
             ensurePlayerInvSlots(p);
@@ -7503,11 +7508,6 @@ wss.on('connection', (ws, request) => {
             }
             // Fase 5: maxHp/maxMp autoritativos no server — recalcula baseado em
             // skills + talent hpBonus. Cliente fica com valor server via pstats.
-            // Inicializa hp/mp do save (cliente envia no join) só na primeira vez.
-            if (p.maxHp == null && typeof msg.maxHp === 'number') p.maxHp = msg.maxHp;
-            if (p.maxMp == null && typeof msg.maxMp === 'number') p.maxMp = msg.maxMp;
-            if (p.hp == null && typeof msg.hp === 'number') p.hp = msg.hp;
-            if (p.mp == null && typeof msg.mp === 'number') p.mp = msg.mp;
             // O maxHp salvo já pode incluir bônus do equipamento.
             p._gearHp = equippedAffixes(p).hp;
             p._gearMp = equippedAffixes(p).mp;

@@ -80,7 +80,9 @@ test('real WebSocket: human hits an adventurer; only attacker is hit back, dies 
     innocent:'Pvpi'+crypto.randomBytes(3).toString('hex'),safe:'Pvps'+crypto.randomBytes(3).toString('hex')};
   const accountsFile=path.join(tmp,'accounts.json');
   fs.writeFileSync(accountsFile,JSON.stringify({v:1,savedAt:Date.now(),accounts:[
-    account(names.attacker,56,50,12000),account(names.innocent,56,51,0),account(names.safe,50,50,12000)]}));
+    // HP baixo no save (o join não aceita mais hp da mensagem) acelera a morte do atacante.
+    account(names.attacker,56,50,12000),account(names.innocent,56,51,0),account(names.safe,50,50,12000)]
+    .map(a=>a.name===names.attacker?{...a,save:{...a.save,hp:1}}:a)}));
   const port=await freePort(),token='local-companion-pvp-'+crypto.randomBytes(8).toString('hex');
   const entry="const http=require('node:http');const listen=http.Server.prototype.listen;http.Server.prototype.listen=function(port,...rest){return listen.call(this,port,'127.0.0.1',...rest)};require('./server/server.js');const realNow=Date.now;Date.now=()=>realNow()+181000;process.on('message',m=>{if(m==='stop')process.emit('SIGTERM')});";
   const child=spawn(process.execPath,['-e',entry],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc'],
