@@ -1416,6 +1416,9 @@
             -webkit-user-select: none;
         }
         .mtb-gold:active { transform: scale(0.95); filter: brightness(1.15); }
+        .login-touch-label { display: none; }
+        body.touch .login-touch-label { display: inline; }
+        body.touch .login-desktop-label { display: none; }
         .mtb-gold-ico { font-size: 13px; }
         #touchControls { display: none; }
         body.touch #touchControls {
@@ -1703,7 +1706,7 @@
         .vto-btn:active { transform: translateY(1px); }
         .vto-hint { font-size: 11px; color: #886040; margin-top: 8px; font-style: italic; }
         /* Hamburguer (topo) e sidebars colapsáveis em mobile */
-        #mobileMenu {
+        #mobileMenu, #mobileFullscreenBtn {
             display: none;
             position: fixed;
             top: 10px; right: 10px;
@@ -1716,9 +1719,36 @@
             z-index: 160;
             cursor: pointer;
             pointer-events: auto;
-            display: none;
         }
-        body.touch #mobileMenu { display: flex; align-items: center; justify-content: center; }
+        #mobileFullscreenBtn { right: 62px; }
+        body.touch #mobileMenu, body.touch #mobileFullscreenBtn {
+            display: flex; align-items: center; justify-content: center;
+        }
+        body.touch:not(.game-active) #mobileFullscreenBtn { display: none; }
+        body.touch.standalone #mobileFullscreenBtn { display: none; }
+        body.touch.menu-open #mobileFullscreenBtn { display: none; }
+        #mobileFullscreenHint {
+            display: none; position: fixed; z-index: 650;
+            top: calc(56px + env(safe-area-inset-top)); left: 50%;
+            transform: translateX(-50%); width: min(440px, calc(100vw - 24px));
+            max-height: calc(100dvh - 64px - env(safe-area-inset-top));
+            overflow-y: auto; padding: 10px 42px 10px 14px;
+            border: 1px solid #d4a850; border-radius: 8px;
+            background: #1b2b28f5; color: #fff0ca;
+            box-shadow: 0 8px 28px #000b;
+            font-size: 12px; line-height: 1.4;
+        }
+        body.touch #mobileFullscreenHint.visible { display: block; }
+        body.touch.menu-open #mobileFullscreenHint { display: none; }
+        #mobileFullscreenHint strong { display: block; margin-bottom: 3px; color: #ffdb8d; }
+        #mobileFullscreenHint small { display: block; margin-top: 3px; color: #d4ddcf; font-size: 11px; }
+        #mobileFullscreenHint[data-platform="ios"] .fsh-other,
+        #mobileFullscreenHint[data-platform="other"] .fsh-ios { display: none; }
+        #mobileFullscreenHint button {
+            position: absolute; top: 2px; right: 2px;
+            width: 36px; height: 36px; border: 0; background: none;
+            color: #fff0ca; font-size: 24px; cursor: pointer;
+        }
         body.touch.menu-open #leftSidebar,
         body.touch.menu-open #rightSidebar,
         body.touch.menu-open #invSidebar { display: flex !important; }
@@ -1804,7 +1834,21 @@
     <button class="mhb-slot" id="mhbSlotMagic" type="button" title="Magia ativa (compre no altar — tecla M)"><span class="mhb-ico">✦</span><span class="mhb-lbl">MAGIA</span><span class="mhb-qty" id="mhbQtyMagic"></span></button>
     <button class="mhb-slot" id="mhbSlotSpear" type="button" title="Arremessar lança"><span class="mhb-ico">↗</span><span class="mhb-lbl">LANÇA</span><span class="mhb-qty" id="mhbQtySpear"></span></button>
 </div>
+<button id="mobileFullscreenBtn" type="button" onclick="uiToggleFullscreen()" data-i18n-title="mobile.fullscreen_title" data-i18n-aria-label="mobile.fullscreen_title" title="Jogar em tela cheia" aria-label="Jogar em tela cheia"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
 <button id="mobileMenu" type="button" title="Menu">≡</button>
+<div id="mobileFullscreenHint" data-platform="ios" role="status" aria-live="polite">
+    <div class="fsh-ios">
+        <strong data-i18n="mobile.ios_title">Sem barras no iPhone</strong>
+        <span>📤 </span><span data-i18n="mobile.ios_share">Safari: ••• Menu da página → Compartilhar (ou botão Compartilhar)</span><br>
+        <span>➕ </span><span data-i18n="mobile.ios_add">Adicionar à Tela de Início (se faltar: Editar Ações)</span>
+        <small data-i18n="mobile.ios_open">Ative Abrir como App → Adicionar. Abra pelo ícone.</small>
+    </div>
+    <div class="fsh-other">
+        <strong data-i18n="mobile.unavailable_title">Tela cheia indisponível</strong>
+        <span data-i18n="mobile.unavailable_hint">Abra o menu do navegador e escolha Instalar ou Adicionar à tela inicial.</span>
+    </div>
+    <button type="button" onclick="hideMobileFullscreenHint()" data-i18n-aria-label="mobile.dismiss" aria-label="Fechar orientação">×</button>
+</div>
 
 <!-- Modal full-screen: cliente Electron desatualizado bloqueado pelo server.
      Aparece no handler t:'versionTooOld' (ver showVersionTooOldModal). -->
@@ -1862,7 +1906,7 @@
         <input type="email" id="emailInput" placeholder="Email (opcional — recuperar senha)" data-i18n-ph="login.email_ph" maxlength="120" autocomplete="email" style="font-size:11px">
         <div class="opt" id="loginStatus" data-i18n="login.status_default">— digite seu nome —</div>
         <div id="loginError" style="color:#d04040;font-size:11px;margin-bottom:8px;min-height:14px"></div>
-        <button onclick="tryLogin(true)" style="width:100%" data-i18n="login.enter">ENTRAR</button>
+        <button onclick="tryLogin(true)" style="width:100%"><span class="login-desktop-label" data-i18n="login.enter">ENTRAR</span><span class="login-touch-label" data-i18n="login.play">JOGAR</span></button>
         <div class="opt" style="margin-top:10px;font-size:10px">
             <a href="#" onclick="event.preventDefault(); openForgotPwd()" style="color:#888;text-decoration:none" data-i18n="login.forgot">esqueci minha senha</a>
         </div>
@@ -2617,7 +2661,7 @@ const blocksLineOfSight = t => t===T.TREE || t===T.CAVE_WALL;
 // ═══════════════════════════════════════════════════════════════════════════
 // i18n — internacionalização (PT padrão · EN opcional). Fallback: lang → pt → chave.
 // UI ESTÁTICA: marque o elemento com data-i18n="chave" (texto), data-i18n-ph (placeholder),
-//   data-i18n-title (title) ou data-i18n-html (innerHTML, p/ texto com <kbd>/<b>); chame applyI18n().
+//   data-i18n-title (title), data-i18n-aria-label ou data-i18n-html (innerHTML, p/ texto com <kbd>/<b>); chame applyI18n().
 // UI DINÂMICA (montada por JS): use tr('chave'[, {param:val}]).
 // ⚠️ a função se chama tr() (NÃO t()) porque 't' já é param de tile no código.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2636,6 +2680,15 @@ const I18N = {
     'login.email_ph': 'Email (opcional — recuperar senha)',
     'login.status_default': '— digite seu nome —',
     'login.enter': 'ENTRAR',
+    'login.play': 'JOGAR',
+    'mobile.fullscreen_title': 'Tela cheia',
+    'mobile.ios_title': 'Sem barras no iPhone',
+    'mobile.ios_share': 'Safari: ••• Menu da página → Compartilhar (ou botão Compartilhar)',
+    'mobile.ios_add': 'Adicionar à Tela de Início (se faltar: Editar Ações)',
+    'mobile.ios_open': 'Ative Abrir como App → Adicionar. Abra pelo ícone.',
+    'mobile.unavailable_title': 'Tela cheia indisponível',
+    'mobile.unavailable_hint': 'Abra o menu do navegador e escolha Instalar ou Adicionar à tela inicial.',
+    'mobile.dismiss': 'Fechar orientação',
     'login.forgot': 'esqueci minha senha',
     'login.server': 'servidor',
     'login.delete_acc': 'excluir conta',
@@ -3380,6 +3433,15 @@ const I18N = {
     'login.email_ph': 'Email (optional — password recovery)',
     'login.status_default': '— enter your name —',
     'login.enter': 'ENTER',
+    'login.play': 'PLAY',
+    'mobile.fullscreen_title': 'Fullscreen',
+    'mobile.ios_title': 'No browser bars on iPhone',
+    'mobile.ios_share': 'Safari: ••• Page Menu → Share (or the Share button)',
+    'mobile.ios_add': 'Add to Home Screen (if missing: Edit Actions)',
+    'mobile.ios_open': 'Turn on Open as Web App → Add. Open the new icon.',
+    'mobile.unavailable_title': 'Fullscreen unavailable',
+    'mobile.unavailable_hint': 'Open your browser menu and choose Install or Add to Home Screen.',
+    'mobile.dismiss': 'Close tip',
     'login.forgot': 'forgot my password',
     'login.server': 'server',
     'login.delete_acc': 'delete account',
@@ -4133,6 +4195,7 @@ function applyI18n(root){
   sc.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
   sc.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', tr(el.getAttribute('data-i18n-ph'))); });
   sc.querySelectorAll('[data-i18n-title]').forEach(el => { el.setAttribute('title', tr(el.getAttribute('data-i18n-title'))); });
+  sc.querySelectorAll('[data-i18n-aria-label]').forEach(el => { el.setAttribute('aria-label', tr(el.getAttribute('data-i18n-aria-label'))); });
 }
 function updateLangButtons(){
   document.querySelectorAll('[data-lang-btn]').forEach(b => {
@@ -16547,7 +16610,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // ─── Acessibilidade: zoom + fullscreen ────────────────────────────────────
 // No Electron desktop usa window.electronApi (preload bridge). No browser
-// usa document.body.style.zoom (Chromium/Edge) + requestFullscreen.
+// usa document.body.style.zoom (Chromium/Edge) + requestFullscreen quando disponível.
 // Browser zoom persiste em localStorage. Electron zoom persiste em userData.
 const UI_ZOOM_KEY = 'valadares:uiZoom';
 function _getBrowserZoom(){
@@ -16568,19 +16631,53 @@ async function uiZoom(delta){
     if (delta === 'out')   _setBrowserZoom(cur - 0.1);
     if (delta === 'reset') _setBrowserZoom(1);
 }
+let mobileFullscreenHintTimer;
+function hideMobileFullscreenHint(){
+    clearTimeout(mobileFullscreenHintTimer);
+    document.getElementById('mobileFullscreenHint')?.classList.remove('visible');
+}
+function showMobileFullscreenHint(){
+    const hint = document.getElementById('mobileFullscreenHint');
+    if (!hint) return;
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    hint.dataset.platform = ios ? 'ios' : 'other';
+    hint.classList.add('visible');
+    clearTimeout(mobileFullscreenHintTimer);
+    mobileFullscreenHintTimer = setTimeout(hideMobileFullscreenHint, 15000);
+}
+function uiFullscreenUnavailable(){
+    if (document.body.classList.contains('touch')) showMobileFullscreenHint();
+    else log(tr('log.fullscreen_blocked'));
+}
+function uiIsStandalone(){
+    return navigator.standalone === true
+        || !!window.matchMedia?.('(display-mode: standalone)').matches;
+}
+function uiEnterFullscreen(){
+    // A chamada precisa acontecer diretamente no gesto, antes do await do login.
+    if (uiIsStandalone()) { document.body.classList.add('standalone'); return; }
+    if (document.fullscreenElement) return;
+    if (document.fullscreenEnabled === false || !document.documentElement.requestFullscreen){
+        uiFullscreenUnavailable();
+        return;
+    }
+    try {
+        Promise.resolve(document.documentElement.requestFullscreen())
+            .then(hideMobileFullscreenHint, uiFullscreenUnavailable);
+    } catch { uiFullscreenUnavailable(); }
+}
 async function uiToggleFullscreen(){
     if (typeof window.electronApi !== 'undefined' && window.electronApi.isDesktop){
         try { await window.electronApi.toggleFullscreen(); return; } catch {}
     }
-    // Fallback browser fullscreen
-    if (!document.fullscreenElement){
-        document.documentElement.requestFullscreen?.().catch(e => log(tr('log.fullscreen_blocked')));
-    } else {
-        document.exitFullscreen?.();
-    }
+    if (document.fullscreenElement){
+        try { await document.exitFullscreen(); } catch { uiFullscreenUnavailable(); }
+    } else uiEnterFullscreen();
 }
 window.uiZoom = uiZoom;
 window.uiToggleFullscreen = uiToggleFullscreen;
+window.hideMobileFullscreenHint = hideMobileFullscreenHint;
 // Restaura zoom do browser na carga inicial (Electron faz isso via main.js)
 if (typeof window.electronApi === 'undefined'){
     const z = _getBrowserZoom();
@@ -16736,11 +16833,9 @@ async function tryLogin(multiplayer){
     if (pwd.length < 3){ err.textContent = 'Senha precisa de pelo menos 3 caracteres.'; return; }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent = 'Email inválido — deixe vazio se não quiser.'; return; }
     const acc = getAccount(name);
-    if (acc){
-        if (acc.pw !== hashPw(pwd)){ err.textContent = 'Senha incorreta.'; return; }
-    } else {
-        setAccount(name, pwd);
-    }
+    if (acc && acc.pw !== hashPw(pwd)){ err.textContent = 'Senha incorreta.'; return; }
+    if (document.body.classList.contains('touch')) uiEnterFullscreen();
+    if (!acc) setAccount(name, pwd);
     // grava sessão para auto-login no próximo F5/abertura
     try {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ name, pw: hashPw(pwd), mp: !!multiplayer }));
@@ -18304,6 +18399,7 @@ function loop(ts){
         || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     if (!isTouchDevice) return;
     document.body.classList.add('touch');
+    if (uiIsStandalone()) document.body.classList.add('standalone');
 
     // Evita zoom por double-tap e long-press menu
     document.addEventListener('gesturestart', e => e.preventDefault());

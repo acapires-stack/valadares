@@ -16,6 +16,7 @@ export async function createRenderer(bridge){
  const sun=new pc.Entity('Sol');sun.addComponent('light',{type:'directional',color:new pc.Color(1,.91,.74),intensity:1.4,castShadows:true,shadowResolution:2048,shadowDistance:45,shadowBias:.15,normalOffsetBias:.04,shadowType:pc.SHADOW_PCF3_32F});sun.setEulerAngles(52,-35,0);app.root.addChild(sun);
  const fill=new pc.Entity('Ceu');fill.addComponent('light',{type:'directional',color:new pc.Color(.5,.7,.88),intensity:.45,castShadows:false});fill.setEulerAngles(55,145,0);app.root.addChild(fill);
  const lamp=new pc.Entity('Luz do aventureiro');lamp.addComponent('light',{type:'omni',color:new pc.Color(1,.67,.32),intensity:.9,range:5,castShadows:false});app.root.addChild(lamp);
+ const worldOrthoHeight=5.7,touchWorldScale=1.15;
  let width=720,height=528,ready=false,failed=false,elapsed=0,frames=0,fps=0,lastError=null;
  const itemIcons=new Map();
  const refreshItemIcons=()=>itemIcons.clear();
@@ -23,7 +24,7 @@ export async function createRenderer(bridge){
  const ctx=overlay.getContext('2d');
  function resize(){const rect=host.getBoundingClientRect(),pr=parent.getBoundingClientRect();if(rect.width<2||rect.height<2)return;width=rect.width;height=rect.height;
   for(const c of [canvas,overlay]){c.style.setProperty('--modern-width',width+'px');c.style.setProperty('--modern-height',height+'px');c.style.setProperty('left',(rect.left-pr.left-parent.clientLeft+parent.scrollLeft)+'px','important');c.style.setProperty('top',(rect.top-pr.top-parent.clientTop+parent.scrollTop)+'px','important');c.style.setProperty('width',width+'px','important');c.style.setProperty('height',height+'px','important');c.style.setProperty('max-height','none','important');c.style.setProperty('aspect-ratio','auto','important');}
-  app.resizeCanvas(width,height);const ratio=Math.min(window.devicePixelRatio||1,2);overlay.width=Math.round(width*ratio);overlay.height=Math.round(height*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);camera.camera.orthoHeight=5.7;
+  app.resizeCanvas(width,height);const ratio=Math.min(window.devicePixelRatio||1,2);overlay.width=Math.round(width*ratio);overlay.height=Math.round(height*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);camera.camera.orthoHeight=worldOrthoHeight/(document.body.classList.contains('touch')?touchWorldScale:1);
  }
  const observer=new ResizeObserver(resize);observer.observe(host);window.addEventListener('resize',resize);resize();
  let viewBounds=null;
