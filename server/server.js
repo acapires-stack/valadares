@@ -397,6 +397,12 @@ async function handleHttpRequest(req, res){
                 const info = adminCheckUser(body.target || '');
                 return httpJson(res, 200, info ? { ok:true, info } : { ok:false, reason:'not_found' });
             }
+            if (kind === 'setPassword'){
+                const result = adminSetPassword(body.target, body.pwHash);
+                const status = result.ok ? 200 : result.reason === 'not_found' ? 404
+                    : result.reason === 'backup_failed' || result.reason === 'persist_failed' ? 500 : 400;
+                return httpJson(res, status, result);
+            }
             if (kind === 'delete'){
                 const r = deleteUserAccount(body.target || '');
                 return httpJson(res, 200, r);
@@ -4308,6 +4314,30 @@ function adminCheckUser(rawName){
         online,
     };
 }
+// Troca administrativa de senha: recebe apenas o hash de transporte do cliente,
+// preserva o save e confirma sucesso somente depois da gravação no volume.
+function adminSetPassword(rawName, clientHash){
+    const key = String(rawName || '').toLowerCase().trim();
+    if (!key) return { ok:false, reason:'empty' };
+    if (!/^s256:[a-f0-9]{64}$/.test(String(clientHash || ''))) return { ok:false, reason:'invalid_hash' };
+    const account = accounts.get(key);
+    if (!account) return { ok:false, reason:'not_found' };
+    // Uma resposta HTTP perdida não deve gerar outro hash/backup para a mesma troca.
+    const alreadySet = verifyPwHash(account.pwHash, clientHash);
+    if (alreadySet && !account.resetToken) return { ok:true, name:account.name, alreadySet:true };
+    if (!backupAccountsFile()) return { ok:false, reason:'backup_failed' };
+    _lastAccountsBackupAt = Date.now();
+    const oldHash = account.pwHash, oldResetToken = account.resetToken;
+    if (!alreadySet) account.pwHash = hashPwScrypt(clientHash);
+    account.resetToken = null;
+    if (!flushAccounts()){
+        account.pwHash = oldHash;
+        account.resetToken = oldResetToken;
+        return { ok:false, reason:'persist_failed' };
+    }
+    console.log(`[admin] senha ${alreadySet?'confirmada':'trocada'} para ${account.name}`);
+    return { ok:true, name:account.name, alreadySet };
+}
 // Admin: reseta pos/hp do player. Corrige sprite invisível por save bichado.
 function adminResetUser(rawName){
     const nameLower = String(rawName || '').toLowerCase().trim();
@@ -4553,16 +4583,17 @@ function _diskAccountsCount(){
 // Snapshot do accounts.json ATUAL (se válido e não-vazio) num backup com timestamp.
 function backupAccountsFile(){
     try {
-        if (!fs.existsSync(ACCOUNTS_FILE)) return;
+        if (!fs.existsSync(ACCOUNTS_FILE)) return false;
         const raw = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
         const parsed = JSON.parse(raw);   // throws se corrompido → não backupa lixo
-        if (!parsed || !Array.isArray(parsed.accounts) || parsed.accounts.length === 0) return;
+        if (!parsed || !Array.isArray(parsed.accounts) || parsed.accounts.length === 0) return false;
         if (!fs.existsSync(ACCOUNTS_BACKUP_DIR)) fs.mkdirSync(ACCOUNTS_BACKUP_DIR, { recursive: true });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         fs.writeFileSync(path.join(ACCOUNTS_BACKUP_DIR, `accounts-${stamp}.json`), raw, 'utf8');
         const files = fs.readdirSync(ACCOUNTS_BACKUP_DIR).filter(f => f.startsWith('accounts-') && f.endsWith('.json')).sort();
         while (files.length > ACCOUNTS_BACKUP_KEEP){ try { fs.unlinkSync(path.join(ACCOUNTS_BACKUP_DIR, files.shift())); } catch {} }
-    } catch(e){ console.warn('[accounts] backup falhou (segue):', e.message); }
+        return true;
+    } catch(e){ console.warn('[accounts] backup falhou (segue):', e.message); return false; }
 }
 function flushAccounts(){
     try {
