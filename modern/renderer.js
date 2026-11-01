@@ -5,26 +5,29 @@ import {createPlayerVisibility} from './player-visibility.js';
 
 export async function createRenderer(bridge){
  const host=bridge.getCanvas(),parent=host.parentElement;
+ const mobileProfile=document.body.classList.contains('touch');
+ const pixelRatio=Math.min(window.devicePixelRatio||1,mobileProfile?1:1.5);
  const canvas=document.createElement('canvas');canvas.id='modernCanvas';canvas.setAttribute('aria-label','Mundo de Valadares');canvas.tabIndex=-1;
  const overlay=document.createElement('canvas');overlay.id='modernLabels';overlay.setAttribute('aria-hidden','true');
  for(const c of [canvas,overlay]){c.style.cssText='position:absolute;left:0;top:0;z-index:5;display:none;width:100%;height:100%;';parent.append(c);}overlay.style.zIndex='6';overlay.style.pointerEvents='none';canvas.style.touchAction='none';
- const app=new pc.Application(canvas,{graphicsDeviceOptions:{alpha:false,antialias:true,powerPreference:'high-performance',deviceTypes:['webgl2']}});
- app.graphicsDevice.maxPixelRatio=Math.min(window.devicePixelRatio||1,1.5);
+ const app=new pc.Application(canvas,{graphicsDeviceOptions:{alpha:false,antialias:!mobileProfile,powerPreference:mobileProfile?'low-power':'high-performance',deviceTypes:['webgl2']}});
+ app.graphicsDevice.maxPixelRatio=pixelRatio;
+ if(mobileProfile)app.autoRender=false;
  app.setCanvasFillMode(pc.FILLMODE_NONE);app.setCanvasResolution(pc.RESOLUTION_AUTO);
  app.scene.ambientLight=new pc.Color(.43,.48,.47);app.scene.toneMapping=pc.TONEMAP_ACES;app.scene.exposure=1.1;
  const camera=new pc.Entity('Camera');camera.addComponent('camera',{projection:pc.PROJECTION_ORTHOGRAPHIC,orthoHeight:5.5,nearClip:.1,farClip:95,clearColor:new pc.Color(.13,.18,.17)});app.root.addChild(camera);
- const sun=new pc.Entity('Sol');sun.addComponent('light',{type:'directional',color:new pc.Color(1,.91,.74),intensity:1.4,castShadows:true,shadowResolution:2048,shadowDistance:45,shadowBias:.15,normalOffsetBias:.04,shadowType:pc.SHADOW_PCF3_32F});sun.setEulerAngles(52,-35,0);app.root.addChild(sun);
+ const sun=new pc.Entity('Sol');sun.addComponent('light',{type:'directional',color:new pc.Color(1,.91,.74),intensity:1.4,castShadows:true,shadowResolution:mobileProfile?1024:2048,shadowDistance:mobileProfile?30:45,shadowBias:.15,normalOffsetBias:.04,shadowType:pc.SHADOW_PCF3_32F});sun.setEulerAngles(52,-35,0);app.root.addChild(sun);
  const fill=new pc.Entity('Ceu');fill.addComponent('light',{type:'directional',color:new pc.Color(.5,.7,.88),intensity:.45,castShadows:false});fill.setEulerAngles(55,145,0);app.root.addChild(fill);
  const lamp=new pc.Entity('Luz do aventureiro');lamp.addComponent('light',{type:'omni',color:new pc.Color(1,.67,.32),intensity:.9,range:5,castShadows:false});app.root.addChild(lamp);
  const worldOrthoHeight=5.7,touchWorldScale=1.15;
- let width=720,height=528,ready=false,failed=false,elapsed=0,frames=0,fps=0,lastError=null;
+ let width=720,height=528,ready=false,failed=false,fps=0,renderedFrames=0,fpsFrames=0,fpsStart=performance.now(),lastVisualAt=-Infinity,visualDt=0,lastError=null;
  const itemIcons=new Map();
  const refreshItemIcons=()=>itemIcons.clear();
  window.addEventListener('valadares:kaykit-icon-ready',refreshItemIcons);
  const ctx=overlay.getContext('2d');
  function resize(){const rect=host.getBoundingClientRect(),pr=parent.getBoundingClientRect();if(rect.width<2||rect.height<2)return;width=rect.width;height=rect.height;
   for(const c of [canvas,overlay]){c.style.setProperty('--modern-width',width+'px');c.style.setProperty('--modern-height',height+'px');c.style.setProperty('left',(rect.left-pr.left-parent.clientLeft+parent.scrollLeft)+'px','important');c.style.setProperty('top',(rect.top-pr.top-parent.clientTop+parent.scrollTop)+'px','important');c.style.setProperty('width',width+'px','important');c.style.setProperty('height',height+'px','important');c.style.setProperty('max-height','none','important');c.style.setProperty('aspect-ratio','auto','important');}
-  app.resizeCanvas(width,height);const ratio=Math.min(window.devicePixelRatio||1,2);overlay.width=Math.round(width*ratio);overlay.height=Math.round(height*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);camera.camera.orthoHeight=worldOrthoHeight/(document.body.classList.contains('touch')?touchWorldScale:1);
+  app.resizeCanvas(width,height);const ratio=mobileProfile?pixelRatio:Math.min(window.devicePixelRatio||1,2);overlay.width=Math.round(width*ratio);overlay.height=Math.round(height*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);camera.camera.orthoHeight=worldOrthoHeight/(mobileProfile?touchWorldScale:1);
  }
  const observer=new ResizeObserver(resize);observer.observe(host);window.addEventListener('resize',resize);resize();
  let viewBounds=null;
@@ -34,7 +37,15 @@ export async function createRenderer(bridge){
  const visibility=createPlayerVisibility(pc,app,camera);
  const project=(x,y,z)=>{const v=camera.camera.worldToScreen(new pc.Vec3(x,y,z));return{x:v.x,y:v.y,z:v.z};};
  const labelBoxes=[];
- const text=(label,x,y,color='#f3ebcf',size=12)=>{ctx.font=`600 ${size}px system-ui, sans-serif`;const w=ctx.measureText(label).width+8;let box=null;for(const dy of [0,-15,-30,-45]){const candidate={x:x-w/2,y:y+dy-size-2,w,h:size+5};if(candidate.y<0||candidate.x<0||candidate.x+w>width)continue;if(!labelBoxes.some(b=>candidate.x<b.x+b.w&&candidate.x+candidate.w>b.x&&candidate.y<b.y+b.h&&candidate.y+candidate.h>b.y)){box=candidate;y+=dy;break;}}if(!box)return;labelBoxes.push(box);ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(10,18,19,.82)';ctx.strokeText(label,x,y);ctx.fillStyle=color;ctx.fillText(label,x,y);};
+ const text=(label,x,y,color='#f3ebcf',size=12,reserveBelow=0,minWidth=0)=>{ctx.font=`600 ${size}px system-ui, sans-serif`;const w=Math.max(ctx.measureText(label).width+8,minWidth);let box=null;for(const dy of [0,-15,-30,-45]){const candidate={x:x-w/2,y:y+dy-size-2,w,h:size+5+reserveBelow};if(candidate.y<0||candidate.x<0||candidate.x+w>width)continue;if(!labelBoxes.some(b=>candidate.x<b.x+b.w&&candidate.x+candidate.w>b.x&&candidate.y<b.y+b.h&&candidate.y+candidate.h>b.y)){box=candidate;y+=dy;break;}}if(!box)return;labelBoxes.push(box);ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(10,18,19,.82)';ctx.strokeText(label,x,y);ctx.fillStyle=color;ctx.fillText(label,x,y);return y;};
+ const resourceRatio=(value,max)=>Number.isFinite(value)&&Number.isFinite(max)&&max>0?Math.max(0,Math.min(1,value/max)):null;
+ function drawRemoteVitals(x,nameY,hp,mp){
+  const barX=Math.round(x-27),barWidth=54,rows=Number(hp!==null)+Number(mp!==null);
+  ctx.fillStyle='rgba(11,18,20,.88)';ctx.fillRect(barX-2,nameY+2,barWidth+4,rows*6+4);
+  let y=nameY+4;
+  if(hp!==null){ctx.fillStyle='#53302d';ctx.fillRect(barX,y,barWidth,4);ctx.fillStyle='#dd615a';ctx.fillRect(barX,y,barWidth*hp,4);y+=6;}
+  if(mp!==null){ctx.fillStyle='#263b60';ctx.fillRect(barX,y,barWidth,4);ctx.fillStyle='#5c8ee4';ctx.fillRect(barX,y,barWidth*mp,4);}
+ }
  function labels(){ctx.clearRect(0,0,width,height);labelBoxes.length=0;const player=bridge.getPlayer(),target=bridge.getTarget?.()||{id:player.target,type:player.targetType};
   for(const [id,r]of actors.entries){const e=r.data;const x=(e.renderX??e.x)+.5,z=(e.renderY??e.y)+.5;const isTarget=id===`${target.type==='player'?'remote':target.type==='companion'?'companion':'mob'}:${target.id}`;
    if(isTarget){const pos=project(x,.035,z);ctx.strokeStyle='#f3c76b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(pos.x,pos.y,18*width/720,9*height/528,0,0,Math.PI*2);ctx.stroke();}
@@ -46,10 +57,12 @@ export async function createRenderer(bridge){
    }
    else if(r.kind==='remote'||r.kind==='player'){
     const cosmetic=bridge.getItems?.()[e.equipped?.cosmetic||e.cosmetic]||{};
-    text((e.ghost?'◌ ':e.pvp?'⚔ ':'')+(r.kind==='player'?player.name:e.name),pos.x,pos.y,cosmetic.nameColor||(r.kind==='player'?'#ece3c6':'#9accc5'),11);
+    const hp=r.kind==='remote'?resourceRatio(e.hp,e.maxHp):null,mp=r.kind==='remote'?resourceRatio(e.mp,e.maxMp):null;
+    const rows=Number(hp!==null)+Number(mp!==null),nameY=text((e.ghost?'◌ ':e.pvp?'⚔ ':'')+(r.kind==='player'?player.name:e.name),pos.x,pos.y-(rows?12:0),cosmetic.nameColor||(r.kind==='player'?'#ece3c6':'#9accc5'),11,rows?16:0,rows?58:0);
+    if(rows&&nameY!==undefined)drawRemoteVitals(pos.x,nameY,hp,mp);
     const en=bridge.getLanguage?.()==='en';
     const status=[e.poison?(en?'POISON':'VENENO'):'',e.stun?(en?'STUNNED':'ATORDOADO'):'',e.bleed?(en?'BLEEDING':'SANGRANDO'):'',e.buff?'✦':''].filter(Boolean).join(' · ');
-    if(status)text(status,pos.x,pos.y-14,e.stun?'#ffbf67':'#a6d78b',9);
+    if(status)text(status,pos.x,(nameY??pos.y)-14,e.stun?'#ffbf67':'#a6d78b',9);
     if(cosmetic.aura){const base=project(x,.04,z);ctx.globalAlpha=.45+Math.sin(performance.now()/350)*.18;ctx.strokeStyle=cosmetic.aura;ctx.lineWidth=3;ctx.shadowColor=cosmetic.aura;ctx.shadowBlur=12;ctx.beginPath();ctx.ellipse(base.x,base.y,23*width/720,11*height/528,0,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;}
    }
    if(r.kind==='mob'&&(isTarget||e.hp<e.maxHp)){const pct=Math.max(0,Math.min(1,e.hp/(e.maxHp||e.hp))),w=36;ctx.fillStyle='rgba(11,18,17,.85)';ctx.fillRect(pos.x-w/2-1,pos.y+4,w+2,5);ctx.fillStyle=isTarget?'#c57152':'#89ac80';ctx.fillRect(pos.x-w/2,pos.y+5,w*pct,3);if(isTarget)text(e.name||bridge.getMonsterTypes?.()[e.type]?.name||e.type,pos.x,pos.y,'#f1d4aa',11);}
@@ -131,9 +144,31 @@ export async function createRenderer(bridge){
   document.dispatchEvent(new CustomEvent('valadares:modern-error',{detail:{message:lastError}}));
  }
  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();recover(new Error('Contexto gráfico interrompido'));});
+ // O PlayCanvas mantém os updates; só o desenho do mundo touch é solicitado a ~30 Hz.
+ const mobileFrameMs=33;
+ const onVisibilityChange=()=>{
+  if(!mobileProfile||failed)return;
+  if(document.hidden){app.renderNextFrame=false;visualDt=0;}
+  fps=0;fpsFrames=0;fpsStart=performance.now();
+  lastVisualAt=-Infinity;
+ };
+ if(mobileProfile)document.addEventListener('visibilitychange',onVisibilityChange);
+ app.on('postrender',()=>{
+  if(failed||!bridge.getStarted?.())return;
+  renderedFrames++;fpsFrames++;
+  const now=performance.now(),elapsed=now-fpsStart;
+  if(elapsed>=1000){fps=Math.round(fpsFrames*1000/elapsed);fpsFrames=0;fpsStart=now;}
+ });
  app.on('update',dt=>{
   if(failed)return;
-  const started=bridge.getStarted?.();canvas.style.display=started?'block':'none';overlay.style.display=started?'block':'none';if(!started){visibility.update(null);return;}
+  const started=bridge.getStarted?.();canvas.style.display=started?'block':'none';overlay.style.display=started?'block':'none';
+  if(!started){visibility.update(null);fps=0;fpsFrames=0;fpsStart=performance.now();if(mobileProfile){app.renderNextFrame=false;visualDt=0;lastVisualAt=-Infinity;}return;}
+  if(mobileProfile){
+   if(document.hidden||document.body.classList.contains('menu-open')){app.renderNextFrame=false;visualDt=0;lastVisualAt=-Infinity;fps=0;fpsFrames=0;fpsStart=performance.now();return;}
+   visualDt=Math.min(.1,visualDt+dt);
+   const now=performance.now();if(now-lastVisualAt<mobileFrameMs)return;
+   dt=visualDt;visualDt=0;lastVisualAt=now;
+  }
   try{
    const p=bridge.getPlayer(),cam=bridge.getCamera(),cx=cam.x+bridge.VP_W/2,cz=cam.y+bridge.VP_H/2;
    const halfX=camera.camera.orthoHeight*width/height,halfZ=camera.camera.orthoHeight*Math.hypot(16,10)/16;
@@ -142,10 +177,11 @@ export async function createRenderer(bridge){
    const underground=(p.floor||0)>0||bridge.inCave?.(p.x,p.y),dark=Math.max(0,Math.min(1,bridge.getDayPhase?.().darkness||0));
    const interior=!!bridge.getInterior?.();
    sun.light.intensity=interior?.95:underground?.46:1.4-dark*.95;fill.light.intensity=interior?.38:underground?.23:.45-dark*.1;lamp.light.intensity=interior?1.15:underground?2.1:.3+dark*.8;
-   world.update(dt);actors.update(dt);visibility.update(actors.entries.get('self'));labels();frames++;elapsed+=dt;if(elapsed>=1){fps=frames/elapsed;frames=0;elapsed=0;}
+   world.update(dt);actors.update(dt);visibility.update(actors.entries.get('self'));labels();
+   if(mobileProfile)app.renderNextFrame=true;
   }catch(error){recover(error);}
  });
  function captureStream(rate=30){const output=document.createElement('canvas');output.width=canvas.width;output.height=canvas.height;const capture=output.getContext('2d'),stream=output.captureStream(rate);const paint=()=>{capture.drawImage(canvas,0,0,output.width,output.height);capture.drawImage(overlay,0,0,output.width,output.height);};app.on('postrender',paint);const timer=setInterval(()=>{if(stream.getVideoTracks().every(t=>t.readyState==='ended')){clearInterval(timer);app.off('postrender',paint);}},500);return stream;}
  app.start();ready=true;document.body.classList.add('modern-renderer-ready');
- return {app,world,actors,camera,canvas,visibility,bridge,project,captureStream,diagnostics:()=>({ready,fps:Math.round(fps),error:lastError,actors:actors.diagnostics(),world:world.diagnostics(),visibility:visibility.diagnostics(),width,height,drawCalls:app.stats.drawCalls.total}),destroy(){observer.disconnect();window.removeEventListener('resize',resize);window.removeEventListener('valadares:kaykit-icon-ready',refreshItemIcons);visibility.destroy();actors.destroy();world.destroy();app.destroy();canvas.remove();overlay.remove();}};
+ return {app,world,actors,camera,canvas,visibility,bridge,project,captureStream,diagnostics:()=>({ready,fps,renderedFrames,error:lastError,actors:actors.diagnostics(),world:world.diagnostics(),visibility:visibility.diagnostics(),width,height,drawCalls:app.stats.drawCalls.total}),destroy(){observer.disconnect();window.removeEventListener('resize',resize);window.removeEventListener('valadares:kaykit-icon-ready',refreshItemIcons);if(mobileProfile)document.removeEventListener('visibilitychange',onVisibilityChange);visibility.destroy();actors.destroy();world.destroy();app.destroy();canvas.remove();overlay.remove();}};
 }
