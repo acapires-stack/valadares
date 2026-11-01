@@ -1962,7 +1962,7 @@
         <div class="reconnect-title" id="loadingTitle">CARREGANDO MUNDO</div>
         <div class="reconnect-desc" id="loadingDesc">Aguardando snapshot do servidor…</div>
         <div class="reconnect-hint" id="loadingHint"></div>
-        <button id="loadingReloadBtn" onclick="window.location.reload()">🔄 RECARREGAR</button>
+        <button id="loadingReloadBtn" onclick="reloadFromLoading()">🔄 RECARREGAR</button>
     </div>
 </div>
 
@@ -3382,6 +3382,14 @@ const I18N = {
     'err.auth_no_pw': '⚠ Senha não informada.',
     'err.auth_bad_name': '⚠ Nome inválido.',
     'err.auth_default': '⚠ Autenticação rejeitada.',
+    'err.auth_server_error': '⚠ Erro no servidor ao validar o login. Seu personagem não foi alterado; tente novamente.',
+    'err.auth_equipment_update': 'Atualizando o suporte aos equipamentos. Seu personagem está salvo.',
+    'err.login_title': 'NÃO FOI POSSÍVEL ENTRAR',
+    'err.login_connect_failed': '⚠ Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.',
+    'err.login_closed': '⚠ A conexão caiu antes de o servidor confirmar o login. Tente novamente.',
+    'err.login_auth_timeout': '⚠ O servidor não respondeu ao login a tempo. Tente novamente.',
+    'err.login_world_timeout': '⚠ Login aceito, mas o mundo não terminou de carregar a tempo. Tente novamente.',
+    'err.login_version': '⚠ Este aplicativo está desatualizado. Baixe a versão nova para entrar.',
     'err.qr_rate_limit': 'Calma — espere um momento.',
     'err.qr_unknown_quest': 'Quest desconhecida.',
     'err.qr_unknown_chain': 'Cadeia desconhecida.',
@@ -4141,6 +4149,14 @@ const I18N = {
     'err.auth_no_pw': '⚠ Password not provided.',
     'err.auth_bad_name': '⚠ Invalid name.',
     'err.auth_default': '⚠ Authentication rejected.',
+    'err.auth_server_error': '⚠ Server error while checking the login. Your character was not changed; try again.',
+    'err.auth_equipment_update': 'Updating equipment support. Your character is safe.',
+    'err.login_title': 'COULD NOT SIGN IN',
+    'err.login_connect_failed': '⚠ Could not connect to the server. Check your internet and try again.',
+    'err.login_closed': '⚠ The connection dropped before the server confirmed the login. Try again.',
+    'err.login_auth_timeout': '⚠ The server did not answer the login in time. Try again.',
+    'err.login_world_timeout': '⚠ Login accepted, but the world did not finish loading in time. Try again.',
+    'err.login_version': '⚠ This app is out of date. Download the new version to sign in.',
     'err.qr_rate_limit': 'Easy — wait a moment.',
     'err.qr_unknown_quest': 'Unknown quest.',
     'err.qr_unknown_chain': 'Unknown chain.',
@@ -7901,6 +7917,12 @@ let _wsAuthed = false;        // true após authOk do server (save server-side l
 let _authPwHash = null;       // transporte FORTE (SHA-256) da senha pro auth ao (re)conectar
 let _authPwHashLegacy = null; // transporte LEGADO (djb2) — migração dual-format no server
 let _didInitialAuth = false;  // marca primeira auth da sessão (login). Reconexão = true
+// Portão do save local: 'pending' = login online ainda sem authOk; 'rejected' = authFail nesta
+// página (recarrega em seguida); 'open' = autenticado, reconexão de sessão já autenticada ou
+// modo sem servidor. Fora de 'open' o player pode ter estado parcial e nada pode ser gravado.
+let _authGate = 'open';
+let _pendingLoginCred = null; // {name, pw (hash legado)} da tentativa; só vai ao disco no authOk
+let _loginIssue = null;       // {reason, code?}: último problema da entrada, sem authFail do server
 const remotePlayers = {}; // id -> {x,y,renderX,renderY,dir,name,hp,maxHp}
 // x/y remain authoritative tile coordinates. Only the presentation moves between
 // accepted positions; a new snapshot, join or non-adjacent step starts at its tile.
@@ -7965,6 +7987,7 @@ function connectMP(){
     // scheduleReconnect duplo ou chamadas concorrentes)
     if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
     const wsUrl = resolveWsUrl();
+    let wsOpened = false;   // distingue "nunca conectou" de "caiu antes do authOk"
     try {
         ws = new WebSocket(wsUrl);
         log(tr('log.connecting', {url: escapeHtml(wsUrl)}));
@@ -7975,8 +7998,11 @@ function connectMP(){
         return;
     }
     ws.onopen = () => {
+        wsOpened = true;
+        _loginIssue = null;
         movementSync.disconnect();
         _wsAuthed = false;   // reseta a cada reconexão
+        if (_authPwHash) _authGate = 'pending'; // reconexão também aguarda nova confirmação do server
         document.getElementById('connStatus').textContent = '● ONLINE';
         document.getElementById('connStatus').className = 'online';
         mpWasConnected = true;
@@ -8008,13 +8034,12 @@ function connectMP(){
         // Se temos pwHash, autentica primeiro. O `join` é mandado quando authOk chegar.
         if (_authPwHash){
             try { ws.send(JSON.stringify({ t:'auth', name: player.name, pwHash: _authPwHash, pwHashLegacy: _authPwHashLegacy || undefined, email: _authEmail || undefined, platform: CLIENT_PLATFORM, clientVersion: CLIENT_VERSION })); } catch {}
-            // Fallback: se server não responder ao auth em 8s, joina como legado (sem sync)
+            // O servidor online exige auth. Se demorar, guarda a causa para a saída do
+            // loading; enviar join sem auth seria ignorado e não ajudaria o jogador.
             const wsAtAuth = ws;
             setTimeout(() => {
-                if (wsAtAuth === ws && wsAtAuth?.readyState === 1 && !_wsAuthed){
-                    log(tr('log.auth_timeout'));
-                    sendJoinNow();
-                }
+                if (wsAtAuth === ws && wsAtAuth?.readyState === 1 && !_wsAuthed && _authGate === 'pending')
+                    _loginIssue = { reason: 'auth_timeout' };
             }, 8000);
         } else {
             // Sem credenciais (legado / modo solo virado MP) — entra direto sem persistência server
@@ -8033,6 +8058,13 @@ function connectMP(){
         document.getElementById('connStatus').textContent = '— OFFLINE —';
         document.getElementById('connStatus').className = 'offline';
         if (_heartbeatTimer){ clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+        // authFail já decidiu a volta ao login: não reconecta sem credencial nem cobre o motivo.
+        if (_authGate === 'rejected') return;
+        // Fechou antes do authOk sem authFail: guarda o motivo para o login, se o loading estourar.
+        // (Não sobrescreve motivo mais específico, como version_too_old.)
+        if (_authGate === 'pending' && !_loginIssue){
+            _loginIssue = { reason: wsOpened ? 'closed_before_auth' : 'connect_failed', code: ev && ev.code };
+        }
         // 🛑 Sessão substituída: a MESMA conta autenticou em outro lugar e o server encerrou ESTA
         // (close 4031, ou _sessionReplaced setado pelo aviso serverMsg caso o proxy troque o código).
         // NÃO reconectar — senão as duas sessões entram num LOOP infinito (uma autentica → mata a
@@ -8040,6 +8072,7 @@ function connectMP(){
         if ((ev && ev.code === 4031) || (_sessionReplaced && Date.now() - _sessionReplaced < 5000)){
             mpDisconnected = true;
             _sessionReplaced = 0;
+            _loginIssue = { reason: 'session_replaced' };   // se ainda estava no loading
             if (_overlayDelayTimer){ clearTimeout(_overlayDelayTimer); _overlayDelayTimer = null; }
             if (_reconnectTimer){ clearTimeout(_reconnectTimer); _reconnectTimer = null; }
             showReconnectOverlay(false);
@@ -8047,8 +8080,10 @@ function connectMP(){
             if (typeof showServerToast === 'function') showServerToast('admin', tr('toast.session_replaced'), null, 15000);
             return;
         }
-        // Se já estava com mobs do server, marca como queda pra bloquear farm offline
-        if (mpWasConnected && serverAuthMobs){
+        // Se já estava com mobs do server, marca como queda pra bloquear farm offline.
+        // `started` falso = logout intencional: reconectar abriria um socket sem auth, e o
+        // connectMP do próximo login o reaproveitaria sem mandar `auth` (loading até estourar).
+        if (mpWasConnected && serverAuthMobs && started){
             mpDisconnected = true;
             // Só mostra o overlay se a desconexão durar >3s — reconexões rápidas
             // (idle timeout de proxy, blip de rede) não devem incomodar o player
@@ -8100,6 +8135,11 @@ function handleMP(msg){
     }
     if (msg.t === 'authOk'){
         _wsAuthed = true;
+        // Só aqui o save local e a credencial local passam a valer. Abre o portão antes dos
+        // saveState/applyServerSave abaixo.
+        _authGate = 'open';
+        _loginIssue = null;
+        commitLoginCredential();
         _analyticsIsTest = !!msg.isTest;
         document.body.classList.add('game-active');
         document.body.dataset.newAccount = String(!!msg.isNew);
@@ -8144,34 +8184,29 @@ function handleMP(msg){
         // Server diz: seu cliente Electron é antigo demais. Mostra modal full-screen
         // bloqueando login até o user baixar a nova versão (auto-update foi pouco
         // confiável em versões antigas — força download manual).
+        _loginIssue = { reason: 'version_too_old' };
         showVersionTooOldModal(msg.current, msg.required, msg.downloadUrl);
         try { ws.close(); } catch {}
         return;
     }
     if (msg.t === 'authFail'){
-        const reason = msg.reason || 'desconhecida';
-        const msgs = {
-            maintenance: tr('err.auth_maintenance'),
-            rate_limited: tr('err.auth_rate'),
-            bad_password: tr('err.auth_bad_pw'),
-            no_password: tr('err.auth_no_pw'),
-            bad_name: tr('err.auth_bad_name'),
-            equipment_update: LANG==='en'?'Updating equipment support. Your character is safe.':'Atualizando o suporte aos equipamentos. Seu personagem está salvo.',
-        };
-        const txt = msgs[reason] || tr('err.auth_default');
+        const reason = String(msg.reason || 'desconhecida');
+        const txt = loginFailureText(reason);
         log(tr('log.auth_rejected', {txt, reason: escapeHtml(reason)}));
         showServerToast(reason === 'maintenance' ? 'warn' : 'admin', txt, null, 4000);
+        // O motivo sobrevive ao reload, para aparecer no login em vez de sumir atrás do loading.
+        rememberLoginNotice({ reason });
         _wsAuthed = false;
         _authPwHash = null;
         _authPwHashLegacy = null;
+        // authFail nunca apaga conta/save locais: a próxima tentativa só depende da senha digitada.
+        // Tentativa recusada não grava mais nada (saveState, beforeunload e intervalos).
+        _authGate = 'rejected';
+        _pendingLoginCred = null;
+        if (_saveStateIntervalId){ clearInterval(_saveStateIntervalId); _saveStateIntervalId = null; }
+        if (_playerSyncIntervalId){ clearInterval(_playerSyncIntervalId); _playerSyncIntervalId = null; }
         try { ws.close(); } catch {}
-        // Limpa credenciais locais erradas SÓ em senha incorreta (não em manutenção!)
-        if (reason === 'bad_password' && player.name){
-            try {
-                localStorage.removeItem('valadares:acc:' + player.name);
-                localStorage.removeItem(SESSION_KEY);
-            } catch {}
-        }
+        showLoadingOverlay(true, tr('err.login_title'), txt);
         if (reason === 'maintenance'){
             // Marca pra tela de login (pós-reload) exibir o aviso — sem isto, com o auto-login
             // removido o player cai numa tela de login "nua" e acha que perdeu o personagem.
@@ -9346,6 +9381,7 @@ let _sessionReplaced = 0;       // ts: server avisou que a conta entrou em outro
 
 function scheduleReconnect(){
     if (_reconnectTimer) return;
+    if (!started || _authGate === 'rejected') return;   // logout ou authFail: não há sessão a retomar
     _reconnectAttempt++;
     // backoff suave: 2s, 3s, 5s, 8s, depois fixo em 10s
     const delays = [2000, 3000, 5000, 8000];
@@ -15426,10 +15462,80 @@ function setAccount(name, pwd){
     localStorage.setItem(accountKey(name), JSON.stringify({ pw: hashPw(pwd), created: Date.now() }));
 }
 
+// Login online aceito pelo server: atualiza o cache local (mesmo com hash antigo de antes de um
+// reset de senha) e o nome usado no pré-preenchimento. Chamado só pelo authOk.
+function commitLoginCredential(){
+    const cred = _pendingLoginCred;
+    _pendingLoginCred = null;
+    if (!cred) return;
+    try {
+        const prev = getAccount(cred.name);
+        localStorage.setItem(accountKey(cred.name), JSON.stringify({ pw: cred.pw, created: (prev && prev.created) || Date.now() }));
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: cred.name, pw: cred.pw, mp: true }));
+    } catch {}
+}
+
+// ─── Motivo da falha de entrada: sobrevive ao reload e fica no login até a próxima tentativa ───
+// Guarda só código de motivo + nome digitado (nunca senha/hash). O texto é traduzido na exibição
+// e entra por textContent; motivo desconhecido só aparece se for um código simples.
+const LOGIN_NOTICE_KEY = 'valadares:loginNotice';
+const LOGIN_NOTICE_TTL = 10 * 60 * 1000;
+let _loginNoticeName = null;   // nome ao qual o aviso em tela se refere (null = sem aviso)
+function loginFailureText(reason){
+    const msgs = {
+        maintenance: tr('err.auth_maintenance'),
+        rate_limited: tr('err.auth_rate'),
+        bad_password: tr('err.auth_bad_pw'),
+        no_password: tr('err.auth_no_pw'),
+        bad_name: tr('err.auth_bad_name'),
+        server_error: tr('err.auth_server_error'),
+        equipment_update: tr('err.auth_equipment_update'),
+        connect_failed: tr('err.login_connect_failed'),
+        closed_before_auth: tr('err.login_closed'),
+        auth_timeout: tr('err.login_auth_timeout'),
+        world_timeout: tr('err.login_world_timeout'),
+        version_too_old: tr('err.login_version'),
+        session_replaced: tr('toast.session_replaced'),
+    };
+    if (Object.prototype.hasOwnProperty.call(msgs, reason)) return msgs[reason];
+    return tr('err.auth_default') + (/^[a-z0-9_]{1,32}$/i.test(reason) ? ' (' + reason + ')' : '');
+}
+function rememberLoginNotice(issue){
+    try {
+        sessionStorage.setItem(LOGIN_NOTICE_KEY, JSON.stringify({
+            reason: String(issue.reason),
+            code: Number.isInteger(issue.code) ? issue.code : undefined,
+            name: (_pendingLoginCred && _pendingLoginCred.name) || player.name || '',
+            at: Date.now(),
+        }));
+    } catch {}
+}
+function clearLoginNotice(){
+    _loginNoticeName = null;
+    try { sessionStorage.removeItem(LOGIN_NOTICE_KEY); } catch {}
+}
+function showStoredLoginNotice(){
+    try {
+        const n = JSON.parse(sessionStorage.getItem(LOGIN_NOTICE_KEY) || 'null');
+        if (!n || typeof n.reason !== 'string') return;
+        if (!(Date.now() - n.at < LOGIN_NOTICE_TTL)){ clearLoginNotice(); return; }
+        const name = typeof n.name === 'string' ? n.name : '';
+        const ci = document.getElementById('charInput');
+        if (ci && name) ci.value = name;
+        const code = Number.isInteger(n.code) ? ' (WS ' + n.code + ')' : '';
+        document.getElementById('loginError').textContent = loginFailureText(n.reason) + code;
+        _loginNoticeName = name;
+    } catch {}
+}
+
 function loginStatus(){
     const name = document.getElementById('charInput').value.trim();
     const el = document.getElementById('loginStatus');
-    document.getElementById('loginError').textContent = '';
+    // O aviso da tentativa anterior só sai se o nome mudar de fato (autofill do mesmo nome o mantém).
+    if (_loginNoticeName !== name){
+        clearLoginNotice();
+        document.getElementById('loginError').textContent = '';
+    }
     el.textContent = name ? tr('ui.login_ready') : tr('login.status_default');
 }
 
@@ -16888,18 +16994,29 @@ async function tryLogin(multiplayer){
     const email = emailField ? emailField.value.trim() : '';
     const err  = document.getElementById('loginError');
     err.textContent = '';
+    clearLoginNotice();
     if (!name)  { err.textContent = 'Digite um nome.'; return; }
     if (!pwd)   { err.textContent = 'Digite uma senha.'; return; }
     if (pwd.length < 3){ err.textContent = 'Senha precisa de pelo menos 3 caracteres.'; return; }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent = 'Email inválido — deixe vazio se não quiser.'; return; }
-    const acc = getAccount(name);
-    if (acc && acc.pw !== hashPw(pwd)){ err.textContent = 'Senha incorreta.'; return; }
+    if (multiplayer){
+        // Online, a senha é autoridade do server: o cache local (talvez anterior a um reset de
+        // senha) não bloqueia a tentativa. Conta, sessão e save locais só mudam após o authOk.
+        _authGate = 'pending';
+        _loginIssue = null;
+        _pendingLoginCred = { name, pw: hashPw(pwd) };
+    } else {
+        // Sem servidor (legado): o cache local é a única referência da senha.
+        const acc = getAccount(name);
+        if (acc && acc.pw !== hashPw(pwd)){ err.textContent = 'Senha incorreta.'; return; }
+        if (!acc) setAccount(name, pwd);
+        _authGate = 'open';
+        _pendingLoginCred = null;
+        try {
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ name, pw: hashPw(pwd), mp: false }));
+        } catch {}
+    }
     if (document.body.classList.contains('touch')) uiEnterFullscreen();
-    if (!acc) setAccount(name, pwd);
-    // grava sessão para auto-login no próximo F5/abertura
-    try {
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ name, pw: hashPw(pwd), mp: !!multiplayer }));
-    } catch {}
     // Guarda o pwHash + email pra mandar no `auth` do WS — server valida + devolve save.
     // Email é opcional: server cria conta com ele se nova; ignora se conta já existe (use setEmail).
     // Transporte FORTE (SHA-256) + LEGADO (djb2) — o server migra contas sem trancar ninguém.
@@ -16962,7 +17079,8 @@ window.submitForgotPwd = submitForgotPwd;
 // Auto-login se sessão válida existir no localStorage
 // Login automático REMOVIDO (a pedido do dono): o jogo nunca entra sozinho — sempre
 // mostra a tela de login. Aqui só pré-preenchemos o último nome usado por conveniência;
-// o player digita a senha e confirma. (SESSION_KEY segue gravado no tryLogin só pra isto.)
+// o player digita a senha e confirma. (SESSION_KEY segue gravado só pra isto: no authOk,
+// ou no tryLogin do modo sem servidor.)
 function tryAutoLogin(){
     try {
         const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
@@ -17033,6 +17151,10 @@ function logout(){
     _authPwHashLegacy = null;
     _wsAuthed = false;
     _didInitialAuth = false;
+    _authGate = 'open';
+    _pendingLoginCred = null;
+    _loginIssue = null;
+    if (_reconnectTimer){ clearTimeout(_reconnectTimer); _reconnectTimer = null; }
     // limpa intervals da sessão (evita saveState rodando pós-logout)
     if (_saveStateIntervalId){ clearInterval(_saveStateIntervalId); _saveStateIntervalId = null; }
     if (_playerSyncIntervalId){ clearInterval(_playerSyncIntervalId); _playerSyncIntervalId = null; }
@@ -17146,7 +17268,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Login automático removido — tryAutoLogin() só pré-preenche o nome (não entra).
     // Foca na senha se o nome já veio preenchido; senão no campo de nome.
+    // O aviso vem antes: o nome da tentativa recusada tem prioridade sobre o da última sessão.
+    showStoredLoginNotice();
     tryAutoLogin();
+    loginStatus();
     if (name && name.value){ document.getElementById('pwdInput')?.focus(); }
     else { name?.focus(); }
     // Aviso de manutenção pós-reload (flag setada no authFail) — evita o "parece que resetou".
@@ -17187,6 +17312,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Salva ao fechar/recarregar pra não perder progresso do último segundo
+// (saveState recusa antes do authOk e depois de authFail: ver _authGate)
 window.addEventListener('beforeunload', () => { if (started) saveState(); });
 
 // Refs de timers/intervals da sessão pra limpar no logout (evita acumular múltiplos
@@ -17242,7 +17368,7 @@ function startGame(multiplayer, name){
     if (_playerSyncIntervalId) clearInterval(_playerSyncIntervalId);
     _saveStateIntervalId = setInterval(saveState, 5000);
     _playerSyncIntervalId = setInterval(() => {
-        if (ws && ws.readyState === 1){
+        if (ws && ws.readyState === 1 && _authGate === 'open'){
             // Check passivo de achievements baseados em gold/tempo
             if (typeof checkAchievements === 'function') checkAchievements();
             // Durante duelo, server tem autoridade sobre gold — não sobrescreve
@@ -17292,9 +17418,18 @@ function showLoadingOverlay(show, title, desc, hint){
     }, 10000);
     _loadingAutoReloadTimer = setTimeout(() => {
         console.warn('[loading] travou 20s — reload automático');
-        window.location.reload();
+        reloadFromLoading();
     }, 20000);
 }
+// Sair do loading travado volta ao login: registra o que faltou, em vez de um retorno sem motivo.
+function reloadFromLoading(){
+    if (_authGate !== 'rejected' && !_isUpdating){
+        const socketOpen = ws && ws.readyState === 1;
+        rememberLoginNotice(_loginIssue || { reason: _wsAuthed ? 'world_timeout' : socketOpen ? 'auth_timeout' : 'connect_failed' });
+    }
+    window.location.reload();
+}
+window.reloadFromLoading = reloadFromLoading;
 
 // ─── Auto-update: detecta nova versão do cliente e recarrega ──────────────
 // Checa a cada 60s o ETag/Last-Modified do HTML. Se mudou, salva e recarrega.
@@ -17390,6 +17525,8 @@ function readSaveRaw(key){
 function saveState(){
     if (!started) return;   // pós-logout o player foi resetado pra defaults; bloqueia overwrite
     if (!player.name) return;
+    // Sem authOk (ou após authFail) o player pode estar parcial: não toca no cache local.
+    if (_authGate !== 'open') return;
     const data = {
         v: 2,
         appearance: AppearanceRules.normalizarAppearance(player.appearance),
