@@ -15826,7 +15826,9 @@ function showTradeInvite(fromName, fromId){
 }
 function openTradeModal(otherName){
     closeAllModals();
-    document.getElementById('tradeModal').style.display = 'flex';
+    const modal = document.getElementById('tradeModal');
+    modal.style.display = 'flex';
+    modal.querySelector('.chest-box').scrollTop = 0;
     document.getElementById('tradeMyName').textContent = player.name;
     document.getElementById('tradeOtherName').textContent = otherName;
     document.getElementById('tradeStatus').textContent = tr('trade.negotiating', {name: otherName});
