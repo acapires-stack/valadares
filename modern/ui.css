@@ -730,3 +730,115 @@ body.modern-renderer-ready.touch #tradeModal .chest-box > div:nth-last-of-type(2
     body.modern-renderer-ready.touch .chest-title { padding-right: 30px; font-size: 15px; letter-spacing: .15em; }
     body.modern-renderer-ready.touch #goldShopList { grid-template-columns: 1fr !important; }
 }
+
+/* The mobile menu is a short route to one existing panel, starting at the bag.
+   The world and touch controls resume from either Jogar or the top menu button. */
+#mobileMenuNav, #mobileInventoryGuide, #mobilePartyEmpty, #mobileEquipmentHint { display: none; }
+body.touch:not(.game-active) #mobileMenu { display: none; }
+body.modern-renderer-ready.touch.menu-open #gameWrapper {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+    overflow: hidden; padding: 8px 10px 10px;
+}
+body.modern-renderer-ready.touch.menu-open #mobileMenuNav {
+    display: grid; flex: none; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px;
+    padding-right: 48px;
+}
+body.modern-renderer-ready.touch.menu-open #mobileMenuNav button {
+    min-width: 0; min-height: 44px; padding: 5px 3px;
+    border: 1px solid #668071; border-radius: 6px;
+    background: #223831; color: #e5ebd9;
+    font: 700 11px/1.15 system-ui, sans-serif; overflow-wrap: anywhere;
+    cursor: pointer;
+}
+body.modern-renderer-ready.touch.menu-open #mobileMenuNav button[aria-pressed="true"] {
+    background: #735b33; border-color: #e0bd78; color: #fff4d6;
+}
+body.modern-renderer-ready.touch.menu-open #mobileMenuNav button[data-mobile-action="close"] {
+    background: #345840; border-color: #a8c88a; color: #f2ffe4;
+}
+body.modern-renderer-ready.touch.menu-open #mobileMenuNav button:focus-visible,
+body.modern-renderer-ready.touch.menu-open .inv-item:focus-visible {
+    outline: 2px solid #f0c678; outline-offset: 2px;
+}
+body.modern-renderer-ready.touch.menu-open #leftSidebar,
+body.modern-renderer-ready.touch.menu-open #rightSidebar,
+body.modern-renderer-ready.touch.menu-open #invSidebar,
+body.modern-renderer-ready.touch.menu-open #chatPanel { display: none !important; }
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="inventory"] #invSidebar,
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="character"] #leftSidebar,
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] #rightSidebar,
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="group"] #rightSidebar {
+    display: flex !important; flex: 1; min-height: 0;
+    height: auto !important; overflow-y: auto; overscroll-behavior: contain;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="chat"] #chatPanel {
+    display: flex !important; flex: 1; flex-direction: column; min-height: 0;
+    height: auto; overflow: hidden; overscroll-behavior: contain;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="chat"] #chatMessages,
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="chat"] #log {
+    flex: 1; min-height: 0; height: auto !important; max-height: none;
+    overflow-y: auto;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="chat"] .chat-tabs,
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="chat"] #chatInputRow { flex: none; }
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="character"] #leftSidebar .minimap-section,
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] #rightSidebar > :not(.s-section:has(#equipment)),
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="group"] #rightSidebar > .s-section:not(#partySection):not(:last-child) { display: none !important; }
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="group"] #mobilePartyEmpty:not([hidden]) {
+    display: block; padding: 14px; border: 1px solid #6e7860; border-radius: 6px;
+    color: #e3e6d4; font-size: 13px; line-height: 1.4;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="inventory"] #mobileInventoryGuide {
+    display: flex; flex: none; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 7px 0; border-bottom: 1px solid #517060;
+    color: #e8e7d3; font-size: 12px; line-height: 1.3;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] .paper-doll {
+    grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px);
+    gap: 14px; padding: 18px 0 10px;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] #mobileEquipmentHint {
+    display: block; margin: 6px 0; color: #d8e0d4; font-size: 12px;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] .paper-slot {
+    width: 52px; height: 52px;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] .paper-icon {
+    width: 38px; height: 38px;
+}
+body.modern-renderer-ready.touch.menu-open[data-mobile-panel="equipment"] .paper-slot-label {
+    top: -11px; font-size: 9px;
+}
+body.modern-renderer-ready.touch.menu-open #mobileInventoryHint { flex: 1; min-width: 0; }
+body.modern-renderer-ready.touch.menu-open #mobileEquipBtn {
+    flex: none; min-height: 44px; padding: 7px 10px;
+    border: 1px solid #dfbd79; border-radius: 6px;
+    background: #755935; color: #fff2ce; font: 700 12px/1.2 system-ui, sans-serif;
+}
+body.modern-renderer-ready.touch.menu-open #mobileEquipBtn:disabled {
+    opacity: .55; border-color: #667267; background: #26342d;
+}
+body.modern-renderer-ready.touch.menu-open #invSidebar > .s-section:first-child > div:not(.s-label) { display: none; }
+body.modern-renderer-ready.touch.menu-open #inventory { min-height: 0; max-height: none; }
+body.modern-renderer-ready.touch.menu-open #inventory .inv-cat-group:not(:has(.inv-item)) { display: none; }
+body.modern-renderer-ready.touch.menu-open #inventory .inv-cat-head {
+    padding: 7px 5px; font-size: 11px; letter-spacing: .08em;
+}
+body.modern-renderer-ready.touch.menu-open #inventory .inv-item.equippable {
+    min-height: 48px; padding: 8px; border: 1px solid #4e665b; border-radius: 6px;
+    margin-bottom: 5px; font-size: 13px;
+}
+body.modern-renderer-ready.touch.menu-open #inventory .inv-item.mobile-selected {
+    border-color: #e0bd78; background: #354533; box-shadow: inset 0 0 0 1px #e0bd78;
+}
+@media (max-width: 600px) {
+    body.modern-renderer-ready.touch.menu-open #mobileMenuNav {
+        grid-template-columns: repeat(4, minmax(0, 1fr)); padding-right: 0;
+    }
+    body.modern-renderer-ready.touch.menu-open #mobileMenuNav button { font-size: 11px; }
+}
+@media (orientation: portrait) and (max-width: 900px) {
+    body.modern-renderer-ready.touch.game-active #mobileMenu { z-index: 301; }
+    body.modern-renderer-ready.touch:has(> [id$="Modal"]:not([style*="display: none"]):not([style*="display:none"])) #mobileMenu { z-index: 160; }
+}

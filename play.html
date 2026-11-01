@@ -1835,7 +1835,7 @@
     <button class="mhb-slot" id="mhbSlotSpear" type="button" title="Arremessar lança"><span class="mhb-ico">↗</span><span class="mhb-lbl">LANÇA</span><span class="mhb-qty" id="mhbQtySpear"></span></button>
 </div>
 <button id="mobileFullscreenBtn" type="button" onclick="uiToggleFullscreen()" data-i18n-title="mobile.fullscreen_title" data-i18n-aria-label="mobile.fullscreen_title" title="Jogar em tela cheia" aria-label="Jogar em tela cheia"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-<button id="mobileMenu" type="button" title="Menu">≡</button>
+<button id="mobileMenu" type="button" title="Menu" aria-label="Menu" aria-expanded="false" aria-controls="mobileMenuNav">≡</button>
 <div id="mobileFullscreenHint" data-platform="ios" role="status" aria-live="polite">
     <div class="fsh-ios">
         <strong data-i18n="mobile.ios_title">Sem barras no iPhone</strong>
@@ -1979,6 +1979,15 @@
 </div>
 
 <div id="gameWrapper">
+    <nav id="mobileMenuNav" aria-label="Menu do jogo">
+        <button type="button" data-mobile-panel="inventory" data-i18n="ui.mobile_bag">Mochila</button>
+        <button type="button" data-mobile-panel="equipment" data-i18n="hud.equipment">Equipamento</button>
+        <button type="button" data-mobile-panel="group" data-i18n="ui.mobile_group">Grupo</button>
+        <button type="button" data-mobile-panel="character" data-i18n="hud.character">Personagem</button>
+        <button type="button" data-mobile-panel="chat" data-i18n="ui.mobile_chat">Chat</button>
+        <button type="button" data-mobile-action="settings" data-i18n="settings.title">⚙ Opções</button>
+        <button type="button" data-mobile-action="close" data-i18n="ui.mobile_play">Jogar</button>
+    </nav>
 
     <!-- SIDEBAR ESQUERDA -->
     <div class="sidebar" id="leftSidebar">
@@ -2068,6 +2077,7 @@
 
         <div class="s-section">
             <div class="s-label" data-i18n="hud.equipment">Equipamento</div>
+            <div id="mobileEquipmentHint" data-i18n="ui.mobile_remove_hint">Toque no item equipado para retirar.</div>
             <div id="equipment" style="font-size:10px"></div>
         </div>
 
@@ -2085,6 +2095,7 @@
             <div class="s-label">Party</div>
             <div id="partyWidget"></div>
         </div>
+        <div id="mobilePartyEmpty" hidden data-i18n="ui.mobile_group_empty">Você ainda não está em um grupo. Convites aparecem durante o jogo.</div>
 
         <!-- Combate (battle list) + Online dividem o espaço restante -->
         <div class="s-section split-half">
@@ -2103,6 +2114,10 @@
         <div class="s-section" style="margin-bottom:6px">
             <div class="s-label"><span data-i18n="hud.inventory">Inventário</span> <span style="float:right;color:#ffcc40" id="goldVal">0 g</span></div>
             <div style="font-size:9px;color:#555" data-i18n="hud.click_equip">click p/ equipar</div>
+        </div>
+        <div id="mobileInventoryGuide">
+            <span id="mobileInventoryHint" data-i18n="ui.mobile_select_item">Toque em um item para selecioná-lo.</span>
+            <button id="mobileEquipBtn" type="button" disabled data-i18n="ui.mobile_equip">Equipar selecionado</button>
         </div>
         <div id="inventory" style="font-size:11px;color:#aaa" data-i18n="hud.empty">vazio</div>
     </div>
@@ -2672,6 +2687,12 @@ const I18N = {
     'ui.layout_classic': 'Layout completo', 'ui.layout_focus': 'Modo foco',
     'ui.equipment': 'Equipamento e status', 'ui.inventory': 'Inventário',
     'ui.chat_expand': 'Expandir chat', 'ui.chat_reduce': 'Reduzir chat',
+    'ui.mobile_bag': 'Mochila', 'ui.mobile_group': 'Grupo', 'ui.mobile_chat': 'Chat',
+    'ui.mobile_play': 'Jogar', 'ui.mobile_menu': 'Menu', 'ui.mobile_close': 'Fechar menu',
+    'ui.mobile_select_item': 'Toque em arma ou armadura para selecionar.',
+    'ui.mobile_selected_item': 'Selecionado: {name}', 'ui.mobile_equip': 'Equipar selecionado',
+    'ui.mobile_remove_hint': 'Toque no item equipado para retirar.',
+    'ui.mobile_group_empty': 'Você ainda não está em um grupo. Convites aparecem durante o jogo.',
     'ui.first_title': 'Primeiros passos',
     'ui.first_body': 'Mova-se com WASD, use Espaço perto de um NPC para conversar e abra Q para ver as missões.',
     'ui.got_it': 'Entendi',
@@ -3425,6 +3446,12 @@ const I18N = {
     'ui.layout_classic': 'Full layout', 'ui.layout_focus': 'Focus mode',
     'ui.equipment': 'Equipment and stats', 'ui.inventory': 'Inventory',
     'ui.chat_expand': 'Expand chat', 'ui.chat_reduce': 'Reduce chat',
+    'ui.mobile_bag': 'Bag', 'ui.mobile_group': 'Group', 'ui.mobile_chat': 'Chat',
+    'ui.mobile_play': 'Play', 'ui.mobile_menu': 'Menu', 'ui.mobile_close': 'Close menu',
+    'ui.mobile_select_item': 'Tap a weapon or armor to select it.',
+    'ui.mobile_selected_item': 'Selected: {name}', 'ui.mobile_equip': 'Equip selected',
+    'ui.mobile_remove_hint': 'Tap an equipped item to remove it.',
+    'ui.mobile_group_empty': 'You are not in a group yet. Invitations appear during play.',
     'ui.first_title': 'First steps',
     'ui.first_body': 'Move with WASD, press Space near an NPC to talk, and press Q to see quests.',
     'ui.got_it': 'Got it',
@@ -4208,6 +4235,7 @@ function setLang(l){
   try { localStorage.setItem('valadares_lang', l); } catch(e){}
   applyI18n();
   updateLangButtons();
+  window.valadaresMobileMenuRefresh?.();
   if (window.valadaresUi) window.valadaresUi.updateLabels();
   invSignature = null; // rótulos do inventário dependem do idioma
   window.ValadaresEnchantUI?.refreshIfOpen();
@@ -13051,6 +13079,7 @@ function renderInventoryIfChanged(){
         });
         invSignature = sig;
         equipSignature = eqSig;
+        if (document.body.classList.contains('menu-open')) window.valadaresMobileMenuRefresh?.();
         return;
     }
     const prevInvScroll = invEl.scrollTop;   // preserva o scroll: re-render (loot/poção) não joga a lista pro topo
@@ -13070,7 +13099,7 @@ function renderInventoryIfChanged(){
             // com o baú) — libera a 1ª linha pro nome e a 2ª (.inv-stats) pros modificadores.
             const meta = itemDisplayMeta(k);
             const forgeBadge = meta.plus > 0 ? `<span class="inv-forge-badge">+${meta.plus}</span>` : '';
-            return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${escapeHtml(tip)}">
+            return `<div class="inv-item ${equippable?'equippable':''}" data-item="${k}" title="${escapeHtml(tip)}" ${equippable?'role="button" tabindex="0"':''}>
                 <div class="inv-row1">
                     <span class="inv-icon" style="background-image:url(${getItemIconURL(k, 18)})">${forgeBadge}</span>
                     <span class="inv-name ${meta.rarCls}">${escapeHtml(meta.name)}</span>
@@ -13091,6 +13120,7 @@ function renderInventoryIfChanged(){
     // as sidebars a cada novo tipo de loot libera a altura por um frame.
     if (firstInventoryRender) syncInvHeight();
     invEl.scrollTop = prevInvScroll;   // restaura após rebuild + ajuste de altura (browser faz clamp se a lista encolheu)
+    if (document.body.classList.contains('menu-open')) window.valadaresMobileMenuRefresh?.();
 }
 
 // Chat/Combate preenchem dinamicamente o espaço abaixo do canvas — alvo é
@@ -17048,6 +17078,7 @@ function logout(){
     // volta para tela de login
     document.getElementById('login').style.display = 'flex';
     document.body.classList.remove('game-active', 'panel-equipment', 'panel-inventory', 'menu-open');
+    window.valadaresMobileMenuClose?.();
     if (window.valadaresUi) window.valadaresUi.onLogout();
     if (window.valadaresAdventureGuide) window.valadaresAdventureGuide.onLogout();
     window.ValadaresJourneyUI?.onLogout();
@@ -18562,13 +18593,86 @@ function loop(ts){
     });
     bindBtn('mhbSlotSpear', () => throwSpear());
 
-    // ─── Hamburguer: mostra/esconde sidebars no mobile ───
+    // ─── Menu mobile: uma seção por vez; equipar exige ação explícita. ───
     const menuBtn = document.getElementById('mobileMenu');
+    const menuNav = document.getElementById('mobileMenuNav');
+    const invSidebar = document.getElementById('invSidebar');
+    const equipBtn = document.getElementById('mobileEquipBtn');
+    const invHint = document.getElementById('mobileInventoryHint');
+    const partySection = document.getElementById('partySection');
+    const partyEmpty = document.getElementById('mobilePartyEmpty');
+    let selectedInvKey = null;
+    function updateMobilePartyEmpty(){
+        if (partyEmpty) partyEmpty.hidden = !!partySection && partySection.style.display !== 'none';
+    }
+    if (partySection) new MutationObserver(updateMobilePartyEmpty).observe(partySection, {attributes:true, attributeFilter:['style']});
+    function updateMobileInvSelection(){
+        if (selectedInvKey && !(player.inv[selectedInvKey] > 0)) selectedInvKey = null;
+        invSidebar?.querySelectorAll('.inv-item.equippable').forEach(item => {
+            item.classList.toggle('mobile-selected', item.dataset.item === selectedInvKey);
+        });
+        if (equipBtn) equipBtn.disabled = !selectedInvKey;
+        if (invHint) invHint.textContent = selectedInvKey
+            ? tr('ui.mobile_selected_item', {name: itmName(selectedInvKey)})
+            : tr('ui.mobile_select_item');
+    }
+    function setMobilePanel(panel){
+        document.body.dataset.mobilePanel = panel;
+        menuNav?.querySelectorAll('[data-mobile-panel]').forEach(btn => {
+            btn.setAttribute('aria-pressed', String(btn.dataset.mobilePanel === panel));
+        });
+        if (panel === 'inventory') updateMobileInvSelection();
+        if (panel === 'group') updateMobilePartyEmpty();
+    }
+    function setMobileMenuOpen(open){
+        document.body.classList.toggle('menu-open', open);
+        if (menuBtn) {
+            menuBtn.textContent = open ? '×' : '≡';
+            menuBtn.setAttribute('aria-expanded', String(open));
+            menuBtn.setAttribute('aria-label', tr(open ? 'ui.mobile_close' : 'ui.mobile_menu'));
+            menuBtn.title = tr(open ? 'ui.mobile_close' : 'ui.mobile_menu');
+        }
+        if (open) setMobilePanel('inventory');
+        else delete document.body.dataset.mobilePanel;
+    }
     if (menuBtn){
         menuBtn.addEventListener('click', () => {
-            document.body.classList.toggle('menu-open');
+            setMobileMenuOpen(!document.body.classList.contains('menu-open'));
         });
     }
+    menuNav?.addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.mobilePanel) setMobilePanel(btn.dataset.mobilePanel);
+        else if (btn.dataset.mobileAction === 'settings') openSettings();
+        else if (btn.dataset.mobileAction === 'close') setMobileMenuOpen(false);
+    });
+    invSidebar?.addEventListener('click', e => {
+        if (!document.body.classList.contains('touch') || !document.body.classList.contains('menu-open')) return;
+        const item = e.target.closest('.inv-item.equippable');
+        if (!item) return;
+        e.stopPropagation(); // o handler legado equiparia ao primeiro toque
+        selectedInvKey = item.dataset.item;
+        updateMobileInvSelection();
+    }, true);
+    invSidebar?.addEventListener('keydown', e => {
+        const item = e.target.closest('.inv-item.equippable');
+        if (!item || !['Enter', ' '].includes(e.key)) return;
+        e.preventDefault();
+        item.click();
+    });
+    equipBtn?.addEventListener('click', () => {
+        if (!selectedInvKey || !(player.inv[selectedInvKey] > 0)) return;
+        equip(selectedInvKey);
+        selectedInvKey = null;
+        renderInventoryIfChanged();
+        updateMobileInvSelection();
+    });
+    window.valadaresMobileMenuRefresh = () => {
+        updateMobileInvSelection();
+        if (menuBtn) menuBtn.setAttribute('aria-label', tr(document.body.classList.contains('menu-open') ? 'ui.mobile_close' : 'ui.mobile_menu'));
+    };
+    window.valadaresMobileMenuClose = () => setMobileMenuOpen(false);
 })();
 </script>
 <script src="/item-art.js?v=20261004c"></script>
