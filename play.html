@@ -6660,7 +6660,7 @@ function enterDungeonClient(msg){
     player.visited = new Uint8Array(M_W * M_H).fill(1);
     // Repopula com quem está no andar (server já filtrou por floor)
     for (const id in remotePlayers) delete remotePlayers[id];
-    if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = sp; }
+    if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = initRemotePlayer(sp); }
     monsters.length = 0;
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot não vaza entre andares
@@ -6708,7 +6708,7 @@ function exitDungeonClient(msg){
     if (typeof msg.pvp === 'boolean') player.pvp = msg.pvp;   // restaura toggle anterior
     if (_overworldVisited) { player.visited = _overworldVisited; _overworldVisited = null; }
     for (const id in remotePlayers) delete remotePlayers[id];
-    if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = sp; }
+    if (Array.isArray(msg.players)) for (const sp of msg.players){ remotePlayers[sp.id] = initRemotePlayer(sp); }
     monsters.length = 0;
     if (typeof applyMobsSnapshot === 'function' && Array.isArray(msg.mobs)) applyMobsSnapshot(msg.mobs);
     groundItems.length = 0;   // #5: loot do andar não vaza pra cidade
@@ -7873,7 +7873,36 @@ let _wsAuthed = false;        // true após authOk do server (save server-side l
 let _authPwHash = null;       // transporte FORTE (SHA-256) da senha pro auth ao (re)conectar
 let _authPwHashLegacy = null; // transporte LEGADO (djb2) — migração dual-format no server
 let _didInitialAuth = false;  // marca primeira auth da sessão (login). Reconexão = true
-const remotePlayers = {}; // id -> {x,y,dir,name,hp,maxHp}
+const remotePlayers = {}; // id -> {x,y,renderX,renderY,dir,name,hp,maxHp}
+// x/y remain authoritative tile coordinates. Only the presentation moves between
+// accepted positions; a new snapshot, join or non-adjacent step starts at its tile.
+function initRemotePlayer(snapshot){
+    return { ...snapshot, renderX:snapshot.x, renderY:snapshot.y,
+        _renderFromX:snapshot.x, _renderFromY:snapshot.y,
+        _renderStartedAt:0, _renderDuration:0, _lastPosAt:0 };
+}
+function tickRemoteRender(rp, now){
+    if (!rp._renderDuration) return;
+    const progress = Math.min(1, Math.max(0, (now-rp._renderStartedAt)/rp._renderDuration));
+    rp.renderX = rp._renderFromX + (rp.x-rp._renderFromX)*progress;
+    rp.renderY = rp._renderFromY + (rp.y-rp._renderFromY)*progress;
+    if (progress === 1) rp._renderDuration = 0;
+}
+function moveRemotePlayer(rp, x, y, now){
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (x === rp.x && y === rp.y) return;
+    tickRemoteRender(rp, now);
+    const adjacent = Math.max(Math.abs(x-rp.x), Math.abs(y-rp.y)) <= 1;
+    const interval = now-rp._lastPosAt;
+    const duration = interval >= 60 && interval <= 300 ? Math.max(80, Math.min(180, interval)) : 100;
+    rp._lastPosAt = now;
+    rp._renderFromX = adjacent && Number.isFinite(rp.renderX) ? rp.renderX : x;
+    rp._renderFromY = adjacent && Number.isFinite(rp.renderY) ? rp.renderY : y;
+    rp.x = x; rp.y = y;
+    rp.renderX = rp._renderFromX; rp.renderY = rp._renderFromY;
+    rp._renderStartedAt = now;
+    rp._renderDuration = adjacent ? duration : 0;
+}
 
 // Estado do evento diário (vem do server em 'state' e atualiza via 'eventBonus')
 let _eventXpMul = 1.0;
@@ -8171,7 +8200,7 @@ function handleMP(msg){
         for (const id in remotePlayers) delete remotePlayers[id];
         msg.players.forEach(p => {
             if (p.id !== msg.you){
-                remotePlayers[p.id] = p;
+                remotePlayers[p.id] = initRemotePlayer(p);
                 if (p.ghost) remotePlayers[p.id].ghost = true;
             } else {
                 // Server é autoritativo em hp/mp/maxHp/maxMp/x/y. Cliente carregou save
@@ -8241,7 +8270,7 @@ function handleMP(msg){
             }
         }
     } else if (msg.t === 'join'){
-        remotePlayers[msg.player.id] = msg.player;
+        remotePlayers[msg.player.id] = initRemotePlayer(msg.player);
         log(tr('log.player_joined', {name: escapeHtml(msg.player.name)}));
     } else if (msg.t === 'leave'){
         if (remotePlayers[msg.id]) log(tr('log.player_left', {name: escapeHtml(remotePlayers[msg.id].name)}));
@@ -8255,8 +8284,7 @@ function handleMP(msg){
         if (remotePlayers[msg.id]){
             const rp = remotePlayers[msg.id];
             const prevX = rp.x, prevY = rp.y;
-            rp.x = msg.x;
-            rp.y = msg.y;
+            moveRemotePlayer(rp, msg.x, msg.y, performance.now());
             rp.dir = msg.dir;
             if (typeof msg.hp === 'number') rp.hp = msg.hp;
             if (typeof msg.maxHp === 'number') rp.maxHp = msg.maxHp;
@@ -17762,6 +17790,7 @@ window.valadaresStopOn3DError = () => {
     player.autoAttack = false;
 };
 
+let lastTouchMinimapAt = -Infinity;
 function loop(ts){
     if (!started) return;   // logout pausa o loop
     if (window.ValadaresModern?.state === 'error' || !document.getElementById('modernRenderError').hidden){
@@ -17789,6 +17818,7 @@ function loop(ts){
     // interpolação visual (depois das mudanças de pos)
     tickRender(player, dt);
     monsters.forEach(m => tickRender(m, dt));
+    for (const rp of Object.values(remotePlayers)) tickRemoteRender(rp, ts);
 
     // Auto-engage passivo: fora da PZ, sem alvo → procura inimigo no viewport
     // (vale pra punho também — boneco novo sem arma equipada engaja igual).
@@ -17852,6 +17882,22 @@ function loop(ts){
                     player.dir = m.y>player.y?'down':'up';
             }
         }
+    }
+
+    // No touch o canvas 2D fica oculto sob o mundo 3D. Mantém os relógios e a
+    // interface, sem repintar tiles/personagens invisíveis a cada RAF.
+    if (document.body.classList.contains('touch') && document.body.classList.contains('modern-renderer-ready') && window.ValadaresModern?.state === 'ready'){
+        gameTime += dt;
+        for (let i=floatTexts.length-1; i>=0; i--){
+            floatTexts[i].life -= dt;
+            if (floatTexts[i].life <= 0) floatTexts.splice(i,1);
+        }
+        if (player.hurtTimer > 0) player.hurtTimer = Math.max(0, player.hurtTimer - dt);
+        // O minimapa tem canvas próprio e continua visível no modo moderno.
+        if (ts-lastTouchMinimapAt >= 250){ drawMinimap(); lastTouchMinimapAt = ts; }
+        updateSidebar();
+        requestAnimationFrame(loop);
+        return;
     }
 
     const cam = getCamera();
@@ -18220,8 +18266,9 @@ function loop(ts){
     // outros jogadores
     for (const id in remotePlayers){
         const p = remotePlayers[id];
-        if (p.x>=cam.x-1&&p.x<cam.x+VP_W+1 && p.y>=cam.y-1&&p.y<cam.y+VP_H+1){
-            const px = (p.x-cam.x)*TS, py = (p.y-cam.y)*TS;
+        const rx = p.renderX ?? p.x, ry = p.renderY ?? p.y;
+        if (rx>=cam.x-1&&rx<cam.x+VP_W+1 && ry>=cam.y-1&&ry<cam.y+VP_H+1){
+            const px = (rx-cam.x)*TS, py = (ry-cam.y)*TS;
             const bodyCol = p.ghost ? '#3a3a3a' : (p.pvp ? '#5a1a1a' : '#1a3a5a');
             const hpPct = (p.maxHp > 0) ? Math.max(0, Math.min(1, (p.hp ?? p.maxHp) / p.maxHp)) : 1;
             const mpPct = (p.maxMp > 0) ? Math.max(0, Math.min(1, (p.mp ?? 0) / p.maxMp)) : null;
