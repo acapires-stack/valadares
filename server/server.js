@@ -2872,7 +2872,7 @@ function enterDungeonFloor(p, id, floor, dir){
             groundDrops: snapshotGroundDrops(floor),   // #5: cliente limpa/repopula loot do andar (não vaza entre andares)
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
 }
 
 // Tira o player da masmorra e o devolve pra cidade (overworld): restaura o PvP,
@@ -2904,7 +2904,7 @@ function returnPlayerToTown(p, id, returnToExpeditionEntrance=false, returnToAut
             groundDrops: snapshotGroundDrops(0),
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
 }
 
 function enterInterior(p,id,room){
@@ -2920,7 +2920,7 @@ function enterInterior(p,id,room){
         mobs:[],groundDrops:[]
     });
     broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,
-        pvp:false,hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,
+        pvp:false,hp:p.hp,maxHp:p.maxHp,mp:p.mp,maxMp:p.maxMp,equipped:p.equipped||null,
         cosmetic:p.cosmetic||null,pet:p.pet||null,badges:p.badges||[],
         dyes:p.dyes||null,appearance:appearanceRules.normalizarAppearance(p.appearance),guild:findGuildOfPlayer(p.name)?.name||null}},room.floor);
 }
@@ -2936,7 +2936,7 @@ function exitInterior(p,id,room){
         mobs:snapshotMobs(0),groundDrops:snapshotGroundDrops(0)
     });
     broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,
-        pvp:p.pvp,hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,
+        pvp:p.pvp,hp:p.hp,maxHp:p.maxHp,mp:p.mp,maxMp:p.maxMp,equipped:p.equipped||null,
         cosmetic:p.cosmetic||null,pet:p.pet||null,badges:p.badges||[],
         dyes:p.dyes||null,appearance:appearanceRules.normalizarAppearance(p.appearance),guild:findGuildOfPlayer(p.name)?.name||null}},0);
 }
@@ -4842,7 +4842,7 @@ function spawnImpostorBot(){
     counters.connections_total++;
     broadcast(null, { t:'join', player: {
         id, name: BOT_NAME, x, y, dir:'down', pvp:true,
-        hp: BOT_HP_MAX, maxHp: BOT_HP_MAX,
+        hp: BOT_HP_MAX, maxHp: BOT_HP_MAX, mp:0, maxMp:0,
         equipped: impostorBot.equipped, cosmetic:null, badges:['007'],
         guild: null,
     }});
@@ -6324,7 +6324,7 @@ function enterAutomatonFloor(p,id,depth,dir){
         players:snapshotPlayers(floor).filter(sp=>sp.id!==id),mobs:snapshotMobs(floor),
         groundDrops:snapshotGroundDrops(floor)});
     broadcast(id,{t:'join',player:{id:p.id,name:p.name,x:p.x,y:p.y,dir:p.dir,pvp:true,
-        hp:p.hp,maxHp:p.maxHp,equipped:p.equipped||null,cosmetic:p.cosmetic||null,pet:p.pet||null,
+        hp:p.hp,maxHp:p.maxHp,mp:p.mp,maxMp:p.maxMp,equipped:p.equipped||null,cosmetic:p.cosmetic||null,pet:p.pet||null,
         badges:p.badges||[],dyes:p.dyes||null,appearance:appearanceRules.normalizarAppearance(p.appearance),
         guild:findGuildOfPlayer(p.name)?.name||null}},floor);
 }
@@ -6466,7 +6466,7 @@ function enterArenaFloor(p, id, floor, spawn, opponentName){
             arena: true, opponentName,
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:true, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, floor);
 }
 
 // Tira o player da arena de volta pra cidade, ao lugar de ORIGEM (clone de
@@ -6486,7 +6486,7 @@ function returnFromArena(p, id){
             groundDrops: snapshotGroundDrops(0),
         }));
     }
-    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
+    broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, 0);
     p._pvpBeforeArena = undefined;
     p._arenaReturn = undefined;
 }
@@ -7632,7 +7632,7 @@ wss.on('connection', (ws, request) => {
             } else {
                 ws.send(JSON.stringify({ t:'partyUpdate', deleted: true }));
             }
-            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
+            broadcast(id, { t:'join', player: { id:p.id, name:p.name, x:p.x, y:p.y, dir:p.dir, pvp:p.pvp, hp:p.hp, maxHp:p.maxHp, mp:p.mp, maxMp:p.maxMp, equipped: p.equipped || null, cosmetic: p.cosmetic || null, pet: p.pet || null, badges: p.badges || [], dyes: p.dyes || null, appearance: appearanceRules.normalizarAppearance(p.appearance), guild: findGuildOfPlayer(p.name)?.name || null } }, p.floor);
             // Anuncia entrada (só pros outros)
             broadcastMsgKey('info', 'srv.entered_world', {name: p.name}, null, id);
             return;
@@ -8787,7 +8787,9 @@ wss.on('connection', (ws, request) => {
                     p.hp = Math.min(maxHp, (p.hp ?? 0) + healedAmount);
                 }
             }
-            if (!sp.groupRange) broadcastPstatsAll(p);
+            // Group heal already broadcasts the caster only when it healed them.
+            // The mana cost is authoritative even if the caster was at full HP.
+            if (!sp.groupRange || !healedAmount) broadcastPstatsAll(p);
             // Bot 007 ataca melee se for um dos membros heal — não precisa pstats extra
             // XP de Magia (compat — cliente continua enviando hits)
             const hits = Math.max(1, Math.min(5, msg.hits | 0 || 1));
